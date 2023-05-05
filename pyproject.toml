@@ -1,0 +1,105 @@
+[build-system]
+requires = ["setuptools >= 42", "versioningit ~= 1.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "jobflow_remote"
+description = "jobflow-remote is a python package to run jobflow workflows on remote resources"
+readme = "README.md"
+keywords = []
+license = { text = "modified BSD" }
+authors = [{ name = "Guido Petretto", email = "guido.petretto@matgenix.com" }]
+dynamic = ["version"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: System Administrators",
+    "Intended Audience :: Information Technology",
+    "Operating System :: OS Independent",
+    "Topic :: Other/Nonlisted Topic",
+    "Topic :: Scientific/Engineering",
+]
+requires-python = ">=3.8"
+dependencies =[]
+
+[project.optional-dependencies]
+dev = [
+    "pre-commit>=3.0.0",
+]
+tests = [
+    "pytest==7.2.1",
+    "pytest-cov==4.0.0",
+    ]
+maintain = [
+    "git-changelog>=0.6",
+]
+strict = []
+
+[project.scripts]
+
+[project.urls]
+homepage = "https://Matgenix.github.io/jobflow_remote/"
+repository = "https://github.com/Matgenix/jobflow_remote"
+documentation = "https://Matgenix.github.io/jobflow_remote/"
+changelog = "https://github.com/Matgenix/jobflow_remote/CHANGELOG.md"
+
+[tool.setuptools.package-data]
+jobflow_remote = ["py.typed"]
+
+[tool.versioningit.vcs]
+method = "git"
+default-tag = "0.0.1"
+
+[tool.isort]
+profile = "black"
+
+[tool.flake8]
+max-line-length = 88
+max-doc-length = 88
+select = "C, E, F, W, B"
+extend-ignore = "E203, W503, E501, F401, RST21"
+min-python-version = "3.8.0"
+docstring-convention = "numpy"
+rst-roles = "class, func, ref, obj"
+
+[tool.mypy]
+ignore_missing_imports = true
+no_strict_optional = true
+
+[tool.pytest.ini_options]
+filterwarnings = [
+    "ignore:.*POTCAR.*:UserWarning",
+    "ignore:.*magmom.*:UserWarning",
+    "ignore:.*is not gzipped.*:UserWarning",
+    "ignore:.*input structure.*:UserWarning",
+    "ignore::DeprecationWarning",
+]
+
+[tool.coverage.run]
+include = ["src/*"]
+parallel = true
+branch = true
+
+[tool.coverage.paths]
+source = ["src/"]
+
+[tool.coverage.report]
+skip_covered = true
+show_missing = true
+exclude_lines = [
+    '^\s*assert False(,|$)',
+    'if typing.TYPE_CHECKING:',
+    '^\s*@overload( |$)',
+]
+
+[tool.autoflake]
+in-place = true
+remove-all-unused-imports = true
+remove-unused-variables = true
+ignore-init-module-imports = true
+expand-star-imports = true

@@ -1,0 +1,18 @@
+# Changes here will be overwritten by Copier; NEVER EDIT MANUALLY
+_commit: a00da53
+_src_path: git@github.com:matgenix/Matgenix-copier-template.git
+author_email: guido.petretto@matgenix.com
+author_fullname: Guido Petretto
+author_username: gpetretto
+conduct_email: guido.petretto@matgenix.com
+copyright_date: '2023'
+copyright_holder: Matgenix SRL
+copyright_holder_email: software@matgenix.com
+package_name: jobflow_remote
+project_long_name: jobflow-remote
+project_name: jobflow-remote
+repository_namespace: Matgenix
+repository_provider: https://github.com/
+short_description: jobflow-remote is a python package to run jobflow workflows on
+    remote resources
+
