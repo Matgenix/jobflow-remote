@@ -10,7 +10,7 @@ from monty.shutil import decompress_file
 @explicit_serialize
 class RemoteJobFiretask(FiretaskBase):
     """
-    A firetask that will run any job.
+    A firetask that will run any job, tailored for the execution on a remote resource.
 
     Other Parameters
     ----------------
@@ -18,9 +18,16 @@ class RemoteJobFiretask(FiretaskBase):
         A serialized job.
     store : JobStore
         A job store. Alternatively, if set to None, :obj:`JobflowSettings.JOB_STORE`
-        will be used. Note, this could be different on the computer that submits the
-        workflow and the computer which runs the workflow. The value of ``JOB_STORE`` on
-        the computer that runs the workflow will be used.
+        will be used. Note, this will use the configuration defined on the local
+        machine, even if the Task is executed on a remote one. An actual store
+        should be set before the Task is executed remotely.
+    machine: Str
+        The id of the Machine where the calculation will be submitted
+    exports: Dict
+        pairs of key-values that will be exported in the submission script
+    qtk_options: Dict or QResources
+        information passed to qtoolkit to require the resources for the submission
+        to the queue.
     """
 
     required_params = ["job", "store", "machine"]

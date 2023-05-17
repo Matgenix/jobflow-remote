@@ -280,6 +280,7 @@ class Runner:
 
         files = get_remote_files(fw_job_data.fw, doc["launch_id"])
         remote_path = get_job_path(job.uuid, fw_job_data.machine.work_dir)
+        self.rlpad.lpad.change_launch_dir(doc["launch_id"], remote_path)
 
         created = fw_job_data.host.mkdir(remote_path)
         if not created:
@@ -300,9 +301,6 @@ class Runner:
         fw_job_data = self.get_fw_data(fw_id)
         job = fw_job_data.job
 
-        get_job_path(
-            doc["job_id"],
-        )
         remote_path = get_job_path(job.uuid, fw_job_data.machine.work_dir)
 
         fw_job_data.machine.pre_run
@@ -350,7 +348,6 @@ class Runner:
 
         store = fw_job_data.store
 
-        # TODO check if the file exists
         fnames = ["FW_offline.json", "remote_job_data.json"]
         for k in store.additional_stores.keys():
             fnames.append(f"additional_store_{k}.json")

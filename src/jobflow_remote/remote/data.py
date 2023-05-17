@@ -10,14 +10,14 @@ from maggma.stores.mongolike import JSONStore
 from jobflow_remote.utils.data import uuid_to_path
 
 
-def get_job_path(job_id: str, base_path: str | Path | None = None) -> Path:
+def get_job_path(job_id: str, base_path: str | Path | None = None) -> str:
     if base_path:
         base_path = Path(base_path)
     else:
         base_path = Path()
 
     relative_path = uuid_to_path(job_id)
-    return base_path / relative_path
+    return str(base_path / relative_path)
 
 
 def get_remote_files(fw, launch_id):

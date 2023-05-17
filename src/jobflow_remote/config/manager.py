@@ -81,7 +81,7 @@ class ConfigManager:
                 f"No project with name {project_name} present in the configuration"
             )
 
-    def load_project_fom_id(self, project_id: str) -> Project:
+    def load_project_from_id(self, project_id: str) -> Project:
         pd = self.projects_data
         for p in pd.projects.values():
             if p.project_id == project_id:

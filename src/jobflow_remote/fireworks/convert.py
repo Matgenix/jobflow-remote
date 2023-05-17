@@ -21,7 +21,6 @@ def flow_to_workflow(
     store: jobflow.JobStore | None = None,
     exports: dict | None = None,
     qtk_options: dict | QResources | None = None,
-    # profile: str | None = None,
     **kwargs,
 ) -> Workflow:
     """
@@ -35,11 +34,18 @@ def flow_to_workflow(
     ----------
     flow
         A flow or job.
+    machine
+        The id of the Machine where the calculation will be submitted
     store
         A job store. Alternatively, if set to None, :obj:`JobflowSettings.JOB_STORE`
         will be used. Note, this could be different on the computer that submits the
         workflow and the computer which runs the workflow. The value of ``JOB_STORE`` on
         the computer that runs the workflow will be used.
+    exports
+        pairs of key-values that will be exported in the submission script
+    qtk_options
+        information passed to qtoolkit to require the resources for the submission
+        to the queue.
     **kwargs
         Keyword arguments passed to Workflow init method.
 

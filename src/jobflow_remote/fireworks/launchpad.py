@@ -203,3 +203,6 @@ class RemoteLaunchPad:
                 )
                 completed = True
         return m_launch.fw_id, completed
+
+    def add_wf(self, wf):
+        return self.lpad.add_wf(wf)
