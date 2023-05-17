@@ -7,11 +7,7 @@
 
 **[Full Documentation][docs]**
 
-jobflow-remote is a Python software for ... Features of jobflow-remote include
-
-- Feature A
-- Feature B
-- ...
+jobflow-remote is a Python package to run jobflow workflows on remote resources.
 
 ## Quick start
 
@@ -60,12 +56,12 @@ jobflow-remote is developed and maintained by Matgenix SRL.
 
 A full list of all contributors can be found [here][contributors].
 
-[help-forum]: https://https://github.com//Matgenix/jobflow_remote/issues
-[issues]: https://https://github.com//Matgenix/jobflow_remote/issues
-[installation]: https://https://github.com//Matgenix/jobflow_remote/blob/main/INSTALL.md
-[contributing]: https://github.com/Matgenix/jobflow_remote/blob/main/CONTRIBUTING.md
-[codeofconduct]: https://github.com/Matgenix/jobflow_remote/blob/main/CODE_OF_CONDUCT.md
-[changelog]: https://https://github.com//Matgenix/jobflow_remote/blob/main/CHANGELOG.md
-[contributors]: https://Matgenix.github.io/jobflow_remote/graphs/contributors
-[license]: https://raw.githubusercontent.com/Matgenix/jobflow_remote/main/LICENSE
-[docs]: https://Matgenix.github.io/jobflow_remote/
+[help-forum]: https://https://github.com//Matgenix/jobflow-remote/issues
+[issues]: https://https://github.com//Matgenix/jobflow-remote/issues
+[installation]: https://https://github.com//Matgenix/jobflow-remote/blob/main/INSTALL.md
+[contributing]: https://github.com/Matgenix/jobflow-remote/blob/main/CONTRIBUTING.md
+[codeofconduct]: https://github.com/Matgenix/jobflow-remote/blob/main/CODE_OF_CONDUCT.md
+[changelog]: https://https://github.com//Matgenix/jobflow-remote/blob/main/CHANGELOG.md
+[contributors]: https://Matgenix.github.io/jobflow-remote/graphs/contributors
+[license]: https://raw.githubusercontent.com/Matgenix/jobflow-remote/main/LICENSE
+[docs]: https://Matgenix.github.io/jobflow-remote/

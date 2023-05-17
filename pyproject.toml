@@ -25,7 +25,10 @@ classifiers = [
     "Topic :: Scientific/Engineering",
 ]
 requires-python = ">=3.8"
-dependencies =[]
+dependencies =[
+    "jobflow",
+    "fireworks"
+]
 
 [project.optional-dependencies]
 dev = [

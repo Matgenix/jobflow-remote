@@ -1,0 +1,139 @@
+from __future__ import annotations
+
+import typing
+
+from fireworks import Firework, Workflow
+from qtoolkit.core.data_objects import QResources
+
+from jobflow_remote.fireworks.tasks import RemoteJobFiretask
+
+if typing.TYPE_CHECKING:
+    from typing import Sequence
+
+    import jobflow
+
+__all__ = ["flow_to_workflow", "job_to_firework"]
+
+
+def flow_to_workflow(
+    flow: jobflow.Flow | jobflow.Job | list[jobflow.Job],
+    machine: str,
+    store: jobflow.JobStore | None = None,
+    exports: dict | None = None,
+    qtk_options: dict | QResources | None = None,
+    # profile: str | None = None,
+    **kwargs,
+) -> Workflow:
+    """
+    Convert a :obj:`Flow` or a :obj:`Job` to a FireWorks :obj:`Workflow` object.
+
+    Each firework spec is updated with the contents of the
+    :obj:`Job.config.manager_config` dictionary. Accordingly, a :obj:`.JobConfig` object
+    can be used to configure FireWork options such as metadata and the fireworker.
+
+    Parameters
+    ----------
+    flow
+        A flow or job.
+    store
+        A job store. Alternatively, if set to None, :obj:`JobflowSettings.JOB_STORE`
+        will be used. Note, this could be different on the computer that submits the
+        workflow and the computer which runs the workflow. The value of ``JOB_STORE`` on
+        the computer that runs the workflow will be used.
+    **kwargs
+        Keyword arguments passed to Workflow init method.
+
+    Returns
+    -------
+    Workflow
+        The job or flow as a workflow.
+    """
+    from fireworks.core.firework import Firework, Workflow
+    from jobflow.core.flow import get_flow
+
+    parent_mapping: dict[str, Firework] = {}
+    fireworks = []
+
+    flow = get_flow(flow)
+
+    for job, parents in flow.iterflow():
+        fw = job_to_firework(
+            job,
+            machine=machine,
+            store=store,
+            parents=parents,
+            parent_mapping=parent_mapping,
+            exports=exports,
+            qtk_options=qtk_options,
+        )
+        fireworks.append(fw)
+
+    return Workflow(fireworks, name=flow.name, **kwargs)
+
+
+def job_to_firework(
+    job: jobflow.Job,
+    machine: str,
+    store: jobflow.JobStore | None = None,
+    parents: Sequence[str] | None = None,
+    parent_mapping: dict[str, Firework] | None = None,
+    exports: dict | None = None,
+    qtk_options: dict | QResources | None = None,
+    **kwargs,
+) -> Firework:
+    """
+    Convert a :obj:`Job` to a :obj:`.Firework`.
+
+    The firework spec is updated with the contents of the
+    :obj:`Job.config.manager_config` dictionary. Accordingly, a :obj:`.JobConfig` object
+    can be used to configure FireWork options such as metadata and the fireworker.
+
+    Parameters
+    ----------
+    job
+        A job.
+    store
+        A job store. Alternatively, if set to None, :obj:`JobflowSettings.JOB_STORE`
+        will be used. Note, this could be different on the computer that submits the
+        workflow and the computer which runs the workflow. The value of ``JOB_STORE`` on
+        the computer that runs the workflow will be used.
+    parents
+        The parent uuids of the job.
+    parent_mapping
+        A dictionary mapping job uuids to Firework objects, as ``{uuid: Firework}``.
+    **kwargs
+        Keyword arguments passed to the Firework constructor.
+
+    Returns
+    -------
+    Firework
+        A firework that will run the job.
+    """
+    from fireworks.core.firework import Firework
+    from jobflow.core.reference import OnMissing
+
+    if (parents is None) is not (parent_mapping is None):
+        raise ValueError("Both or neither of parents and parent_mapping must be set.")
+
+    task = RemoteJobFiretask(
+        job=job, store=store, machine=machine, exports=exports, qtk_options=qtk_options
+    )
+
+    job_parents = None
+    if parents is not None and parent_mapping is not None:
+        job_parents = (
+            [parent_mapping[parent] for parent in parents] if parents else None
+        )
+
+    spec = {"_add_launchpad_and_fw_id": True}  # this allows the job to know the fw_id
+    if job.config.on_missing_references != OnMissing.ERROR:
+        spec["_allow_fizzled_parents"] = True
+    spec.update(job.config.manager_config)
+    spec.update(job.metadata)  # add metadata to spec
+
+    fw = Firework([task], spec=spec, name=job.name, parents=job_parents, **kwargs)
+
+    if parent_mapping is not None:
+        parent_mapping[job.uuid] = fw
+
+    return fw
