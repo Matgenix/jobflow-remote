@@ -19,10 +19,9 @@ from qtoolkit.core.data_objects import QState, SubmissionStatus
 
 from jobflow_remote.config.entities import (
     ConfigError,
+    ExecutionConfig,
     Machine,
     Project,
-    ProjectOptions,
-    ProjectsData,
     RunnerOptions,
 )
 from jobflow_remote.config.manager import ConfigManager
@@ -39,15 +38,6 @@ from jobflow_remote.utils.log import initialize_runner_logger
 
 logger = logging.getLogger(__name__)
 
-# lpad = LaunchPad.auto_load()
-# fworker = FWorker()
-
-# c = RemoteConfig(host="slurmtest", root_dir="/data")
-# rh = RemoteHost(c)
-# queue = QueueManager(SlurmIO(get_job_executable="scontrol"), host=rh)
-#
-# launch_base_dir = "/data/run_jobflow"
-
 
 JobFWData = namedtuple("JobFWData", ["fw", "task", "job", "store", "machine", "host"])
 
@@ -58,32 +48,21 @@ class Runner:
         self.runner_id: str = str(uuid.uuid4())
         self.config_manager: ConfigManager = ConfigManager()
         self.project_name = project_name
-        self.project: Project = self.config_manager.load_project(project_name)
-        self.rlpad: RemoteLaunchPad = self.config_manager.load_launchpad(project_name)
+        self.project: Project = self.config_manager.get_project(project_name)
+        self.rlpad: RemoteLaunchPad = self.project.get_launchpad()
         self.fworker: FWorker = FWorker()
-        self.machines: dict[str, Machine] = {}
+        self.machines: dict[str, Machine] = self.project.get_machines_dict()
+        self.hosts: dict[str, BaseHost] = self.project.get_hosts_dict()
         self.queue_managers: dict = {}
         log_level = log_level if log_level is not None else self.project.log_level
         initialize_runner_logger(
-            log_folder=self.config_manager.get_logs_folder_path(project_name),
+            log_folder=self.project.log_dir,
             level=log_level,
         )
 
     @property
-    def projects_data(self) -> ProjectsData:
-        return self.config_manager.projects_data
-
-    @property
-    def hosts(self) -> dict[str, BaseHost]:
-        return self.projects_data.hosts
-
-    @property
     def runner_options(self) -> RunnerOptions:
-        return self.project.runner_options
-
-    @property
-    def project_options(self) -> ProjectOptions:
-        return self.project.options
+        return self.project.runner
 
     def handle_signal(self, signum, frame):
         logger.info(f"Received signal: {signum}")
@@ -91,8 +70,8 @@ class Runner:
 
     def get_machine(self, machine_id: str) -> Machine:
         if machine_id not in self.machines:
-            self.machines[machine_id] = self.config_manager.load_machine(
-                machine_id, project_name=self.project_name
+            raise ConfigError(
+                f"No machine {machine_id} is defined in project {self.project_name}"
             )
         return self.machines[machine_id]
 
@@ -100,7 +79,7 @@ class Runner:
         if machine_id not in self.queue_managers:
             machine = self.get_machine(machine_id)
             self.queue_managers[machine_id] = QueueManager(
-                machine.scheduler_io, self.hosts[machine.host_id]
+                machine.get_scheduler_io(), self.hosts[machine.host_id]
             )
         return self.queue_managers[machine_id]
 
@@ -238,7 +217,7 @@ class Runner:
             else:
                 step_attempts = doc["step_attempts"]
                 fail_now = (
-                    fail_now or step_attempts >= self.project_options.max_step_attempts
+                    fail_now or step_attempts >= self.runner_options.max_step_attempts
                 )
                 if fail_now:
                     lock.update_on_release = {
@@ -250,7 +229,7 @@ class Runner:
                     }
                 else:
                     step_attempts += 1
-                    delta = self.project_options.get_delta_retry(step_attempts)
+                    delta = self.runner_options.get_delta_retry(step_attempts)
                     retry_time_limit = datetime.utcnow() + timedelta(seconds=delta)
                     lock.update_on_release = {
                         "$set": {
@@ -303,21 +282,26 @@ class Runner:
 
         remote_path = get_job_path(job.uuid, fw_job_data.machine.work_dir)
 
-        fw_job_data.machine.pre_run
-        fw_job_data.machine.post_run
-
         script_commands = ["rlaunch singleshot --offline"]
 
         machine = fw_job_data.machine
         queue_manager = self.get_queue_manager(machine.machine_id)
-        qtk_options = fw_job_data.task.get("qtk_options") or machine.default_qtk_options
-        exports = fw_job_data.task.get("exports")
+        resources = fw_job_data.task.get("resources") or machine.resources
+        exec_config = fw_job_data.task.get("exec_config") or ExecutionConfig(
+            exec_config_id="empty_config"
+        )
+        pre_run = machine.pre_run or ""
+        pre_run += exec_config.pre_run or ""
+        post_run = machine.post_run or ""
+        post_run += exec_config.post_run or ""
+
         submit_result = queue_manager.submit(
             commands=script_commands,
-            pre_run=machine.pre_run,
-            post_run=machine.post_run,
-            options=qtk_options,
-            exports=exports,
+            pre_run=pre_run,
+            post_run=post_run,
+            options=resources,
+            export=exec_config.export,
+            modules=exec_config.modules,
             work_dir=remote_path,
             create_submit_dir=False,
         )
@@ -341,7 +325,7 @@ class Runner:
         job = fw_job_data.job
 
         remote_path = get_job_path(job.uuid, fw_job_data.machine.work_dir)
-        loca_base_dir = Path(self.project.folder_tmp, "download")
+        loca_base_dir = Path(self.project.tmp_dir, "download")
         local_path = get_job_path(job.uuid, loca_base_dir)
 
         makedirs_p(local_path)
@@ -372,7 +356,7 @@ class Runner:
         logger.debug(f"complete launch fw_id: {doc['fw_id']}")
         fw_job_data = self.get_fw_data(fw_id)
 
-        loca_base_dir = Path(self.project.folder_tmp, "download")
+        loca_base_dir = Path(self.project.tmp_dir, "download")
         local_path = get_job_path(fw_job_data.job.uuid, loca_base_dir)
 
         remote_data = loadfn(Path(local_path, "FW_offline.json"), cls=None)

@@ -3,6 +3,7 @@ from __future__ import annotations
 import jobflow
 from qtoolkit.core.data_objects import QResources
 
+from jobflow_remote.config.entities import ExecutionConfig
 from jobflow_remote.config.manager import ConfigManager
 from jobflow_remote.fireworks.convert import flow_to_workflow
 
@@ -12,8 +13,8 @@ def submit_flow(
     machine: str,
     store: jobflow.JobStore | None = None,
     project: str | None = None,
-    exports: dict | None = None,
-    qtk_options: dict | QResources | None = None,
+    exec_config: ExecutionConfig | None = None,
+    resources: dict | QResources | None = None,
 ):
     """
     Submit a flow for calculation to the selected Machine.
@@ -35,20 +36,22 @@ def submit_flow(
     project
         the name of the project to which the Flow should be submitted. If None the
         current project will be used.
-    exports
-        pairs of key-values that will be exported in the submission script
-    qtk_options
+    exec_config: ExecutionConfig
+        the options to set before the execution of the job in the submission script.
+        In addition to those defined in the Machine.
+    resources: Dict or QResources
         information passed to qtoolkit to require the resources for the submission
         to the queue.
     """
     wf = flow_to_workflow(
-        flow, machine=machine, store=store, exports=exports, qtk_options=qtk_options
+        flow, machine=machine, store=store, exec_config=exec_config, resources=resources
     )
 
     config_manager = ConfigManager()
 
     # try to load the machine to check that the project and the machine are well defined
-    machine = config_manager.load_machine(machine_id=machine, project_name=project)
+    _ = config_manager.load_machine(machine_id=machine, project_name=project)
 
-    rlpad = config_manager.load_launchpad(project)
+    proj_obj = config_manager.get_project(project)
+    rlpad = proj_obj.get_launchpad()
     rlpad.add_wf(wf)

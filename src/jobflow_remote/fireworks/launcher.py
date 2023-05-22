@@ -39,8 +39,6 @@ def checkout_remote(
             return None, None
         logger.info(f"reserved FW with fw_id: {fw.fw_id}")
 
-        fw.tasks[0].get("job").uuid
-
         rlpad.add_remote_run(launch_id, fw)
 
         return fw, launch_id
@@ -53,7 +51,7 @@ def checkout_remote(
                     f"Un-reserving FW with fw_id, launch_id: {fw.fw_id}, {launch_id}"
                 )
                 rlpad.lpad.cancel_reservation(launch_id)
-                rlpad.forget_remote(launch_id, rlpad)
+                rlpad.forget_remote(launch_id)
             except Exception:
                 logger.exception(f"Error unreserving FW with fw_id {fw.fw_id}")
 

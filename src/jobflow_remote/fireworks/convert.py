@@ -5,6 +5,7 @@ import typing
 from fireworks import Firework, Workflow
 from qtoolkit.core.data_objects import QResources
 
+from jobflow_remote.config.entities import ExecutionConfig
 from jobflow_remote.fireworks.tasks import RemoteJobFiretask
 
 if typing.TYPE_CHECKING:
@@ -19,8 +20,8 @@ def flow_to_workflow(
     flow: jobflow.Flow | jobflow.Job | list[jobflow.Job],
     machine: str,
     store: jobflow.JobStore | None = None,
-    exports: dict | None = None,
-    qtk_options: dict | QResources | None = None,
+    exec_config: ExecutionConfig = None,
+    resources: dict | QResources | None = None,
     **kwargs,
 ) -> Workflow:
     """
@@ -41,9 +42,10 @@ def flow_to_workflow(
         will be used. Note, this could be different on the computer that submits the
         workflow and the computer which runs the workflow. The value of ``JOB_STORE`` on
         the computer that runs the workflow will be used.
-    exports
-        pairs of key-values that will be exported in the submission script
-    qtk_options
+    exec_config: ExecutionConfig
+        the options to set before the execution of the job in the submission script.
+        In addition to those defined in the Machine.
+    resources: Dict or QResources
         information passed to qtoolkit to require the resources for the submission
         to the queue.
     **kwargs
@@ -69,8 +71,8 @@ def flow_to_workflow(
             store=store,
             parents=parents,
             parent_mapping=parent_mapping,
-            exports=exports,
-            qtk_options=qtk_options,
+            exec_config=exec_config,
+            resources=resources,
         )
         fireworks.append(fw)
 
@@ -83,8 +85,8 @@ def job_to_firework(
     store: jobflow.JobStore | None = None,
     parents: Sequence[str] | None = None,
     parent_mapping: dict[str, Firework] | None = None,
-    exports: dict | None = None,
-    qtk_options: dict | QResources | None = None,
+    exec_config: ExecutionConfig = None,
+    resources: dict | QResources | None = None,
     **kwargs,
 ) -> Firework:
     """
@@ -122,7 +124,11 @@ def job_to_firework(
         raise ValueError("Both or neither of parents and parent_mapping must be set.")
 
     task = RemoteJobFiretask(
-        job=job, store=store, machine=machine, exports=exports, qtk_options=qtk_options
+        job=job,
+        store=store,
+        machine=machine,
+        resources=resources,
+        exec_config=exec_config,
     )
 
     job_parents = None

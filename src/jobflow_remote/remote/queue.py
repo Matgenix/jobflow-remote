@@ -59,7 +59,8 @@ class QueueManager:
         work_dir: str | Path | None = None,
         pre_run: str | list[str] | None = None,
         post_run: str | list[str] | None = None,
-        exports: dict | None = None,
+        export: dict | None = None,
+        modules: list[str] | None = None,
     ) -> str:
         """ """
         commands_list = []
@@ -67,8 +68,10 @@ class QueueManager:
             commands_list.append(change_dir)
         if pre_run := self.get_pre_run(pre_run):
             commands_list.append(pre_run)
-        if exports_str := self.get_exports(exports):
-            commands_list.append(exports_str)
+        if export_str := self.get_export(export):
+            commands_list.append(export_str)
+        if modules_str := self.get_modules(modules):
+            commands_list.append(modules_str)
         if run_commands := self.get_run_commands(commands):
             commands_list.append(run_commands)
         if post_run := self.get_post_run(post_run):
@@ -85,13 +88,21 @@ class QueueManager:
             return "\n".join(pre_run)
         return pre_run
 
-    def get_exports(self, exports: dict | None) -> str:
+    def get_export(self, exports: dict | None) -> str:
         if not exports:
             return None
         exports_str = []
         for k, v in exports.items():
             exports_str.append(f"export {k}={v}")
         return "\n".join(exports_str)
+
+    def get_modules(self, modules: list[str] | None) -> str:
+        if not modules:
+            return None
+        modules_str = []
+        for m in modules:
+            modules_str.append(f"module load {m}")
+        return "\n".join(modules_str)
 
     def get_run_commands(self, commands) -> str:
         if isinstance(commands, str):
@@ -113,7 +124,8 @@ class QueueManager:
         work_dir=None,
         pre_run: str | list[str] | None = None,
         post_run: str | list[str] | None = None,
-        exports: dict | None = None,
+        export: dict | None = None,
+        modules: list[str] | None = None,
         script_fname="submit.sh",
         create_submit_dir=False,
         timeout: int | None = None,
@@ -124,7 +136,8 @@ class QueueManager:
             work_dir=work_dir,
             pre_run=pre_run,
             post_run=post_run,
-            exports=exports,
+            export=export,
+            modules=modules,
         )
 
         if create_submit_dir and work_dir:
@@ -182,4 +195,6 @@ class QueueManager:
         if isinstance(machine, str):
             machine = config_manager.load_machine(machine, project_name)
         host = config_manager.load_host(machine.host_id)
-        return cls(machine.scheduler_io, host, timeout_exec=machine.queue_exec_timeout)
+        return cls(
+            machine.get_scheduler_io(), host, timeout_exec=machine.queue_exec_timeout
+        )

@@ -23,15 +23,16 @@ class RemoteJobFiretask(FiretaskBase):
         should be set before the Task is executed remotely.
     machine: Str
         The id of the Machine where the calculation will be submitted
-    exports: Dict
-        pairs of key-values that will be exported in the submission script
-    qtk_options: Dict or QResources
+    exec_config: ExecutionConfig
+        the options to set before the execution of the job in the submission script.
+        In addition to those defined in the Machine.
+    resources: Dict or QResources
         information passed to qtoolkit to require the resources for the submission
         to the queue.
     """
 
     required_params = ["job", "store", "machine"]
-    optional_params = ["exports", "qtk_options"]
+    optional_params = ["exec_config", "resources"]
 
     def run_task(self, fw_spec):
         """Run the job and handle any dynamic firework submissions."""

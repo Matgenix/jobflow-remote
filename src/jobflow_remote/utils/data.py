@@ -47,6 +47,19 @@ def deep_merge_dict(
     return d1
 
 
+def remove_none(obj):
+    if isinstance(obj, (list, tuple, set)):
+        return type(obj)(remove_none(x) for x in obj if x is not None)
+    elif isinstance(obj, dict):
+        return type(obj)(
+            (remove_none(k), remove_none(v))
+            for k, v in obj.items()
+            if k is not None and v is not None
+        )
+    else:
+        return obj
+
+
 def uuid_to_path(uuid: str, num_subdirs: int = 3, subdir_len: int = 2):
     u = UUID(uuid)
     u_hex = u.hex
