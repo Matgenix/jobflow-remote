@@ -149,6 +149,7 @@ class Project(BaseModel):
     base_dir: str | None = None
     tmp_dir: str | None = None
     log_dir: str | None = None
+    daemon_dir: str | None = None
     log_level: int = logging.INFO
     runner: RunnerOptions = Field(default_factory=RunnerOptions)
     hosts: list[HostConfig] = Field(default_factory=list)
@@ -215,11 +216,20 @@ class Project(BaseModel):
     @validator("log_dir", always=True)
     def check_log_dir(cls, log_dir: str, values: dict) -> str:
         """
-        Validator to set the default of tmp_dir based on the base_dir
+        Validator to set the default of log_dir based on the base_dir
         """
         if not log_dir:
             return str(Path(values["base_dir"], "log"))
         return log_dir
+
+    @validator("daemon_dir", always=True)
+    def check_daemon_dir(cls, daemon_dir: str, values: dict) -> str:
+        """
+        Validator to set the default of daemon_dir based on the base_dir
+        """
+        if not daemon_dir:
+            return str(Path(values["base_dir"], "daemon"))
+        return daemon_dir
 
     @validator("machines", always=True)
     def check_machines(cls, machines: list[Machine], values: dict) -> list[Machine]:
