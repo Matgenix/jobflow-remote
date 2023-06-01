@@ -5,16 +5,10 @@ import traceback
 from pathlib import Path
 from typing import Annotated, Literal
 
-# from dataclasses import dataclass, field
-from uuid import uuid4
-
 from jobflow import JobStore
-
-# from pydantic.dataclasses import dataclass
 from pydantic import BaseModel, Extra, Field, validator
 from qtoolkit.io import BaseSchedulerIO, scheduler_mapping
 
-from jobflow_remote import SETTINGS
 from jobflow_remote.fireworks.launchpad import RemoteLaunchPad
 from jobflow_remote.remote.host import BaseHost, LocalHost, RemoteHost
 
@@ -133,7 +127,7 @@ HostConfig = Annotated[
 
 
 class ExecutionConfig(BaseModel):
-    exec_config_id: str
+    exec_config_id: str | None = None
     modules: list[str] | None = None
     export: dict[str, str] | None = None
     pre_run: str | None
@@ -145,7 +139,6 @@ class ExecutionConfig(BaseModel):
 
 class Project(BaseModel):
     name: str
-    unique_id: str
     base_dir: str | None = None
     tmp_dir: str | None = None
     log_dir: str | None = None
@@ -157,11 +150,6 @@ class Project(BaseModel):
     run_db: LaunchPadConfig = Field(default_factory=LaunchPadConfig)
     exec_config: list[ExecutionConfig] = Field(default_factory=list)
     jobstore: dict = Field(default_factory=lambda: dict(DEFAULT_JOBSTORE))
-
-    @classmethod
-    def from_uuid_id(cls, **kwargs):
-        unique_id = str(uuid4())
-        return cls(unique_id=unique_id, **kwargs)
 
     def get_machines_dict(self) -> dict[str, Machine]:
         return {m.machine_id: m for m in self.machines}
@@ -201,6 +189,8 @@ class Project(BaseModel):
         Validator to set the default of base_dir based on the project name
         """
         if not base_dir:
+            from jobflow_remote import SETTINGS
+
             return str(Path(SETTINGS.projects_folder, values["name"]))
         return base_dir
 

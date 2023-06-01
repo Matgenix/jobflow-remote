@@ -5,9 +5,12 @@ from pathlib import Path
 from string import Template
 
 import psutil
+from monty.os import makedirs_p
 from supervisor import childutils
 from supervisor.states import RUNNING_STATES, STOPPED_STATES, ProcessStates
 from supervisor.xmlrpc import Faults
+
+from jobflow_remote.config import ConfigManager
 
 logger = logging.getLogger(__name__)
 
@@ -23,16 +26,16 @@ supervisor.rpcinterface_factory = supervisor.rpcinterface:make_main_rpcinterface
 logfile=$log_file
 logfile_maxbytes=10MB
 logfile_backups=5
-loglevel=info
+loglevel=$loglevel
 pidfile=$pid_file
 nodaemon=$nodaemon
 
 [supervisorctl]
 serverurl=unix://$sock_file
 
-[program:myprogram]
+[program:runner_daemon]
 priority=100
-command=TODO create executable
+command=jf -p $project runner run
 autostart=true
 autorestart=false
 numprocs=$num_procs
@@ -56,9 +59,20 @@ class DaemonManager:
 
     conf_template = Template(supervisord_conf_str)
 
-    def __init__(self, daemon_dir: str | Path, log_dir: str | Path | None = None):
+    def __init__(
+        self,
+        daemon_dir: str | Path | None = None,
+        log_dir: str | Path | None = None,
+        project_name: str | None = None,
+    ):
+        config_manager = ConfigManager()
+        self.project = config_manager.get_project(project_name)
+        if not daemon_dir:
+            daemon_dir = self.project.daemon_dir
         self.daemon_dir = Path(daemon_dir).absolute()
-        self.log_dir = Path(log_dir).absolute() if log_dir else self.daemon_dir
+        if not log_dir:
+            log_dir = self.project.log_dir
+        self.log_dir = Path(log_dir).absolute()
 
     @property
     def conf_filepath(self) -> Path:
@@ -140,7 +154,7 @@ class DaemonManager:
 
         return running
 
-    def check_status(self):
+    def check_status(self) -> DaemonStatus:
         process_active = self.check_supervisord_process()
 
         if not process_active:
@@ -155,7 +169,7 @@ class DaemonManager:
         proc_info = interface.supervisor.getAllProcessInfo()
         if not proc_info:
             raise DaemonError(
-                "supervisord process is running but not daemon process is present"
+                "supervisord process is running but no daemon process is present"
             )
 
         if any(pi.get("state") in RUNNING_STATES for pi in proc_info):
@@ -172,21 +186,52 @@ class DaemonManager:
 
         raise DaemonError("Could not determine the current status of the daemon")
 
-    def write_config(self, num_procs: int = 1, nodaemon: bool = False):
+    def get_pids(self) -> dict[str, int] | None:
+        process_active = self.check_supervisord_process()
+
+        if not process_active:
+            return None
+
+        pids = {"supervisord": self.get_supervisord_pid()}
+
+        if not self.sock_filepath.is_socket():
+            raise DaemonError(
+                "the supervisord process is alive, but the socket is missing"
+            )
+
+        interface = self.get_interface()
+        proc_info = interface.supervisor.getAllProcessInfo()
+        if not proc_info:
+            raise DaemonError(
+                "supervisord process is running but no daemon process is present"
+            )
+
+        for pi in proc_info:
+            pids[pi.get("name")] = pi.get("pid")
+
+        return pids
+
+    def write_config(
+        self, num_procs: int = 1, log_level: str = "info", nodaemon: bool = False
+    ):
         conf = self.conf_template.substitute(
             sock_file=str(self.sock_filepath),
             pid_file=str(self.pid_filepath),
             log_file=str(self.log_filepath),
             num_procs=num_procs,
             nodaemon="true" if nodaemon else "false",
+            project=self.project.name,
+            loglevel=log_level,
         )
         with open(self.conf_filepath, "w") as f:
             f.write(conf)
 
     def start_supervisord(
-        self, num_procs: int = 1, nodaemon: bool = False
+        self, num_procs: int = 1, log_level: str = "info", nodaemon: bool = False
     ) -> str | None:
-        self.write_config(num_procs=num_procs, nodaemon=nodaemon)
+        makedirs_p(self.daemon_dir)
+        makedirs_p(self.log_dir)
+        self.write_config(num_procs=num_procs, log_level=log_level, nodaemon=nodaemon)
         cp = subprocess.run(
             f"supervisord -c {str(self.conf_filepath)}",
             shell=True,
@@ -217,15 +262,19 @@ class DaemonManager:
 
         return None
 
-    def start(self, raise_on_error: bool = False) -> bool:
+    def start(
+        self, num_procs: int = 1, log_level: str = "info", raise_on_error: bool = False
+    ) -> bool:
         status = self.check_status()
         if status == DaemonStatus.RUNNING:
-            return True
-
-        if status == DaemonStatus.SHUT_DOWN:
-            error = self.start_supervisord()
+            error = "Daemon process is already running"
+        elif status == DaemonStatus.SHUT_DOWN:
+            error = self.start_supervisord(num_procs=num_procs, log_level=log_level)
         elif status == DaemonStatus.STOPPED:
-            error = self.start_processes()
+            self.shut_down(raise_on_error=raise_on_error)
+            error = self.start_supervisord(num_procs=num_procs, log_level=log_level)
+            # else:
+            #     error = self.start_processes()
         elif status == DaemonStatus.STOPPING:
             error = "Daemon process are stopping. Cannot start."
         else:

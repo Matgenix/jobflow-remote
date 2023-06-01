@@ -17,12 +17,20 @@ class MongoLock:
     LOCK_TIME_KEY = "_lock_time"
 
     def __init__(
-        self, collection, filter, update=None, timeout=None, lock_id=None, **kwargs
+        self,
+        collection,
+        filter,
+        update=None,
+        timeout=None,
+        break_lock=False,
+        lock_id=None,
+        **kwargs,
     ):
         self.collection = collection
         self.filter = filter or {}
         self.update = update
         self.timeout = timeout
+        self.break_lock = break_lock
         self.locked_document = None
         self.lock_id = lock_id or id(self)
         self.kwargs = kwargs
@@ -33,18 +41,19 @@ class MongoLock:
         now = datetime.utcnow()
         db_filter = copy.deepcopy(self.filter)
 
-        lock_filter = {self.LOCK_KEY: {"$exists": False}}
-        lock_limit = None
-        if self.timeout:
-            lock_limit = now - timedelta(seconds=self.timeout)
-            time_filter = {self.LOCK_TIME_KEY: {"$lt": lock_limit}}
-            combined_filter = {"$or": [lock_filter, time_filter]}
-            if "$or" in db_filter:
-                db_filter["$and"] = [db_filter, combined_filter]
+        if not self.break_lock:
+            lock_filter = {self.LOCK_KEY: {"$exists": False}}
+            lock_limit = None
+            if self.timeout:
+                lock_limit = now - timedelta(seconds=self.timeout)
+                time_filter = {self.LOCK_TIME_KEY: {"$lt": lock_limit}}
+                combined_filter = {"$or": [lock_filter, time_filter]}
+                if "$or" in db_filter:
+                    db_filter["$and"] = [db_filter, combined_filter]
+                else:
+                    db_filter.update(combined_filter)
             else:
-                db_filter.update(combined_filter)
-        else:
-            db_filter.update(lock_filter)
+                db_filter.update(lock_filter)
 
         lock_set = {self.LOCK_KEY: self.lock_id, self.LOCK_TIME_KEY: now}
         update = defaultdict(dict)

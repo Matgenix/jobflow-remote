@@ -5,7 +5,7 @@ import typing
 from fireworks import Firework, Workflow
 from qtoolkit.core.data_objects import QResources
 
-from jobflow_remote.config.entities import ExecutionConfig
+from jobflow_remote.config.base import ExecutionConfig
 from jobflow_remote.fireworks.tasks import RemoteJobFiretask
 
 if typing.TYPE_CHECKING:
@@ -20,7 +20,7 @@ def flow_to_workflow(
     flow: jobflow.Flow | jobflow.Job | list[jobflow.Job],
     machine: str,
     store: jobflow.JobStore | None = None,
-    exec_config: ExecutionConfig = None,
+    exec_config: str | ExecutionConfig = None,
     resources: dict | QResources | None = None,
     **kwargs,
 ) -> Workflow:
@@ -85,7 +85,7 @@ def job_to_firework(
     store: jobflow.JobStore | None = None,
     parents: Sequence[str] | None = None,
     parent_mapping: dict[str, Firework] | None = None,
-    exec_config: ExecutionConfig = None,
+    exec_config: str | ExecutionConfig = None,
     resources: dict | QResources | None = None,
     **kwargs,
 ) -> Firework:
@@ -123,6 +123,18 @@ def job_to_firework(
     if (parents is None) is not (parent_mapping is None):
         raise ValueError("Both or neither of parents and parent_mapping must be set.")
 
+    if isinstance(exec_config, ExecutionConfig):
+        exec_config = exec_config.dict()
+
+    manager_config = dict(job.config.manager_config)
+    resources_from_manager = manager_config.pop("resources", None)
+    exec_config_manager = manager_config.pop("exec_config", None)
+    resources = resources_from_manager or resources
+    exec_config = exec_config_manager or exec_config
+
+    if isinstance(exec_config, ExecutionConfig):
+        exec_config = exec_config.dict()
+
     task = RemoteJobFiretask(
         job=job,
         store=store,
@@ -140,7 +152,7 @@ def job_to_firework(
     spec = {"_add_launchpad_and_fw_id": True}  # this allows the job to know the fw_id
     if job.config.on_missing_references != OnMissing.ERROR:
         spec["_allow_fizzled_parents"] = True
-    spec.update(job.config.manager_config)
+    spec.update(manager_config)
     spec.update(job.metadata)  # add metadata to spec
 
     fw = Firework([task], spec=spec, name=job.name, parents=job_parents, **kwargs)

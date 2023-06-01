@@ -5,7 +5,7 @@ from pathlib import Path
 from qtoolkit.core.data_objects import CancelResult, QJob, QResources, SubmissionResult
 from qtoolkit.io.base import BaseSchedulerIO
 
-from jobflow_remote.config.entities import Machine
+from jobflow_remote.config.base import Machine
 from jobflow_remote.config.manager import ConfigManager
 from jobflow_remote.remote.host import BaseHost
 

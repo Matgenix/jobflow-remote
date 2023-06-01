@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 from collections.abc import Mapping, MutableMapping
 from copy import deepcopy
+from typing import Any
 from uuid import UUID
 
 
@@ -58,6 +59,18 @@ def remove_none(obj):
         )
     else:
         return obj
+
+
+def check_dict_keywords(obj: Any, keywords: list[str]) -> bool:
+    if isinstance(obj, (list, tuple, set)):
+        return any(check_dict_keywords(x, keywords) for x in obj)
+    elif isinstance(obj, dict):
+        for k, v in obj.items():
+            if isinstance(k, str) and any(k.startswith(kw) for kw in keywords):
+                return True
+            if check_dict_keywords(v, keywords):
+                return True
+    return False
 
 
 def uuid_to_path(uuid: str, num_subdirs: int = 3, subdir_len: int = 2):

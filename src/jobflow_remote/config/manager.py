@@ -13,8 +13,7 @@ from jobflow import JobStore
 from monty.os import makedirs_p
 from monty.serialization import dumpfn, loadfn
 
-from jobflow_remote import SETTINGS
-from jobflow_remote.config.entities import (
+from jobflow_remote.config.base import (
     ConfigError,
     ExecutionConfig,
     LaunchPadConfig,
@@ -35,6 +34,8 @@ class ConfigManager:
     projects_ext = ["json", "yaml", "toml"]
 
     def __init__(self):
+        from jobflow_remote import SETTINGS
+
         self.projects_folder = Path(SETTINGS.projects_folder)
         makedirs_p(self.projects_folder)
         self.projects_data = self.load_projects_data()
@@ -66,16 +67,28 @@ class ConfigManager:
 
         return projects_data
 
-    def get_project_data(self, project_name: str | None) -> ProjectData:
+    def select_project_name(self, project_name: str | None = None) -> str:
+        from jobflow_remote import SETTINGS
+
         project_name = project_name or SETTINGS.project
         if not project_name:
-            raise ConfigError(
-                "A project name should be defined at least in the config to be loaded"
-            )
+            if len(self.projects_data) == 1:
+                project_name = next(iter(self.projects_data.keys()))
+            else:
+                raise ConfigError("A project name should be defined")
+
+        return project_name
+
+    def get_project_data(self, project_name: str | None = None) -> ProjectData:
+
+        project_name = self.select_project_name(project_name)
+
+        if project_name not in self.projects_data:
+            raise ConfigError(f"The selected project {project_name} does not exist")
 
         return self.projects_data[project_name]
 
-    def get_project(self, project_name: str | None) -> Project:
+    def get_project(self, project_name: str | None = None) -> Project:
         return self.get_project_data(project_name).project
 
     def dump_project(self, project_data: ProjectData):
