@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from jobflow import Job
 
 from jobflow_remote.fireworks.launchpad import fw_uuid
-from jobflow_remote.jobs.state import JobState, RemoteState
+from jobflow_remote.jobs.state import FlowState, JobState, RemoteState
 
 
 @dataclass
@@ -74,7 +74,7 @@ class JobInfo:
             last_updated = fw_update_date
         # the dates should be in utc time. Convert them to the system time
         last_updated = last_updated.replace(tzinfo=timezone.utc).astimezone(tz=None)
-        remote_previous_state_val = remote.get("state")
+        remote_previous_state_val = remote.get("previous_state")
         remote_previous_state = (
             RemoteState(remote_previous_state_val)
             if remote_previous_state_val is not None
@@ -117,3 +117,60 @@ class JobInfo:
             error_remote=remote.get("error"),
             error_job=error_job,
         )
+
+
+flow_info_projection = {
+    "fws.fw_id": 1,
+    f"fws.{fw_uuid}": 1,
+    "fws.state": 1,
+    "remote.state": 1,
+    "name": 1,
+    "updated_on": 1,
+    "fws.updated_on": 1,
+    "remote.updated_on": 1,
+    "fws.spec._tasks.machine": 1,
+}
+
+
+@dataclass
+class FlowInfo:
+    db_ids: int
+    job_ids: str
+    state: FlowState
+    name: str
+    last_updated: datetime
+    machines: list[str]
+    job_states: list[JobState]
+    job_names: list[str]
+
+    # @classmethod
+    # def from_query_dict(cls, d):
+    #     fws = d.get("fws") or []
+    #     remotes = d.get("remote") or []
+    #
+    #     matched_data = defaultdict(list)
+    #     for fw in fws:
+    #         matched_data[fw.get(fw_uuid)].append(fw)
+    #     for r in remotes:
+    #         matched_data[r.get("job_id")].append(r)
+    #
+    #     machines = []
+    #     job_states = []
+    #     job_names = []
+    #     last_updated_list = []
+    #     db_ids = []
+    #     job_ids = []
+    #     for job_id, (fw, r) in matched_data.items():
+    #         job_ids.append(job_id)
+    #         db_ids.append(fw.get("fw_id"))
+    #
+    #         last_updated_list.append(datetime.fromisoformat(d["updated_on"]))
+    #         remote_update_date = remote.get("updated_on")
+    #         if remote_update_date:
+    #             remote_update_date = datetime.fromisoformat(d["updated_on"])
+    #             last_updated = max(fw_update_date, remote_update_date)
+    #         else:
+    #             last_updated = fw_update_date
+    #         last_updated_list
+    #
+    #     # for the last updated field, collect all the dates and take the latest one

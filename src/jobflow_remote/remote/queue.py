@@ -9,6 +9,27 @@ from jobflow_remote.config.base import Machine
 from jobflow_remote.config.manager import ConfigManager
 from jobflow_remote.remote.host import BaseHost
 
+OUT_FNAME = "queue.out"
+ERR_FNAME = "queue.err"
+
+
+def set_name_out(
+    resources: dict | QResources,
+    name: str,
+    out_fpath: str | Path = OUT_FNAME,
+    err_fpath: str | Path = ERR_FNAME,
+):
+    # sanitize the name
+    name = name.replace(" ", "_")
+    if isinstance(resources, QResources):
+        resources.job_name = name
+        resources.output_filepath = out_fpath
+        resources.error_filepath = err_fpath
+    else:
+        resources["job_name"] = name
+        resources["qout_path"] = out_fpath
+        resources["qerr_path"] = err_fpath
+
 
 class QueueManager:
     """Base class for job queues.

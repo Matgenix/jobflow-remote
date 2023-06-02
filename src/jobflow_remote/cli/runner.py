@@ -113,7 +113,7 @@ def kill():
 
 
 @app_runner.command()
-def shut_down():
+def shutdown():
     """
     Shuts down the supervisord process.
     Note that if the daemon is running it will wait for the daemon to stop.
@@ -161,21 +161,21 @@ def pids():
     Both the supervisord process and the processing running the Runner.
     """
     dm = DaemonManager()
-    with loading_spinner():
-        try:
+    pids_dict = None
+    try:
+        with loading_spinner():
             pids_dict = dm.get_pids()
-            if not pids_dict:
-                exit_with_warning_msg("Daemon is not running")
-            table = Table()
-            table.add_column("Process")
-            table.add_column("PID")
+    except DaemonError as e:
+        exit_with_error_msg(
+            f"Error while stopping the daemon: {getattr(e, 'message', e)}"
+        )
+    if not pids_dict:
+        exit_with_warning_msg("Daemon is not running")
+    table = Table()
+    table.add_column("Process")
+    table.add_column("PID")
 
-            for name, pid in pids_dict.items():
-                table.add_row(name, str(pid))
-
-        except DaemonError as e:
-            exit_with_error_msg(
-                f"Error while stopping the daemon: {getattr(e, 'message', e)}"
-            )
+    for name, pid in pids_dict.items():
+        table.add_row(name, str(pid))
 
     out_console.print(table)

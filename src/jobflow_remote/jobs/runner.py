@@ -36,7 +36,7 @@ from jobflow_remote.remote.data import (
     get_remote_store_filenames,
 )
 from jobflow_remote.remote.host import BaseHost
-from jobflow_remote.remote.queue import QueueManager
+from jobflow_remote.remote.queue import QueueManager, set_name_out
 from jobflow_remote.utils.data import deep_merge_dict
 from jobflow_remote.utils.db import MongoLock
 from jobflow_remote.utils.log import initialize_runner_logger
@@ -302,7 +302,6 @@ class Runner:
         fw_id = doc["fw_id"]
         logger.debug(f"submit fw_id: {doc['fw_id']}")
         fw_job_data = self.get_fw_data(fw_id)
-        fw_job_data.job
 
         remote_path = doc["run_dir"]
 
@@ -310,7 +309,8 @@ class Runner:
 
         machine = fw_job_data.machine
         queue_manager = self.get_queue_manager(machine.machine_id)
-        resources = fw_job_data.task.get("resources") or machine.resources
+        resources = fw_job_data.task.get("resources") or machine.resources or {}
+        set_name_out(resources, fw_job_data.job.name)
         exec_config = fw_job_data.task.get("exec_config")
         if isinstance(exec_config, str):
             exec_config = self.config_manager.load_exec_config(

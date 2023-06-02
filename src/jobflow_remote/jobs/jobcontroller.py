@@ -9,7 +9,7 @@ from jobflow import JobStore
 from jobflow_remote.config.base import Project
 from jobflow_remote.config.manager import ConfigManager
 from jobflow_remote.fireworks.launchpad import RemoteLaunchPad
-from jobflow_remote.jobs.data import JobData, JobInfo, job_info_projection
+from jobflow_remote.jobs.data import FlowInfo, JobData, JobInfo, job_info_projection
 from jobflow_remote.jobs.state import FlowState, JobState, RemoteState
 
 logger = logging.getLogger(__name__)
@@ -224,10 +224,7 @@ class JobController:
     def get_job_info(
         self, job_id: str | None, db_id: int | None, full: bool = False
     ) -> JobInfo | None:
-        if (job_id is None) == (db_id is None):
-            raise ValueError(
-                "One and only one among job_id and db_id should be defined"
-            )
+        self.check_ids(job_id, db_id)
         query = self._build_query_fw(job_ids=job_id, db_ids=db_id)
 
         if full:
@@ -249,6 +246,13 @@ class JobController:
             return None
 
         return JobInfo.from_query_dict(data[0])
+
+    @staticmethod
+    def check_ids(job_id: str | None, db_id: int | None):
+        if (job_id is None) == (db_id is None):
+            raise ValueError(
+                "One and only one among job_id and db_id should be defined"
+            )
 
     def rerun_jobs(
         self,
@@ -292,3 +296,57 @@ class JobController:
             self.jobstore.remove_docs({})
 
         return True
+
+    def set_remote_state(
+        self, state: RemoteState, job_id: str | None, db_id: int | None
+    ) -> bool:
+        self.check_ids(job_id, db_id)
+        values = {
+            "state": state.value,
+            "step_attempts": 0,
+            "retry_time_limit": None,
+            "previous_state": None,
+            "queue_state": None,
+            "error": None,
+        }
+        return self.rlpad.set_remote_values(values=values, job_id=job_id, fw_id=db_id)
+
+    def reset_remote_attempts(self, job_id: str | None, db_id: int | None) -> bool:
+        self.check_ids(job_id, db_id)
+        values = {
+            "step_attempts": 0,
+            "retry_time_limit": None,
+        }
+        return self.rlpad.set_remote_values(values=values, job_id=job_id, fw_id=db_id)
+
+    def reset_failed_state(self, job_id: str | None, db_id: int | None) -> bool:
+        self.check_ids(job_id, db_id)
+        return self.rlpad.reset_failed_state(job_id=job_id, fw_id=db_id)
+
+    def get_flows_info(
+        self,
+        job_ids: str | list[str] | None = None,
+        db_ids: int | list[int] | None = None,
+        state: FlowState | None = None,
+        start_date: datetime | None = None,
+        end_date: datetime | None = None,
+        sort: dict | None = None,
+        limit: int = 0,
+    ) -> list[FlowInfo]:
+        query = self._build_query_wf(
+            job_ids=job_ids,
+            db_ids=db_ids,
+            state=state,
+            start_date=start_date,
+            end_date=end_date,
+        )
+
+        data = self.rlpad.get_wf_fw_remote_run_data(
+            query=query, sort=sort, limit=limit, projection=job_info_projection
+        )
+
+        jobs_data = []
+        for d in data:
+            jobs_data.append(JobInfo.from_query_dict(d))
+
+        return jobs_data

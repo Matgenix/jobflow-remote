@@ -15,21 +15,6 @@ out_console = Console()
 fmt_datetime = "%Y-%m-%d %H:%M"
 
 
-class Verbosity(Enum):
-    MINIMAL = "minimal"
-    NORMAL = "normal"
-    DETAILED = "detailed"
-    DIAGNOSTIC = "diagnostic"
-
-    def to_int(self) -> int:
-        return {
-            Verbosity.MINIMAL: 0,
-            Verbosity.NORMAL: 10,
-            Verbosity.DETAILED: 20,
-            Verbosity.DIAGNOSTIC: 30,
-        }[self]
-
-
 class LogLevel(Enum):
     ERROR = "error"
     WARN = "warn"
@@ -55,6 +40,11 @@ def exit_with_warning_msg(message, code=0, **kwargs):
     kwargs.setdefault("style", "gold1")
     err_console.print(message, **kwargs)
     raise typer.Exit(code)
+
+
+def print_success_msg(message="operation completed", **kwargs):
+    kwargs.setdefault("style", "green")
+    out_console.print(message, **kwargs)
 
 
 def check_incompatible_opt(d: dict):
@@ -104,3 +94,18 @@ def loading_spinner(processing: bool = True):
         if processing:
             progress.add_task(description="Processing...", total=None)
         yield progress
+
+
+def get_job_db_ids(db_id, job_id):
+    if db_id:
+        try:
+            db_id_value = int(job_id)
+        except ValueError:
+            raise typer.BadParameter(
+                "if --db-id is selected the ID should be an integer"
+            )
+        job_id_value = None
+    else:
+        job_id_value = job_id
+        db_id_value = None
+    return db_id_value, job_id_value

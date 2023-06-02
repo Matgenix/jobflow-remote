@@ -254,9 +254,9 @@ class RemoteLaunchPad:
                     exit=True,
                 )
                 self.lpad.complete_launch(launch_id, m_action, "FIZZLED")
-                self.remote_runs.update_one(
-                    {"launch_id": launch_id}, {"$set": {"completed": True}}
-                )
+                # self.remote_runs.update_one(
+                #     {"launch_id": launch_id}, {"$set": {"completed": True}}
+                # )
                 completed = True
         return m_launch.fw_id, completed
 
@@ -373,30 +373,21 @@ class RemoteLaunchPad:
 
         self.remote_runs.delete_many({"fw_id": {"$in": rerun_fw_ids}})
 
-    def set_remote_state(
+    def set_remote_values(
         self,
-        state: RemoteState,
+        values: dict,
         fw_id: int | None,
         job_id: str | None = None,
         break_lock: bool = False,
-    ):
+    ) -> bool:
         lock_filter = self._generate_id_query(fw_id, job_id)
         with MongoLock(
             collection=self.remote_runs, filter=lock_filter, break_lock=break_lock
         ) as lock:
             if lock.locked_document:
-                lock.update_on_release = {
-                    "$set": {
-                        "state": state.value,
-                        "updated_on": datetime.datetime.utcnow().isoformat(),
-                        "completed": False,
-                        "step_attempts": 0,
-                        "retry_time_limit": None,
-                        "previous_state": None,
-                        "queue_state": None,
-                        "error": None,
-                    }
-                }
+                values = dict(values)
+                values["updated_on"] = datetime.datetime.utcnow().isoformat()
+                lock.update_on_release = {"$set": values}
                 return True
 
         return False
@@ -411,14 +402,16 @@ class RemoteLaunchPad:
         if not result:
             raise ValueError("No job matching id")
 
-    def is_locked(self, fw_id: int | None = None, job_id: str | None = None):
+    def is_locked(self, fw_id: int | None = None, job_id: str | None = None) -> bool:
         query = self._generate_id_query(fw_id, job_id)
         result = self.remote_runs.find_one(query, projection=[MongoLock.LOCK_KEY])
         if not result:
             raise ValueError("No job matching id")
         return MongoLock.LOCK_KEY in result
 
-    def reset_failed_state(self, fw_id: int | None = None, job_id: str | None = None):
+    def reset_failed_state(
+        self, fw_id: int | None = None, job_id: str | None = None
+    ) -> bool:
         lock_filter = self._generate_id_query(fw_id, job_id)
         with MongoLock(collection=self.remote_runs, filter=lock_filter) as lock:
             doc = lock.locked_document
@@ -437,7 +430,6 @@ class RemoteLaunchPad:
                     "$set": {
                         "state": previous_state,
                         "updated_on": datetime.datetime.utcnow().isoformat(),
-                        "completed": False,
                         "step_attempts": 0,
                         "retry_time_limit": None,
                         "previous_state": None,

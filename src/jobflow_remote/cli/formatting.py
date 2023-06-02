@@ -6,35 +6,30 @@ from monty.json import jsanitize
 from rich.scope import render_scope
 from rich.table import Table
 
-from jobflow_remote.cli.utils import Verbosity, fmt_datetime
+from jobflow_remote.cli.utils import fmt_datetime
 from jobflow_remote.jobs.data import JobInfo
 from jobflow_remote.jobs.state import JobState
 from jobflow_remote.utils.data import remove_none
 
 
-def get_job_info_table(
-    jobs_info: list[JobInfo], verbosity: Verbosity = Verbosity.NORMAL
-):
+def get_job_info_table(jobs_info: list[JobInfo], verbosity: int):
     table = Table(title="Jobs info")
     table.add_column("DB id")
     table.add_column("Name")
     table.add_column("State [Remote]")
     table.add_column("Job id")
 
-    v = verbosity.to_int()
+    table.add_column("Machine")
+    table.add_column("Last updated")
 
-    if v >= 10:
-        table.add_column("Machine")
-        table.add_column("Last updated")
-        if v < 30:
-            table.add_column("Locked")
-
-    if v >= 20:
+    if verbosity >= 1:
         table.add_column("Queue id")
         table.add_column("Retry time")
         table.add_column("Prev state")
+        if verbosity < 2:
+            table.add_column("Locked")
 
-    if v >= 30:
+    if verbosity >= 2:
         table.add_column("Lock id")
         table.add_column("Lock time")
 
@@ -44,14 +39,16 @@ def get_job_info_table(
         if ji.remote_state is not None and ji.state not in excluded_states:
 
             state += f" [{ji.remote_state.name}]"
-        row = [str(ji.db_id), ji.name, state, ji.job_id]
-        if v >= 10:
-            row.append(ji.machine)
-            row.append(ji.last_updated.strftime(fmt_datetime))
-            if v < 30:
-                row.append("*" if ji.lock_id is not None else None)
+        row = [
+            str(ji.db_id),
+            ji.name,
+            state,
+            ji.job_id,
+            ji.machine,
+            ji.last_updated.strftime(fmt_datetime),
+        ]
 
-        if v >= 20:
+        if verbosity >= 1:
             row.append(ji.queue_job_id)
             row.append(
                 ji.retry_time_limit.strftime(fmt_datetime)
@@ -61,8 +58,10 @@ def get_job_info_table(
             row.append(
                 ji.remote_previous_state.name if ji.remote_previous_state else None
             )
+            if verbosity < 2:
+                row.append("*" if ji.lock_id is not None else None)
 
-        if v >= 30:
+        if verbosity >= 2:
             row.append(ji.lock_id)
             row.append(ji.lock_time.strftime(fmt_datetime) if ji.lock_time else None)
 

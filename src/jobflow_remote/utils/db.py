@@ -41,9 +41,9 @@ class MongoLock:
         now = datetime.utcnow()
         db_filter = copy.deepcopy(self.filter)
 
+        lock_limit = None
         if not self.break_lock:
             lock_filter = {self.LOCK_KEY: {"$exists": False}}
-            lock_limit = None
             if self.timeout:
                 lock_limit = now - timedelta(seconds=self.timeout)
                 time_filter = {self.LOCK_TIME_KEY: {"$lt": lock_limit}}
@@ -79,7 +79,7 @@ class MongoLock:
     def release(self, exc_type, exc_val, exc_tb):
         # Release the lock by removing the unique identifier and lock expiration time
         update = {"$unset": {self.LOCK_KEY: "", self.LOCK_TIME_KEY: ""}}
-        # TODO maybe set on release only if not exception was raised?
+        # TODO maybe set on release only if no exception was raised?
         if self.update_on_release:
             update = deep_merge_dict(update, self.update_on_release)
         logger.debug(f"release lock with update: {update}")

@@ -4,7 +4,7 @@ from typing import List, Optional
 import typer
 from typing_extensions import Annotated
 
-from jobflow_remote.cli.utils import LogLevel, Verbosity
+from jobflow_remote.cli.utils import LogLevel
 from jobflow_remote.jobs.state import JobState, RemoteState
 
 job_ids_opt = Annotated[
@@ -47,6 +47,11 @@ remote_state_opt = Annotated[
 ]
 
 
+remote_state_arg = Annotated[
+    RemoteState, typer.Argument(help="One of the remote states")
+]
+
+
 start_date_opt = Annotated[
     Optional[datetime],
     typer.Option(
@@ -78,11 +83,9 @@ days_opt = Annotated[
 
 
 verbosity_opt = Annotated[
-    Verbosity,
+    int,
     typer.Option(
-        "--verbosity",
-        "-v",
-        help="Set the verbosity of the output",
+        "--verbosity", "-v", help="Set the verbosity of the output", count=True
     ),
 ]
 
