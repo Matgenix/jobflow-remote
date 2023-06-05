@@ -8,8 +8,18 @@ from jobflow import JobStore
 
 from jobflow_remote.config.base import Project
 from jobflow_remote.config.manager import ConfigManager
-from jobflow_remote.fireworks.launchpad import RemoteLaunchPad
-from jobflow_remote.jobs.data import FlowInfo, JobData, JobInfo, job_info_projection
+from jobflow_remote.fireworks.launchpad import (
+    FW_UUID_PATH,
+    REMOTE_DOC_PATH,
+    RemoteLaunchPad,
+)
+from jobflow_remote.jobs.data import (
+    FlowInfo,
+    JobData,
+    JobInfo,
+    flow_info_projection,
+    job_info_projection,
+)
 from jobflow_remote.jobs.state import FlowState, JobState, RemoteState
 
 logger = logging.getLogger(__name__)
@@ -70,14 +80,16 @@ class JobController:
         if db_ids:
             query["fw_id"] = {"$in": db_ids}
         if job_ids:
-            query["spec._tasks.job.uuid"] = {"$in": job_ids}
+            query[FW_UUID_PATH] = {"$in": job_ids}
 
         if state:
             fw_states, remote_state = state.to_states()
             query["state"] = {"$in": fw_states}
 
         if remote_state:
-            query["remote.state"] = {"$in": [rs.value for rs in remote_state]}
+            query[f"{REMOTE_DOC_PATH}.state"] = {
+                "$in": [rs.value for rs in remote_state]
+            }
 
         if start_date:
             start_date_str = start_date.astimezone(timezone.utc).isoformat()
@@ -107,7 +119,7 @@ class JobController:
         if db_ids:
             query["nodes"] = {"$in": db_ids}
         if job_ids:
-            query["fws.spec._tasks.job.uuid"] = {"$in": job_ids}
+            query[f"fws.{FW_UUID_PATH}"] = {"$in": job_ids}
 
         if state:
             if state == FlowState.WAITING:
@@ -125,19 +137,20 @@ class JobController:
             elif state == FlowState.ONGOING:
                 query["state"] = "RUNNING"
                 query["fws.state"] = {"$in": ["RUNNING", "RESERVED"]}
-                query["remote.state"] = {
+                query[f"fws.{REMOTE_DOC_PATH}.state"] = {
                     "$nin": [JobState.FAILED.value, JobState.REMOTE_ERROR.value]
                 }
             elif state == FlowState.FAILED:
                 query["$or"] = [
                     {"state": "FIZZLED"},
                     {
-                        "remote.state": {
+                        f"fws.{REMOTE_DOC_PATH}.state": {
                             "$in": [JobState.FAILED.value, JobState.REMOTE_ERROR.value]
                         }
                     },
                 ]
 
+        # TODO should this consider the dates of the fws?
         if start_date:
             start_date_str = start_date.astimezone(timezone.utc).isoformat()
             query["updated_on"] = {"$gte": start_date_str}
@@ -210,9 +223,8 @@ class JobController:
             start_date=start_date,
             end_date=end_date,
         )
-
-        data = self.rlpad.get_fw_remote_run_data(
-            query=query, sort=sort, limit=limit, projection=job_info_projection
+        data = self.rlpad.fireworks.find(
+            query, sort=sort, limit=limit, projection=job_info_projection
         )
 
         jobs_data = []
@@ -239,9 +251,7 @@ class JobController:
                 query=query, projection=proj
             )
         else:
-            data = self.rlpad.get_fw_remote_run_data(
-                query=query, projection=job_info_projection
-            )
+            data = self.rlpad.fireworks.find(query, projection=job_info_projection)
         if not data:
             return None
 
@@ -341,8 +351,8 @@ class JobController:
             end_date=end_date,
         )
 
-        data = self.rlpad.get_wf_fw_remote_run_data(
-            query=query, sort=sort, limit=limit, projection=job_info_projection
+        data = self.rlpad.get_wf_fw_data(
+            query=query, sort=sort, limit=limit, projection=flow_info_projection
         )
 
         jobs_data = []

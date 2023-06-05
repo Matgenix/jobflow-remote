@@ -12,7 +12,7 @@ from collections import defaultdict, namedtuple
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from fireworks import FWorker
+from fireworks import Firework, FWorker
 from monty.os import makedirs_p
 from monty.serialization import loadfn
 from qtoolkit.core.data_objects import QState, SubmissionStatus
@@ -26,7 +26,13 @@ from jobflow_remote.config.base import (
 )
 from jobflow_remote.config.manager import ConfigManager
 from jobflow_remote.fireworks.launcher import rapidfire_checkout
-from jobflow_remote.fireworks.launchpad import RemoteLaunchPad
+from jobflow_remote.fireworks.launchpad import (
+    FW_UUID_PATH,
+    REMOTE_DOC_PATH,
+    RemoteLaunchPad,
+    get_job_doc,
+    get_remote_doc,
+)
 from jobflow_remote.fireworks.tasks import RemoteJobFiretask
 from jobflow_remote.jobs.state import RemoteState
 from jobflow_remote.remote.data import (
@@ -95,8 +101,13 @@ class Runner:
             )
         return self.queue_managers[machine_id]
 
-    def get_fw_data(self, fw_id: int) -> JobFWData:
-        fw = self.rlpad.lpad.get_fw_by_id(fw_id)
+    def get_fw_data(self, fw_doc: dict) -> JobFWData:
+        # remove the launches to be able to create the FW instance without
+        # accessing the DB again
+        fw_doc_no_launches = dict(fw_doc)
+        fw_doc_no_launches["launches"] = []
+        fw_doc_no_launches["archived_launches"] = []
+        fw = Firework.from_dict(fw_doc_no_launches)
         task = fw.tasks[0]
         if len(fw.tasks) != 1 and not isinstance(task, RemoteJobFiretask):
             raise RuntimeError(f"jobflow-remote cannot handle task {task}")
@@ -144,8 +155,7 @@ class Runner:
                         RemoteState.TERMINATED.value,
                         RemoteState.DOWNLOADED.value,
                     ]
-                    collection = self.rlpad.remote_runs
-                    updated = self.lock_and_update(states, collection)
+                    updated = self.lock_and_update(states)
                     wait_advance_status = not updated
                     if not updated:
                         last_advance_status = time.time()
@@ -157,7 +167,7 @@ class Runner:
     def lock_and_update(
         self,
         states,
-        collection,
+        # collection,
         job_id=None,
         additional_filter=None,
         update=None,
@@ -175,27 +185,32 @@ class Runner:
         }
 
         db_filter = {
-            "state": {"$in": states},
-            "retry_time_limit": {"$not": {"$gt": datetime.utcnow()}},
+            f"{REMOTE_DOC_PATH}.state": {"$in": states},
+            f"{REMOTE_DOC_PATH}.retry_time_limit": {"$not": {"$gt": datetime.utcnow()}},
         }
         if job_id is not None:
-            db_filter["job_id"] = job_id
+            db_filter[FW_UUID_PATH] = job_id
         if additional_filter:
             db_filter = deep_merge_dict(db_filter, additional_filter)
 
+        collection = self.rlpad.fireworks
         with MongoLock(
             collection=collection,
             filter=db_filter,
             update=update,
             timeout=timeout,
             lock_id=self.runner_id,
+            lock_subdoc=REMOTE_DOC_PATH,
             **kwargs,
         ) as lock:
             doc = lock.locked_document
             if not doc:
                 return False
+            remote_doc = get_remote_doc(doc)
+            if not remote_doc:
+                return False
 
-            state = RemoteState(doc["state"])
+            state = RemoteState(remote_doc["state"])
 
             function = states_methods[state]
 
@@ -214,26 +229,26 @@ class Runner:
                 # the state.next.value is correct as SUBMITTED is not dealt with here.
                 succeeded_update = {
                     "$set": {
-                        "state": state.next.value,
-                        "step_attempts": 0,
-                        "retry_time_limit": None,
-                        "error": None,
+                        f"{REMOTE_DOC_PATH}.state": state.next.value,
+                        f"{REMOTE_DOC_PATH}.step_attempts": 0,
+                        f"{REMOTE_DOC_PATH}.retry_time_limit": None,
+                        f"{REMOTE_DOC_PATH}.error": None,
                     }
                 }
                 lock.update_on_release = deep_merge_dict(
                     succeeded_update, set_output or {}
                 )
             else:
-                step_attempts = doc["step_attempts"]
+                step_attempts = remote_doc["step_attempts"]
                 fail_now = (
                     fail_now or step_attempts >= self.runner_options.max_step_attempts
                 )
                 if fail_now:
                     lock.update_on_release = {
                         "$set": {
-                            "state": RemoteState.FAILED.value,
-                            "previous_state": state.value,
-                            "error": error,
+                            f"{REMOTE_DOC_PATH}.state": RemoteState.FAILED.value,
+                            f"{REMOTE_DOC_PATH}.previous_state": state.value,
+                            f"{REMOTE_DOC_PATH}.error": error,
                         }
                     }
                 else:
@@ -242,18 +257,25 @@ class Runner:
                     retry_time_limit = datetime.utcnow() + timedelta(seconds=delta)
                     lock.update_on_release = {
                         "$set": {
-                            "step_attempts": step_attempts,
-                            "retry_time_limit": retry_time_limit,
-                            "error": error,
+                            f"{REMOTE_DOC_PATH}.step_attempts": step_attempts,
+                            f"{REMOTE_DOC_PATH}.retry_time_limit": retry_time_limit,
+                            f"{REMOTE_DOC_PATH}.error": error,
                         }
                     }
+
+            if "$set" in lock.update_on_release:
+                lock.update_on_release["$set"][
+                    "updated_on"
+                ] = datetime.utcnow().isoformat()
+                self.ping_wf_doc(doc["fw_id"])
 
         return True
 
     def upload(self, doc):
         fw_id = doc["fw_id"]
+        remote_doc = get_remote_doc(doc)
         logger.debug(f"upload fw_id: {fw_id}")
-        fw_job_data = self.get_fw_data(fw_id)
+        fw_job_data = self.get_fw_data(doc)
 
         job = fw_job_data.job
         store = fw_job_data.store
@@ -279,8 +301,8 @@ class Runner:
         fw.tasks[0]["store"] = remote_store
         fw.tasks[0]["original_store"] = fw_job_data.original_store
 
-        files = get_remote_files(fw, doc["launch_id"])
-        self.rlpad.lpad.change_launch_dir(doc["launch_id"], remote_path)
+        files = get_remote_files(fw, remote_doc["launch_id"])
+        self.rlpad.lpad.change_launch_dir(remote_doc["launch_id"], remote_path)
 
         created = fw_job_data.host.mkdir(remote_path)
         if not created:
@@ -294,16 +316,16 @@ class Runner:
             path_file = Path(remote_path, fname)
             fw_job_data.host.write_text_file(path_file, fcontent)
 
-        set_output = {"$set": {"run_dir": remote_path}}
+        set_output = {"$set": {f"{REMOTE_DOC_PATH}.run_dir": remote_path}}
 
         return None, False, set_output
 
     def submit(self, doc):
-        fw_id = doc["fw_id"]
         logger.debug(f"submit fw_id: {doc['fw_id']}")
-        fw_job_data = self.get_fw_data(fw_id)
+        remote_doc = get_remote_doc(doc)
+        fw_job_data = self.get_fw_data(doc)
 
-        remote_path = doc["run_dir"]
+        remote_path = remote_doc["run_dir"]
 
         script_commands = ["rlaunch singleshot --offline"]
 
@@ -345,19 +367,21 @@ class Runner:
             return err_msg, True, None
         elif submit_result.status == SubmissionStatus.SUCCESSFUL:
 
-            set_output = {"$set": {"process_id": str(submit_result.job_id)}}
+            set_output = {
+                "$set": {f"{REMOTE_DOC_PATH}.process_id": str(submit_result.job_id)}
+            }
 
             return None, False, set_output
 
         raise RuntimeError(f"unhandled submission status {submit_result.status}")
 
     def download(self, doc):
-        fw_id = doc["fw_id"]
+        remote_doc = get_remote_doc(doc)
         logger.debug(f"download fw_id: {doc['fw_id']}")
-        fw_job_data = self.get_fw_data(fw_id)
+        fw_job_data = self.get_fw_data(doc)
         job = fw_job_data.job
 
-        remote_path = doc["run_dir"]
+        remote_path = remote_doc["run_dir"]
         loca_base_dir = Path(self.project.tmp_dir, "download")
         local_path = get_job_path(job.uuid, loca_base_dir)
 
@@ -383,9 +407,9 @@ class Runner:
         return None, False, None
 
     def complete_launch(self, doc):
-        fw_id = doc["fw_id"]
+        remote_doc = get_remote_doc(doc)
         logger.debug(f"complete launch fw_id: {doc['fw_id']}")
-        fw_job_data = self.get_fw_data(fw_id)
+        fw_job_data = self.get_fw_data(doc)
 
         loca_base_dir = Path(self.project.tmp_dir, "download")
         local_path = get_job_path(fw_job_data.job.uuid, loca_base_dir)
@@ -407,7 +431,7 @@ class Runner:
                 store=store,
                 remote_store=remote_store,
                 save=save,
-                launch_id=doc["launch_id"],
+                launch_id=remote_doc["launch_id"],
                 terminated=True,
             )
         except json.JSONDecodeError:
@@ -430,18 +454,22 @@ class Runner:
         # check for jobs that could have changed state
         machines_ids_docs = defaultdict(dict)
         db_filter = {
-            "state": {"$in": [RemoteState.SUBMITTED.value, RemoteState.RUNNING.value]}
+            f"{REMOTE_DOC_PATH}.state": {
+                "$in": [RemoteState.SUBMITTED.value, RemoteState.RUNNING.value]
+            }
         }
         projection = [
             "fw_id",
-            "launch_id",
-            "job_id",
-            "process_id",
-            "state",
-            "machine_id",
+            f"{REMOTE_DOC_PATH}.launch_id",
+            FW_UUID_PATH,
+            f"{REMOTE_DOC_PATH}.process_id",
+            f"{REMOTE_DOC_PATH}.state",
+            "spec._tasks.machine",
         ]
-        for doc in self.rlpad.remote_runs.find(db_filter, projection):
-            machines_ids_docs[doc["machine_id"]][doc["process_id"]] = doc
+        for doc in self.rlpad.fireworks.find(db_filter, projection):
+            machine_id = doc["spec"]["_tasks"][0]["machine"]
+            remote_doc = get_remote_doc(doc)
+            machines_ids_docs[machine_id][remote_doc["process_id"]] = (doc, remote_doc)
 
         for machine_id, ids_docs in machines_ids_docs.items():
 
@@ -460,39 +488,59 @@ class Runner:
 
             qjobs_dict = {qjob.job_id: qjob for qjob in qjobs}
 
-            for doc_id, doc in ids_docs.items():
+            for doc_id, (doc, remote_doc) in ids_docs.items():
                 # TODO if failed should maybe be handled differently?
                 qjob = qjobs_dict.get(doc_id)
                 qstate = qjob.state if qjob else None
-                collection = self.rlpad.remote_runs
+                collection = self.rlpad.fireworks
                 if (
                     qstate == QState.RUNNING
-                    and doc["state"] == RemoteState.SUBMITTED.value
+                    and remote_doc["state"] == RemoteState.SUBMITTED.value
                 ):
-                    lock_filter = {"state": doc["state"], "job_id": doc["job_id"]}
-                    with MongoLock(collection=collection, filter=lock_filter) as lock:
+                    lock_filter = {
+                        f"{REMOTE_DOC_PATH}.state": remote_doc["state"],
+                        FW_UUID_PATH: get_job_doc(doc)["uuid"],
+                    }
+                    with MongoLock(
+                        collection=collection,
+                        filter=lock_filter,
+                        lock_subdoc=REMOTE_DOC_PATH,
+                    ) as lock:
                         if lock.locked_document:
                             lock.update_on_release = {
                                 "$set": {
-                                    "state": RemoteState.RUNNING.value,
-                                    "queue_state": qstate.value,
+                                    f"{REMOTE_DOC_PATH}.state": RemoteState.RUNNING.value,
+                                    f"{REMOTE_DOC_PATH}.queue_state": qstate.value,
+                                    "updated_on": datetime.utcnow().isoformat(),
                                 }
                             }
+                            self.ping_wf_doc(doc["fw_id"])
                             logger.debug(
-                                f"remote job with id {doc['process_id']} is running"
+                                f"remote job with id {remote_doc['process_id']} is running"
                             )
                 elif qstate in [None, QState.DONE, QState.FAILED]:
-                    lock_filter = {"state": doc["state"], "job_id": doc["job_id"]}
-                    with MongoLock(collection=collection, filter=lock_filter) as lock:
+                    lock_filter = {
+                        f"{REMOTE_DOC_PATH}.state": remote_doc["state"],
+                        FW_UUID_PATH: get_job_doc(doc)["uuid"],
+                    }
+                    with MongoLock(
+                        collection=collection,
+                        filter=lock_filter,
+                        lock_subdoc=REMOTE_DOC_PATH,
+                    ) as lock:
                         if lock.locked_document:
                             lock.update_on_release = {
                                 "$set": {
-                                    "state": RemoteState.TERMINATED.value,
-                                    "queue_state": qstate.value if qstate else None,
+                                    f"{REMOTE_DOC_PATH}.state": RemoteState.TERMINATED.value,
+                                    f"{REMOTE_DOC_PATH}.queue_state": qstate.value
+                                    if qstate
+                                    else None,
+                                    "updated_on": datetime.utcnow().isoformat(),
                                 }
                             }
+                            self.ping_wf_doc(doc["fw_id"])
                             logger.debug(
-                                f"terminated remote job with id {doc['process_id']}"
+                                f"terminated remote job with id {remote_doc['process_id']}"
                             )
 
     def checkout(self):
@@ -506,3 +554,8 @@ class Runner:
                 host.close()
             except Exception:
                 logging.exception(f"error while closing host {host_id}")
+
+    def ping_wf_doc(self, db_id: int):
+        self.rlpad.workflows.find_one_and_update(
+            {"nodes": db_id}, {"$set": {"updated_on": datetime.utcnow().isoformat()}}
+        )

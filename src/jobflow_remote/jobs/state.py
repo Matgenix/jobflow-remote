@@ -75,9 +75,9 @@ class JobState(Enum):
         elif self in (JobState.COMPLETED, JobState.PAUSED):
             return [self.value], [RemoteState(self.value)]
         elif self == JobState.ONGOING:
-            return ["RESERVED", "RUNNING"], [RemoteState.FAILED]
-        elif self == JobState.REMOTE_ERROR:
             return ["RESERVED", "RUNNING"], list(remote_states_order)
+        elif self == JobState.REMOTE_ERROR:
+            return ["RESERVED", "RUNNING"], [RemoteState.FAILED]
         elif self == JobState.FAILED:
             return ["FIZZLED"], [RemoteState.COMPLETED]
 
@@ -100,7 +100,7 @@ class FlowState(Enum):
             return cls.READY
         elif all(js == JobState.COMPLETED for js in jobs_states):
             return cls.COMPLETED
-        elif any(js == JobState.FAILED for js in jobs_states):
+        elif any(js in (JobState.FAILED, JobState.REMOTE_ERROR) for js in jobs_states):
             return cls.FAILED
         elif all(js == JobState.PAUSED for js in jobs_states):
             return cls.PAUSED

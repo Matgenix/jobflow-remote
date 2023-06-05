@@ -22,6 +22,7 @@ def flow_to_workflow(
     store: jobflow.JobStore | None = None,
     exec_config: str | ExecutionConfig = None,
     resources: dict | QResources | None = None,
+    metadata: dict | None = None,
     **kwargs,
 ) -> Workflow:
     """
@@ -48,6 +49,9 @@ def flow_to_workflow(
     resources: Dict or QResources
         information passed to qtoolkit to require the resources for the submission
         to the queue.
+    metadata: Dict
+        metadata passed to the workflow. The flow uuid will be added with the key
+        "flow_id".
     **kwargs
         Keyword arguments passed to Workflow init method.
 
@@ -76,7 +80,10 @@ def flow_to_workflow(
         )
         fireworks.append(fw)
 
-    return Workflow(fireworks, name=flow.name, **kwargs)
+    metadata = metadata or {}
+    metadata["flow_id"] = flow.uuid
+
+    return Workflow(fireworks, name=flow.name, metadata=metadata, **kwargs)
 
 
 def job_to_firework(

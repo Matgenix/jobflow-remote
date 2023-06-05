@@ -30,6 +30,18 @@ class LogLevel(Enum):
         }[self]
 
 
+class SortOption(Enum):
+    CREATED_ON = "created_on"
+    UPDATED_ON = "updated_on"
+    DB_ID = "db_id"
+
+    @property
+    def query_field(self) -> str:
+        if self == SortOption.DB_ID:
+            return "fw_id"
+        return self.value
+
+
 def exit_with_error_msg(message, code=1, **kwargs):
     kwargs.setdefault("style", "red")
     err_console.print(message, **kwargs)

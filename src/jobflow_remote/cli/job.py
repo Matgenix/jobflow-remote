@@ -13,12 +13,16 @@ from jobflow_remote.cli.types import (
     job_id_arg,
     job_ids_opt,
     job_state_opt,
+    max_results_opt,
     remote_state_arg,
     remote_state_opt,
+    reverse_sort_flag_opt,
+    sort_opt,
     start_date_opt,
     verbosity_opt,
 )
 from jobflow_remote.cli.utils import (
+    SortOption,
     check_incompatible_opt,
     exit_with_error_msg,
     get_job_db_ids,
@@ -44,6 +48,9 @@ def jobs_list(
     end_date: end_date_opt = None,
     days: days_opt = None,
     verbosity: verbosity_opt = 0,
+    max_results: max_results_opt = 100,
+    sort: sort_opt = SortOption.UPDATED_ON.value,
+    reverse_sort: reverse_sort_flag_opt = False,
 ):
     """
     Get the list of Jobs in the database
@@ -57,6 +64,8 @@ def jobs_list(
     if days:
         start_date = datetime.now() - timedelta(days=days)
 
+    sort = [(sort.query_field, 1 if reverse_sort else -1)]
+
     with loading_spinner():
         jobs_info = jc.get_jobs_info(
             job_ids=job_id,
@@ -65,12 +74,19 @@ def jobs_list(
             remote_state=remote_state,
             start_date=start_date,
             end_date=end_date,
+            limit=max_results,
+            sort=sort,
         )
 
         table = get_job_info_table(jobs_info, verbosity=verbosity)
 
-    console = out_console
-    console.print(table)
+    if max_results and len(jobs_info) == max_results:
+        out_console.print(
+            f"The number of Jobs printed is limited by the maximum selected: {max_results}",
+            style="yellow",
+        )
+
+    out_console.print(table)
 
 
 @app_job.command(name="info")

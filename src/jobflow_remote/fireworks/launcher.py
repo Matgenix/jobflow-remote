@@ -51,7 +51,7 @@ def checkout_remote(
                     f"Un-reserving FW with fw_id, launch_id: {fw.fw_id}, {launch_id}"
                 )
                 rlpad.lpad.cancel_reservation(launch_id)
-                rlpad.forget_remote(launch_id)
+                rlpad.forget_remote(fw.fw_id)
             except Exception:
                 logger.exception(f"Error unreserving FW with fw_id {fw.fw_id}")
 

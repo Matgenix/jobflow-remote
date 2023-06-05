@@ -6,8 +6,8 @@ import traceback
 from dataclasses import asdict, dataclass
 
 from fireworks import Firework, FWAction, Launch, LaunchPad, Workflow
-from fireworks.core.launchpad import get_action_from_gridfs
-from fireworks.utilities.fw_serializers import reconstitute_dates
+from fireworks.core.launchpad import WFLock, get_action_from_gridfs
+from fireworks.utilities.fw_serializers import reconstitute_dates, recursive_dict
 from pymongo import ASCENDING
 from qtoolkit.core.data_objects import QState
 
@@ -19,18 +19,25 @@ from jobflow_remote.utils.db import MongoLock
 logger = logging.getLogger(__name__)
 
 
-fw_uuid = "spec._tasks.job.uuid"
+FW_UUID_PATH = "spec._tasks.job.uuid"
+REMOTE_DOC_PATH = "spec.remote"
+REMOTE_LOCK_PATH = f"{REMOTE_DOC_PATH}.{MongoLock.LOCK_KEY}"
+REMOTE_LOCK_TIME_PATH = f"{REMOTE_DOC_PATH}.{MongoLock.LOCK_TIME_KEY}"
+
+
+def get_remote_doc(doc: dict) -> dict:
+    for k in REMOTE_DOC_PATH.split("."):
+        doc = doc.get(k, {})
+    return doc
+
+
+def get_job_doc(doc: dict) -> dict:
+    return doc["spec"]["_tasks"][0]["job"]
 
 
 @dataclass
 class RemoteRun:
-    fw_id: int
     launch_id: int
-    name: str
-    job_id: str
-    machine_id: str
-    created_on: str = datetime.datetime.utcnow().isoformat()
-    updated_on: str = datetime.datetime.utcnow().isoformat()
     state: RemoteState = RemoteState.CHECKED_OUT
     step_attempts: int = 0
     retry_time_limit: datetime.datetime | None = None
@@ -60,7 +67,6 @@ class RemoteRun:
         d["state"] = RemoteState(d["state"])
         d["previous_state"] = RemoteState(d["previous_state"])
         d["queue_state"] = QState(d["queue_state"])
-        d.pop("_id", None)
         d["lock_id"] = d.pop(MongoLock.LOCK_KEY, None)
         d["lock_time"] = d.pop(MongoLock.LOCK_TIME_KEY, None)
         return cls(**d)
@@ -73,7 +79,6 @@ class RemoteRun:
 class RemoteLaunchPad:
     def __init__(self, **kwargs):
         self.lpad = LaunchPad(**kwargs)
-        self.remote_runs = self.db.remote_runs
         self.archived_remote_runs = self.db.archived_remote_runs
 
     @property
@@ -94,13 +99,9 @@ class RemoteLaunchPad:
 
     def reset(self, password, require_password=True, max_reset_wo_password=25):
         self.lpad.reset(password, require_password, max_reset_wo_password)
-        self.remote_runs.delete_many({})
-        self.fireworks.create_index(fw_uuid, unique=True, background=True)
-        self.remote_runs.create_index("job_id", unique=True, background=True)
-        self.remote_runs.create_index("launch_id", unique=True, background=True)
-        self.remote_runs.create_index("fw_id", unique=True, background=True)
+        self.fireworks.create_index(FW_UUID_PATH, unique=True, background=True)
 
-    def forget_remote(self, launchid_or_fwid, launch_mode=True):
+    def forget_remote(self, fwid):
         """
         Delete the remote run  document for the given launch or firework id.
 
@@ -108,12 +109,9 @@ class RemoteLaunchPad:
             launchid_or_fwid (int): launch od or firework id
             launch_mode (bool): if True then launch id is given.
         """
-        q = (
-            {"launch_id": launchid_or_fwid}
-            if launch_mode
-            else {"fw_id": launchid_or_fwid}
-        )
-        self.db.remote_runs.delete_many(q)
+        q = {"fw_id": fwid}
+
+        self.db.fireworks.update_one(q, {"$unset": {"spec._remote": ""}})
 
     def add_remote_run(self, launch_id, fw):
         """
@@ -123,16 +121,12 @@ class RemoteLaunchPad:
             launch_id (int): launch id
         """
         task = fw.tasks[0]
-        job = task.get("job")
-        remote_run = RemoteRun(
-            fw_id=fw.fw_id,
-            launch_id=launch_id,
-            name=fw.name,
-            job_id=job.uuid,
-            machine_id=task.get("machine"),
-        )
+        task.get("job")
+        remote_run = RemoteRun(launch_id)
 
-        self.db.remote_runs.insert_one(remote_run.as_db_dict())
+        self.db.fireworks.update_one(
+            {"fw_id": fw.fw_id}, {"$set": {REMOTE_DOC_PATH: remote_run.as_db_dict()}}
+        )
 
     def recover_remote(
         self,
@@ -218,19 +212,12 @@ class RemoteLaunchPad:
                     {
                         "$set": {
                             "state": "RUNNING",
-                            "updated_on": datetime.datetime.utcnow(),
+                            "updated_on": datetime.datetime.utcnow().isoformat(),
                         }
                     },
                 )
                 if f:
                     self.lpad._refresh_wf(fw_id)
-
-            # update the updated_on
-            self.remote_runs.update_one(
-                {"launch_id": launch_id},
-                {"$set": {"updated_on": datetime.datetime.utcnow().isoformat()}},
-            )
-            # return None
 
             if completed:
                 update_store(store, remote_store, save)
@@ -254,9 +241,7 @@ class RemoteLaunchPad:
                     exit=True,
                 )
                 self.lpad.complete_launch(launch_id, m_action, "FIZZLED")
-                # self.remote_runs.update_one(
-                #     {"launch_id": launch_id}, {"$set": {"completed": True}}
-                # )
+
                 completed = True
         return m_launch.fw_id, completed
 
@@ -316,7 +301,7 @@ class RemoteLaunchPad:
         if fw_id:
             query["fw_id"] = fw_id
         if job_id:
-            query[fw_uuid] = job_id
+            query[FW_UUID_PATH] = job_id
         if not query:
             raise ValueError("At least one among fw_id and job_id should be specified")
         return query
@@ -347,7 +332,7 @@ class RemoteLaunchPad:
         return Firework.from_dict(self.get_fw_dict(fw_id, job_id))
 
     def get_fw_id_from_job_id(self, job_id: str):
-        fw_dict = self.fireworks.find_one({fw_uuid: job_id}, projection=["fw_id"])
+        fw_dict = self.fireworks.find_one({FW_UUID_PATH: job_id}, projection=["fw_id"])
         if not fw_dict:
             raise ValueError(f"No Firework exists with id: {job_id}")
 
@@ -357,21 +342,87 @@ class RemoteLaunchPad:
         self,
         fw_id: int | None = None,
         job_id: str | None = None,
-        rerun_duplicates: bool = True,
         recover_launch: int | str | None = None,
         recover_mode: str | None = None,
     ):
-        fw_id, job_id = self._check_ids(fw_id, job_id)
-        rerun_fw_ids = self.lpad.rerun_fw(
-            fw_id, rerun_duplicates, recover_launch, recover_mode
-        )
+        """
+        Rerun the firework corresponding to the given id.
 
-        to_archive = self.remote_runs.find({"fw_id": {"$in": rerun_fw_ids}})
-        for doc in to_archive:
-            doc.pop("_id", None)
-            self.archived_remote_runs.insert(doc)
+        Args:
+            fw_id (int): firework id
+            recover_launch ('last' or int): launch_id for last recovery, if set to
+                'last' (default), recovery will find the last available launch.
+                If it is an int, will recover that specific launch
+            recover_mode ('prev_dir' or 'cp'): flag to indicate whether to copy
+                or run recovery fw in previous directory
 
-        self.remote_runs.delete_many({"fw_id": {"$in": rerun_fw_ids}})
+        Returns:
+            [int]: list of firework ids that were rerun
+        """
+        if job_id is None and fw_id is None:
+            raise ValueError("At least one among fw_id and job_id should be defined")
+
+        if job_id:
+            m_fw = self.fireworks.find_one(
+                {FW_UUID_PATH: job_id}, {"state": 1, "fw_id": 1}
+            )
+        else:
+            m_fw = self.fireworks.find_one({"fw_id": fw_id}, {"state": 1, "fw_id": 1})
+
+        if not m_fw:
+            raise ValueError(f"FW with id: {fw_id or job_id} not found!")
+        fw_id = m_fw["fw_id"]
+
+        reruns = []
+
+        # Launch recovery
+        if recover_launch is not None:
+            recovery = self.lpad.get_recovery(fw_id, recover_launch)
+            recovery.update({"_mode": recover_mode})
+            set_spec = recursive_dict({"$set": {"spec._recovery": recovery}})
+            if recover_mode == "prev_dir":
+                prev_dir = self.lpad.get_launch_by_id(
+                    recovery.get("_launch_id")
+                ).launch_dir
+                set_spec["$set"]["spec._launch_dir"] = prev_dir
+            self.fireworks.find_one_and_update({"fw_id": fw_id}, set_spec)
+
+        # If no launch recovery specified, unset the firework recovery spec
+        else:
+            set_spec = {"$unset": {"spec._recovery": ""}}
+            self.fireworks.find_one_and_update({"fw_id": fw_id}, set_spec)
+
+        # rerun this FW
+        if m_fw["state"] in ["ARCHIVED", "DEFUSED"]:
+            self.lpad.m_logger.info(
+                f"Cannot rerun fw_id: {fw_id}: it is {m_fw['state']}."
+            )
+        elif m_fw["state"] == "WAITING" and not recover_launch:
+            self.lpad.m_logger.debug(
+                f"Skipping rerun fw_id: {fw_id}: it is already WAITING."
+            )
+        else:
+            with WFLock(self.lpad, fw_id):
+                wf = self.lpad.get_wf_by_fw_id_lzyfw(fw_id)
+                updated_ids = wf.rerun_fw(fw_id)
+                # before updating the fireworks in the database deal with the
+                # remote part of the document in the fireworks. Copy the content to
+                # archived ones and remove the "remote" from the FW.
+                remote_docs = []
+                for fw in wf.fws:
+                    if fw.fw_id in updated_ids:
+                        remote_doc = fw.spec.pop("_remote")
+                        if remote_doc:
+                            remote_docs.append(remote_doc)
+
+                if remote_docs:
+                    self.archived_remote_runs.insert_many(remote_docs)
+
+                # now update the fw and wf in the db
+                self.lpad._update_wf(wf, updated_ids)
+                reruns.append(fw_id)
+
+        return reruns
 
     def set_remote_values(
         self,
@@ -382,10 +433,13 @@ class RemoteLaunchPad:
     ) -> bool:
         lock_filter = self._generate_id_query(fw_id, job_id)
         with MongoLock(
-            collection=self.remote_runs, filter=lock_filter, break_lock=break_lock
+            collection=self.fireworks,
+            filter=lock_filter,
+            break_lock=break_lock,
+            lock_subdoc=REMOTE_DOC_PATH,
         ) as lock:
             if lock.locked_document:
-                values = dict(values)
+                values = {f"{REMOTE_DOC_PATH}{k}": v for k, v in values.items()}
                 values["updated_on"] = datetime.datetime.utcnow().isoformat()
                 lock.update_on_release = {"$set": values}
                 return True
@@ -394,9 +448,9 @@ class RemoteLaunchPad:
 
     def remove_lock(self, fw_id: int | None = None, job_id: str | None = None):
         query = self._generate_id_query(fw_id, job_id)
-        result = self.remote_runs.find_one_and_update(
+        result = self.fireworks.find_one_and_update(
             query,
-            {"$unset": {MongoLock.LOCK_KEY: "", MongoLock.LOCK_TIME_KEY: ""}},
+            {"$unset": {REMOTE_LOCK_PATH: "", REMOTE_LOCK_TIME_PATH: ""}},
             projection=["fw_id"],
         )
         if not result:
@@ -404,39 +458,45 @@ class RemoteLaunchPad:
 
     def is_locked(self, fw_id: int | None = None, job_id: str | None = None) -> bool:
         query = self._generate_id_query(fw_id, job_id)
-        result = self.remote_runs.find_one(query, projection=[MongoLock.LOCK_KEY])
+        result = self.fireworks.find_one(query, projection=[REMOTE_LOCK_PATH])
         if not result:
             raise ValueError("No job matching id")
-        return MongoLock.LOCK_KEY in result
+        return REMOTE_LOCK_PATH in result
 
     def reset_failed_state(
         self, fw_id: int | None = None, job_id: str | None = None
     ) -> bool:
         lock_filter = self._generate_id_query(fw_id, job_id)
-        with MongoLock(collection=self.remote_runs, filter=lock_filter) as lock:
+        with MongoLock(
+            collection=self.fireworks, filter=lock_filter, lock_subdoc=REMOTE_DOC_PATH
+        ) as lock:
             doc = lock.locked_document
-            if doc:
-                state = doc["state"]
+            remote = get_remote_doc(doc)
+            if remote:
+                state = remote["state"]
                 if state != RemoteState.FAILED.value:
                     raise ValueError("Job is not in a FAILED state")
-                previous_state = doc["previous_state"]
+                previous_state = remote["previous_state"]
                 try:
                     RemoteState(previous_state)
                 except ValueError:
                     raise ValueError(
                         f"The registered previous state: {previous_state} is not a valid state"
                     )
-                lock.update_on_release = {
-                    "$set": {
-                        "state": previous_state,
-                        "updated_on": datetime.datetime.utcnow().isoformat(),
-                        "step_attempts": 0,
-                        "retry_time_limit": None,
-                        "previous_state": None,
-                        "queue_state": None,
-                        "error": None,
-                    }
+                set_dict = {
+                    "state": previous_state,
+                    "step_attempts": 0,
+                    "retry_time_limit": None,
+                    "previous_state": None,
+                    "queue_state": None,
+                    "error": None,
                 }
+                for k, v in list(set_dict.items()):
+                    set_dict[f"{REMOTE_DOC_PATH}.{k}"] = v
+                    set_dict.pop(k)
+                set_dict["updated_on"] = datetime.datetime.utcnow().isoformat()
+
+                lock.update_on_release = {"$set": {set_dict}}
                 return True
 
         return False
@@ -451,21 +511,32 @@ class RemoteLaunchPad:
         links_dict = self.workflows.find_one({"nodes": fw_id})
         fw_ids = links_dict["nodes"]
         self.lpad.delete_fws(fw_ids, delete_launch_dirs=False)
-        self.remote_runs.delete_many({"fw_id": {"$in": fw_ids}})
         self.archived_remote_runs.delete_many({"fw_id": {"$in": fw_ids}})
         self.workflows.delete_one({"nodes": fw_id})
 
     def get_remote_run(
         self, fw_id: int | None = None, job_id: str | None = None
     ) -> RemoteRun:
-        query = self._generate_id_query(fw_id, job_id)
-        remote_run_dict = self.remote_runs.find_one(query)
-        if not remote_run_dict:
+        query: dict = {}
+        if job_id:
+            query[FW_UUID_PATH] = job_id
+        if fw_id:
+            query["fw_id"] = fw_id
+
+        if not query:
+            raise ValueError("At least one among fw_id and job_id should be defined")
+
+        fw = self.fireworks.find_one(query)
+        if not fw:
+            raise ValueError(f"No Job exists with fw id: {fw_id} or job_id {job_id}")
+
+        remote_dict = get_remote_doc(fw)
+        if not remote_dict:
             raise ValueError(
-                f"No Firework exists with fw id: {fw_id} or job_id {job_id}"
+                f"No Remote run exists with fw id: {fw_id} or job_id {job_id}"
             )
 
-        return RemoteRun.from_db_dict(remote_run_dict)
+        return RemoteRun.from_db_dict(remote_dict)
 
     def get_fws(
         self, query: dict | None = None, sort: list[tuple] | None = None, limit: int = 0
@@ -477,38 +548,38 @@ class RemoteLaunchPad:
             fws.append(Firework.from_dict(doc))
         return fws
 
-    def get_fw_remote_run_data(
-        self,
-        query: dict | None = None,
-        projection: dict | None = None,
-        sort: dict | None = None,
-        limit: int = 0,
-    ) -> list[dict]:
-
-        pipeline: list[dict] = [
-            {
-                "$lookup": {
-                    "from": "remote_runs",
-                    "localField": "fw_id",
-                    "foreignField": "fw_id",
-                    "as": "remote",
-                }
-            }
-        ]
-
-        if query:
-            pipeline.append({"$match": query})
-
-        if projection:
-            pipeline.append({"$project": projection})
-
-        if sort:
-            pipeline.append({"$sort": sort})
-
-        if limit:
-            pipeline.append({"$limit": limit})
-
-        return list(self.fireworks.aggregate(pipeline))
+    # def get_fw_remote_run_data(
+    #     self,
+    #     query: dict | None = None,
+    #     projection: dict | None = None,
+    #     sort: dict | None = None,
+    #     limit: int = 0,
+    # ) -> list[dict]:
+    #
+    #     pipeline: list[dict] = [
+    #         {
+    #             "$lookup": {
+    #                 "from": "remote_runs",
+    #                 "localField": "fw_id",
+    #                 "foreignField": "fw_id",
+    #                 "as": "remote",
+    #             }
+    #         }
+    #     ]
+    #
+    #     if query:
+    #         pipeline.append({"$match": query})
+    #
+    #     if projection:
+    #         pipeline.append({"$project": projection})
+    #
+    #     if sort:
+    #         pipeline.append({"$sort": sort})
+    #
+    #     if limit:
+    #         pipeline.append({"$limit": limit})
+    #
+    #     return list(self.fireworks.aggregate(pipeline))
 
     def get_fw_remote_run(
         self,
@@ -517,23 +588,19 @@ class RemoteLaunchPad:
         sort: dict | None = None,
         limit: int = 0,
     ) -> list[tuple[Firework, RemoteRun | None]]:
-        raw_data = self.get_fw_remote_run_data(
+        fws = self.fireworks.find(
             query=query, projection=projection, sort=sort, limit=limit
         )
 
         data = []
-        for d in raw_data:
-            r = d.pop("remote", None)
+        for fw_dict in fws:
+            r = get_remote_doc(fw_dict)
             if r:
-                if len(r) > 1:
-                    raise RuntimeError(
-                        f"error retrieving the remote_run document. {len(r)} found. Expected 1."
-                    )
-                remote_run = RemoteRun.from_db_dict(r[0])
+                remote_run = RemoteRun.from_db_dict(r)
             else:
                 remote_run = None
 
-            fw = Firework.from_dict(d)
+            fw = Firework.from_dict(fw_dict)
             data.append((fw, remote_run))
 
         return data
@@ -541,15 +608,9 @@ class RemoteLaunchPad:
     def get_fw_ids(
         self, query: dict | None = None, sort: dict | None = None, limit: int = 0
     ) -> list[int]:
-        remote_required = check_dict_keywords(query, ["remote."])
-        if remote_required:
-            result = self.get_fw_remote_run_data(
-                query=query, sort=sort, limit=limit, projection={"fw_id": 1}
-            )
-        else:
-            result = self.fireworks.find(
-                query, sort=sort, limit=limit, projection=["fw_id"]
-            )
+        result = self.fireworks.find(
+            query=query, sort=sort, limit=limit, projection={"fw_id": 1}
+        )
 
         fw_ids = []
         for doc in result:
@@ -566,13 +627,13 @@ class RemoteLaunchPad:
         if fw_id:
             query["fw_id"] = fw_id
         if job_id:
-            query[fw_uuid] = job_id
+            query[FW_UUID_PATH] = job_id
         results = self.get_fw_remote_run(query=query)
         if not results:
             return None
         return results[0]
 
-    def get_wf_fw_remote_run_data(
+    def get_wf_fw_data(
         self,
         query: dict | None = None,
         projection: dict | None = None,
@@ -588,15 +649,7 @@ class RemoteLaunchPad:
                     "foreignField": "fw_id",
                     "as": "fws",
                 }
-            },
-            {
-                "$lookup": {
-                    "from": "remote_runs",
-                    "localField": "nodes",
-                    "foreignField": "fw_id",
-                    "as": "remote",
-                }
-            },
+            }
         ]
 
         if query:
@@ -616,15 +669,16 @@ class RemoteLaunchPad:
     def get_wf_fw_remote_run(
         self, query: dict | None = None, sort: dict | None = None, limit: int = 0
     ) -> list[tuple[Workflow, dict[int, RemoteRun]]]:
-        raw_data = self.get_wf_fw_remote_run_data(query=query, sort=sort, limit=limit)
+        raw_data = self.get_wf_fw_data(query=query, sort=sort, limit=limit)
 
         data = []
         for d in raw_data:
-            remotes = d.pop("remote", None)
-
+            fws = d["fws"]
             remotes_dict = {}
-            for r in remotes:
-                remotes_dict[r["fw_id"]] = RemoteRun.from_db_dict(r)
+            for fw_dict in fws:
+                r = get_remote_doc(fw_dict)
+                if r:
+                    remotes_dict[fw_dict["fw_id"]] = RemoteRun.from_db_dict(r)
 
             wf = Workflow.from_dict(d)
             data.append((wf, remotes_dict))
@@ -634,10 +688,10 @@ class RemoteLaunchPad:
     def get_wf_ids(
         self, query: dict | None = None, sort: dict | None = None, limit: int = 0
     ) -> list[int]:
-        full_required = check_dict_keywords(query, ["remote.", "fws."])
+        full_required = check_dict_keywords(query, ["fws."])
 
         if full_required:
-            result = self.get_wf_fw_remote_run_data(
+            result = self.get_wf_fw_data(
                 query=query, sort=sort, limit=limit, projection={"fw_id": 1}
             )
         else:
@@ -658,15 +712,7 @@ class RemoteLaunchPad:
     ) -> list[dict]:
 
         # only take the most recent launch
-        pipeline = [
-            {
-                "$lookup": {
-                    "from": "remote_runs",
-                    "localField": "fw_id",
-                    "foreignField": "fw_id",
-                    "as": "remote",
-                }
-            },
+        pipeline: list[dict] = [
             {
                 "$lookup": {
                     "from": "launches",

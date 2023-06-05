@@ -24,6 +24,7 @@ class MongoLock:
         timeout=None,
         break_lock=False,
         lock_id=None,
+        lock_subdoc="",
         **kwargs,
     ):
         self.collection = collection
@@ -33,8 +34,31 @@ class MongoLock:
         self.break_lock = break_lock
         self.locked_document = None
         self.lock_id = lock_id or id(self)
+        if lock_subdoc and not lock_subdoc.endswith("."):
+            lock_subdoc = lock_subdoc + "."
+        self.lock_subdoc = lock_subdoc
         self.kwargs = kwargs
-        self.update_on_release = None
+        self.update_on_release: dict = {}
+
+    @property
+    def lock_key(self) -> str:
+        return f"{self.lock_subdoc}{self.LOCK_KEY}"
+
+    @property
+    def lock_time_key(self) -> str:
+        return f"{self.lock_subdoc}{self.LOCK_TIME_KEY}"
+
+    def get_lock_time(self, d: dict):
+        keys = self.lock_time_key.split(".")
+        for k in keys:
+            d = d.get(k, {})
+        return d
+
+    def get_lock_id(self, d: dict):
+        keys = self.lock_id.split(".")
+        for k in keys:
+            d = d.get(k, {})
+        return d
 
     def acquire(self):
         # Set the lock expiration time
@@ -43,10 +67,10 @@ class MongoLock:
 
         lock_limit = None
         if not self.break_lock:
-            lock_filter = {self.LOCK_KEY: {"$exists": False}}
+            lock_filter = {self.lock_key: {"$exists": False}}
             if self.timeout:
                 lock_limit = now - timedelta(seconds=self.timeout)
-                time_filter = {self.LOCK_TIME_KEY: {"$lt": lock_limit}}
+                time_filter = {self.lock_time_key: {"$lt": lock_limit}}
                 combined_filter = {"$or": [lock_filter, time_filter]}
                 if "$or" in db_filter:
                     db_filter["$and"] = [db_filter, combined_filter]
@@ -55,7 +79,7 @@ class MongoLock:
             else:
                 db_filter.update(lock_filter)
 
-        lock_set = {self.LOCK_KEY: self.lock_id, self.LOCK_TIME_KEY: now}
+        lock_set = {self.lock_key: self.lock_id, self.lock_time_key: now}
         update = defaultdict(dict)
         if self.update:
             update.update(copy.deepcopy(self.update))
@@ -70,22 +94,24 @@ class MongoLock:
         )
 
         if result:
-            if lock_limit and result[self.LOCK_TIME_KEY] > lock_limit:
-                msg = f"The lock was broken. Previous lock id: {result[self.LOCK_KEY]}"
+            if lock_limit and self.get_lock_time(result) > lock_limit:
+                msg = (
+                    f"The lock was broken. Previous lock id: {self.get_lock_id(result)}"
+                )
                 warnings.warn(msg)
 
             self.locked_document = result
 
     def release(self, exc_type, exc_val, exc_tb):
         # Release the lock by removing the unique identifier and lock expiration time
-        update = {"$unset": {self.LOCK_KEY: "", self.LOCK_TIME_KEY: ""}}
+        update = {"$unset": {self.lock_key: "", self.lock_time_key: ""}}
         # TODO maybe set on release only if no exception was raised?
         if self.update_on_release:
             update = deep_merge_dict(update, self.update_on_release)
         logger.debug(f"release lock with update: {update}")
         # TODO if failed to release the lock maybe retry before failing
         result = self.collection.update_one(
-            {"_id": self.locked_document["_id"], self.LOCK_KEY: self.lock_id},
+            {"_id": self.locked_document["_id"], self.lock_key: self.lock_id},
             update,
             upsert=False,
         )

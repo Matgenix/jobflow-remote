@@ -1,11 +1,16 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
 from jobflow import Job
 
-from jobflow_remote.fireworks.launchpad import fw_uuid
+from jobflow_remote.fireworks.launchpad import (
+    FW_UUID_PATH,
+    REMOTE_DOC_PATH,
+    get_job_doc,
+    get_remote_doc,
+)
 from jobflow_remote.jobs.state import FlowState, JobState, RemoteState
 
 
@@ -20,19 +25,20 @@ class JobData:
 
 job_info_projection = {
     "fw_id": 1,
-    fw_uuid: 1,
+    FW_UUID_PATH: 1,
     "state": 1,
-    "remote.state": 1,
+    f"{REMOTE_DOC_PATH}.state": 1,
     "name": 1,
     "updated_on": 1,
-    "remote.updated_on": 1,
-    "remote.previous_state": 1,
-    "remote.lock_id": 1,
-    "remote.lock_time": 1,
-    "remote.retry_time_limit": 1,
-    "remote.process_id": 1,
-    "remote.run_dir": 1,
+    f"{REMOTE_DOC_PATH}.updated_on": 1,
+    f"{REMOTE_DOC_PATH}.previous_state": 1,
+    f"{REMOTE_DOC_PATH}.lock_id": 1,
+    f"{REMOTE_DOC_PATH}.lock_time": 1,
+    f"{REMOTE_DOC_PATH}.retry_time_limit": 1,
+    f"{REMOTE_DOC_PATH}.process_id": 1,
+    f"{REMOTE_DOC_PATH}.run_dir": 1,
     "spec._tasks.machine": 1,
+    "spec._tasks.job.hosts": 1,
 }
 
 
@@ -53,25 +59,18 @@ class JobInfo:
     run_dir: str | None = None
     error_job: str | None = None
     error_remote: str | None = None
+    host_flows_ids: list[str] = field(default_factory=lambda: list())
 
     @classmethod
     def from_query_dict(cls, d):
-        remote = d.get("remote") or {}
-        if remote:
-            remote = remote[0]
+        remote = get_remote_doc(d)
         remote_state_val = remote.get("state")
         remote_state = (
             RemoteState(remote_state_val) if remote_state_val is not None else None
         )
         state = JobState.from_states(d["state"], remote_state)
         # in FW the date is encoded in a string
-        fw_update_date = datetime.fromisoformat(d["updated_on"])
-        remote_update_date = remote.get("updated_on")
-        if remote_update_date:
-            remote_update_date = datetime.fromisoformat(d["updated_on"])
-            last_updated = max(fw_update_date, remote_update_date)
-        else:
-            last_updated = fw_update_date
+        last_updated = datetime.fromisoformat(d["updated_on"])
         # the dates should be in utc time. Convert them to the system time
         last_updated = last_updated.replace(tzinfo=timezone.utc).astimezone(tz=None)
         remote_previous_state_val = remote.get("previous_state")
@@ -116,26 +115,29 @@ class JobInfo:
             run_dir=remote.get("run_dir"),
             error_remote=remote.get("error"),
             error_job=error_job,
+            host_flows_ids=d["spec"]["_tasks"][0]["job"]["hosts"],
         )
 
 
 flow_info_projection = {
     "fws.fw_id": 1,
-    f"fws.{fw_uuid}": 1,
+    f"fws.{FW_UUID_PATH}": 1,
     "fws.state": 1,
-    "remote.state": 1,
+    "fws.name": 1,
+    f"fws.{REMOTE_DOC_PATH}.state": 1,
     "name": 1,
     "updated_on": 1,
     "fws.updated_on": 1,
-    "remote.updated_on": 1,
     "fws.spec._tasks.machine": 1,
+    "metadata.flow_id": 1,
 }
 
 
 @dataclass
 class FlowInfo:
-    db_ids: int
-    job_ids: str
+    db_ids: list[int]
+    job_ids: list[str]
+    flow_id: str
     state: FlowState
     name: str
     last_updated: datetime
@@ -143,34 +145,43 @@ class FlowInfo:
     job_states: list[JobState]
     job_names: list[str]
 
-    # @classmethod
-    # def from_query_dict(cls, d):
-    #     fws = d.get("fws") or []
-    #     remotes = d.get("remote") or []
-    #
-    #     matched_data = defaultdict(list)
-    #     for fw in fws:
-    #         matched_data[fw.get(fw_uuid)].append(fw)
-    #     for r in remotes:
-    #         matched_data[r.get("job_id")].append(r)
-    #
-    #     machines = []
-    #     job_states = []
-    #     job_names = []
-    #     last_updated_list = []
-    #     db_ids = []
-    #     job_ids = []
-    #     for job_id, (fw, r) in matched_data.items():
-    #         job_ids.append(job_id)
-    #         db_ids.append(fw.get("fw_id"))
-    #
-    #         last_updated_list.append(datetime.fromisoformat(d["updated_on"]))
-    #         remote_update_date = remote.get("updated_on")
-    #         if remote_update_date:
-    #             remote_update_date = datetime.fromisoformat(d["updated_on"])
-    #             last_updated = max(fw_update_date, remote_update_date)
-    #         else:
-    #             last_updated = fw_update_date
-    #         last_updated_list
-    #
-    #     # for the last updated field, collect all the dates and take the latest one
+    @classmethod
+    def from_query_dict(cls, d):
+        # in FW the date is encoded in a string
+        last_updated = datetime.fromisoformat(d["updated_on"])
+        # the dates should be in utc time. Convert them to the system time
+        last_updated = last_updated.replace(tzinfo=timezone.utc).astimezone(tz=None)
+        flow_id = d["metadata"].get("flow_id")
+        fws = d.get("fws") or []
+        machines = []
+        job_states = []
+        job_names = []
+        db_ids = []
+        job_ids = []
+        for fw_doc in fws:
+            db_ids.append(fw_doc["fw_id"])
+            job_doc = get_job_doc(fw_doc)
+            remote_doc = get_remote_doc(fw_doc)
+            job_ids.append(job_doc["uuid"])
+            job_names.append(fw_doc["name"])
+            if remote_doc:
+                remote_state = RemoteState(remote_doc["state"])
+            else:
+                remote_state = None
+            fw_state = fw_doc["state"]
+            job_states.append(JobState.from_states(fw_state, remote_state))
+            machines.append(fw_doc["spec"]["_tasks"][0]["machine"])
+
+        state = FlowState.from_jobs_states(job_states)
+
+        return cls(
+            db_ids=db_ids,
+            job_ids=job_ids,
+            flow_id=flow_id,
+            state=state,
+            name=d["name"],
+            last_updated=last_updated,
+            machines=machines,
+            job_states=job_states,
+            job_names=job_names,
+        )

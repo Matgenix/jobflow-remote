@@ -4,7 +4,7 @@ from typing import List, Optional
 import typer
 from typing_extensions import Annotated
 
-from jobflow_remote.cli.utils import LogLevel
+from jobflow_remote.cli.utils import LogLevel, SortOption
 from jobflow_remote.jobs.state import JobState, RemoteState
 
 job_ids_opt = Annotated[
@@ -105,6 +105,34 @@ runner_num_procs_opt = Annotated[
         "--num-procs",
         "-n",
         help="The number of Runner processes started",
+    ),
+]
+
+max_results_opt = Annotated[
+    int,
+    typer.Option(
+        "--max-results",
+        "-m",
+        help="Limit the maximum number of returned results. Set 0 for no limit",
+    ),
+]
+
+
+sort_opt = Annotated[
+    SortOption,
+    typer.Option(
+        "--sort",
+        help="The field on which the results will be sorted. In descending order",
+    ),
+]
+
+
+reverse_sort_flag_opt = Annotated[
+    bool,
+    typer.Option(
+        "--reverse-sort",
+        "-revs",
+        help=("Reverse the sorting order"),
     ),
 ]
 
