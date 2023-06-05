@@ -344,9 +344,11 @@ class Runner:
         exec_config = exec_config or ExecutionConfig()
 
         pre_run = machine.pre_run or ""
-        pre_run += exec_config.pre_run or ""
+        if exec_config.pre_run:
+            pre_run += "\n" + exec_config.pre_run
         post_run = machine.post_run or ""
-        post_run += exec_config.post_run or ""
+        if exec_config.post_run:
+            post_run += "\n" + exec_config.post_run
 
         submit_result = queue_manager.submit(
             commands=script_commands,
@@ -556,6 +558,7 @@ class Runner:
                 logging.exception(f"error while closing host {host_id}")
 
     def ping_wf_doc(self, db_id: int):
+        # in the WF document the date is a real Date
         self.rlpad.workflows.find_one_and_update(
-            {"nodes": db_id}, {"$set": {"updated_on": datetime.utcnow().isoformat()}}
+            {"nodes": db_id}, {"$set": {"updated_on": datetime.utcnow()}}
         )

@@ -64,9 +64,15 @@ class RemoteRun:
 
     @classmethod
     def from_db_dict(cls, d: dict) -> RemoteRun:
+        prev_state = d["previous_state"]
+        if prev_state is not None:
+            prev_state = RemoteState(prev_state)
+        qstate = d["queue_state"]
+        if qstate is not None:
+            qstate = QState(qstate)
         d["state"] = RemoteState(d["state"])
-        d["previous_state"] = RemoteState(d["previous_state"])
-        d["queue_state"] = QState(d["queue_state"])
+        d["previous_state"] = prev_state
+        d["queue_state"] = qstate
         d["lock_id"] = d.pop(MongoLock.LOCK_KEY, None)
         d["lock_time"] = d.pop(MongoLock.LOCK_TIME_KEY, None)
         return cls(**d)
@@ -509,6 +515,10 @@ class RemoteLaunchPad:
         fw_id, job_id = self._check_ids(fw_id, job_id)
 
         links_dict = self.workflows.find_one({"nodes": fw_id})
+        if not links_dict:
+            raise ValueError(
+                f"No Flow matching the criteria db_id: {fw_id} job_id: {job_id}"
+            )
         fw_ids = links_dict["nodes"]
         self.lpad.delete_fws(fw_ids, delete_launch_dirs=False)
         self.archived_remote_runs.delete_many({"fw_id": {"$in": fw_ids}})
@@ -548,39 +558,6 @@ class RemoteLaunchPad:
             fws.append(Firework.from_dict(doc))
         return fws
 
-    # def get_fw_remote_run_data(
-    #     self,
-    #     query: dict | None = None,
-    #     projection: dict | None = None,
-    #     sort: dict | None = None,
-    #     limit: int = 0,
-    # ) -> list[dict]:
-    #
-    #     pipeline: list[dict] = [
-    #         {
-    #             "$lookup": {
-    #                 "from": "remote_runs",
-    #                 "localField": "fw_id",
-    #                 "foreignField": "fw_id",
-    #                 "as": "remote",
-    #             }
-    #         }
-    #     ]
-    #
-    #     if query:
-    #         pipeline.append({"$match": query})
-    #
-    #     if projection:
-    #         pipeline.append({"$project": projection})
-    #
-    #     if sort:
-    #         pipeline.append({"$sort": sort})
-    #
-    #     if limit:
-    #         pipeline.append({"$limit": limit})
-    #
-    #     return list(self.fireworks.aggregate(pipeline))
-
     def get_fw_remote_run(
         self,
         query: dict | None = None,
@@ -588,9 +565,7 @@ class RemoteLaunchPad:
         sort: dict | None = None,
         limit: int = 0,
     ) -> list[tuple[Firework, RemoteRun | None]]:
-        fws = self.fireworks.find(
-            query=query, projection=projection, sort=sort, limit=limit
-        )
+        fws = self.fireworks.find(query, projection=projection, sort=sort, limit=limit)
 
         data = []
         for fw_dict in fws:
@@ -599,6 +574,10 @@ class RemoteLaunchPad:
                 remote_run = RemoteRun.from_db_dict(r)
             else:
                 remote_run = None
+
+            # remove the launches as they will require additional queries to the db
+            fw_dict.pop("launches")
+            fw_dict.pop("archived_launches")
 
             fw = Firework.from_dict(fw_dict)
             data.append((fw, remote_run))
@@ -659,7 +638,7 @@ class RemoteLaunchPad:
             pipeline.append({"$project": projection})
 
         if sort:
-            pipeline.append({"$sort": sort})
+            pipeline.append({"$sort": {k: v for (k, v) in sort}})
 
         if limit:
             pipeline.append({"$limit": limit})

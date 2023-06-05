@@ -27,6 +27,16 @@ db_ids_opt = Annotated[
 ]
 
 
+flow_ids_opt = Annotated[
+    Optional[List[str]],
+    typer.Option(
+        "--flow-id",
+        "-fid",
+        help="One or more flow ids",
+    ),
+]
+
+
 job_state_opt = Annotated[
     Optional[JobState],
     typer.Option(
@@ -148,5 +158,15 @@ db_id_flag_opt = Annotated[
         help=(
             "If set the id passed would be considered to be the DB id (i.e. an integer)"
         ),
+    ),
+]
+
+
+force_opt = Annotated[
+    bool,
+    typer.Option(
+        "--force",
+        "-f",
+        help=("No confirmation will be asked before proceeding"),
     ),
 ]

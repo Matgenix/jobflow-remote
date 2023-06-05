@@ -83,6 +83,12 @@ class JobState(Enum):
 
         raise ValueError(f"Unhandled state {self}")
 
+    @property
+    def short_value(self) -> str:
+        if self == JobState.REMOTE_ERROR:
+            return "RE"
+        return self.value[0]
+
 
 class FlowState(Enum):
     WAITING = "WAITING"

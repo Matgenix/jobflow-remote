@@ -4,7 +4,12 @@ from typing_extensions import Annotated
 from jobflow_remote.cli.utils import exit_with_error_msg
 from jobflow_remote.config import ConfigManager
 
-app = typer.Typer(name="jf", add_completion=False, no_args_is_help=True)
+app = typer.Typer(
+    name="jf",
+    add_completion=False,
+    no_args_is_help=True,
+    context_settings={"help_option_names": ["-h", "--help"]},
+)
 
 
 @app.callback()

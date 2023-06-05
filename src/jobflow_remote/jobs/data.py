@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
-from jobflow import Job
+from jobflow import Job, JobStore
 
 from jobflow_remote.fireworks.launchpad import (
     FW_UUID_PATH,
@@ -19,6 +19,8 @@ class JobData:
     job: Job
     state: JobState
     db_id: int
+    store: JobStore
+    info: JobInfo | None = None
     remote_state: RemoteState | None = None
     output: dict | None = None
 
@@ -62,7 +64,7 @@ class JobInfo:
     host_flows_ids: list[str] = field(default_factory=lambda: list())
 
     @classmethod
-    def from_query_dict(cls, d):
+    def from_fw_dict(cls, d):
         remote = get_remote_doc(d)
         remote_state_val = remote.get("state")
         remote_state = (
@@ -99,6 +101,11 @@ class JobInfo:
             if message or stack_strace:
                 error_job = f"Message: {message}\nStack trace:\n{stack_strace}"
 
+        queue_job_id = remote.get("process_id")
+        if queue_job_id is not None:
+            # convert to string in case the format is the one of an integer
+            queue_job_id = str(queue_job_id)
+
         return cls(
             db_id=d["fw_id"],
             job_id=d["spec"]["_tasks"][0]["job"]["uuid"],
@@ -111,7 +118,7 @@ class JobInfo:
             lock_id=lock_id,
             lock_time=lock_time,
             retry_time_limit=retry_time_limit,
-            queue_job_id=str(remote.get("process_id")),
+            queue_job_id=queue_job_id,
             run_dir=remote.get("run_dir"),
             error_remote=remote.get("error"),
             error_job=error_job,
@@ -147,10 +154,8 @@ class FlowInfo:
 
     @classmethod
     def from_query_dict(cls, d):
-        # in FW the date is encoded in a string
-        last_updated = datetime.fromisoformat(d["updated_on"])
         # the dates should be in utc time. Convert them to the system time
-        last_updated = last_updated.replace(tzinfo=timezone.utc).astimezone(tz=None)
+        last_updated = d["updated_on"].replace(tzinfo=timezone.utc).astimezone(tz=None)
         flow_id = d["metadata"].get("flow_id")
         fws = d.get("fws") or []
         machines = []

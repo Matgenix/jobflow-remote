@@ -4,6 +4,7 @@ from rich.text import Text
 from typing_extensions import Annotated
 
 from jobflow_remote.cli.jf import app
+from jobflow_remote.cli.types import force_opt
 from jobflow_remote.cli.utils import exit_with_error_msg, loading_spinner, out_console
 from jobflow_remote.config import ConfigManager
 from jobflow_remote.jobs.daemon import DaemonError, DaemonManager, DaemonStatus
@@ -35,14 +36,7 @@ def reset(
             ),
         ),
     ] = 25,
-    force: Annotated[
-        bool,
-        typer.Option(
-            "--force",
-            "-f",
-            help=("No confirmation will be asked before proceeding"),
-        ),
-    ] = False,
+    force: force_opt = False,
 ):
     """
     Reset the jobflow database.
@@ -76,7 +70,7 @@ def reset(
         text.append(f"{project_name} ", style="red bold")
         text.append("Proceed anyway?", style="red")
 
-        confirmed = Confirm.ask(text)
+        confirmed = Confirm.ask(text, default=False)
         if not confirmed:
             raise typer.Exit(0)
     with loading_spinner(False) as progress:

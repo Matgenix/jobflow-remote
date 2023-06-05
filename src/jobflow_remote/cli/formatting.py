@@ -7,7 +7,7 @@ from rich.scope import render_scope
 from rich.table import Table
 
 from jobflow_remote.cli.utils import fmt_datetime
-from jobflow_remote.jobs.data import JobInfo
+from jobflow_remote.jobs.data import FlowInfo, JobInfo
 from jobflow_remote.jobs.state import JobState
 from jobflow_remote.utils.data import remove_none
 
@@ -64,6 +64,44 @@ def get_job_info_table(jobs_info: list[JobInfo], verbosity: int):
         if verbosity >= 2:
             row.append(ji.lock_id)
             row.append(ji.lock_time.strftime(fmt_datetime) if ji.lock_time else None)
+
+        table.add_row(*row)
+
+    return table
+
+
+def get_flow_info_table(flows_info: list[FlowInfo], verbosity: int):
+    table = Table(title="Flows info")
+    table.add_column("DB id")
+    table.add_column("Name")
+    table.add_column("State")
+    table.add_column("Flow id")
+    table.add_column("Num Jobs")
+    table.add_column("Last updated")
+
+    if verbosity >= 1:
+        table.add_column("Machines")
+
+        table.add_column("Job states")
+
+    for fi in flows_info:
+        # show the smallest fw_id as db_id
+        db_id = min(fi.db_ids)
+
+        row = [
+            str(db_id),
+            fi.name,
+            fi.state.name,
+            fi.flow_id,
+            str(len(fi.job_ids)),
+            fi.last_updated.strftime(fmt_datetime),
+        ]
+
+        if verbosity >= 1:
+            machines = set(fi.machines)
+            row.append(", ".join(machines))
+            job_states = "-".join(js.short_value for js in fi.job_states)
+            row.append(job_states)
 
         table.add_row(*row)
 

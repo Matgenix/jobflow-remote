@@ -1,4 +1,6 @@
+import io
 from datetime import datetime, timedelta
+from pathlib import Path
 
 import typer
 from typing_extensions import Annotated
@@ -25,12 +27,16 @@ from jobflow_remote.cli.utils import (
     SortOption,
     check_incompatible_opt,
     exit_with_error_msg,
+    exit_with_warning_msg,
     get_job_db_ids,
     loading_spinner,
     out_console,
     print_success_msg,
 )
+from jobflow_remote.config import ConfigManager
 from jobflow_remote.jobs.jobcontroller import JobController
+from jobflow_remote.jobs.state import RemoteState
+from jobflow_remote.remote.queue import ERR_FNAME, OUT_FNAME
 
 app_job = typer.Typer(
     name="job", help="Commands for managing the jobs", no_args_is_help=True
@@ -234,3 +240,86 @@ def rerun(
         )
 
     out_console.print(f"{len(fw_ids)} Jobs were rerun: {fw_ids}")
+
+
+@app_job.command()
+def queue_out(
+    job_id: job_id_arg,
+    db_id: db_id_flag_opt = False,
+):
+    with loading_spinner() as progress:
+        progress.add_task(description="Retrieving info...", total=None)
+        jc = JobController()
+
+        db_id_value, job_id_value = get_job_db_ids(db_id, job_id)
+
+        job_data_list = jc.get_jobs_data(
+            job_ids=job_id_value,
+            db_ids=db_id_value,
+        )
+
+    if not job_data_list:
+        exit_with_error_msg("No data matching the request")
+
+    job_data = job_data_list[0]
+    info = job_data.info
+    if info.remote_state not in (
+        RemoteState.RUNNING,
+        RemoteState.TERMINATED,
+        RemoteState.DOWNLOADED,
+        RemoteState.COMPLETED,
+        RemoteState.FAILED,
+    ):
+        remote_state_str = f"[{info.remote_state.value}]" if info.remote_state else ""
+        exit_with_warning_msg(
+            f"The Job is in state {info.state.value}{remote_state_str} and the queue output will not be present"
+        )
+
+    remote_dir = info.run_dir
+
+    out_path = Path(remote_dir, OUT_FNAME)
+    err_path = Path(remote_dir, ERR_FNAME)
+    out = None
+    err = None
+    out_error = None
+    err_error = None
+    with loading_spinner() as progress:
+        progress.add_task(description="Retrieving files...", total=None)
+        cm = ConfigManager()
+        machine = cm.load_machine(info.machine)
+        host = cm.load_host(machine.host_id)
+
+        try:
+            host.connect()
+            try:
+                out_bytes = io.BytesIO()
+                host.get(out_path, out_bytes)
+                out = out_bytes.getvalue().decode("utf-8")
+            except Exception as e:
+                out_error = getattr(e, "message", str(e))
+            try:
+                err_bytes = io.BytesIO()
+                host.get(err_path, err_bytes)
+                err = err_bytes.getvalue().decode("utf-8")
+            except Exception as e:
+                err_error = getattr(e, "message", str(e))
+        finally:
+            host.close()
+
+    if out_error:
+        out_console.print(
+            f"Error while fetching queue output from {str(out_path)}: {out_error}",
+            style="red",
+        )
+    else:
+        out_console.print(f"Queue output from {str(out_path)}:\n")
+        out_console.print(out)
+
+    if err_error:
+        out_console.print(
+            f"Error while fetching queue error from {str(err_path)}: {err_error}",
+            style="red",
+        )
+    else:
+        out_console.print(f"Queue error from {str(err_path)}:\n")
+        out_console.print(err)

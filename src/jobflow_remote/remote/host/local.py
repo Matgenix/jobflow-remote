@@ -94,10 +94,16 @@ class LocalHost(BaseHost):
             with open(dst, "wb") as f:
                 f.write(src.read())
         else:
-            shutil.copy(src, dst)
+            self.copy(src, dst)
 
     def get(self, src, dst):
-        self.copy(src, dst)
+        is_file_like = hasattr(dst, "write") and callable(dst.write)
+
+        if is_file_like:
+            with open(src, "rb") as f:
+                dst.write(f.read())
+        else:
+            self.copy(src, dst)
 
     def copy(self, src, dst):
         shutil.copy(src, dst)

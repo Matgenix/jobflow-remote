@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import io
 import logging
+from contextlib import redirect_stdout
 from datetime import datetime, timezone
 
 from fireworks import Firework
 from jobflow import JobStore
+from monty.json import MontyDecoder
 
 from jobflow_remote.config.base import Project
 from jobflow_remote.config.manager import ConfigManager
@@ -12,6 +15,7 @@ from jobflow_remote.fireworks.launchpad import (
     FW_UUID_PATH,
     REMOTE_DOC_PATH,
     RemoteLaunchPad,
+    get_remote_doc,
 )
 from jobflow_remote.jobs.data import (
     FlowInfo,
@@ -104,6 +108,7 @@ class JobController:
         self,
         job_ids: str | list[str] | None = None,
         db_ids: int | list[int] | None = None,
+        flow_id: str | None = None,
         state: FlowState | None = None,
         start_date: datetime | None = None,
         end_date: datetime | None = None,
@@ -120,6 +125,9 @@ class JobController:
             query["nodes"] = {"$in": db_ids}
         if job_ids:
             query[f"fws.{FW_UUID_PATH}"] = {"$in": job_ids}
+
+        if flow_id:
+            query["metadata.flow_id"] = flow_id
 
         if state:
             if state == FlowState.WAITING:
@@ -150,12 +158,12 @@ class JobController:
                     },
                 ]
 
-        # TODO should this consider the dates of the fws?
+        # at variance with Firework doc, the dates in the Workflow are Date objects
         if start_date:
-            start_date_str = start_date.astimezone(timezone.utc).isoformat()
+            start_date_str = start_date.astimezone(timezone.utc)
             query["updated_on"] = {"$gte": start_date_str}
         if end_date:
-            end_date_str = end_date.astimezone(timezone.utc).isoformat()
+            end_date_str = end_date.astimezone(timezone.utc)
             query["updated_on"] = {"$lte": end_date_str}
 
         return query
@@ -181,23 +189,31 @@ class JobController:
             end_date=end_date,
         )
 
-        data = self.rlpad.get_fw_remote_run(query=query, sort=sort, limit=limit)
-
+        data = self.rlpad.fireworks.find(query, sort=sort, limit=limit)
         jobs_data = []
-        for fw, remote in data:
-            job = fw.tasks[0]["job"]
-            remote_state_job = remote.state if remote else None
-            state = JobState.from_states(fw.state, remote_state_job)
+        for fw_dict in data:
+            # deserialize the task to get the objects
+            decoded_task = MontyDecoder().process_decoded(fw_dict["spec"]["_tasks"][0])
+            job = decoded_task["job"]
+            remote_dict = get_remote_doc(fw_dict)
+            remote_state_job = (
+                RemoteState(remote_dict["state"]) if remote_dict else None
+            )
+            state = JobState.from_states(fw_dict["state"], remote_state_job)
+            store = decoded_task.get("store") or self.jobstore
+            info = JobInfo.from_fw_dict(fw_dict)
+
             output = None
-            jobstore = fw.tasks[0].get("store") or self.jobstore
             if state == RemoteState.COMPLETED and load_output:
-                output = jobstore.query_one({"uuid": job.uuid}, load=True)
+                output = store.query_one({"uuid": job.uuid}, load=True)
             jobs_data.append(
                 JobData(
                     job=job,
                     state=state,
-                    db_id=fw.fw_id,
+                    db_id=fw_dict["fw_id"],
                     remote_state=remote_state,
+                    store=store,
+                    info=info,
                     output=output,
                 )
             )
@@ -212,7 +228,7 @@ class JobController:
         remote_state: RemoteState | None = None,
         start_date: datetime | None = None,
         end_date: datetime | None = None,
-        sort: dict | None = None,
+        sort: list[tuple] | None = None,
         limit: int = 0,
     ) -> list[JobInfo]:
         query = self._build_query_fw(
@@ -229,7 +245,7 @@ class JobController:
 
         jobs_data = []
         for d in data:
-            jobs_data.append(JobInfo.from_query_dict(d))
+            jobs_data.append(JobInfo.from_fw_dict(d))
 
         return jobs_data
 
@@ -247,15 +263,17 @@ class JobController:
                     "remote.error": 1,
                 }
             )
-            data = self.rlpad.get_fw_launch_remote_run_data(
-                query=query, projection=proj
+            data = list(
+                self.rlpad.get_fw_launch_remote_run_data(query=query, projection=proj)
             )
         else:
-            data = self.rlpad.fireworks.find(query, projection=job_info_projection)
+            data = list(
+                self.rlpad.fireworks.find(query, projection=job_info_projection)
+            )
         if not data:
             return None
 
-        return JobInfo.from_query_dict(data[0])
+        return JobInfo.from_fw_dict(data[0])
 
     @staticmethod
     def check_ids(job_id: str | None, db_id: int | None):
@@ -337,15 +355,17 @@ class JobController:
         self,
         job_ids: str | list[str] | None = None,
         db_ids: int | list[int] | None = None,
+        flow_id: str | None = None,
         state: FlowState | None = None,
         start_date: datetime | None = None,
         end_date: datetime | None = None,
-        sort: dict | None = None,
+        sort: list[tuple] | None = None,
         limit: int = 0,
     ) -> list[FlowInfo]:
         query = self._build_query_wf(
             job_ids=job_ids,
             db_ids=db_ids,
+            flow_id=flow_id,
             state=state,
             start_date=start_date,
             end_date=end_date,
@@ -357,6 +377,34 @@ class JobController:
 
         jobs_data = []
         for d in data:
-            jobs_data.append(JobInfo.from_query_dict(d))
+            jobs_data.append(FlowInfo.from_query_dict(d))
 
         return jobs_data
+
+    def delete_flows(
+        self,
+        job_ids: str | list[str] | None = None,
+        db_ids: int | list[int] | None = None,
+    ):
+        if (job_ids is None) == (db_ids is None):
+            raise ValueError(
+                "One and only one among job_ids and db_ids should be defined"
+            )
+
+        if job_ids:
+            ids_list: str | int | list = job_ids
+            arg = "job_id"
+        else:
+            ids_list = db_ids
+            arg = "fw_id"
+
+        if not isinstance(ids_list, (list, tuple)):
+            ids_list = [ids_list]
+        for jid in ids_list:
+            try:
+                # the fireworks launchpad has "print" in it for the out. Capture it
+                # to avoid exposing Fireworks output
+                with redirect_stdout(io.StringIO()):
+                    self.rlpad.delete_wf(**{arg: jid})
+            except ValueError as e:
+                logger.warning(f"Error while deleting flow: {getattr(e, 'message', e)}")
