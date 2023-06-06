@@ -62,7 +62,7 @@ def get_job_info_table(jobs_info: list[JobInfo], verbosity: int):
                 row.append("*" if ji.lock_id is not None else None)
 
         if verbosity >= 2:
-            row.append(ji.lock_id)
+            row.append(str(ji.lock_id))
             row.append(ji.lock_time.strftime(fmt_datetime) if ji.lock_time else None)
 
         table.add_row(*row)

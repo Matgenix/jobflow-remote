@@ -25,6 +25,7 @@ from jobflow_remote.jobs.data import (
     job_info_projection,
 )
 from jobflow_remote.jobs.state import FlowState, JobState, RemoteState
+from jobflow_remote.utils.db import MongoLock
 
 logger = logging.getLogger(__name__)
 
@@ -66,6 +67,7 @@ class JobController:
         db_ids: int | list[int] | None = None,
         state: JobState | None = None,
         remote_state: RemoteState | None = None,
+        locked: bool = False,
         start_date: datetime | None = None,
         end_date: datetime | None = None,
     ) -> dict:
@@ -101,6 +103,9 @@ class JobController:
         if end_date:
             end_date_str = end_date.astimezone(timezone.utc).isoformat()
             query["updated_on"] = {"$lte": end_date_str}
+
+        if locked:
+            query[f"{REMOTE_DOC_PATH}.{MongoLock.LOCK_KEY}"] = {"$exists": True}
 
         return query
 
@@ -220,25 +225,12 @@ class JobController:
 
         return jobs_data
 
-    def get_jobs_info(
+    def get_jobs_info_query(
         self,
-        job_ids: str | list[str] | None = None,
-        db_ids: int | list[int] | None = None,
-        state: JobState | None = None,
-        remote_state: RemoteState | None = None,
-        start_date: datetime | None = None,
-        end_date: datetime | None = None,
+        query: dict = None,
         sort: list[tuple] | None = None,
         limit: int = 0,
     ) -> list[JobInfo]:
-        query = self._build_query_fw(
-            job_ids=job_ids,
-            db_ids=db_ids,
-            state=state,
-            remote_state=remote_state,
-            start_date=start_date,
-            end_date=end_date,
-        )
         data = self.rlpad.fireworks.find(
             query, sort=sort, limit=limit, projection=job_info_projection
         )
@@ -248,6 +240,29 @@ class JobController:
             jobs_data.append(JobInfo.from_fw_dict(d))
 
         return jobs_data
+
+    def get_jobs_info(
+        self,
+        job_ids: str | list[str] | None = None,
+        db_ids: int | list[int] | None = None,
+        state: JobState | None = None,
+        remote_state: RemoteState | None = None,
+        start_date: datetime | None = None,
+        end_date: datetime | None = None,
+        locked: bool = False,
+        sort: list[tuple] | None = None,
+        limit: int = 0,
+    ) -> list[JobInfo]:
+        query = self._build_query_fw(
+            job_ids=job_ids,
+            db_ids=db_ids,
+            state=state,
+            remote_state=remote_state,
+            locked=locked,
+            start_date=start_date,
+            end_date=end_date,
+        )
+        return self.get_jobs_info_query(query=query, sort=sort, limit=limit)
 
     def get_job_info(
         self, job_id: str | None, db_id: int | None, full: bool = False
@@ -408,3 +423,24 @@ class JobController:
                     self.rlpad.delete_wf(**{arg: jid})
             except ValueError as e:
                 logger.warning(f"Error while deleting flow: {getattr(e, 'message', e)}")
+
+    def remove_lock(
+        self,
+        job_ids: str | list[str] | None = None,
+        db_ids: int | list[int] | None = None,
+        state: JobState | None = None,
+        remote_state: RemoteState | None = None,
+        start_date: datetime | None = None,
+        end_date: datetime | None = None,
+    ) -> int:
+        query = self._build_query_fw(
+            job_ids=job_ids,
+            db_ids=db_ids,
+            state=state,
+            remote_state=remote_state,
+            start_date=start_date,
+            end_date=end_date,
+            locked=True,
+        )
+
+        return self.rlpad.remove_lock(query=query)

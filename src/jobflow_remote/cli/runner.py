@@ -41,7 +41,7 @@ def run(
     Should be used by the daemon or for testing purposes.
     """
     runner_id = os.getpid() if set_pid else None
-    runner = Runner(log_level=log_level.to_logging(), runner_id=runner_id)
+    runner = Runner(log_level=log_level.to_logging(), runner_id=str(runner_id))
     runner.run()
 
 

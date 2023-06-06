@@ -33,7 +33,7 @@ class MongoLock:
         self.timeout = timeout
         self.break_lock = break_lock
         self.locked_document = None
-        self.lock_id = lock_id or id(self)
+        self.lock_id = lock_id or str(id(self))
         if lock_subdoc and not lock_subdoc.endswith("."):
             lock_subdoc = lock_subdoc + "."
         self.lock_subdoc = lock_subdoc

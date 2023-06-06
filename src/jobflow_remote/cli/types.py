@@ -1,6 +1,8 @@
+import json
 from datetime import datetime
 from typing import List, Optional
 
+import click
 import typer
 from typing_extensions import Annotated
 
@@ -142,7 +144,7 @@ reverse_sort_flag_opt = Annotated[
     typer.Option(
         "--reverse-sort",
         "-revs",
-        help=("Reverse the sorting order"),
+        help="Reverse the sorting order",
     ),
 ]
 
@@ -167,6 +169,45 @@ force_opt = Annotated[
     typer.Option(
         "--force",
         "-f",
-        help=("No confirmation will be asked before proceeding"),
+        help="No confirmation will be asked before proceeding",
+    ),
+]
+
+
+locked_opt = Annotated[
+    bool,
+    typer.Option(
+        "--locked",
+        "-l",
+        help="Select locked Jobs",
+    ),
+]
+
+
+# as of typer version 0.9.0 the dict is not a supported type. Define a custom one
+class DictType(dict):
+    pass
+
+
+class DictTypeParser(click.ParamType):
+    name = "DictType"
+
+    def convert(self, value, param, ctx):
+        try:
+            value = json.loads(value)
+        except Exception as e:
+            raise typer.BadParameter(
+                f"Error while converting JSON: {getattr(e, 'message', str(e))}"
+            )
+        return DictType(value)
+
+
+query_opt = Annotated[
+    Optional[DictType],
+    typer.Option(
+        "--query",
+        "-q",
+        help="A JSON string representing a generic query in the form of a dictionary. Overrides all other query options. Requires knowledge of the internal structure of the DB. ",
+        click_type=DictTypeParser(),
     ),
 ]

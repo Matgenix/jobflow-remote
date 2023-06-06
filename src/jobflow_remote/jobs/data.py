@@ -12,6 +12,7 @@ from jobflow_remote.fireworks.launchpad import (
     get_remote_doc,
 )
 from jobflow_remote.jobs.state import FlowState, JobState, RemoteState
+from jobflow_remote.utils.db import MongoLock
 
 
 @dataclass
@@ -34,8 +35,8 @@ job_info_projection = {
     "updated_on": 1,
     f"{REMOTE_DOC_PATH}.updated_on": 1,
     f"{REMOTE_DOC_PATH}.previous_state": 1,
-    f"{REMOTE_DOC_PATH}.lock_id": 1,
-    f"{REMOTE_DOC_PATH}.lock_time": 1,
+    f"{REMOTE_DOC_PATH}.{MongoLock.LOCK_KEY}": 1,
+    f"{REMOTE_DOC_PATH}.{MongoLock.LOCK_TIME_KEY}": 1,
     f"{REMOTE_DOC_PATH}.retry_time_limit": 1,
     f"{REMOTE_DOC_PATH}.process_id": 1,
     f"{REMOTE_DOC_PATH}.run_dir": 1,
@@ -54,7 +55,7 @@ class JobInfo:
     machine: str
     remote_state: RemoteState | None = None
     remote_previous_state: RemoteState | None = None
-    lock_id: datetime | None = None
+    lock_id: str | None = None
     lock_time: datetime | None = None
     retry_time_limit: datetime | None = None
     queue_job_id: str | None = None
@@ -81,8 +82,8 @@ class JobInfo:
             if remote_previous_state_val is not None
             else None
         )
-        lock_id = remote.get("lock_id")
-        lock_time = remote.get("lock_time")
+        lock_id = remote.get(MongoLock.LOCK_KEY)
+        lock_time = remote.get(MongoLock.LOCK_TIME_KEY)
         if lock_time is not None:
             lock_time = lock_time.replace(tzinfo=timezone.utc).astimezone(tz=None)
         retry_time_limit = remote.get("retry_time_limit")

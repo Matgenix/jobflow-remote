@@ -15,7 +15,9 @@ from jobflow_remote.cli.types import (
     job_id_arg,
     job_ids_opt,
     job_state_opt,
+    locked_opt,
     max_results_opt,
+    query_opt,
     remote_state_arg,
     remote_state_opt,
     reverse_sort_flag_opt,
@@ -57,6 +59,8 @@ def jobs_list(
     max_results: max_results_opt = 100,
     sort: sort_opt = SortOption.UPDATED_ON.value,
     reverse_sort: reverse_sort_flag_opt = False,
+    locked: locked_opt = False,
+    custom_query: query_opt = None,
 ):
     """
     Get the list of Jobs in the database
@@ -73,16 +77,24 @@ def jobs_list(
     sort = [(sort.query_field, 1 if reverse_sort else -1)]
 
     with loading_spinner():
-        jobs_info = jc.get_jobs_info(
-            job_ids=job_id,
-            db_ids=db_id,
-            state=state,
-            remote_state=remote_state,
-            start_date=start_date,
-            end_date=end_date,
-            limit=max_results,
-            sort=sort,
-        )
+        if custom_query:
+            jobs_info = jc.get_jobs_info_query(
+                query=custom_query,
+                limit=max_results,
+                sort=sort,
+            )
+        else:
+            jobs_info = jc.get_jobs_info(
+                job_ids=job_id,
+                db_ids=db_id,
+                state=state,
+                remote_state=remote_state,
+                start_date=start_date,
+                locked=locked,
+                end_date=end_date,
+                limit=max_results,
+                sort=sort,
+            )
 
         table = get_job_info_table(jobs_info, verbosity=verbosity)
 

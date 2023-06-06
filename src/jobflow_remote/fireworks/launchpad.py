@@ -452,15 +452,12 @@ class RemoteLaunchPad:
 
         return False
 
-    def remove_lock(self, fw_id: int | None = None, job_id: str | None = None):
-        query = self._generate_id_query(fw_id, job_id)
-        result = self.fireworks.find_one_and_update(
-            query,
-            {"$unset": {REMOTE_LOCK_PATH: "", REMOTE_LOCK_TIME_PATH: ""}},
-            projection=["fw_id"],
+    def remove_lock(self, query: dict | None = None) -> int:
+        result = self.fireworks.update_many(
+            filter=query,
+            update={"$unset": {REMOTE_LOCK_PATH: "", REMOTE_LOCK_TIME_PATH: ""}},
         )
-        if not result:
-            raise ValueError("No job matching id")
+        return result.modified_count
 
     def is_locked(self, fw_id: int | None = None, job_id: str | None = None) -> bool:
         query = self._generate_id_query(fw_id, job_id)
