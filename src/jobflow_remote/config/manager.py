@@ -23,19 +23,23 @@ from jobflow_remote.config.base import (
     RemoteHostConfig,
 )
 from jobflow_remote.remote.host.base import BaseHost
-from jobflow_remote.utils.data import deep_merge_dict, remove_none
+from jobflow_remote.utils.data import deep_merge_dict
 
 logger = logging.getLogger(__name__)
 
 ProjectData = namedtuple("ProjectData", ["filepath", "project", "ext"])
 
+WorkerData = namedtuple("WorkerData", ["name", "worker"])
+
 
 class ConfigManager:
     projects_ext = ["json", "yaml", "toml"]
 
-    def __init__(self):
+    def __init__(self, exclude_unset=False, exclude_none=False):
         from jobflow_remote import SETTINGS
 
+        self.exclude_unset = exclude_unset
+        self.exclude_none = exclude_none
         self.projects_folder = Path(SETTINGS.projects_folder)
         makedirs_p(self.projects_folder)
         self.projects_data = self.load_projects_data()
@@ -92,11 +96,13 @@ class ConfigManager:
         return self.get_project_data(project_name).project
 
     def dump_project(self, project_data: ProjectData):
-        d = project_data.project.dict()
+        exclude_none = True if project_data.ext == "toml" else self.exclude_none
+        d = project_data.project.dict(
+            exclude_none=exclude_none, exclude_unset=self.exclude_unset
+        )
         if project_data.ext in ["json", "yaml"]:
             dumpfn(d, project_data.filepath)
         elif project_data.ext == "toml":
-            d = remove_none(d)
             with open(project_data.filepath, "w") as f:
                 tomlkit.dump(d, f)
 
@@ -108,6 +114,10 @@ class ConfigManager:
         makedirs_p(project.tmp_dir)
         makedirs_p(project.log_dir)
         filepath = self.projects_folder / f"{project.name}.{ext}"
+        if filepath.exists():
+            raise ConfigError(
+                f"Project with name {project.name} does not exist, but file {str(filepath)} does"
+            )
         project_data = ProjectData(filepath, project, ext)
         self.dump_project(project_data)
         self.projects_data[project.name] = project_data

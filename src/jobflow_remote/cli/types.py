@@ -6,7 +6,7 @@ import click
 import typer
 from typing_extensions import Annotated
 
-from jobflow_remote.cli.utils import LogLevel, SortOption
+from jobflow_remote.cli.utils import LogLevel, SerializeFileFormat, SortOption
 from jobflow_remote.jobs.state import JobState, RemoteState
 
 job_ids_opt = Annotated[
@@ -180,6 +180,16 @@ locked_opt = Annotated[
         "--locked",
         "-l",
         help="Select locked Jobs",
+    ),
+]
+
+
+serialize_file_format_opt = Annotated[
+    SerializeFileFormat,
+    typer.Option(
+        "--format",
+        "-f",
+        help="File format",
     ),
 ]
 

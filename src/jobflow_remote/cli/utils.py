@@ -42,6 +42,12 @@ class SortOption(Enum):
         return self.value
 
 
+class SerializeFileFormat(Enum):
+    JSON = "json"
+    YAML = "yaml"
+    TOML = "toml"
+
+
 def exit_with_error_msg(message, code=1, **kwargs):
     kwargs.setdefault("style", "red")
     err_console.print(message, **kwargs)
