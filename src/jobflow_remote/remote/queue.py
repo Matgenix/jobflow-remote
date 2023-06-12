@@ -5,8 +5,6 @@ from pathlib import Path
 from qtoolkit.core.data_objects import CancelResult, QJob, QResources, SubmissionResult
 from qtoolkit.io.base import BaseSchedulerIO
 
-from jobflow_remote.config.base import Machine
-from jobflow_remote.config.manager import ConfigManager
 from jobflow_remote.remote.host import BaseHost
 
 OUT_FNAME = "queue.out"
@@ -202,20 +200,4 @@ class QueueManager:
         stdout, stderr, returncode = self.execute_cmd(job_cmd, timeout=timeout)
         return self.scheduler_io.parse_jobs_list_output(
             exit_code=returncode, stdout=stdout, stderr=stderr
-        )
-
-    @classmethod
-    def from_machine(
-        cls,
-        machine: str | Machine,
-        config_manager: ConfigManager | None = None,
-        project_name: str | None = None,
-    ):
-        if not config_manager:
-            config_manager = ConfigManager()
-        if isinstance(machine, str):
-            machine = config_manager.load_machine(machine, project_name)
-        host = config_manager.load_host(machine.host_id)
-        return cls(
-            machine.get_scheduler_io(), host, timeout_exec=machine.queue_exec_timeout
         )

@@ -40,7 +40,7 @@ job_info_projection = {
     f"{REMOTE_DOC_PATH}.retry_time_limit": 1,
     f"{REMOTE_DOC_PATH}.process_id": 1,
     f"{REMOTE_DOC_PATH}.run_dir": 1,
-    "spec._tasks.machine": 1,
+    "spec._tasks.worker": 1,
     "spec._tasks.job.hosts": 1,
 }
 
@@ -52,7 +52,7 @@ class JobInfo:
     state: JobState
     name: str
     last_updated: datetime
-    machine: str
+    worker: str
     remote_state: RemoteState | None = None
     remote_previous_state: RemoteState | None = None
     lock_id: str | None = None
@@ -113,7 +113,7 @@ class JobInfo:
             state=state,
             name=d["name"],
             last_updated=last_updated,
-            machine=d["spec"]["_tasks"][0]["machine"],
+            worker=d["spec"]["_tasks"][0]["worker"],
             remote_state=remote_state,
             remote_previous_state=remote_previous_state,
             lock_id=lock_id,
@@ -136,7 +136,7 @@ flow_info_projection = {
     "name": 1,
     "updated_on": 1,
     "fws.updated_on": 1,
-    "fws.spec._tasks.machine": 1,
+    "fws.spec._tasks.worker": 1,
     "metadata.flow_id": 1,
 }
 
@@ -149,7 +149,7 @@ class FlowInfo:
     state: FlowState
     name: str
     last_updated: datetime
-    machines: list[str]
+    workers: list[str]
     job_states: list[JobState]
     job_names: list[str]
 
@@ -159,7 +159,7 @@ class FlowInfo:
         last_updated = d["updated_on"].replace(tzinfo=timezone.utc).astimezone(tz=None)
         flow_id = d["metadata"].get("flow_id")
         fws = d.get("fws") or []
-        machines = []
+        workers = []
         job_states = []
         job_names = []
         db_ids = []
@@ -176,7 +176,7 @@ class FlowInfo:
                 remote_state = None
             fw_state = fw_doc["state"]
             job_states.append(JobState.from_states(fw_state, remote_state))
-            machines.append(fw_doc["spec"]["_tasks"][0]["machine"])
+            workers.append(fw_doc["spec"]["_tasks"][0]["worker"])
 
         state = FlowState.from_jobs_states(job_states)
 
@@ -187,7 +187,7 @@ class FlowInfo:
             state=state,
             name=d["name"],
             last_updated=last_updated,
-            machines=machines,
+            workers=workers,
             job_states=job_states,
             job_names=job_names,
         )

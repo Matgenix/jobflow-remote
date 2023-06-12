@@ -6,7 +6,8 @@ import click
 import typer
 from typing_extensions import Annotated
 
-from jobflow_remote.cli.utils import LogLevel, SerializeFileFormat, SortOption
+from jobflow_remote.cli.utils import SerializeFileFormat, SortOption
+from jobflow_remote.config.base import LogLevel
 from jobflow_remote.jobs.state import JobState, RemoteState
 
 job_ids_opt = Annotated[

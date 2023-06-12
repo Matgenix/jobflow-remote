@@ -20,9 +20,10 @@ from qtoolkit.core.data_objects import QState, SubmissionStatus
 from jobflow_remote.config.base import (
     ConfigError,
     ExecutionConfig,
-    Machine,
+    LogLevel,
     Project,
     RunnerOptions,
+    WorkerBase,
 )
 from jobflow_remote.config.manager import ConfigManager
 from jobflow_remote.fireworks.launcher import rapidfire_checkout
@@ -51,7 +52,8 @@ logger = logging.getLogger(__name__)
 
 
 JobFWData = namedtuple(
-    "JobFWData", ["fw", "task", "job", "store", "machine", "host", "original_store"]
+    "JobFWData",
+    ["fw", "task", "job", "store", "worker_name", "worker", "host", "original_store"],
 )
 
 
@@ -59,7 +61,7 @@ class Runner:
     def __init__(
         self,
         project_name: str | None = None,
-        log_level: int | None = None,
+        log_level: LogLevel | None = None,
         runner_id: str | None = None,
     ):
         self.stop_signal = False
@@ -69,13 +71,23 @@ class Runner:
         self.project: Project = self.config_manager.get_project(project_name)
         self.rlpad: RemoteLaunchPad = self.project.get_launchpad()
         self.fworker: FWorker = FWorker()
-        self.machines: dict[str, Machine] = self.project.get_machines_dict()
-        self.hosts: dict[str, BaseHost] = self.project.get_hosts_dict()
+        self.workers: dict[str, WorkerBase] = self.project.workers
+        # Build the dictionary of hosts. The reference is the worker name.
+        # If two hosts match, use the same instance
+        self.hosts: dict[str, BaseHost] = {}
+        for wname, w in self.workers.items():
+            new_host = w.get_host()
+            for host in self.hosts.values():
+                if new_host == host:
+                    self.hosts[wname] = host
+                    break
+            else:
+                self.hosts[wname] = new_host
         self.queue_managers: dict = {}
         log_level = log_level if log_level is not None else self.project.log_level
         initialize_runner_logger(
             log_folder=self.project.log_dir,
-            level=log_level,
+            level=log_level.to_logging(),
         )
 
     @property
@@ -86,20 +98,20 @@ class Runner:
         logger.info(f"Received signal: {signum}")
         self.stop_signal = True
 
-    def get_machine(self, machine_id: str) -> Machine:
-        if machine_id not in self.machines:
+    def get_worker(self, worker_name: str) -> WorkerBase:
+        if worker_name not in self.workers:
             raise ConfigError(
-                f"No machine {machine_id} is defined in project {self.project_name}"
+                f"No worker {worker_name} is defined in project {self.project_name}"
             )
-        return self.machines[machine_id]
+        return self.workers[worker_name]
 
-    def get_queue_manager(self, machine_id: str) -> QueueManager:
-        if machine_id not in self.queue_managers:
-            machine = self.get_machine(machine_id)
-            self.queue_managers[machine_id] = QueueManager(
-                machine.get_scheduler_io(), self.hosts[machine.host_id]
+    def get_queue_manager(self, worker_name: str) -> QueueManager:
+        if worker_name not in self.queue_managers:
+            worker = self.get_worker(worker_name)
+            self.queue_managers[worker_name] = QueueManager(
+                worker.get_scheduler_io(), self.hosts[worker_name]
             )
-        return self.queue_managers[machine_id]
+        return self.queue_managers[worker_name]
 
     def get_fw_data(self, fw_doc: dict) -> JobFWData:
         # remove the launches to be able to create the FW instance without
@@ -116,10 +128,13 @@ class Runner:
         if store is None:
             store = self.project.get_jobstore()
             task["store"] = store
-        machine = self.get_machine(task["machine"])
-        host = self.hosts[machine.host_id]
+        worker_name = task["worker"]
+        worker = self.get_worker(worker_name)
+        host = self.hosts[worker_name]
 
-        return JobFWData(fw, task, job, store, machine, host, task.get("store"))
+        return JobFWData(
+            fw, task, job, store, worker_name, worker, host, task.get("store")
+        )
 
     def run(self):
         signal.signal(signal.SIGTERM, self.handle_signal)
@@ -214,6 +229,7 @@ class Runner:
             function = states_methods[state]
 
             fail_now = False
+            set_output = None
             try:
                 error, fail_now, set_output = function(doc)
             except ConfigError:
@@ -314,7 +330,7 @@ class Runner:
             except Exception:
                 logging.error(f"error while closing the store {store}", exc_info=True)
 
-        remote_path = get_job_path(job.uuid, fw_job_data.machine.work_dir)
+        remote_path = get_job_path(job.uuid, fw_job_data.worker.work_dir)
 
         # Set the value of the original store for dynamical workflow. Usually it
         # will be None don't add the serializer, at this stage the default_orjson
@@ -355,9 +371,9 @@ class Runner:
 
         script_commands = ["rlaunch singleshot --offline"]
 
-        machine = fw_job_data.machine
-        queue_manager = self.get_queue_manager(machine.machine_id)
-        resources = fw_job_data.task.get("resources") or machine.resources or {}
+        worker = fw_job_data.worker
+        queue_manager = self.get_queue_manager(fw_job_data.worker_name)
+        resources = fw_job_data.task.get("resources") or worker.resources or {}
         set_name_out(resources, fw_job_data.job.name)
         exec_config = fw_job_data.task.get("exec_config")
         if isinstance(exec_config, str):
@@ -369,10 +385,10 @@ class Runner:
 
         exec_config = exec_config or ExecutionConfig()
 
-        pre_run = machine.pre_run or ""
+        pre_run = worker.pre_run or ""
         if exec_config.pre_run:
             pre_run += "\n" + exec_config.pre_run
-        post_run = machine.post_run or ""
+        post_run = worker.post_run or ""
         if exec_config.post_run:
             post_run += "\n" + exec_config.post_run
 
@@ -480,7 +496,7 @@ class Runner:
     def check_run_status(self):
         logger.debug("check_run_status")
         # check for jobs that could have changed state
-        machines_ids_docs = defaultdict(dict)
+        workers_ids_docs = defaultdict(dict)
         db_filter = {
             f"{REMOTE_DOC_PATH}.state": {
                 "$in": [RemoteState.SUBMITTED.value, RemoteState.RUNNING.value]
@@ -495,14 +511,14 @@ class Runner:
             f"{REMOTE_DOC_PATH}.process_id",
             f"{REMOTE_DOC_PATH}.state",
             f"{REMOTE_DOC_PATH}.step_attempts",
-            "spec._tasks.machine",
+            "spec._tasks.worker",
         ]
         for doc in self.rlpad.fireworks.find(db_filter, projection):
-            machine_id = doc["spec"]["_tasks"][0]["machine"]
+            worker_name = doc["spec"]["_tasks"][0]["worker"]
             remote_doc = get_remote_doc(doc)
-            machines_ids_docs[machine_id][remote_doc["process_id"]] = (doc, remote_doc)
+            workers_ids_docs[worker_name][remote_doc["process_id"]] = (doc, remote_doc)
 
-        for machine_id, ids_docs in machines_ids_docs.items():
+        for worker_name, ids_docs in workers_ids_docs.items():
 
             error = None
             if not ids_docs:
@@ -511,12 +527,12 @@ class Runner:
             qjobs_dict = {}
             try:
                 ids_list = list(ids_docs.keys())
-                queue = self.get_queue_manager(machine_id)
+                queue = self.get_queue_manager(worker_name)
                 qjobs = queue.get_jobs_list(ids_list)
                 qjobs_dict = {qjob.job_id: qjob for qjob in qjobs}
             except Exception:
                 logger.warning(
-                    f"error trying to get jobs list for machine: {machine_id}",
+                    f"error trying to get jobs list for worker: {worker_name}",
                     exc_info=True,
                 )
                 error = traceback.format_exc()
@@ -576,11 +592,13 @@ class Runner:
         logger.debug(f"checked out {n} jobs")
 
     def cleanup(self):
-        for host_id, host in self.hosts.items():
+        for worker_name, host in self.hosts.items():
             try:
                 host.close()
             except Exception:
-                logging.exception(f"error while closing host {host_id}")
+                logging.exception(
+                    f"error while closing connection to worker {worker_name}"
+                )
 
     def ping_wf_doc(self, db_id: int):
         # in the WF document the date is a real Date

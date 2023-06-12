@@ -1,10 +1,9 @@
 from jobflow_remote.config.base import (
     ConfigError,
-    LaunchPadConfig,
-    LocalHostConfig,
-    Machine,
+    LocalWorker,
     Project,
     RemoteLaunchPad,
+    RemoteWorker,
     RunnerOptions,
 )
 from jobflow_remote.config.manager import ConfigManager, ProjectData

@@ -275,7 +275,7 @@ class JobController:
             proj.update(
                 {
                     "launch.action.stored_data": 1,
-                    "remote.error": 1,
+                    f"{REMOTE_DOC_PATH}.error": 1,
                 }
             )
             data = list(

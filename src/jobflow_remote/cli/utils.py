@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 from contextlib import contextmanager
 from enum import Enum
 
@@ -13,21 +12,6 @@ out_console = Console()
 
 
 fmt_datetime = "%Y-%m-%d %H:%M"
-
-
-class LogLevel(Enum):
-    ERROR = "error"
-    WARN = "warn"
-    INFO = "info"
-    DEBUG = "debug"
-
-    def to_logging(self) -> int:
-        return {
-            LogLevel.ERROR: logging.ERROR,
-            LogLevel.WARN: logging.WARN,
-            LogLevel.INFO: logging.INFO,
-            LogLevel.DEBUG: logging.DEBUG,
-        }[self]
 
 
 class SortOption(Enum):

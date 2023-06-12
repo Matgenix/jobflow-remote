@@ -1,79 +1,61 @@
 from __future__ import annotations
 
-import logging
-
 from jobflow_remote.config.base import (
     ExecutionConfig,
-    LaunchPadConfig,
-    LocalHostConfig,
-    Machine,
+    LocalWorker,
     Project,
-    RemoteHostConfig,
+    RemoteWorker,
+    WorkerBase,
 )
 
 
 def generate_dummy_project(name: str, full: bool = False) -> Project:
 
-    rh = generate_dummy_host("remote")
-    hosts = [rh]
-    remote_machine = generate_dummy_machine(scheduler_type="slurm", host_id=rh.host_id)
-    machines = [remote_machine]
+    remote_worker = generate_dummy_worker(scheduler_type="slurm", host_type="remote")
+    workers = {"example_worker": remote_worker}
     exec_config = []
     if full:
-        lh = generate_dummy_host("local")
-        hosts.append(lh)
-        local_machine = generate_dummy_machine(
-            scheduler_type="shell", host_id=lh.host_id
-        )
-        machines.append(local_machine)
+        local_worker = generate_dummy_worker(scheduler_type="shell", host_type="local")
+        workers["example_local"] = local_worker
         exec_config = [generate_dummy_exec_config()]
 
-    lpad_config = generate_dummy_launchpad_config()
+    queue = generate_dummy_queue()
 
     jobstore = generate_dummy_jobstore()
 
     p = Project(
         name=name,
-        log_level=logging.DEBUG,
-        hosts=hosts,
         jobstore=jobstore,
-        run_db=lpad_config,
-        machines=machines,
+        queue=queue,
+        workers=workers,
         exec_config=exec_config,
     )
 
     return p
 
 
-def generate_dummy_host(host_type: str) -> RemoteHostConfig | LocalHostConfig:
+def generate_dummy_worker(
+    scheduler_type: str = "slurm", host_type: str = "remote"
+) -> WorkerBase:
+    d: dict = dict(
+        scheduler_type=scheduler_type,
+        work_dir="/path/to/run/folder",
+        pre_run="source /path/to/python/environment/activate",
+    )
     if host_type == "local":
-        return LocalHostConfig(
-            host_type="local",
-            host_id="test_local_host",
+        d.update(
+            type="local",
             timeout_execute=60,
         )
+        return LocalWorker(**d)
     elif host_type == "remote":
-        return RemoteHostConfig(
-            host_type="remote",
-            host_id="test_remote_host",
+        d.update(
+            type="remote",
             host="remote.host.net",
             user="bob",
             timeout_execute=60,
         )
-    else:
-        raise ValueError(f"Unknown host type {host_type}")
-
-
-def generate_dummy_machine(
-    scheduler_type: str = "slurm", host_id: str = "test_remote_host"
-) -> Machine:
-    return Machine(
-        machine_id=f"machine_{host_id}",
-        scheduler_type=scheduler_type,
-        host_id=host_id,
-        work_dir="/path/to/run/folder",
-        pre_run="source /path/to/python/environment/activate",
-    )
+        return RemoteWorker(**d)
 
 
 def generate_dummy_jobstore() -> dict:
@@ -113,12 +95,13 @@ def generate_dummy_exec_config() -> ExecutionConfig:
     return exec_config
 
 
-def generate_dummy_launchpad_config() -> LaunchPadConfig:
-    lp_config = LaunchPadConfig(
+def generate_dummy_queue() -> dict:
+    lp_config = dict(
+        type="MongoStore",
         host="localhost",
-        port=27017,
-        name="db_name",
+        database="db_name",
         username="bob",
         password="secret_password",
+        collection_name="jobs",
     )
     return lp_config

@@ -53,6 +53,11 @@ class RemoteHost(BaseHost):
             inline_ssh_env=self.inline_ssh_env,
         )
 
+    def __eq__(self, other):
+        if not isinstance(other, RemoteHost):
+            return False
+        return self.as_dict() == other.as_dict()
+
     @property
     def connection(self):
         return self._connection

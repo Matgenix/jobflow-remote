@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import abc
 import logging
 import traceback
+from enum import Enum
 from pathlib import Path
 from typing import Annotated, Literal
 
@@ -11,6 +13,7 @@ from qtoolkit.io import BaseSchedulerIO, scheduler_mapping
 
 from jobflow_remote.fireworks.launchpad import RemoteLaunchPad
 from jobflow_remote.remote.host import BaseHost, LocalHost, RemoteHost
+from jobflow_remote.utils.data import store_from_dict
 
 DEFAULT_JOBSTORE = {"docs_store": {"type": "MemoryStore"}}
 
@@ -32,16 +35,29 @@ class RunnerOptions(BaseModel):
         extra = Extra.forbid
 
 
-class Machine(BaseModel):
+class LogLevel(str, Enum):
+    ERROR = "error"
+    WARN = "warn"
+    INFO = "info"
+    DEBUG = "debug"
 
-    machine_id: str
+    def to_logging(self) -> int:
+        return {
+            LogLevel.ERROR: logging.ERROR,
+            LogLevel.WARN: logging.WARN,
+            LogLevel.INFO: logging.INFO,
+            LogLevel.DEBUG: logging.DEBUG,
+        }[self]
+
+
+class WorkerBase(BaseModel):
+
     scheduler_type: str
-    host_id: str
     work_dir: str
     resources: dict | None = None
     pre_run: str | None = None
     post_run: str | None = None
-    queue_exec_timeout: int | None = 30
+    timeout_execute: int = 60
 
     class Config:
         extra = Extra.forbid
@@ -60,28 +76,22 @@ class Machine(BaseModel):
             raise ConfigError(f"Unknown scheduler type {self.scheduler_type}")
         return scheduler_mapping[self.scheduler_type]()
 
-
-class LaunchPadConfig(BaseModel):
-    host: str | None = "localhost"
-    port: int | None = None
-    name: str | None = None
-    username: str | None = None
-    password: str | None = None
-    logdir: str | None = None
-    strm_lvl: str = "CRITICAL"
-    user_indices: list[str] | None = None
-    wf_user_indices: list[str] | None = None
-    authsource: str | None = None
-    uri_mode: bool = False
-    mongoclient_kwargs: dict | None = None
-
-    class Config:
-        extra = Extra.forbid
+    @abc.abstractmethod
+    def get_host(self) -> BaseHost:
+        pass
 
 
-class RemoteHostConfig(BaseModel):
-    host_type: Literal["remote"] = "remote"
-    host_id: str
+class LocalWorker(WorkerBase):
+
+    type: Literal["local"] = "local"
+
+    def get_host(self) -> BaseHost:
+        return LocalHost(timeout_execute=self.timeout_execute)
+
+
+class RemoteWorker(WorkerBase):
+
+    type: Literal["remote"] = "remote"
     host: str
     user: str = None
     port: int = None
@@ -90,10 +100,6 @@ class RemoteHostConfig(BaseModel):
     connect_timeout: int = None
     connect_kwargs: dict = None
     inline_ssh_env: bool = None
-    timeout_execute: int = 60
-
-    class Config:
-        extra = Extra.forbid
 
     def get_host(self) -> BaseHost:
         return RemoteHost(
@@ -109,21 +115,7 @@ class RemoteHostConfig(BaseModel):
         )
 
 
-class LocalHostConfig(BaseModel):
-    host_type: Literal["local"] = "local"
-    host_id: str
-    timeout_execute: int = 60
-
-    class Config:
-        extra = Extra.forbid
-
-    def get_host(self) -> BaseHost:
-        return LocalHost(timeout_execute=self.timeout_execute)
-
-
-HostConfig = Annotated[
-    LocalHostConfig | RemoteHostConfig, Field(discriminator="host_type")
-]
+WorkerConfig = Annotated[LocalWorker | RemoteWorker, Field(discriminator="type")]
 
 
 class ExecutionConfig(BaseModel):
@@ -143,28 +135,12 @@ class Project(BaseModel):
     tmp_dir: str | None = None
     log_dir: str | None = None
     daemon_dir: str | None = None
-    log_level: int = logging.INFO
+    log_level: LogLevel = LogLevel.INFO
     runner: RunnerOptions = Field(default_factory=RunnerOptions)
-    hosts: list[HostConfig] = Field(default_factory=list)
-    machines: list[Machine] = Field(default_factory=list)
-    run_db: LaunchPadConfig = Field(default_factory=LaunchPadConfig)
+    workers: dict[str, WorkerConfig] = Field(default_factory=dict)
+    queue: dict = Field(default_factory=dict)
     exec_config: list[ExecutionConfig] = Field(default_factory=list)
     jobstore: dict = Field(default_factory=lambda: dict(DEFAULT_JOBSTORE))
-
-    def get_machines_dict(self) -> dict[str, Machine]:
-        return {m.machine_id: m for m in self.machines}
-
-    def get_machines_ids(self) -> list[str]:
-        return [m.machine_id for m in self.machines]
-
-    def get_hosts_config_dict(self) -> dict[str, LocalHostConfig | RemoteHostConfig]:
-        return {h.host_id: h for h in self.hosts}
-
-    def get_hosts_ids(self) -> list[str]:
-        return [h.host_id for h in self.hosts]
-
-    def get_hosts_dict(self) -> dict[str, BaseHost]:
-        return {h.host_id: h.get_host() for h in self.hosts}
 
     def get_exec_config_dict(self) -> dict[str, ExecutionConfig]:
         return {ec.exec_config_id: ec for ec in self.exec_config}
@@ -180,8 +156,11 @@ class Project(BaseModel):
         else:
             return JobStore.from_dict_spec(self.jobstore)
 
+    def get_queue_store(self):
+        return store_from_dict(self.queue)
+
     def get_launchpad(self) -> RemoteLaunchPad:
-        return RemoteLaunchPad(**self.run_db.dict())
+        return RemoteLaunchPad(self.get_queue_store())
 
     @validator("base_dir", always=True)
     def check_base_dir(cls, base_dir: str, values: dict) -> str:
@@ -221,31 +200,6 @@ class Project(BaseModel):
             return str(Path(values["base_dir"], "daemon"))
         return daemon_dir
 
-    @validator("machines", always=True)
-    def check_machines(cls, machines: list[Machine], values: dict) -> list[Machine]:
-        if "hosts" not in values:
-            raise ValueError("hosts should be defined to define a Machine")
-
-        hosts_ids = [h.host_id for h in values["hosts"]]
-        mids: list[Machine] = []
-        for m in machines:
-            if m.machine_id in mids:
-                raise ValueError(f"Repeated Machine with id {m.machine_id}")
-            if m.host_id not in hosts_ids:
-                raise ValueError(
-                    f"Host with id {m.host_id} defined in Machine {m.machine_id} is not defined"
-                )
-        return machines
-
-    @validator("hosts", always=True)
-    def check_hosts(cls, hosts: list[HostConfig], values: dict) -> list[HostConfig]:
-        hids: list[HostConfig] = []
-        for h in hosts:
-            if h.host_id in hids:
-                raise ValueError(f"Repeated Host with id {h.host_id}")
-
-        return hosts
-
     @validator("exec_config", always=True)
     def check_exec_config(
         cls, exec_config: list[ExecutionConfig], values: dict
@@ -270,6 +224,17 @@ class Project(BaseModel):
                     f"error while converting jobstore to JobStore. Error: {traceback.format_exc()}"
                 ) from e
         return jobstore
+
+    @validator("queue", always=True)
+    def check_queue(cls, queue: dict, values: dict) -> dict:
+        if queue:
+            try:
+                store_from_dict(queue)
+            except Exception as e:
+                raise ValueError(
+                    f"error while converting queue to a maggma store. Error: {traceback.format_exc()}"
+                ) from e
+        return queue
 
     class Config:
         extra = Extra.forbid

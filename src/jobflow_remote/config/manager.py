@@ -10,19 +10,12 @@ from pathlib import Path
 
 import tomlkit
 from jobflow import JobStore
+from maggma.stores import MongoStore
+from monty.json import jsanitize
 from monty.os import makedirs_p
 from monty.serialization import dumpfn, loadfn
 
-from jobflow_remote.config.base import (
-    ConfigError,
-    ExecutionConfig,
-    LaunchPadConfig,
-    LocalHostConfig,
-    Machine,
-    Project,
-    RemoteHostConfig,
-)
-from jobflow_remote.remote.host.base import BaseHost
+from jobflow_remote.config.base import ConfigError, ExecutionConfig, Project, WorkerBase
 from jobflow_remote.utils.data import deep_merge_dict
 
 logger = logging.getLogger(__name__)
@@ -97,8 +90,11 @@ class ConfigManager:
 
     def dump_project(self, project_data: ProjectData):
         exclude_none = True if project_data.ext == "toml" else self.exclude_none
-        d = project_data.project.dict(
-            exclude_none=exclude_none, exclude_unset=self.exclude_unset
+        d = jsanitize(
+            project_data.project.dict(
+                exclude_none=exclude_none, exclude_unset=self.exclude_unset
+            ),
+            enum_values=True,
         )
         if project_data.ext in ["json", "yaml"]:
             dumpfn(d, project_data.filepath)
@@ -137,71 +133,36 @@ class ConfigManager:
         self.dump_project(project_data)
         self.projects_data[project_data.project.name] = project_data
 
-    def set_machine(
-        self, machine: Machine, project_name: str | None = None, replace: bool = False
-    ):
-        project_data = self.get_project_data(project_name)
-        machines_data = project_data.project.get_machines_dict()
-        if not replace and machine.machine_id in machines_data:
-            raise ConfigError(
-                f"Machine with id {machine.machine_id} is already defined"
-            )
-        if machine.host_id not in project_data.project.get_hosts_ids():
-            raise ConfigError(f"host {machine.host_id} is not defined")
-        machines_data[machine.machine_id] = machine
-        project_data.project.machines = list(machines_data.values())
-
-        self.dump_project(project_data)
-
-    def remove_machine(self, machine_id: str, project_name: str | None = None):
-        project_data = self.get_project_data(project_name)
-        machines_data = project_data.project.get_machines_dict()
-        machines_data.pop(machine_id)
-        project_data.project.machines = list(machines_data.values())
-        self.dump_project(project_data)
-
-    def load_machine(self, machine_id: str, project_name: str | None = None) -> Machine:
-        project = self.get_project(project_name)
-        machines_data = project.get_machines_dict()
-        if machine_id not in machines_data:
-            raise ConfigError(f"Machine with id {machine_id} is not defined")
-        return machines_data[machine_id]
-
-    def set_host(
+    def set_worker(
         self,
-        host: LocalHostConfig | RemoteHostConfig,
+        name: str,
+        worker: WorkerBase,
         project_name: str | None = None,
         replace: bool = False,
     ):
         project_data = self.get_project_data(project_name)
-        hosts_data = project_data.project.get_hosts_config_dict()
-        if not replace and host.host_id in hosts_data:
-            raise ConfigError(f"Host with id {host.host_id} is already defined")
-        if any(host.host_id == m.host_id for m in project_data.project.machines):
-            raise ConfigError(
-                f"host {host.host_id} is used in one of the Machines, will not remove."
-            )
-        hosts_data[host.host_id] = host
-        project_data.project.hosts = list(hosts_data.values())
+        if not replace and name in project_data.project.workers:
+            raise ConfigError(f"Worker with name {name} is already defined")
+
+        project_data.project.workers[name] = worker
         self.dump_project(project_data)
 
-    def remove_host(self, host_id: str, project_name: str | None = None):
+    def remove_worker(self, worker_name: str, project_name: str | None = None):
         project_data = self.get_project_data(project_name)
-        hosts_data = project_data.project.get_hosts_config_dict()
-        hosts_data.pop(host_id)
-        project_data.project.hosts = list(hosts_data.values())
+        project_data.project.workers.pop(worker_name)
         self.dump_project(project_data)
 
-    def load_host(self, host_id: str, project_name: str | None = None) -> BaseHost:
+    def load_worker(
+        self, worker_name: str, project_name: str | None = None
+    ) -> WorkerBase:
         project = self.get_project(project_name)
-        hosts_data = project.get_hosts_config_dict()
-        if host_id not in hosts_data:
-            raise ConfigError(f"Host with id {host_id} is not defined")
-        return hosts_data[host_id].get_host()
+        if worker_name not in project.workers:
+            raise ConfigError(f"Worker with name {worker_name} is not defined")
+        return project.workers[worker_name]
 
-    def set_run_db(self, config: LaunchPadConfig, project_name: str | None = None):
+    def set_queue_db(self, store: MongoStore, project_name: str | None = None):
         project_data = self.get_project_data(project_name)
-        project_data.project.run_db = config
+        project_data.project.queue = store.as_dict()
 
         self.dump_project(project_data)
 

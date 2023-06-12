@@ -8,6 +8,8 @@ from dataclasses import asdict, dataclass
 from fireworks import Firework, FWAction, Launch, LaunchPad, Workflow
 from fireworks.core.launchpad import WFLock, get_action_from_gridfs
 from fireworks.utilities.fw_serializers import reconstitute_dates, recursive_dict
+from maggma.core import Store
+from maggma.stores import MongoStore
 from pymongo import ASCENDING
 from qtoolkit.core.data_objects import QState
 
@@ -83,8 +85,22 @@ class RemoteRun:
 
 
 class RemoteLaunchPad:
-    def __init__(self, **kwargs):
-        self.lpad = LaunchPad(**kwargs)
+    def __init__(self, store: Store):
+        if not isinstance(store, MongoStore):
+            raise ValueError(
+                f"The store should be an instance of a maggma MongoStore. Got {store.__class__} instead"
+            )
+        self.store = store
+        self.store.connect()
+        self.lpad = LaunchPad()
+        self.lpad.db = store._coll.db
+        self.lpad.fireworks = self.db.fireworks
+        self.lpad.launches = self.db.launches
+        self.lpad.offline_runs = self.db.offline_runs
+        self.lpad.fw_id_assigner = self.db.fw_id_assigner
+        self.lpad.workflows = self.db.workflows
+        self.lpad.gridfs_fallback = None
+
         self.archived_remote_runs = self.db.archived_remote_runs
 
     @property
@@ -417,7 +433,7 @@ class RemoteLaunchPad:
                 remote_docs = []
                 for fw in wf.fws:
                     if fw.fw_id in updated_ids:
-                        remote_doc = fw.spec.pop("_remote")
+                        remote_doc = fw.spec.pop("remote")
                         if remote_doc:
                             remote_docs.append(remote_doc)
 
@@ -585,7 +601,7 @@ class RemoteLaunchPad:
         self, query: dict | None = None, sort: dict | None = None, limit: int = 0
     ) -> list[int]:
         result = self.fireworks.find(
-            query=query, sort=sort, limit=limit, projection={"fw_id": 1}
+            filter=query, sort=sort, limit=limit, projection={"fw_id": 1}
         )
 
         fw_ids = []

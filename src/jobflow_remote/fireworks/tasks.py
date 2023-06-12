@@ -27,11 +27,11 @@ class RemoteJobFiretask(FiretaskBase):
         will be used. Note, this will use the configuration defined on the local
         machine, even if the Task is executed on a remote one. An actual store
         should be set before the Task is executed remotely.
-    machine: Str
-        The id of the Machine where the calculation will be submitted
+    worker: Str
+        The id of the Worker where the calculation will be submitted
     exec_config: ExecutionConfig
         the options to set before the execution of the job in the submission script.
-        In addition to those defined in the Machine.
+        In addition to those defined in the Worker.
     resources: Dict or QResources
         information passed to qtoolkit to require the resources for the submission
         to the queue.
@@ -40,7 +40,7 @@ class RemoteJobFiretask(FiretaskBase):
         a dynamical Flow.
     """
 
-    required_params = ["job", "store", "machine"]
+    required_params = ["job", "store", "worker"]
     optional_params = ["exec_config", "resources", "original_store"]
 
     def run_task(self, fw_spec):
@@ -77,7 +77,7 @@ class RemoteJobFiretask(FiretaskBase):
         additions = None
         # in case of dynamic Flow set the same parameters as the current Job
         kwargs_dynamic = {
-            "machine": self.get("machine"),
+            "worker": self.get("worker"),
             "store": self.get("original_store"),
             "exports": self.get("exports"),
             "qtk_options": self.get("qtk_options"),

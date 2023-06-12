@@ -19,7 +19,7 @@ def get_job_info_table(jobs_info: list[JobInfo], verbosity: int):
     table.add_column("State [Remote]")
     table.add_column("Job id")
 
-    table.add_column("Machine")
+    table.add_column("Worker")
     table.add_column("Last updated")
 
     if verbosity >= 1:
@@ -44,7 +44,7 @@ def get_job_info_table(jobs_info: list[JobInfo], verbosity: int):
             ji.name,
             state,
             ji.job_id,
-            ji.machine,
+            ji.worker,
             ji.last_updated.strftime(fmt_datetime),
         ]
 
@@ -80,7 +80,7 @@ def get_flow_info_table(flows_info: list[FlowInfo], verbosity: int):
     table.add_column("Last updated")
 
     if verbosity >= 1:
-        table.add_column("Machines")
+        table.add_column("Workers")
 
         table.add_column("Job states")
 
@@ -98,8 +98,8 @@ def get_flow_info_table(flows_info: list[FlowInfo], verbosity: int):
         ]
 
         if verbosity >= 1:
-            machines = set(fi.machines)
-            row.append(", ".join(machines))
+            workers = set(fi.workers)
+            row.append(", ".join(workers))
             job_states = "-".join(js.short_value for js in fi.job_states)
             row.append(job_states)
 

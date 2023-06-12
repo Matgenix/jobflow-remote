@@ -298,8 +298,8 @@ def queue_out(
     with loading_spinner() as progress:
         progress.add_task(description="Retrieving files...", total=None)
         cm = ConfigManager()
-        machine = cm.load_machine(info.machine)
-        host = cm.load_host(machine.host_id)
+        worker = cm.load_worker(info.worker)
+        host = worker.get_host()
 
         try:
             host.connect()

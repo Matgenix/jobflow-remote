@@ -18,7 +18,7 @@ __all__ = ["flow_to_workflow", "job_to_firework"]
 
 def flow_to_workflow(
     flow: jobflow.Flow | jobflow.Job | list[jobflow.Job],
-    machine: str,
+    worker: str,
     store: jobflow.JobStore | None = None,
     exec_config: str | ExecutionConfig = None,
     resources: dict | QResources | None = None,
@@ -36,8 +36,8 @@ def flow_to_workflow(
     ----------
     flow
         A flow or job.
-    machine
-        The id of the Machine where the calculation will be submitted
+    worker
+        The name of the Worker where the calculation will be submitted
     store
         A job store. Alternatively, if set to None, :obj:`JobflowSettings.JOB_STORE`
         will be used. Note, this could be different on the computer that submits the
@@ -45,7 +45,7 @@ def flow_to_workflow(
         the computer that runs the workflow will be used.
     exec_config: ExecutionConfig
         the options to set before the execution of the job in the submission script.
-        In addition to those defined in the Machine.
+        In addition to those defined in the Worker.
     resources: Dict or QResources
         information passed to qtoolkit to require the resources for the submission
         to the queue.
@@ -71,7 +71,7 @@ def flow_to_workflow(
     for job, parents in flow.iterflow():
         fw = job_to_firework(
             job,
-            machine=machine,
+            worker=worker,
             store=store,
             parents=parents,
             parent_mapping=parent_mapping,
@@ -88,7 +88,7 @@ def flow_to_workflow(
 
 def job_to_firework(
     job: jobflow.Job,
-    machine: str,
+    worker: str,
     store: jobflow.JobStore | None = None,
     parents: Sequence[str] | None = None,
     parent_mapping: dict[str, Firework] | None = None,
@@ -145,7 +145,7 @@ def job_to_firework(
     task = RemoteJobFiretask(
         job=job,
         store=store,
-        machine=machine,
+        worker=worker,
         resources=resources,
         exec_config=exec_config,
     )

@@ -8,12 +8,12 @@ from typing_extensions import Annotated
 from jobflow_remote.cli.jf import app
 from jobflow_remote.cli.types import log_level_opt, runner_num_procs_opt
 from jobflow_remote.cli.utils import (
-    LogLevel,
     exit_with_error_msg,
     exit_with_warning_msg,
     loading_spinner,
     out_console,
 )
+from jobflow_remote.config.base import LogLevel
 from jobflow_remote.jobs.daemon import DaemonError, DaemonManager, DaemonStatus
 from jobflow_remote.jobs.runner import Runner
 
@@ -41,7 +41,7 @@ def run(
     Should be used by the daemon or for testing purposes.
     """
     runner_id = os.getpid() if set_pid else None
-    runner = Runner(log_level=log_level.to_logging(), runner_id=str(runner_id))
+    runner = Runner(log_level=log_level, runner_id=str(runner_id))
     runner.run()
 
 

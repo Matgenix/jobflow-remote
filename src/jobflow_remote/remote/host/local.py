@@ -14,6 +14,9 @@ class LocalHost(BaseHost):
     def __init__(self, timeout_execute: int = None):
         self.timeout_execute = timeout_execute
 
+    def __eq__(self, other):
+        return isinstance(other, LocalHost)
+
     def execute(
         self,
         command: str | list[str],
