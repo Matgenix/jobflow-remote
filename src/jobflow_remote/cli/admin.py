@@ -76,12 +76,9 @@ def reset(
     if not force:
         cm = ConfigManager()
         project_name = cm.get_project_data().project.name
-        text = Text()
-        text.append("This operation will ", style="red")
-        text.append("delete all the Jobs data ", style="red bold")
-        text.append("for project ", style="red")
-        text.append(f"{project_name} ", style="red bold")
-        text.append("Proceed anyway?", style="red")
+        text = Text.from_markup(
+            f"[red]This operation will [bold]delete all the Jobs data[/bold] for project [bold]{project_name}[/bold]. Proceed anyway?[/red]"
+        )
 
         confirmed = Confirm.ask(text, default=False)
         if not confirmed:
@@ -126,12 +123,9 @@ def remove_lock(
                 end_date=end_date,
             )
 
-        text = Text()
-        text.append("This operation will ", style="red")
-        text.append("remove the lock ", style="red bold")
-        text.append("for (roughly) ", style="red")
-        text.append(f"{len(jobs_info)} Job(s). ", style="red bold")
-        text.append("Proceed anyway?", style="red")
+        text = Text(
+            f"[red]This operation will [bold]remove the lock[/bold] for (roughly) [bold]{len(jobs_info)} Job(s)[/bold]. Proceed anyway?[/red]"
+        )
         confirmed = Confirm.ask(text, default=False)
 
         if not confirmed:

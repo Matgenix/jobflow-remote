@@ -92,7 +92,7 @@ class RemoteLaunchPad:
             )
         self.store = store
         self.store.connect()
-        self.lpad = LaunchPad()
+        self.lpad = LaunchPad(strm_lvl="CRITICAL")
         self.lpad.db = store._coll.db
         self.lpad.fireworks = self.db.fireworks
         self.lpad.launches = self.db.launches

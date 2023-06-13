@@ -141,6 +141,7 @@ class Project(BaseModel):
     queue: dict = Field(default_factory=dict)
     exec_config: list[ExecutionConfig] = Field(default_factory=list)
     jobstore: dict = Field(default_factory=lambda: dict(DEFAULT_JOBSTORE))
+    metadata: dict | None = None
 
     def get_exec_config_dict(self) -> dict[str, ExecutionConfig]:
         return {ec.exec_config_id: ec for ec in self.exec_config}

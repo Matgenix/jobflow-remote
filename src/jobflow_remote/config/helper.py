@@ -1,5 +1,11 @@
 from __future__ import annotations
 
+import logging
+import traceback
+
+from jobflow import JobStore
+from maggma.core import Store
+
 from jobflow_remote.config.base import (
     ExecutionConfig,
     LocalWorker,
@@ -7,6 +13,8 @@ from jobflow_remote.config.base import (
     RemoteWorker,
     WorkerBase,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def generate_dummy_project(name: str, full: bool = False) -> Project:
@@ -105,3 +113,58 @@ def generate_dummy_queue() -> dict:
         collection_name="jobs",
     )
     return lp_config
+
+
+def check_worker(worker: WorkerBase) -> str | None:
+    host = worker.get_host()
+    try:
+        host.connect()
+        host_error = host.test()
+        if host_error:
+            return host_error
+
+        from jobflow_remote.remote.queue import QueueManager
+
+        qm = QueueManager(scheduler_io=worker.get_scheduler_io(), host=host)
+        qm.get_jobs_list()
+    except Exception:
+        exc = traceback.format_exc()
+        return f"Error while testing worker:\n {exc}"
+    finally:
+        try:
+            host.close()
+        except Exception:
+            logger.warning(f"error while closing connection to host {host}")
+
+    return None
+
+
+def _check_store(store: Store) -> str | None:
+    try:
+        store.connect()
+        store.query_one()
+    except Exception:
+        exc = traceback.format_exc()
+        return exc
+    finally:
+        store.close()
+
+    return None
+
+
+def check_queue_store(queue_store: Store):
+    err = _check_store(queue_store)
+    if err:
+        return f"Error while checking queue store:\n{err}"
+    return None
+
+
+def check_jobstore(jobstore: JobStore) -> str | None:
+    err = _check_store(jobstore.docs_store)
+    if err:
+        return f"Error while checking docs_store store:\n{err}"
+    for store_name, store in jobstore.additional_stores.items():
+        err = _check_store(store)
+        if err:
+            return f"Error while checking additional store {store_name}:\n{err}"
+    return None

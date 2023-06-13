@@ -119,10 +119,9 @@ def delete(
         exit_with_warning_msg("No flows matching criteria")
 
     if flows_info and not force:
-        text = Text()
-        text.append("This operation will ", style="red")
-        text.append(f"delete {len(flows_info)} Flow(s)", style="red bold")
-        text.append(". Proceed anyway?", style="red")
+        text = Text.from_markup(
+            f"[red]This operation will [bold]delete {len(flows_info)} Flow(s)[/bold]. Proceed anyway?[/red]"
+        )
 
         confirmed = Confirm.ask(text, default=False)
         if not confirmed:

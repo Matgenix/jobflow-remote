@@ -1,0 +1,195 @@
+import typer
+from rich.text import Text
+from typing_extensions import Annotated
+
+from jobflow_remote.cli.jf import app
+from jobflow_remote.cli.types import serialize_file_format_opt
+from jobflow_remote.cli.utils import (
+    SerializeFileFormat,
+    check_incompatible_opt,
+    exit_with_error_msg,
+    exit_with_warning_msg,
+    loading_spinner,
+    out_console,
+    print_success_msg,
+)
+from jobflow_remote.config import ConfigError, ConfigManager
+from jobflow_remote.config.helper import (
+    check_jobstore,
+    check_queue_store,
+    check_worker,
+    generate_dummy_project,
+)
+
+app_project = typer.Typer(
+    name="project",
+    help="Commands concerning the project definition",
+    # no_args_is_help=True,
+)
+app.add_typer(app_project)
+
+
+@app_project.command(name="list")
+def list_projects():
+    cm = ConfigManager()
+
+    project_name = None
+    try:
+        project_data = cm.get_project_data()
+        project_name = project_data.project.name
+    except ConfigError:
+        pass
+
+    if not cm.projects_data:
+        exit_with_warning_msg(f"No project available in {cm.projects_folder}")
+
+    out_console.print(f"List of projects in {cm.projects_folder}")
+    for pn in sorted(cm.projects_data.keys()):
+        out_console.print(f" - {pn}", style="green" if pn == project_name else None)
+
+
+@app_project.callback(invoke_without_command=True)
+def current_project(ctx: typer.Context):
+    """
+    Print the list of the project currently selected
+    """
+    # only run if no other subcommand is executed
+    if ctx.invoked_subcommand is None:
+        cm = ConfigManager()
+
+        try:
+            project_data = cm.get_project_data()
+            text = Text.from_markup(
+                f"The selected project is [green]{project_data.project.name}[/green] from config file [green]{project_data.filepath}[/green]"
+            )
+            out_console.print(text)
+        except ConfigError as e:
+            exit_with_error_msg(f"Error loading the selected project: {e}")
+
+
+@app_project.command()
+def generate(
+    name: Annotated[str, typer.Argument(help="Name of the project")],
+    file_format: serialize_file_format_opt = SerializeFileFormat.YAML.value,
+    full: Annotated[
+        bool,
+        typer.Option(
+            "--full",
+            help="Generate a configuration file with all the fields and more elements",
+        ),
+    ] = False,
+):
+    """
+    Generate a project configuration file with dummy elements to be edited manually
+    """
+
+    cm = ConfigManager(exclude_unset=not full)
+    if name in cm.projects_data:
+        exit_with_error_msg(f"Project with name {name} already exists")
+
+    filepath = cm.projects_folder / f"{name}.{file_format.value}"
+    if filepath.exists():
+        exit_with_error_msg(
+            f"Project with name {name} does not exist, but file {str(filepath)} does and will not be overwritten"
+        )
+
+    project = generate_dummy_project(name=name, full=full)
+    cm.create_project(project, ext=file_format.value)
+    print_success_msg(
+        f"Configuration file for project {name} created in {str(filepath)}"
+    )
+
+
+@app_project.command()
+def check(
+    jobstore: Annotated[
+        bool,
+        typer.Option(
+            "--jobstore",
+            "-js",
+            help="Only check the jobstore connection",
+        ),
+    ] = False,
+    queue: Annotated[
+        bool,
+        typer.Option(
+            "--queue",
+            "-q",
+            help="Only check the queue connection",
+        ),
+    ] = False,
+    worker: Annotated[
+        str,
+        typer.Option(
+            "--worker",
+            "-w",
+            help="Only check the connection for the selected worker",
+        ),
+    ] = None,
+    print_errors: Annotated[
+        bool,
+        typer.Option(
+            "--errors",
+            "-e",
+            help="Print the errors at the end of the checks",
+        ),
+    ] = False,
+):
+    """
+    Check that the connection to the different elements of the projects are working
+    """
+    check_incompatible_opt({"jobstore": jobstore, "queue": queue, "worker": worker})
+
+    cm = ConfigManager()
+    project = cm.get_project()
+
+    check_all = all(not v for v in (jobstore, worker, queue))
+
+    workers_to_test = []
+    if check_all:
+        workers_to_test = project.workers.keys()
+    elif worker:
+        if worker not in project.workers:
+            exit_with_error_msg(
+                f"Worker {worker} does not exists in project {project.name}"
+            )
+        workers_to_test = [worker]
+
+    tick = "[bold green]✓[/] "
+    cross = "[bold red]x[/] "
+    errors = []
+    with loading_spinner(False) as progress:
+        task_id = progress.add_task("Checking")
+        for worker_name in workers_to_test:
+            progress.update(task_id, description=f"Checking worker {worker_name}")
+            worker = project.workers[worker_name]
+            err = check_worker(worker)
+            header = tick
+            if err:
+                errors.append((f"Worker {worker_name}", err))
+                header = cross
+            progress.print(Text.from_markup(header + f"Worker {worker_name}"))
+
+        if check_all or jobstore:
+            progress.update(task_id, description="Checking jobstore")
+            err = check_jobstore(project.get_jobstore())
+            header = tick
+            if err:
+                errors.append(("Jobstore", err))
+                header = cross
+            progress.print(Text.from_markup(header + "Jobstore"))
+
+        if check_all or queue:
+            progress.update(task_id, description="Checking queue store")
+            err = check_queue_store(project.get_queue_store())
+            header = tick
+            if err:
+                errors.append(("Queue store", err))
+                header = cross
+            progress.print(Text.from_markup(header + "Queue store"))
+
+    if print_errors and errors:
+        out_console.print("Errors:", style="red bold")
+        for e in errors:
+            out_console.print(e[0], style="bold")
+            out_console.print(e[1])
