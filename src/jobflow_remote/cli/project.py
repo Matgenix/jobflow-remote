@@ -1,9 +1,10 @@
 import typer
+from rich.prompt import Confirm
 from rich.text import Text
 from typing_extensions import Annotated
 
 from jobflow_remote.cli.jf import app
-from jobflow_remote.cli.types import serialize_file_format_opt
+from jobflow_remote.cli.types import force_opt, serialize_file_format_opt
 from jobflow_remote.cli.utils import (
     SerializeFileFormat,
     check_incompatible_opt,
@@ -31,6 +32,9 @@ app.add_typer(app_project)
 
 @app_project.command(name="list")
 def list_projects():
+    """
+    List of available projects
+    """
     cm = ConfigManager()
 
     project_name = None
@@ -193,3 +197,36 @@ def check(
         for e in errors:
             out_console.print(e[0], style="bold")
             out_console.print(e[1])
+
+
+@app_project.command()
+def remove(
+    name: Annotated[str, typer.Argument(help="Name of the project")],
+    keep_folders: Annotated[
+        bool,
+        typer.Option(
+            "--keep-folders",
+            "-k",
+            help="Project related folders are not deleted",
+        ),
+    ] = False,
+    force: force_opt = False,
+):
+    """
+    Remove a project from the projects' folder, including the related folders.
+    """
+    cm = ConfigManager()
+
+    if name not in cm.projects_data:
+        exit_with_warning_msg(f"Project {name} does not exist")
+
+    p = cm.get_project(name)
+
+    if not keep_folders and not force:
+        msg = f"This will delete also the folders:\n\t{p.base_dir}\n\t{p.log_dir}\n\t{p.tmp_dir}\n\t{p.daemon_dir}\nProceed anyway?"
+        if not Confirm.ask(msg):
+            raise typer.Exit(0)
+
+    with loading_spinner(False) as progress:
+        progress.add_task("Deleting project")
+        cm.remove_project(project_name=name, remove_folders=not keep_folders)

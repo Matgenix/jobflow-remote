@@ -64,7 +64,7 @@ def reset(
 
     except DaemonError as e:
         exit_with_error_msg(
-            f"Error while checking the status of the daemon: {getattr(e, 'message', e)}"
+            f"Error while checking the status of the daemon: {getattr(e, 'message', str(e))}"
         )
 
     if current_status not in (DaemonStatus.STOPPED, DaemonStatus.SHUT_DOWN):

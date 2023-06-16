@@ -118,11 +118,12 @@ class ConfigManager:
         self.dump_project(project_data)
         self.projects_data[project.name] = project_data
 
-    def remove_project(self, project_name: str):
+    def remove_project(self, project_name: str, remove_folders: bool = True):
         if project_name not in self.projects_data:
             return
         project_data = self.projects_data.pop(project_name)
-        shutil.rmtree(project_data.project.base_dir, ignore_errors=True)
+        if remove_folders:
+            shutil.rmtree(project_data.project.base_dir, ignore_errors=True)
         os.remove(project_data.filepath)
 
     def update_project(self, config: dict, project_name: str):

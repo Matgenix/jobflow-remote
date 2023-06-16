@@ -100,6 +100,7 @@ class RemoteWorker(WorkerBase):
     connect_timeout: int = None
     connect_kwargs: dict = None
     inline_ssh_env: bool = None
+    keepalive: int | None = 60
 
     def get_host(self) -> BaseHost:
         return RemoteHost(
@@ -112,6 +113,7 @@ class RemoteWorker(WorkerBase):
             connect_kwargs=self.connect_kwargs,
             inline_ssh_env=self.inline_ssh_env,
             timeout_execute=self.timeout_execute,
+            keepalive=self.keepalive,
         )
 
 
