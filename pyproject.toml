@@ -27,7 +27,14 @@ classifiers = [
 requires-python = ">=3.8"
 dependencies =[
     "jobflow",
-    "fireworks"
+    "fireworks",
+    "fabric",
+    "tomlkit",
+#    "qtoolkit",  # Should be added here when released
+    "typer",
+    "rich",
+    "psutil",
+    "supervisor",
 ]
 
 [project.optional-dependencies]
@@ -44,6 +51,7 @@ maintain = [
 strict = []
 
 [project.scripts]
+jf = "jobflow_remote.cli.jf:app"
 
 [project.urls]
 homepage = "https://Matgenix.github.io/jobflow_remote/"

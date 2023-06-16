@@ -28,6 +28,7 @@ class RemoteHost(BaseHost):
         connect_kwargs=None,
         inline_ssh_env=None,
         timeout_execute=None,
+        keepalive=60,
     ):
         self.host = host
         self.user = user
@@ -39,6 +40,7 @@ class RemoteHost(BaseHost):
         self.connect_kwargs = connect_kwargs
         self.inline_ssh_env = inline_ssh_env
         self.timeout_execute = timeout_execute
+        self.keepalive = keepalive
         self._connection = fabric.Connection(
             host=self.host,
             user=self.user,
@@ -50,6 +52,11 @@ class RemoteHost(BaseHost):
             connect_kwargs=self.connect_kwargs,
             inline_ssh_env=self.inline_ssh_env,
         )
+
+    def __eq__(self, other):
+        if not isinstance(other, RemoteHost):
+            return False
+        return self.as_dict() == other.as_dict()
 
     @property
     def connection(self):
@@ -111,6 +118,8 @@ class RemoteHost(BaseHost):
 
     def connect(self):
         self.connection.open()
+        if self.keepalive:
+            self.connection.transport.set_keepalive(self.keepalive)
 
     def close(self) -> bool:
         try:

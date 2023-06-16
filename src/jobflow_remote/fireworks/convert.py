@@ -5,6 +5,7 @@ import typing
 from fireworks import Firework, Workflow
 from qtoolkit.core.data_objects import QResources
 
+from jobflow_remote.config.base import ExecutionConfig
 from jobflow_remote.fireworks.tasks import RemoteJobFiretask
 
 if typing.TYPE_CHECKING:
@@ -17,10 +18,11 @@ __all__ = ["flow_to_workflow", "job_to_firework"]
 
 def flow_to_workflow(
     flow: jobflow.Flow | jobflow.Job | list[jobflow.Job],
-    machine: str,
+    worker: str,
     store: jobflow.JobStore | None = None,
-    exports: dict | None = None,
-    qtk_options: dict | QResources | None = None,
+    exec_config: str | ExecutionConfig = None,
+    resources: dict | QResources | None = None,
+    metadata: dict | None = None,
     **kwargs,
 ) -> Workflow:
     """
@@ -34,18 +36,22 @@ def flow_to_workflow(
     ----------
     flow
         A flow or job.
-    machine
-        The id of the Machine where the calculation will be submitted
+    worker
+        The name of the Worker where the calculation will be submitted
     store
         A job store. Alternatively, if set to None, :obj:`JobflowSettings.JOB_STORE`
         will be used. Note, this could be different on the computer that submits the
         workflow and the computer which runs the workflow. The value of ``JOB_STORE`` on
         the computer that runs the workflow will be used.
-    exports
-        pairs of key-values that will be exported in the submission script
-    qtk_options
+    exec_config: ExecutionConfig
+        the options to set before the execution of the job in the submission script.
+        In addition to those defined in the Worker.
+    resources: Dict or QResources
         information passed to qtoolkit to require the resources for the submission
         to the queue.
+    metadata: Dict
+        metadata passed to the workflow. The flow uuid will be added with the key
+        "flow_id".
     **kwargs
         Keyword arguments passed to Workflow init method.
 
@@ -65,26 +71,29 @@ def flow_to_workflow(
     for job, parents in flow.iterflow():
         fw = job_to_firework(
             job,
-            machine=machine,
+            worker=worker,
             store=store,
             parents=parents,
             parent_mapping=parent_mapping,
-            exports=exports,
-            qtk_options=qtk_options,
+            exec_config=exec_config,
+            resources=resources,
         )
         fireworks.append(fw)
 
-    return Workflow(fireworks, name=flow.name, **kwargs)
+    metadata = metadata or {}
+    metadata["flow_id"] = flow.uuid
+
+    return Workflow(fireworks, name=flow.name, metadata=metadata, **kwargs)
 
 
 def job_to_firework(
     job: jobflow.Job,
-    machine: str,
+    worker: str,
     store: jobflow.JobStore | None = None,
     parents: Sequence[str] | None = None,
     parent_mapping: dict[str, Firework] | None = None,
-    exports: dict | None = None,
-    qtk_options: dict | QResources | None = None,
+    exec_config: str | ExecutionConfig = None,
+    resources: dict | QResources | None = None,
     **kwargs,
 ) -> Firework:
     """
@@ -121,8 +130,24 @@ def job_to_firework(
     if (parents is None) is not (parent_mapping is None):
         raise ValueError("Both or neither of parents and parent_mapping must be set.")
 
+    if isinstance(exec_config, ExecutionConfig):
+        exec_config = exec_config.dict()
+
+    manager_config = dict(job.config.manager_config)
+    resources_from_manager = manager_config.pop("resources", None)
+    exec_config_manager = manager_config.pop("exec_config", None)
+    resources = resources_from_manager or resources
+    exec_config = exec_config_manager or exec_config
+
+    if isinstance(exec_config, ExecutionConfig):
+        exec_config = exec_config.dict()
+
     task = RemoteJobFiretask(
-        job=job, store=store, machine=machine, exports=exports, qtk_options=qtk_options
+        job=job,
+        store=store,
+        worker=worker,
+        resources=resources,
+        exec_config=exec_config,
     )
 
     job_parents = None
@@ -134,7 +159,7 @@ def job_to_firework(
     spec = {"_add_launchpad_and_fw_id": True}  # this allows the job to know the fw_id
     if job.config.on_missing_references != OnMissing.ERROR:
         spec["_allow_fizzled_parents"] = True
-    spec.update(job.config.manager_config)
+    spec.update(manager_config)
     spec.update(job.metadata)  # add metadata to spec
 
     fw = Firework([task], spec=spec, name=job.name, parents=job_parents, **kwargs)

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import abc
+import traceback
 from pathlib import Path
 
 from monty.json import MSONable
@@ -68,3 +69,16 @@ class BaseHost(MSONable):
     @abc.abstractmethod
     def copy(self, src, dst):
         raise NotImplementedError
+
+    def test(self) -> str | None:
+        msg = None
+        try:
+            cmd = "echo 'test'"
+            stdout, stderr, returncode = self.execute(cmd)
+            if returncode != 0 or stdout.strip() != "test":
+                msg = f"Command was executed but some error occurred.\nstdoud: {stdout}\nstderr: {stderr}"
+        except Exception:
+            exc = traceback.format_exc()
+            msg = f"Error while executing command:\n {exc}"
+
+        return msg

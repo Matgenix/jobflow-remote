@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import os
 from pathlib import Path
+from typing import Any
 
 from jobflow.core.store import JobStore
 from maggma.stores.mongolike import JSONStore
@@ -30,15 +31,31 @@ def get_remote_files(fw, launch_id):
     return files
 
 
-def get_remote_store(store, launch_dir):
+def default_orjson_serializer(obj: Any) -> Any:
+    type_obj = type(obj)
+    if type_obj != float and issubclass(type_obj, float):
+        return float(obj)
+    raise TypeError
+
+
+def get_remote_store(
+    store: JobStore, launch_dir: str | Path, add_orjson_serializer: bool = True
+) -> JobStore:
+    serialization_default = None
+    if add_orjson_serializer:
+        serialization_default = default_orjson_serializer
 
     docs_store = JSONStore(
-        os.path.join(launch_dir, "remote_job_data.json"), read_only=False
+        os.path.join(launch_dir, "remote_job_data.json"),
+        read_only=False,
+        serialization_default=serialization_default,
     )
     additional_stores = {}
     for k in store.additional_stores.keys():
         additional_stores[k] = JSONStore(
-            os.path.join(launch_dir, f"additional_store_{k}.json"), read_only=False
+            os.path.join(launch_dir, f"additional_store_{k}.json"),
+            read_only=False,
+            serialization_default=serialization_default,
         )
     remote_store = JobStore(
         docs_store=docs_store,
@@ -47,9 +64,15 @@ def get_remote_store(store, launch_dir):
         load=store.load,
     )
 
-    remote_store.connect()
-
     return remote_store
+
+
+def get_remote_store_filenames(store: JobStore) -> list[str]:
+    filenames = ["remote_job_data.json"]
+    for k in store.additional_stores.keys():
+        filenames.append(f"additional_store_{k}.json")
+
+    return filenames
 
 
 def update_store(store, remote_store, save):
