@@ -56,7 +56,9 @@ class LocalHost(BaseHost):
             )
         return proc.stdout.decode(), proc.stderr.decode(), proc.returncode
 
-    def mkdir(self, directory, recursive=True, exist_ok=True) -> bool:
+    def mkdir(
+        self, directory: str | Path, recursive: bool = True, exist_ok: bool = True
+    ) -> bool:
         try:
             Path(directory).mkdir(parents=recursive, exist_ok=exist_ok)
         except OSError:

@@ -121,7 +121,6 @@ WorkerConfig = Annotated[LocalWorker | RemoteWorker, Field(discriminator="type")
 
 
 class ExecutionConfig(BaseModel):
-    exec_config_id: str | None = None
     modules: list[str] | None = None
     export: dict[str, str] | None = None
     pre_run: str | None
@@ -141,15 +140,9 @@ class Project(BaseModel):
     runner: RunnerOptions = Field(default_factory=RunnerOptions)
     workers: dict[str, WorkerConfig] = Field(default_factory=dict)
     queue: dict = Field(default_factory=dict)
-    exec_config: list[ExecutionConfig] = Field(default_factory=list)
+    exec_config: dict[str, ExecutionConfig] = Field(default_factory=dict)
     jobstore: dict = Field(default_factory=lambda: dict(DEFAULT_JOBSTORE))
     metadata: dict | None = None
-
-    def get_exec_config_dict(self) -> dict[str, ExecutionConfig]:
-        return {ec.exec_config_id: ec for ec in self.exec_config}
-
-    def get_exec_config_ids(self) -> list[str]:
-        return [ec.exec_config_id for ec in self.exec_config]
 
     def get_jobstore(self) -> JobStore | None:
         if not self.jobstore:
@@ -203,17 +196,6 @@ class Project(BaseModel):
             return str(Path(values["base_dir"], "daemon"))
         return daemon_dir
 
-    @validator("exec_config", always=True)
-    def check_exec_config(
-        cls, exec_config: list[ExecutionConfig], values: dict
-    ) -> list[ExecutionConfig]:
-        ecids: list[ExecutionConfig] = []
-        for ec in exec_config:
-            if ec.exec_config_id in ecids:
-                raise ValueError(f"Repeated Host with id {ec.exec_config_id}")
-
-        return exec_config
-
     @validator("jobstore", always=True)
     def check_jobstore(cls, jobstore: dict, values: dict) -> dict:
         if jobstore:
@@ -244,4 +226,8 @@ class Project(BaseModel):
 
 
 class ConfigError(Exception):
+    pass
+
+
+class ProjectUndefined(ConfigError):
     pass

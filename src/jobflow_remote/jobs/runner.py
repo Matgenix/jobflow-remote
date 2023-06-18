@@ -378,7 +378,7 @@ class Runner:
         exec_config = fw_job_data.task.get("exec_config")
         if isinstance(exec_config, str):
             exec_config = self.config_manager.load_exec_config(
-                exec_config_id=exec_config, project_name=self.project_name
+                exec_config_name=exec_config, project_name=self.project_name
             )
         elif isinstance(exec_config, dict):
             exec_config = ExecutionConfig.parse_obj(exec_config)

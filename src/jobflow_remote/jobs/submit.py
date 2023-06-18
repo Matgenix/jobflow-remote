@@ -51,7 +51,7 @@ def submit_flow(
     config_manager.load_worker(worker_name=worker, project_name=project)
     if isinstance(exec_config, str):
         config_manager.load_exec_config(
-            exec_config_id=exec_config, project_name=project
+            exec_config_name=exec_config, project_name=project
         )
 
     wf = flow_to_workflow(

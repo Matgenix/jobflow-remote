@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import functools
 from contextlib import contextmanager
 from enum import Enum
 
 import typer
+from click import ClickException
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
+
+from jobflow_remote.config.base import ProjectUndefined
 
 err_console = Console(stderr=True)
 out_console = Console()
@@ -111,3 +115,27 @@ def get_job_db_ids(db_id, job_id):
         job_id_value = job_id
         db_id_value = None
     return db_id_value, job_id_value
+
+
+def cli_error_handler(func):
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except (typer.Exit, typer.Abort, ClickException):
+            raise  # Do not capture click or typer exceptions
+        except ProjectUndefined:
+            exit_with_error_msg(
+                "The active project could not be determined and it is required to execute this command"
+            )
+        except Exception as e:
+            from jobflow_remote import SETTINGS
+
+            if SETTINGS.cli_full_exc:
+                raise  # Reraise exceptions to print the full stacktrace
+            else:
+                exit_with_error_msg(
+                    f"An Error occurred during the command execution: {e.__class__.__name__} {getattr(e, 'message', str(e))}"
+                )
+
+    return wrapper

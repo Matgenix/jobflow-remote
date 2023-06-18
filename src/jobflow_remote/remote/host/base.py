@@ -32,7 +32,9 @@ class BaseHost(MSONable):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def mkdir(self, directory, recursive: bool = True, exist_ok: bool = True) -> bool:
+    def mkdir(
+        self, directory: str | Path, recursive: bool = True, exist_ok: bool = True
+    ) -> bool:
         """Create directory on the host."""
         # TODO: define a common error that is raised or a returned in case the procedure
         # fails to avoid handling different kind of errors for the different hosts

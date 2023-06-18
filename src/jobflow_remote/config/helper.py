@@ -21,11 +21,11 @@ def generate_dummy_project(name: str, full: bool = False) -> Project:
 
     remote_worker = generate_dummy_worker(scheduler_type="slurm", host_type="remote")
     workers = {"example_worker": remote_worker}
-    exec_config = []
+    exec_config = {}
     if full:
         local_worker = generate_dummy_worker(scheduler_type="shell", host_type="local")
         workers["example_local"] = local_worker
-        exec_config = [generate_dummy_exec_config()]
+        exec_config = {"example_config": generate_dummy_exec_config()}
 
     queue = generate_dummy_queue()
 
@@ -95,7 +95,6 @@ def generate_dummy_jobstore() -> dict:
 
 def generate_dummy_exec_config() -> ExecutionConfig:
     exec_config = ExecutionConfig(
-        exec_config_id="example_config",
         modules=["GCC/10.2.0", "OpenMPI/4.0.5-GCC-10.2.0"],
         export={"PATH": "/path/to/binaries:$PATH"},
         pre_run="conda activate env_name",

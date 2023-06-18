@@ -7,6 +7,7 @@ from typing_extensions import Annotated
 
 from jobflow_remote.cli.formatting import format_job_info, get_job_info_table
 from jobflow_remote.cli.jf import app
+from jobflow_remote.cli.jfr_typer import JFRTyper
 from jobflow_remote.cli.types import (
     days_opt,
     db_id_flag_opt,
@@ -40,7 +41,7 @@ from jobflow_remote.jobs.jobcontroller import JobController
 from jobflow_remote.jobs.state import RemoteState
 from jobflow_remote.remote.queue import ERR_FNAME, OUT_FNAME
 
-app_job = typer.Typer(
+app_job = JFRTyper(
     name="job", help="Commands for managing the jobs", no_args_is_help=True
 )
 app.add_typer(app_job)
@@ -259,7 +260,7 @@ def queue_out(
     job_id: job_id_arg,
     db_id: db_id_flag_opt = False,
 ):
-    with loading_spinner() as progress:
+    with loading_spinner(processing=False) as progress:
         progress.add_task(description="Retrieving info...", total=None)
         jc = JobController()
 
@@ -295,7 +296,7 @@ def queue_out(
     err = None
     out_error = None
     err_error = None
-    with loading_spinner() as progress:
+    with loading_spinner(processing=False) as progress:
         progress.add_task(description="Retrieving files...", total=None)
         cm = ConfigManager()
         worker = cm.load_worker(info.worker)

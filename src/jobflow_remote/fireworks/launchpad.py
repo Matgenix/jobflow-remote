@@ -93,7 +93,7 @@ class RemoteLaunchPad:
         self.store = store
         self.store.connect()
         self.lpad = LaunchPad(strm_lvl="CRITICAL")
-        self.lpad.db = store._coll.db
+        self.lpad.db = store._coll.database
         self.lpad.fireworks = self.db.fireworks
         self.lpad.launches = self.db.launches
         self.lpad.offline_runs = self.db.offline_runs
@@ -461,7 +461,7 @@ class RemoteLaunchPad:
             lock_subdoc=REMOTE_DOC_PATH,
         ) as lock:
             if lock.locked_document:
-                values = {f"{REMOTE_DOC_PATH}{k}": v for k, v in values.items()}
+                values = {f"{REMOTE_DOC_PATH}.{k}": v for k, v in values.items()}
                 values["updated_on"] = datetime.datetime.utcnow().isoformat()
                 lock.update_on_release = {"$set": values}
                 return True
@@ -515,7 +515,7 @@ class RemoteLaunchPad:
                     set_dict.pop(k)
                 set_dict["updated_on"] = datetime.datetime.utcnow().isoformat()
 
-                lock.update_on_release = {"$set": {set_dict}}
+                lock.update_on_release = {"$set": set_dict}
                 return True
 
         return False
