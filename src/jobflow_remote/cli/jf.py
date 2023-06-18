@@ -1,10 +1,11 @@
 import typer
 from typing_extensions import Annotated
 
+from jobflow_remote.cli.jfr_typer import JFRTyper
 from jobflow_remote.cli.utils import exit_with_error_msg
 from jobflow_remote.config import ConfigManager
 
-app = typer.Typer(
+app = JFRTyper(
     name="jf",
     add_completion=False,
     no_args_is_help=True,
@@ -22,14 +23,23 @@ def main(
             help="Select a project for the current execution",
             is_eager=True,
         ),
-    ] = None
+    ] = None,
+    full_exc: Annotated[
+        bool,
+        typer.Option(
+            "--full-exc",
+            "-fe",
+            help="Print the full stack trace of exception when enabled",
+            is_eager=True,
+        ),
+    ] = False,
 ):
     """
     The controller CLI for jobflow-remote
     """
-    if project:
-        from jobflow_remote import SETTINGS
+    from jobflow_remote import SETTINGS
 
+    if project:
         cm = ConfigManager()
         if project not in cm.projects_data:
             exit_with_error_msg(
@@ -37,3 +47,6 @@ def main(
             )
 
         SETTINGS.project = project
+
+    if full_exc:
+        SETTINGS.cli_full_exc = True

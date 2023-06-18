@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import io
+import logging
 from pathlib import Path
 
 import fabric
 
 from jobflow_remote.remote.host.base import BaseHost
 
-# from fabric import Connection, Config
+logger = logging.getLogger(__name__)
 
 
 class RemoteHost(BaseHost):
@@ -98,7 +99,9 @@ class RemoteHost(BaseHost):
 
         return out.stdout, out.stderr, out.exited
 
-    def mkdir(self, directory, recursive: bool = True, exist_ok: bool = True) -> bool:
+    def mkdir(
+        self, directory: str | Path, recursive: bool = True, exist_ok: bool = True
+    ) -> bool:
         """Create directory on the host."""
         command = "mkdir "
         if recursive:
@@ -106,8 +109,13 @@ class RemoteHost(BaseHost):
         command += str(directory)
         try:
             stdout, stderr, returncode = self.execute(command)
+            if returncode != 0:
+                logger.warning(
+                    f"Error creating folder {directory}. stdout: {stdout}, stderr: {stderr}"
+                )
             return returncode == 0
         except Exception:
+            logger.warning(f"Error creating folder {directory}", exc_info=True)
             return False
 
     def write_text_file(self, filepath: str | Path, content: str):

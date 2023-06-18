@@ -6,6 +6,7 @@ from rich.text import Text
 from typing_extensions import Annotated
 
 from jobflow_remote.cli.jf import app
+from jobflow_remote.cli.jfr_typer import JFRTyper
 from jobflow_remote.cli.types import log_level_opt, runner_num_procs_opt
 from jobflow_remote.cli.utils import (
     exit_with_error_msg,
@@ -17,7 +18,7 @@ from jobflow_remote.config.base import LogLevel
 from jobflow_remote.jobs.daemon import DaemonError, DaemonManager, DaemonStatus
 from jobflow_remote.jobs.runner import Runner
 
-app_runner = typer.Typer(
+app_runner = JFRTyper(
     name="runner", help="Commands for handling the Runner", no_args_is_help=True
 )
 app.add_typer(app_runner)

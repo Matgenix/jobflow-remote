@@ -15,7 +15,13 @@ from monty.json import jsanitize
 from monty.os import makedirs_p
 from monty.serialization import dumpfn, loadfn
 
-from jobflow_remote.config.base import ConfigError, ExecutionConfig, Project, WorkerBase
+from jobflow_remote.config.base import (
+    ConfigError,
+    ExecutionConfig,
+    Project,
+    ProjectUndefined,
+    WorkerBase,
+)
 from jobflow_remote.utils.data import deep_merge_dict
 
 logger = logging.getLogger(__name__)
@@ -72,7 +78,7 @@ class ConfigManager:
             if len(self.projects_data) == 1:
                 project_name = next(iter(self.projects_data.keys()))
             else:
-                raise ConfigError("A project name should be defined")
+                raise ProjectUndefined("A project name should be defined")
 
         return project_name
 
@@ -174,34 +180,30 @@ class ConfigManager:
 
     def set_exec_config(
         self,
+        exec_config_name: str,
         exec_config: ExecutionConfig,
         project_name: str | None = None,
         replace: bool = False,
     ):
         project_data = self.get_project_data(project_name)
-        exec_config_data = project_data.project.get_exec_config_dict()
-        if not replace and exec_config.exec_config_id in exec_config_data:
-            raise ConfigError(
-                f"Host with id {exec_config.exec_config_id} is already defined"
-            )
-        exec_config_data[exec_config.exec_config_id] = exec_config
-        project_data.project.hosts = list(exec_config_data.values())
+        if not replace and exec_config_name in project_data.project.exec_config:
+            raise ConfigError(f"Host with name {exec_config_name} is already defined")
+        project_data.project.exec_config[exec_config_name] = exec_config
         self.dump_project(project_data)
 
-    def remove_exec_config(self, exec_config_id: str, project_name: str | None = None):
+    def remove_exec_config(
+        self, exec_config_name: str, project_name: str | None = None
+    ):
         project_data = self.get_project_data(project_name)
-        exec_config_data = project_data.project.get_exec_config_dict()
-        exec_config_data.pop(exec_config_id)
-        project_data.project.hosts = list(exec_config_data.values())
+        project_data.project.exec_config.pop(exec_config_name, None)
         self.dump_project(project_data)
 
     def load_exec_config(
-        self, exec_config_id: str, project_name: str | None = None
+        self, exec_config_name: str, project_name: str | None = None
     ) -> ExecutionConfig:
         project = self.get_project(project_name)
-        exec_config_data = project.get_exec_config_dict()
-        if exec_config_id not in exec_config_data:
+        if exec_config_name not in project.exec_config:
             raise ConfigError(
-                f"ExecutionConfig with id {exec_config_id} is not defined"
+                f"ExecutionConfig with id {exec_config_name} is not defined"
             )
-        return exec_config_data[exec_config_id]
+        return project.exec_config[exec_config_name]

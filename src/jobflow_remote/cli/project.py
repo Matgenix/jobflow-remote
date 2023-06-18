@@ -4,6 +4,7 @@ from rich.text import Text
 from typing_extensions import Annotated
 
 from jobflow_remote.cli.jf import app
+from jobflow_remote.cli.jfr_typer import JFRTyper
 from jobflow_remote.cli.types import force_opt, serialize_file_format_opt
 from jobflow_remote.cli.utils import (
     SerializeFileFormat,
@@ -22,7 +23,7 @@ from jobflow_remote.config.helper import (
     generate_dummy_project,
 )
 
-app_project = typer.Typer(
+app_project = JFRTyper(
     name="project",
     help="Commands concerning the project definition",
     # no_args_is_help=True,

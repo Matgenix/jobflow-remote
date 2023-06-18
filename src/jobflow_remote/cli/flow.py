@@ -6,6 +6,7 @@ from rich.text import Text
 
 from jobflow_remote.cli.formatting import get_flow_info_table
 from jobflow_remote.cli.jf import app
+from jobflow_remote.cli.jfr_typer import JFRTyper
 from jobflow_remote.cli.types import (
     days_opt,
     db_ids_opt,
@@ -29,7 +30,7 @@ from jobflow_remote.cli.utils import (
 )
 from jobflow_remote.jobs.jobcontroller import JobController
 
-app_flow = typer.Typer(
+app_flow = JFRTyper(
     name="flow", help="Commands for managing the flows", no_args_is_help=True
 )
 app.add_typer(app_flow)

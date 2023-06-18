@@ -4,6 +4,7 @@ from rich.text import Text
 from typing_extensions import Annotated
 
 from jobflow_remote.cli.jf import app
+from jobflow_remote.cli.jfr_typer import JFRTyper
 from jobflow_remote.cli.types import (
     db_ids_opt,
     end_date_opt,
@@ -23,7 +24,7 @@ from jobflow_remote.config import ConfigManager
 from jobflow_remote.jobs.daemon import DaemonError, DaemonManager, DaemonStatus
 from jobflow_remote.jobs.jobcontroller import JobController
 
-app_admin = typer.Typer(
+app_admin = JFRTyper(
     name="admin", help="Commands for administering the database", no_args_is_help=True
 )
 app.add_typer(app_admin)
