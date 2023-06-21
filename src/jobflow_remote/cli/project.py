@@ -3,9 +3,10 @@ from rich.prompt import Confirm
 from rich.text import Text
 from typing_extensions import Annotated
 
+from jobflow_remote.cli.formatting import get_exec_config_table, get_worker_table
 from jobflow_remote.cli.jf import app
 from jobflow_remote.cli.jfr_typer import JFRTyper
-from jobflow_remote.cli.types import force_opt, serialize_file_format_opt
+from jobflow_remote.cli.types import force_opt, serialize_file_format_opt, verbosity_opt
 from jobflow_remote.cli.utils import (
     SerializeFileFormat,
     check_incompatible_opt,
@@ -60,16 +61,7 @@ def current_project(ctx: typer.Context):
     """
     # only run if no other subcommand is executed
     if ctx.invoked_subcommand is None:
-        cm = ConfigManager()
-
-        try:
-            project_data = cm.get_project_data()
-            text = Text.from_markup(
-                f"The selected project is [green]{project_data.project.name}[/green] from config file [green]{project_data.filepath}[/green]"
-            )
-            out_console.print(text)
-        except ConfigError as e:
-            exit_with_error_msg(f"Error loading the selected project: {e}")
+        out_console.print("Run 'jf project -h' to get the list of available commands")
 
 
 @app_project.command()
@@ -231,3 +223,49 @@ def remove(
     with loading_spinner(False) as progress:
         progress.add_task("Deleting project")
         cm.remove_project(project_name=name, remove_folders=not keep_folders)
+
+
+#####################################
+# Exec config app
+#####################################
+
+
+app_exec_config = JFRTyper(
+    name="exec_config",
+    help="Commands concerning the Execution configurations",
+    no_args_is_help=True,
+)
+app_project.add_typer(app_exec_config)
+
+
+@app_exec_config.command(name="list")
+def list_exec_config(
+    verbosity: verbosity_opt = 0,
+):
+    cm = ConfigManager()
+    project = cm.get_project()
+    table = get_exec_config_table(project.exec_config, verbosity)
+    out_console.print(table)
+
+
+#####################################
+# Worker app
+#####################################
+
+
+app_worker = JFRTyper(
+    name="worker",
+    help="Commands concerning the workers",
+    no_args_is_help=True,
+)
+app_project.add_typer(app_worker)
+
+
+@app_worker.command(name="list")
+def list_worker(
+    verbosity: verbosity_opt = 0,
+):
+    cm = ConfigManager()
+    project = cm.get_project()
+    table = get_worker_table(project.workers, verbosity)
+    out_console.print(table)

@@ -1,9 +1,10 @@
 import typer
+from rich.text import Text
 from typing_extensions import Annotated
 
 from jobflow_remote.cli.jfr_typer import JFRTyper
-from jobflow_remote.cli.utils import exit_with_error_msg
-from jobflow_remote.config import ConfigManager
+from jobflow_remote.cli.utils import exit_with_error_msg, out_console
+from jobflow_remote.config import ConfigError, ConfigManager
 
 app = JFRTyper(
     name="jf",
@@ -50,3 +51,13 @@ def main(
 
     if full_exc:
         SETTINGS.cli_full_exc = True
+
+    cm = ConfigManager()
+    try:
+        project_data = cm.get_project_data()
+        text = Text.from_markup(
+            f"The selected project is [green]{project_data.project.name}[/green] from config file [green]{project_data.filepath}[/green]"
+        )
+        out_console.print(text)
+    except ConfigError as e:
+        out_console.print(f"Current project could not be determined: {e}", style="red")

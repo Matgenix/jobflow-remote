@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from typing import Callable
 
-from jobflow import Flow, Job
+from jobflow import Flow, Job, JobStore
 from qtoolkit.core.data_objects import QResources
 
+from jobflow_remote.config import ConfigManager
 from jobflow_remote.config.base import ExecutionConfig
 
 
@@ -26,3 +27,22 @@ def set_run_config(
     flow_or_job.update_config(
         config=config, name_filter=name_filter, function_filter=function_filter
     )
+
+
+def load_job_store(project: str | None = None) -> JobStore:
+    """
+    Load the JobStore for the current project.
+
+    Parameters
+    ----------
+    project
+
+    Returns
+    -------
+
+    """
+    cm = ConfigManager()
+    p = cm.get_project(project)
+    job_store = p.get_jobstore()
+
+    return job_store

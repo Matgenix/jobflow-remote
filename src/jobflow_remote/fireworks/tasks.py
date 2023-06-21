@@ -79,8 +79,8 @@ class RemoteJobFiretask(FiretaskBase):
         kwargs_dynamic = {
             "worker": self.get("worker"),
             "store": self.get("original_store"),
-            "exports": self.get("exports"),
-            "qtk_options": self.get("qtk_options"),
+            "resources": self.get("resources"),
+            "exec_config": self.get("exec_config"),
         }
         from jobflow_remote.fireworks.convert import flow_to_workflow
 

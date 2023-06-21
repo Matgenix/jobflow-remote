@@ -5,8 +5,10 @@ from dataclasses import asdict
 from monty.json import jsanitize
 from rich.scope import render_scope
 from rich.table import Table
+from rich.text import Text
 
 from jobflow_remote.cli.utils import fmt_datetime
+from jobflow_remote.config.base import ExecutionConfig, WorkerBase
 from jobflow_remote.jobs.data import FlowInfo, JobInfo
 from jobflow_remote.jobs.state import JobState
 from jobflow_remote.utils.data import remove_none
@@ -115,3 +117,63 @@ def format_job_info(job_info: JobInfo, show_none: bool = False):
 
     d = jsanitize(d, allow_bson=False, enum_values=True)
     return render_scope(d)
+
+
+def get_exec_config_table(exec_config: dict[str, ExecutionConfig], verbosity: int = 0):
+    table = Table(title="Execution config", show_lines=verbosity > 0)
+    table.add_column("Name")
+    if verbosity > 0:
+        table.add_column("modules")
+        table.add_column("export")
+        table.add_column("pre_run")
+        table.add_column("post_run")
+    for name in sorted(exec_config.keys()):
+        row = [Text(name, style="bold")]
+        if verbosity > 0:
+            ec = exec_config[name]
+            from ruamel import yaml
+
+            if ec.modules:
+                row.append(yaml.dump(ec.modules, default_flow_style=False))
+            else:
+                row.append("")
+            if ec.export:
+                row.append(yaml.dump(ec.export, default_flow_style=False))
+            else:
+                row.append("")
+            if ec.post_run:
+                row.append(ec.post_run)
+            else:
+                row.append("")
+
+        table.add_row(*row)
+
+    return table
+
+
+def get_worker_table(workers: dict[str, WorkerBase], verbosity: int = 0):
+    table = Table(title="Workers", show_lines=verbosity > 1)
+    table.add_column("Name")
+    if verbosity > 0:
+        table.add_column("type")
+    if verbosity == 1:
+        table.add_column("info")
+    elif verbosity > 1:
+        table.add_column("details")
+
+    for name in sorted(workers.keys()):
+        row = [Text(name, style="bold")]
+        worker = workers[name]
+        if verbosity > 0:
+            row.append(worker.type)
+        if verbosity == 1:
+            row.append(render_scope(worker.cli_info))
+        elif verbosity > 1:
+            d = worker.dict()
+            d = remove_none(d)
+            d = jsanitize(d, allow_bson=False, enum_values=True)
+            row.append(render_scope(d))
+
+        table.add_row(*row)
+
+    return table

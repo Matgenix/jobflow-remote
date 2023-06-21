@@ -80,6 +80,11 @@ class WorkerBase(BaseModel):
     def get_host(self) -> BaseHost:
         pass
 
+    @property
+    @abc.abstractmethod
+    def cli_info(self) -> dict:
+        pass
+
 
 class LocalWorker(WorkerBase):
 
@@ -87,6 +92,13 @@ class LocalWorker(WorkerBase):
 
     def get_host(self) -> BaseHost:
         return LocalHost(timeout_execute=self.timeout_execute)
+
+    @property
+    def cli_info(self) -> dict:
+        return dict(
+            scheduler_type=self.scheduler_type,
+            work_dir=self.work_dir,
+        )
 
 
 class RemoteWorker(WorkerBase):
@@ -114,6 +126,14 @@ class RemoteWorker(WorkerBase):
             inline_ssh_env=self.inline_ssh_env,
             timeout_execute=self.timeout_execute,
             keepalive=self.keepalive,
+        )
+
+    @property
+    def cli_info(self) -> dict:
+        return dict(
+            host=self.host,
+            scheduler_type=self.scheduler_type,
+            work_dir=self.work_dir,
         )
 
 
