@@ -125,15 +125,15 @@ class Runner:
             raise RuntimeError(f"jobflow-remote cannot handle task {task}")
         job = task.get("job")
         store = task.get("store")
+        original_store = store
         if store is None:
             store = self.project.get_jobstore()
-            task["store"] = store
         worker_name = task["worker"]
         worker = self.get_worker(worker_name)
         host = self.hosts[worker_name]
 
         return JobFWData(
-            fw, task, job, store, worker_name, worker, host, task.get("store")
+            fw, task, job, store, worker_name, worker, host, original_store
         )
 
     def run(self):

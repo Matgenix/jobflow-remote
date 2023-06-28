@@ -85,6 +85,12 @@ class JobInfo:
         lock_id = remote.get(MongoLock.LOCK_KEY)
         lock_time = remote.get(MongoLock.LOCK_TIME_KEY)
         if lock_time is not None:
+            # TODO when updating the state of a Firework fireworks replaces the dict
+            #  with its serialized version, where dates are replaced by strings.
+            # Intercept those cases and convert back to dates. This should be removed
+            # if fireworks is replaced by another tool.
+            if isinstance(lock_time, str):
+                lock_time = datetime.fromisoformat(lock_time)
             lock_time = lock_time.replace(tzinfo=timezone.utc).astimezone(tz=None)
         retry_time_limit = remote.get("retry_time_limit")
         if retry_time_limit is not None:

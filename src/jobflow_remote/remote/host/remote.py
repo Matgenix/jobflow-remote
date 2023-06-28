@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 import logging
+import shlex
 from pathlib import Path
 
 import fabric
@@ -30,6 +31,8 @@ class RemoteHost(BaseHost):
         inline_ssh_env=None,
         timeout_execute=None,
         keepalive=60,
+        shell_cmd="bash",
+        login_shell=True,
     ):
         self.host = host
         self.user = user
@@ -42,6 +45,8 @@ class RemoteHost(BaseHost):
         self.inline_ssh_env = inline_ssh_env
         self.timeout_execute = timeout_execute
         self.keepalive = keepalive
+        self.shell_cmd = shell_cmd
+        self.login_shell = login_shell
         self._connection = fabric.Connection(
             host=self.host,
             user=self.user,
@@ -88,14 +93,29 @@ class RemoteHost(BaseHost):
             Exit code of the command.
         """
 
+        if isinstance(command, (list, tuple)):
+            command = " ".join(command)
+
         # TODO: check if this works:
         if not workdir:
             workdir = "."
         else:
             workdir = str(workdir)
         timeout = timeout or self.timeout_execute
+
+        if self.shell_cmd:
+            shell_cmd = self.shell_cmd
+            if self.login_shell:
+                shell_cmd += " -l "
+            shell_cmd += " -c "
+            remote_command = shell_cmd + shlex.quote(command)
+        else:
+            remote_command = command
+
         with self.connection.cd(workdir):
-            out = self.connection.run(command, hide=True, warn=True, timeout=timeout)
+            out = self.connection.run(
+                remote_command, hide=True, warn=True, timeout=timeout
+            )
 
         return out.stdout, out.stderr, out.exited
 
