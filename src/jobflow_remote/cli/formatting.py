@@ -7,7 +7,7 @@ from rich.scope import render_scope
 from rich.table import Table
 from rich.text import Text
 
-from jobflow_remote.cli.utils import fmt_datetime
+from jobflow_remote.cli.utils import ReprStr, fmt_datetime
 from jobflow_remote.config.base import ExecutionConfig, WorkerBase
 from jobflow_remote.jobs.data import FlowInfo, JobInfo
 from jobflow_remote.jobs.state import JobState
@@ -40,11 +40,15 @@ def get_job_info_table(jobs_info: list[JobInfo], verbosity: int):
         state = ji.state.name
         if ji.remote_state is not None and ji.state not in excluded_states:
 
-            state += f" [{ji.remote_state.name}]"
+            if ji.retry_time_limit is not None:
+                state += f" [[bold red]{ji.remote_state.name}[/]]"
+            else:
+                state += f" [{ji.remote_state.name}]"
+
         row = [
             str(ji.db_id),
             ji.name,
-            state,
+            Text.from_markup(state),
             ji.job_id,
             ji.worker,
             ji.last_updated.strftime(fmt_datetime),
@@ -116,6 +120,9 @@ def format_job_info(job_info: JobInfo, show_none: bool = False):
         d = remove_none(d)
 
     d = jsanitize(d, allow_bson=False, enum_values=True)
+    error_remote = d.get("error_remote")
+    if error_remote:
+        d["error_remote"] = ReprStr(error_remote)
     return render_scope(d)
 
 

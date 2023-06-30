@@ -4,6 +4,7 @@ import typer
 from rich.prompt import Confirm
 from rich.text import Text
 
+from jobflow_remote import SETTINGS
 from jobflow_remote.cli.formatting import get_flow_info_table
 from jobflow_remote.cli.jf import app
 from jobflow_remote.cli.jfr_typer import JFRTyper
@@ -77,11 +78,12 @@ def flows_list(
 
         table = get_flow_info_table(flows_info, verbosity=verbosity)
 
-    if max_results and len(flows_info) == max_results:
-        out_console.print(
-            f"The number of Flows printed is limited by the maximum selected: {max_results}",
-            style="yellow",
-        )
+    if SETTINGS.cli_suggestions:
+        if max_results and len(flows_info) == max_results:
+            out_console.print(
+                f"The number of Flows printed is limited by the maximum selected: {max_results}",
+                style="yellow",
+            )
 
     out_console.print(table)
 

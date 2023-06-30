@@ -5,6 +5,7 @@ from pathlib import Path
 import typer
 from typing_extensions import Annotated
 
+from jobflow_remote import SETTINGS
 from jobflow_remote.cli.formatting import format_job_info, get_job_info_table
 from jobflow_remote.cli.jf import app
 from jobflow_remote.cli.jfr_typer import JFRTyper
@@ -99,13 +100,20 @@ def jobs_list(
 
         table = get_job_info_table(jobs_info, verbosity=verbosity)
 
-    if max_results and len(jobs_info) == max_results:
-        out_console.print(
-            f"The number of Jobs printed is limited by the maximum selected: {max_results}",
-            style="yellow",
-        )
-
     out_console.print(table)
+    if SETTINGS.cli_suggestions:
+        if max_results and len(jobs_info) == max_results:
+            out_console.print(
+                f"The number of Jobs printed may be limited by the maximum selected: {max_results}",
+                style="yellow",
+            )
+        if any(ji.retry_time_limit is not None for ji in jobs_info):
+            text = (
+                "Some jobs (remote state in red) have failed while interacting with"
+                " the worker, but will be retried again.\nGet more information about"
+                " the error with 'jf job info -err JOB_ID'"
+            )
+            out_console.print(text, style="yellow")
 
 
 @app_job.command(name="info")

@@ -36,6 +36,18 @@ class SerializeFileFormat(Enum):
     TOML = "toml"
 
 
+class ReprStr(str):
+    """
+    Helper class that overrides the standard __repr__ to return the string itself
+    and not its repr().
+    Used mainly to allow printing of strings with newlines instead of '\n' when
+    repr is used in rich.
+    """
+
+    def __repr__(self):
+        return self
+
+
 def exit_with_error_msg(message, code=1, **kwargs):
     kwargs.setdefault("style", "red")
     err_console.print(message, **kwargs)
