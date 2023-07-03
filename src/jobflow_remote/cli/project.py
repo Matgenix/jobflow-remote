@@ -33,11 +33,20 @@ app.add_typer(app_project)
 
 
 @app_project.command(name="list")
-def list_projects():
+def list_projects(
+    warn: Annotated[
+        bool,
+        typer.Option(
+            "--warn",
+            "-w",
+            help="Print the warning for the files that could not be parsed",
+        ),
+    ] = False,
+):
     """
     List of available projects
     """
-    cm = ConfigManager()
+    cm = ConfigManager(warn=warn)
 
     project_name = None
     try:
@@ -46,12 +55,30 @@ def list_projects():
     except ConfigError:
         pass
 
-    if not cm.projects_data:
+    full_project_list = cm.project_names_from_files()
+
+    if not full_project_list:
         exit_with_warning_msg(f"No project available in {cm.projects_folder}")
 
     out_console.print(f"List of projects in {cm.projects_folder}")
-    for pn in sorted(cm.projects_data.keys()):
+    for pn in sorted(full_project_list):
         out_console.print(f" - {pn}", style="green" if pn == project_name else None)
+
+    not_parsed_projects = set(full_project_list).difference(cm.projects_data.keys())
+    if not_parsed_projects:
+        out_console.print(
+            "The following project names exist in files in the project folder, "
+            "but could not properly parsed as projects: "
+            f"{', '.join(not_parsed_projects)}.",
+            style="yellow",
+        )
+        from jobflow_remote import SETTINGS
+
+        if SETTINGS.cli_suggestions:
+            out_console.print(
+                "Run the command with -w option to see the parsing errors",
+                style="yellow",
+            )
 
 
 @app_project.callback(invoke_without_command=True)

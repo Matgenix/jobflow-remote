@@ -40,8 +40,8 @@ def main(
     """
     from jobflow_remote import SETTINGS
 
+    cm = ConfigManager()
     if project:
-        cm = ConfigManager()
         if project not in cm.projects_data:
             exit_with_error_msg(
                 f"Project {project} is not defined in {SETTINGS.projects_folder}"
@@ -52,7 +52,6 @@ def main(
     if full_exc:
         SETTINGS.cli_full_exc = True
 
-    cm = ConfigManager()
     try:
         project_data = cm.get_project_data()
         text = Text.from_markup(

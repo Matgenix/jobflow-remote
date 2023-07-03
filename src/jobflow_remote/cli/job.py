@@ -307,7 +307,7 @@ def queue_out(
     with loading_spinner(processing=False) as progress:
         progress.add_task(description="Retrieving files...", total=None)
         cm = ConfigManager()
-        worker = cm.load_worker(info.worker)
+        worker = cm.get_worker(info.worker)
         host = worker.get_host()
 
         try:

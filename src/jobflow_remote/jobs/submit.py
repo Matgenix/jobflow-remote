@@ -48,9 +48,9 @@ def submit_flow(
     proj_obj = config_manager.get_project(project)
 
     # try to load the worker and exec_config to check that the values are well defined
-    config_manager.load_worker(worker_name=worker, project_name=project)
+    config_manager.get_worker(worker_name=worker, project_name=project)
     if isinstance(exec_config, str):
-        config_manager.load_exec_config(
+        config_manager.get_exec_config(
             exec_config_name=exec_config, project_name=project
         )
 

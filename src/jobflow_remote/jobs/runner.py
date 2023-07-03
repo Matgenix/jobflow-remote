@@ -377,7 +377,7 @@ class Runner:
         set_name_out(resources, fw_job_data.job.name)
         exec_config = fw_job_data.task.get("exec_config")
         if isinstance(exec_config, str):
-            exec_config = self.config_manager.load_exec_config(
+            exec_config = self.config_manager.get_exec_config(
                 exec_config_name=exec_config, project_name=self.project_name
             )
         elif isinstance(exec_config, dict):
