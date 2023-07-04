@@ -19,15 +19,54 @@ DEFAULT_JOBSTORE = {"docs_store": {"type": "MemoryStore"}}
 
 
 class RunnerOptions(BaseModel):
-    delay_checkout: int = 30
-    delay_check_run_status: int = 30
-    delay_advance_status: int = 30
-    lock_timeout: int | None = 7200
-    delete_tmp_folder: bool = True
-    max_step_attempts: int = 3
-    delta_retry: tuple[int, ...] = (30, 300, 1200)
+    """
+    Options to tune the execution of the Runner
+    """
 
-    def get_delta_retry(self, step_attempts: int):
+    delay_checkout: int = Field(
+        30,
+        description="Delay between subsequent execution of the checkout from database (seconds)",
+    )
+    delay_check_run_status: int = Field(
+        30,
+        description="Delay between subsequent execution of the checking the status of jobs that are submitted to the scheduler (seconds)",
+    )
+    delay_advance_status: int = Field(
+        30,
+        description="Delay between subsequent advancement of the job's remote state (seconds)",
+    )
+    lock_timeout: int | None = Field(
+        86400,
+        description="Time to consider the lock on a document expired and can be overridden (seconds)",
+    )
+    delete_tmp_folder: bool = Field(
+        True,
+        description="Whether to delete the local temporary folder after a job has completed",
+    )
+    max_step_attempts: int = Field(
+        3,
+        description="Maximum number of attempt performed before failing an advancement of a remote state",
+    )
+    delta_retry: tuple[int, ...] = Field(
+        (30, 300, 1200),
+        description="List of increasing delay between subsequent attempts when the advancement of a remote step fails",
+    )
+
+    def get_delta_retry(self, step_attempts: int) -> int:
+        """
+        The time to wait before retrying a failed advancement of the remote state,
+        based on the number of attempts.
+
+        If exceeding the size of the list delta_retry, the last value is returned.
+
+        Parameters
+        ----------
+        step_attempts
+            The number of attempts advancing a remote state.
+        Returns
+        -------
+            The delay in seconds.
+        """
         ind = min(step_attempts, len(self.delta_retry)) - 1
         return self.delta_retry[ind]
 
@@ -36,12 +75,23 @@ class RunnerOptions(BaseModel):
 
 
 class LogLevel(str, Enum):
+    """
+    Enumeration of logging level.
+    """
+
     ERROR = "error"
     WARN = "warn"
     INFO = "info"
     DEBUG = "debug"
 
     def to_logging(self) -> int:
+        """
+        Helper converter to python logging values.
+
+        Returns
+        -------
+        The int corresponding to python logging value
+        """
         return {
             LogLevel.ERROR: logging.ERROR,
             LogLevel.WARN: logging.WARN,
@@ -51,13 +101,35 @@ class LogLevel(str, Enum):
 
 
 class WorkerBase(BaseModel):
+    """
+    Base class defining the common field for the different types of Worker.
+    """
 
-    scheduler_type: str
-    work_dir: str
-    resources: dict | None = None
-    pre_run: str | None = None
-    post_run: str | None = None
-    timeout_execute: int = 60
+    scheduler_type: str = Field(
+        description="Type of the scheduler. Depending on the values supported by QToolKit"
+    )
+    work_dir: str = Field(
+        description="Path to the directory of the worker where subfolders for "
+        "executing the calculation will be created"
+    )
+    resources: dict | None = Field(
+        None,
+        description="A dictionary defining the default resources requested to the "
+        "scheduler. Used to fill in the QToolKit template",
+    )
+    pre_run: str | None = Field(
+        None,
+        description="String with commands that will be executed before the execution of the Job",
+    )
+    post_run: str | None = Field(
+        None,
+        description="String with commands that will be executed after the execution of the Job",
+    )
+    timeout_execute: int = Field(
+        60,
+        description="Timeout for the execution of the commands in the worker "
+        "(e.g. submitting a job)",
+    )
 
     class Config:
         extra = Extra.forbid
@@ -72,29 +144,67 @@ class WorkerBase(BaseModel):
         return scheduler_type
 
     def get_scheduler_io(self) -> BaseSchedulerIO:
+        """
+        Get the BaseSchedulerIO from QToolKit depending on scheduler_type.
+
+        Returns
+        -------
+        The instance of the scheduler_type.
+        """
         if self.scheduler_type not in scheduler_mapping:
             raise ConfigError(f"Unknown scheduler type {self.scheduler_type}")
         return scheduler_mapping[self.scheduler_type]()
 
     @abc.abstractmethod
     def get_host(self) -> BaseHost:
-        pass
+        """
+        Return the Host object used in the Worker.
+        """
 
     @property
     @abc.abstractmethod
     def cli_info(self) -> dict:
-        pass
+        """
+        Short information about the worker to be displayed in the command line
+        interface.
+
+        Returns
+        -------
+        A dictionary with the Worker short information.
+        """
 
 
 class LocalWorker(WorkerBase):
+    """
+    Worker representing the local host.
 
-    type: Literal["local"] = "local"
+    Executes command directly.
+    """
+
+    type: Literal["local"] = Field(
+        "local", description="The discriminator field to determine the worker type"
+    )
 
     def get_host(self) -> BaseHost:
+        """
+        Return the LocalHost.
+
+        Returns
+        -------
+        The LocalHost.
+        """
         return LocalHost(timeout_execute=self.timeout_execute)
 
     @property
     def cli_info(self) -> dict:
+        """
+        Short information about the worker to be displayed in the command line
+        interface.
+
+        Returns
+        -------
+        A dictionary with the Worker short information.
+        """
         return dict(
             scheduler_type=self.scheduler_type,
             work_dir=self.work_dir,
@@ -102,19 +212,71 @@ class LocalWorker(WorkerBase):
 
 
 class RemoteWorker(WorkerBase):
+    """
+    Worker representing a remote host reached through an SSH connection.
 
-    type: Literal["remote"] = "remote"
-    host: str
-    user: str = None
-    port: int = None
-    gateway: str = None
-    forward_agent: bool = None
-    connect_timeout: int = None
-    connect_kwargs: dict = None
-    inline_ssh_env: bool = None
-    keepalive: int | None = 60
+    Uses a Fabric Connection. Check Fabric documentation for more datails on the
+    options defininf a Connection.
+    """
+
+    type: Literal["remote"] = Field(
+        "remote", description="The discriminator field to determine the worker type"
+    )
+    host: str = Field(description="The host to which to connect")
+    user: str = Field(None, description="Login username")
+    port: int = Field(None, description="Port number")
+    password: str | None = Field(None, description="Login password")
+    key_filename: str | list[str] | None = Field(
+        None,
+        description="The filename, or list of filenames, of optional private key(s) "
+        "and/or certs to try for authentication",
+    )
+    passphrase: str | None = Field(
+        None, description="Passphrase used for decrypting private keys"
+    )
+    gateway: str = Field(
+        None, description="A shell command string to use as a proxy or gateway"
+    )
+    forward_agent: bool = Field(
+        None, description="Whether to enable SSH agent forwarding"
+    )
+    connect_timeout: int = Field(None, description="Connection timeout, in seconds")
+    connect_kwargs: dict = Field(
+        None,
+        description="Other keyword arguments passed to paramiko.client.SSHClient.connect",
+    )
+    inline_ssh_env: bool = Field(
+        None,
+        description="Whether to send environment variables 'inline' as prefixes in "
+        "front of command strings",
+    )
+    keepalive: int | None = Field(
+        60, description="Keepalive value in seconds passed to paramiko's transport"
+    )
+    shell_cmd: str | None = Field(
+        "bash",
+        description="The shell command used to execute the command remotely. If None "
+        "the command is executed directly",
+    )
+    login_shell: bool = Field(
+        True, description="Whether to use a login shell when executing the command"
+    )
 
     def get_host(self) -> BaseHost:
+        """
+        Return the RemoteHost.
+
+        Returns
+        -------
+        The RemoteHost.
+        """
+        connect_kwargs = dict(self.connect_kwargs) if self.connect_kwargs else {}
+        if self.password:
+            connect_kwargs["password"] = self.password
+        if self.key_filename:
+            connect_kwargs["key_filename"] = self.key_filename
+        if self.passphrase:
+            connect_kwargs["passphrase"] = self.passphrase
         return RemoteHost(
             host=self.host,
             user=self.user,
@@ -122,14 +284,24 @@ class RemoteWorker(WorkerBase):
             gateway=self.gateway,
             forward_agent=self.forward_agent,
             connect_timeout=self.connect_timeout,
-            connect_kwargs=self.connect_kwargs,
+            connect_kwargs=connect_kwargs,
             inline_ssh_env=self.inline_ssh_env,
             timeout_execute=self.timeout_execute,
             keepalive=self.keepalive,
+            shell_cmd=self.shell_cmd,
+            login_shell=self.login_shell,
         )
 
     @property
     def cli_info(self) -> dict:
+        """
+        Short information about the worker to be displayed in the command line
+        interface.
+
+        Returns
+        -------
+        A dictionary with the Worker short information.
+        """
         return dict(
             host=self.host,
             scheduler_type=self.scheduler_type,
@@ -141,30 +313,86 @@ WorkerConfig = Annotated[LocalWorker | RemoteWorker, Field(discriminator="type")
 
 
 class ExecutionConfig(BaseModel):
-    modules: list[str] | None = None
-    export: dict[str, str] | None = None
-    pre_run: str | None
-    post_run: str | None
+    """
+    Configuration to be set before and after the execution of a Job.
+    """
+
+    modules: list[str] | None = Field(None, description="list of modules to be loaded")
+    export: dict[str, str] | None = Field(
+        None, description="dictionary with variable to be exported"
+    )
+    pre_run: str | None = Field(
+        None, description="Other commands to be executed before the execution of a job"
+    )
+    post_run: str | None = Field(
+        None, description="Commands to be executed after the execution of a job"
+    )
 
     class Config:
         extra = Extra.forbid
 
 
 class Project(BaseModel):
-    name: str
-    base_dir: str | None = None
-    tmp_dir: str | None = None
-    log_dir: str | None = None
-    daemon_dir: str | None = None
-    log_level: LogLevel = LogLevel.INFO
-    runner: RunnerOptions = Field(default_factory=RunnerOptions)
-    workers: dict[str, WorkerConfig] = Field(default_factory=dict)
-    queue: dict = Field(default_factory=dict)
-    exec_config: dict[str, ExecutionConfig] = Field(default_factory=dict)
-    jobstore: dict = Field(default_factory=lambda: dict(DEFAULT_JOBSTORE))
-    metadata: dict | None = None
+    """
+    The configurations of a Project.
+    """
+
+    name: str = Field(description="The name of the project")
+    base_dir: str | None = Field(
+        None,
+        description="The base directory containing the project related files. Default "
+        "is a folder with the project name inside the projects folder",
+    )
+    tmp_dir: str | None = Field(
+        None,
+        description="Folder where remote files are copied. Default a 'tmp' folder in base_dir",
+    )
+    log_dir: str | None = Field(
+        None,
+        description="Folder containing all the logs. Default a 'log' folder in base_dir",
+    )
+    daemon_dir: str | None = Field(
+        None,
+        description="Folder containing daemon related files. Default to a 'daemon' "
+        "folder in base_dir",
+    )
+    log_level: LogLevel = Field(LogLevel.INFO, description="The level set for logging")
+    runner: RunnerOptions = Field(
+        default_factory=RunnerOptions, description="The options for the Runner"
+    )
+    workers: dict[str, WorkerConfig] = Field(
+        default_factory=dict,
+        description="A dictionary with the worker name as keys and the worker "
+        "configuration as values",
+    )
+    queue: dict = Field(
+        default_factory=dict,
+        description="Dictionary describing a maggma Store used for the queue data. "
+        "Can contain the monty serialized dictionary or a dictionary with a 'type' "
+        "specifying the Store subclass",
+    )
+    exec_config: dict[str, ExecutionConfig] = Field(
+        default_factory=dict,
+        description="A dictionary with the ExecutionConfig name as keys and the "
+        "ExecutionConfig configuration as values",
+    )
+    jobstore: dict = Field(
+        default_factory=lambda: dict(DEFAULT_JOBSTORE),
+        description="The JobStore used for the input. Can contain the monty "
+        "serialized dictionary or the Store int the Jobflow format",
+    )
+    metadata: dict | None = Field(
+        None, description="A dictionary with metadata associated to the project"
+    )
 
     def get_jobstore(self) -> JobStore | None:
+        """
+        Generate an instance of the JobStore based on the configuration
+
+        Returns
+        -------
+        A JobStore
+        """
         if not self.jobstore:
             return None
         elif self.jobstore.get("@class") == "JobStore":
@@ -173,9 +401,23 @@ class Project(BaseModel):
             return JobStore.from_dict_spec(self.jobstore)
 
     def get_queue_store(self):
+        """
+        Generate an instance of a maggma Store based on the queue configuration.
+
+        Returns
+        -------
+        A maggma Store
+        """
         return store_from_dict(self.queue)
 
     def get_launchpad(self) -> RemoteLaunchPad:
+        """
+        Provide an instance of a RemoteLaunchPad based on the queue Store.
+
+        Returns
+        -------
+        A RemoteLaunchPad
+        """
         return RemoteLaunchPad(self.get_queue_store())
 
     @validator("base_dir", always=True)
@@ -218,6 +460,9 @@ class Project(BaseModel):
 
     @validator("jobstore", always=True)
     def check_jobstore(cls, jobstore: dict, values: dict) -> dict:
+        """
+        Check that the jobstore configuration could be converted to a JobStore.
+        """
         if jobstore:
             try:
                 if jobstore.get("@class") == "JobStore":
@@ -232,6 +477,9 @@ class Project(BaseModel):
 
     @validator("queue", always=True)
     def check_queue(cls, queue: dict, values: dict) -> dict:
+        """
+        Check that the queue configuration could be converted to a Store.
+        """
         if queue:
             try:
                 store_from_dict(queue)
@@ -246,8 +494,12 @@ class Project(BaseModel):
 
 
 class ConfigError(Exception):
-    pass
+    """
+    A generic Exception related to the configuration
+    """
 
 
 class ProjectUndefined(ConfigError):
-    pass
+    """
+    Exception raised if the Project has not been defined or could not be determined.
+    """
