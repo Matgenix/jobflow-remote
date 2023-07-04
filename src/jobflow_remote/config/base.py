@@ -29,7 +29,8 @@ class RunnerOptions(BaseModel):
     )
     delay_check_run_status: int = Field(
         30,
-        description="Delay between subsequent execution of the checking the status of jobs that are submitted to the scheduler (seconds)",
+        description="Delay between subsequent execution of the checking the status of "
+        "jobs that are submitted to the scheduler (seconds)",
     )
     delay_advance_status: int = Field(
         30,
@@ -45,11 +46,13 @@ class RunnerOptions(BaseModel):
     )
     max_step_attempts: int = Field(
         3,
-        description="Maximum number of attempt performed before failing an advancement of a remote state",
+        description="Maximum number of attempt performed before failing an "
+        "advancement of a remote state",
     )
     delta_retry: tuple[int, ...] = Field(
         (30, 300, 1200),
-        description="List of increasing delay between subsequent attempts when the advancement of a remote step fails",
+        description="List of increasing delay between subsequent attempts when the "
+        "advancement of a remote step fails",
     )
 
     def get_delta_retry(self, step_attempts: int) -> int:
