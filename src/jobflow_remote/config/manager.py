@@ -330,7 +330,7 @@ class ConfigManager:
         self.dump_project(project_data)
 
     def get_worker(
-        self, worker_name: str, project_name: str | None = None
+        self, worker_name: str | None = None, project_name: str | None = None
     ) -> WorkerBase:
         """
         Return the worker object based on the name.
@@ -338,7 +338,8 @@ class ConfigManager:
         Parameters
         ----------
         worker_name
-            Name of the worker to retrieve.
+            Name of the worker to retrieve, or None to use the first one listed in the
+            project.
         project_name
             Name of the project from which the Worker should be retrieved, or None to
             use the one from the settings.
@@ -347,6 +348,9 @@ class ConfigManager:
             The selected Worker.
         """
         project = self.get_project(project_name)
+        if not worker_name:
+            worker_name = next(iter(project.workers.keys()))
+
         if worker_name not in project.workers:
             raise ConfigError(f"Worker with name {worker_name} is not defined")
         return project.workers[worker_name]
