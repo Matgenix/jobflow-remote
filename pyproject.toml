@@ -30,7 +30,7 @@ dependencies =[
     "fireworks",
     "fabric",
     "tomlkit",
-#    "qtoolkit",  # Should be added here when released
+    "qtoolkit @ git+ssh://git@github.com/matgenix/qtoolkit",  # TODO: Should be updated here when released
     "typer",
     "rich",
     "psutil",
