@@ -26,7 +26,7 @@ classifiers = [
 ]
 requires-python = ">=3.8"
 dependencies =[
-    "jobflow[strict]",
+    "jobflow[strict] @ git+ssh://git@github.com/materialsproject/jobflow",
     "fireworks",
     "fabric",
     "tomlkit",
