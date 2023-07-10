@@ -325,7 +325,10 @@ def queue_out(
             except Exception as e:
                 err_error = getattr(e, "message", str(e))
         finally:
-            host.close()
+            try:
+                host.close()
+            except Exception:
+                pass
 
     if out_error:
         out_console.print(

@@ -84,3 +84,22 @@ class BaseHost(MSONable):
             msg = f"Error while executing command:\n {exc}"
 
         return msg
+
+    def _check_connected(self) -> bool:
+        """
+        Helper method to determine if a connection is open or raise otherwise.
+
+        Returns
+        -------
+        True if the connection is open.
+        """
+
+        if not self.is_connected:
+            raise HostError(
+                "The host should be connected before executing this operation"
+            )
+        return True
+
+
+class HostError(Exception):
+    pass

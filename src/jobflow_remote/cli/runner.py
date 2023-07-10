@@ -94,6 +94,13 @@ def stop(
             exit_with_error_msg(
                 f"Error while stopping the daemon: {getattr(e, 'message', e)}"
             )
+    from jobflow_remote import SETTINGS
+
+    if SETTINGS.cli_suggestions:
+        out_console(
+            "The stop signal has been sent to the Runner. Run 'jf runner status' to verify if it stopped",
+            style="yellow",
+        )
 
 
 @app_runner.command()

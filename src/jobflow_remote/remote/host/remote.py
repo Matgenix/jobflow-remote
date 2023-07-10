@@ -92,6 +92,7 @@ class RemoteHost(BaseHost):
         exit_code : int
             Exit code of the command.
         """
+        self._check_connected()
 
         if isinstance(command, (list, tuple)):
             command = " ".join(command)
@@ -140,6 +141,8 @@ class RemoteHost(BaseHost):
 
     def write_text_file(self, filepath: str | Path, content: str):
         """Write content to a file on the host."""
+        self._check_connected()
+
         f = io.StringIO(content)
 
         self.connection.put(f, str(filepath))
@@ -161,9 +164,13 @@ class RemoteHost(BaseHost):
         return self.connection.is_connected
 
     def put(self, src, dst):
+        self._check_connected()
+
         self.connection.put(src, dst)
 
     def get(self, src, dst):
+        self._check_connected()
+
         self.connection.get(src, dst)
 
     def copy(self, src, dst):

@@ -105,11 +105,17 @@ class Runner:
             )
         return self.workers[worker_name]
 
+    def get_host(self, worker_name: str):
+        host = self.hosts[worker_name]
+        if not host.is_connected:
+            host.connect()
+        return host
+
     def get_queue_manager(self, worker_name: str) -> QueueManager:
         if worker_name not in self.queue_managers:
             worker = self.get_worker(worker_name)
             self.queue_managers[worker_name] = QueueManager(
-                worker.get_scheduler_io(), self.hosts[worker_name]
+                worker.get_scheduler_io(), self.get_host(worker_name)
             )
         return self.queue_managers[worker_name]
 
@@ -130,7 +136,7 @@ class Runner:
             store = self.project.get_jobstore()
         worker_name = task["worker"]
         worker = self.get_worker(worker_name)
-        host = self.hosts[worker_name]
+        host = self.get_host(worker_name)
 
         return JobFWData(
             fw, task, job, store, worker_name, worker, host, original_store
