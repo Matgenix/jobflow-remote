@@ -410,7 +410,6 @@ class Runner:
             err_msg = f"submission succeeded but ID not known. Job may be running but status cannot be checked. {repr(submit_result)}"
             return err_msg, True, None
         elif submit_result.status == SubmissionStatus.SUCCESSFUL:
-
             set_output = {
                 "$set": {f"{REMOTE_DOC_PATH}.process_id": str(submit_result.job_id)}
             }
@@ -519,7 +518,6 @@ class Runner:
             workers_ids_docs[worker_name][remote_doc["process_id"]] = (doc, remote_doc)
 
         for worker_name, ids_docs in workers_ids_docs.items():
-
             error = None
             if not ids_docs:
                 continue
@@ -603,5 +601,5 @@ class Runner:
     def ping_wf_doc(self, db_id: int):
         # in the WF document the date is a real Date
         self.rlpad.workflows.find_one_and_update(
-            {"nodes": db_id}, {"$set": {"updated_on": datetime.utcnow()}}
+            {"nodes": db_id}, {"$set": {"updated_on": datetime.utcnow().isoformat()}}
         )
