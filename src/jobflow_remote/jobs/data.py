@@ -40,6 +40,8 @@ job_info_projection = {
     f"{REMOTE_DOC_PATH}.retry_time_limit": 1,
     f"{REMOTE_DOC_PATH}.process_id": 1,
     f"{REMOTE_DOC_PATH}.run_dir": 1,
+    f"{REMOTE_DOC_PATH}.start_time": 1,
+    f"{REMOTE_DOC_PATH}.end_time": 1,
     "spec._tasks.worker": 1,
     "spec._tasks.job.hosts": 1,
 }
@@ -63,6 +65,8 @@ class JobInfo:
     error_job: str | None = None
     error_remote: str | None = None
     host_flows_ids: list[str] = field(default_factory=lambda: list())
+    start_time: datetime | None = None
+    end_time: datetime | None = None
 
     @classmethod
     def from_fw_dict(cls, d):
@@ -113,6 +117,13 @@ class JobInfo:
             # convert to string in case the format is the one of an integer
             queue_job_id = str(queue_job_id)
 
+        start_time = remote.get("start_time")
+        if start_time:
+            start_time = start_time.replace(tzinfo=timezone.utc).astimezone(tz=None)
+        end_time = remote.get("end_time")
+        if end_time:
+            end_time = end_time.replace(tzinfo=timezone.utc).astimezone(tz=None)
+
         return cls(
             db_id=d["fw_id"],
             job_id=d["spec"]["_tasks"][0]["job"]["uuid"],
@@ -130,7 +141,25 @@ class JobInfo:
             error_remote=remote.get("error"),
             error_job=error_job,
             host_flows_ids=d["spec"]["_tasks"][0]["job"]["hosts"],
+            start_time=start_time,
+            end_time=end_time,
         )
+
+    @property
+    def run_time(self) -> float | None:
+        if self.start_time and self.end_time:
+            return (self.end_time - self.start_time).total_seconds()
+
+        return None
+
+    @property
+    def estimated_run_time(self) -> float | None:
+        if self.start_time:
+            return (
+                datetime.now(tz=self.start_time.tzinfo) - self.start_time
+            ).total_seconds()
+
+        return None
 
 
 flow_info_projection = {

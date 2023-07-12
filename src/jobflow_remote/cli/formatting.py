@@ -10,7 +10,7 @@ from rich.text import Text
 from jobflow_remote.cli.utils import ReprStr, fmt_datetime
 from jobflow_remote.config.base import ExecutionConfig, WorkerBase
 from jobflow_remote.jobs.data import FlowInfo, JobInfo
-from jobflow_remote.jobs.state import JobState
+from jobflow_remote.jobs.state import JobState, RemoteState
 from jobflow_remote.utils.data import remove_none
 
 
@@ -26,6 +26,7 @@ def get_job_info_table(jobs_info: list[JobInfo], verbosity: int):
 
     if verbosity >= 1:
         table.add_column("Queue id")
+        table.add_column("Run time")
         table.add_column("Retry time")
         table.add_column("Prev state")
         if verbosity < 2:
@@ -56,6 +57,18 @@ def get_job_info_table(jobs_info: list[JobInfo], verbosity: int):
 
         if verbosity >= 1:
             row.append(ji.queue_job_id)
+            prefix = ""
+            if ji.remote_state == RemoteState.RUNNING:
+                run_time = ji.estimated_run_time
+                prefix = "~"
+            else:
+                run_time = ji.run_time
+            if run_time:
+                m, s = divmod(run_time, 60)
+                h, m = divmod(m, 60)
+                row.append(prefix + f"{h:g}:{m:02g}")
+            else:
+                row.append("")
             row.append(
                 ji.retry_time_limit.strftime(fmt_datetime)
                 if ji.retry_time_limit

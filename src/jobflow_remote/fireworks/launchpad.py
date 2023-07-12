@@ -50,6 +50,8 @@ class RemoteRun:
     lock_time: datetime.datetime | None = None
     process_id: str | None = None
     run_dir: str | None = None
+    start_time: datetime.datetime | None = None
+    end_time: datetime.datetime | None = None
 
     def as_db_dict(self):
         d = asdict(self)
@@ -188,8 +190,15 @@ class RemoteLaunchPad:
                         )
                         already_running = True
 
+                # Fixed with respect to fireworks.
+                # Otherwise the created_on for RUNNING state is wrong
                 if not already_running:
                     m_launch.state = "RUNNING"  # this should also add a history item
+                    for s in m_launch.state_history:
+                        if s["state"] == "RUNNING":
+                            s["created_on"] = reconstitute_dates(
+                                remote_status["started_on"]
+                            )
 
             status = remote_status.get("state")
             if terminated and status not in ("COMPLETED", "FIZZLED"):
@@ -265,7 +274,7 @@ class RemoteLaunchPad:
                 self.lpad.complete_launch(launch_id, m_action, "FIZZLED")
 
                 completed = True
-        return m_launch.fw_id, completed
+        return m_launch, completed
 
     def add_wf(self, wf):
         return self.lpad.add_wf(wf)

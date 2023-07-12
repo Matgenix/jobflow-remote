@@ -476,7 +476,7 @@ class Runner:
             # TODO add ping data?
             remote_store = get_remote_store(store, local_path)
             remote_store.connect()
-            fw_id, completed = self.rlpad.recover_remote(
+            launch, completed = self.rlpad.recover_remote(
                 remote_status=remote_data,
                 store=store,
                 remote_store=remote_store,
@@ -484,6 +484,13 @@ class Runner:
                 launch_id=remote_doc["launch_id"],
                 terminated=True,
             )
+
+            set_output = {
+                "$set": {
+                    f"{REMOTE_DOC_PATH}.start_time": launch.time_start or None,
+                    f"{REMOTE_DOC_PATH}.end_time": launch.time_end or None,
+                }
+            }
         except json.JSONDecodeError:
             # if an empty file is copied this error can appear, do not retry
             err_msg = traceback.format_exc()
@@ -497,7 +504,7 @@ class Runner:
             err_msg = "the parsed output does not contain the required information to complete the job"
             return err_msg, True, None
 
-        return None, False, None
+        return None, False, set_output
 
     def check_run_status(self):
         logger.debug("check_run_status")
@@ -549,11 +556,13 @@ class Runner:
                 qstate = qjob.state if qjob else None
                 collection = self.rlpad.fireworks
                 next_state = None
+                start_time = None
                 if (
                     qstate == QState.RUNNING
                     and remote_doc["state"] == RemoteState.SUBMITTED.value
                 ):
                     next_state = RemoteState.RUNNING
+                    start_time = datetime.utcnow()
                     logger.debug(
                         f"remote job with id {remote_doc['process_id']} is running"
                     )
@@ -588,6 +597,10 @@ class Runner:
                                     else None
                                 }
                             }
+                            if start_time:
+                                set_output["$set"][
+                                    f"{REMOTE_DOC_PATH}.start_time"
+                                ] = start_time
                             lock.update_on_release = self._prepare_lock_update(
                                 doc, error, False, set_output, next_state
                             )
