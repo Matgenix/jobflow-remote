@@ -49,6 +49,11 @@ tests = [
 maintain = [
     "git-changelog>=0.6",
 ]
+docs = [
+    "sphinx",
+    "sphinx_design",
+    "pydata-sphinx-theme",
+]
 strict = []
 
 [project.scripts]
