@@ -76,8 +76,10 @@ class JobInfo:
             RemoteState(remote_state_val) if remote_state_val is not None else None
         )
         state = JobState.from_states(d["state"], remote_state)
-        # in FW the date is encoded in a string
-        last_updated = datetime.fromisoformat(d["updated_on"])
+        if isinstance(d["updated_on"], str):
+            last_updated = datetime.fromisoformat(d["updated_on"])
+        else:
+            last_updated = d["updated_on"]
         # the dates should be in utc time. Convert them to the system time
         last_updated = last_updated.replace(tzinfo=timezone.utc).astimezone(tz=None)
         remote_previous_state_val = remote.get("previous_state")

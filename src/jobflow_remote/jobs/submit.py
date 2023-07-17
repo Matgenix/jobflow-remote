@@ -10,7 +10,7 @@ from jobflow_remote.fireworks.convert import flow_to_workflow
 
 def submit_flow(
     flow: jobflow.Flow | jobflow.Job | list[jobflow.Job],
-    worker: str,
+    worker: str | None = None,
     store: str | jobflow.JobStore | None = None,
     project: str | None = None,
     exec_config: str | ExecutionConfig | None = None,

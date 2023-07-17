@@ -26,11 +26,11 @@ classifiers = [
 ]
 requires-python = ">=3.8"
 dependencies =[
-    "jobflow",
+    "jobflow[strict] @ git+ssh://git@github.com/materialsproject/jobflow",
     "fireworks",
     "fabric",
     "tomlkit",
-#    "qtoolkit",  # Should be added here when released
+    "qtoolkit @ git+ssh://git@github.com/matgenix/qtoolkit",  # TODO: Should be updated here when released
     "typer",
     "rich",
     "psutil",
