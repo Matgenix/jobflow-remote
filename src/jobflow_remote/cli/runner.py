@@ -97,7 +97,7 @@ def stop(
     from jobflow_remote import SETTINGS
 
     if SETTINGS.cli_suggestions:
-        out_console(
+        out_console.print(
             "The stop signal has been sent to the Runner. Run 'jf runner status' to verify if it stopped",
             style="yellow",
         )

@@ -11,6 +11,7 @@ app = JFRTyper(
     add_completion=False,
     no_args_is_help=True,
     context_settings={"help_option_names": ["-h", "--help"]},
+    epilog=None,  # to remove the default message in JFRTyper
 )
 
 
