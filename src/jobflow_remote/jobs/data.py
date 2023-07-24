@@ -193,7 +193,10 @@ class FlowInfo:
     @classmethod
     def from_query_dict(cls, d):
         # the dates should be in utc time. Convert them to the system time
-        last_updated = d["updated_on"].replace(tzinfo=timezone.utc).astimezone(tz=None)
+        updated_on = d["updated_on"]
+        if isinstance(updated_on, str):
+            updated_on = datetime.fromisoformat(updated_on)
+        last_updated = updated_on.replace(tzinfo=timezone.utc).astimezone(tz=None)
         flow_id = d["metadata"].get("flow_id")
         fws = d.get("fws") or []
         workers = []
