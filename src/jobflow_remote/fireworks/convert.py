@@ -5,7 +5,7 @@ import typing
 from fireworks import Firework, Workflow
 from qtoolkit.core.data_objects import QResources
 
-from jobflow_remote.config.base import ExecutionConfig
+from jobflow_remote.config.base import ConfigError, ExecutionConfig
 from jobflow_remote.fireworks.tasks import RemoteJobFiretask
 
 if typing.TYPE_CHECKING:
@@ -65,6 +65,9 @@ def flow_to_workflow(
 
     parent_mapping: dict[str, Firework] = {}
     fireworks = []
+
+    if not worker:
+        raise ConfigError("Worker name must be set.")
 
     flow = get_flow(flow)
 
