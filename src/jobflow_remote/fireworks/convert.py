@@ -23,6 +23,7 @@ def flow_to_workflow(
     exec_config: str | ExecutionConfig = None,
     resources: dict | QResources | None = None,
     metadata: dict | None = None,
+    allow_external_references: bool = False,
     **kwargs,
 ) -> Workflow:
     """
@@ -52,6 +53,9 @@ def flow_to_workflow(
     metadata: Dict
         metadata passed to the workflow. The flow uuid will be added with the key
         "flow_id".
+    allow_external_references
+        If False all the references to other outputs should be from other Jobs
+        of the Flow.
     **kwargs
         Keyword arguments passed to Workflow init method.
 
@@ -69,7 +73,7 @@ def flow_to_workflow(
     if not worker:
         raise ConfigError("Worker name must be set.")
 
-    flow = get_flow(flow)
+    flow = get_flow(flow, allow_external_references=allow_external_references)
 
     for job, parents in flow.iterflow():
         fw = job_to_firework(

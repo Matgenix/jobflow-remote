@@ -15,6 +15,7 @@ def submit_flow(
     project: str | None = None,
     exec_config: str | ExecutionConfig | None = None,
     resources: dict | QResources | None = None,
+    allow_external_references: bool = False,
 ):
     """
     Submit a flow for calculation to the selected Worker.
@@ -43,6 +44,9 @@ def submit_flow(
     resources: Dict or QResources
         information passed to qtoolkit to require the resources for the submission
         to the queue.
+    allow_external_references
+        If False all the references to other outputs should be from other Jobs
+        of the Flow.
     """
     config_manager = ConfigManager()
 
@@ -60,7 +64,12 @@ def submit_flow(
         )
 
     wf = flow_to_workflow(
-        flow, worker=worker, store=store, exec_config=exec_config, resources=resources
+        flow,
+        worker=worker,
+        store=store,
+        exec_config=exec_config,
+        resources=resources,
+        allow_external_references=allow_external_references,
     )
 
     rlpad = proj_obj.get_launchpad()

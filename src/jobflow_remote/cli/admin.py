@@ -46,7 +46,7 @@ def reset(
             "--max-limit",
             "-max",
             help=(
-                "The database will be reset only if the number of Jobs is lower than the specified limit. 0 means no limit"
+                "The database will be reset only if the number of Flows is lower than the specified limit. 0 means no limit"
             ),
         ),
     ] = 25,
@@ -56,6 +56,8 @@ def reset(
     Reset the jobflow database.
     WARNING: deletes all the data. These could not be retrieved anymore.
     """
+    from jobflow_remote import SETTINGS
+
     dm = DaemonManager()
 
     try:
@@ -78,7 +80,8 @@ def reset(
         cm = ConfigManager()
         project_name = cm.get_project_data().project.name
         text = Text.from_markup(
-            f"[red]This operation will [bold]delete all the Jobs data[/bold] for project [bold]{project_name}[/bold]. Proceed anyway?[/red]"
+            "[red]This operation will [bold]delete all the Jobs data[/bold] "
+            f"for project [bold]{project_name}[/bold]. Proceed anyway?[/red]"
         )
 
         confirmed = Confirm.ask(text, default=False)
@@ -88,7 +91,13 @@ def reset(
         progress.add_task(description="Resetting the DB...", total=None)
         jc = JobController()
         done = jc.reset(reset_output=reset_output, max_limit=max_limit)
-    out_console.print(f"The database was {'' if done else 'NOT '}reset")
+    not_text = "" if done else "[bold]NOT [/bold]"
+    out_console.print(f"The database was {not_text}reset")
+    if not done and SETTINGS.cli_suggestions:
+        out_console.print(
+            "Check the amount of Flows and change --max-limit if this is the correct project to reset",
+            style="yellow",
+        )
 
 
 @app_admin.command()
