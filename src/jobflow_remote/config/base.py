@@ -111,8 +111,8 @@ class WorkerBase(BaseModel):
     scheduler_type: str = Field(
         description="Type of the scheduler. Depending on the values supported by QToolKit"
     )
-    work_dir: str = Field(
-        description="Path to the directory of the worker where subfolders for "
+    work_dir: Path = Field(
+        description="Absolute path of the directory of the worker where subfolders for "
         "executing the calculation will be created"
     )
     resources: dict | None = Field(
