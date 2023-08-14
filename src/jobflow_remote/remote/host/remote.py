@@ -107,8 +107,9 @@ class RemoteHost(BaseHost):
         # TODO: check if this works:
         if not workdir:
             workdir = "."
-        else:
-            workdir = str(workdir)
+
+        workdir = Path(workdir)
+
         timeout = timeout or self.timeout_execute
 
         if self.shell_cmd:
@@ -135,10 +136,8 @@ class RemoteHost(BaseHost):
         self, directory: str | Path, recursive: bool = True, exist_ok: bool = True
     ) -> bool:
         """Create directory on the host."""
-        command = "mkdir "
-        if recursive:
-            command += "-p "
-        command += str(directory)
+        directory = Path(directory)
+        command = f"mkdir {'-p ' if recursive else ''}{str(directory)!r}"
         try:
             stdout, stderr, returncode = self.execute(command)
             if returncode != 0:
