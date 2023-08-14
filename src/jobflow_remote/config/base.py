@@ -146,6 +146,12 @@ class WorkerBase(BaseModel):
             raise ValueError(f"Unknown scheduler type {scheduler_type}")
         return scheduler_type
 
+    @validator("work_dir", always=True)
+    def check_work_dir(cls, v) -> Path:
+        if not v.is_absolute():
+            raise ValueError("`work_dir` must be an absolute path")
+        return v
+
     def get_scheduler_io(self) -> BaseSchedulerIO:
         """
         Get the BaseSchedulerIO from QToolKit depending on scheduler_type.
