@@ -3,7 +3,7 @@ from __future__ import annotations
 import jobflow
 from qtoolkit.core.data_objects import QResources
 
-from jobflow_remote.config.base import ExecutionConfig
+from jobflow_remote.config.base import ConfigError, ExecutionConfig
 from jobflow_remote.config.manager import ConfigManager
 from jobflow_remote.fireworks.convert import flow_to_workflow
 
@@ -27,7 +27,8 @@ def submit_flow(
     flow
         A flow or job.
     worker
-        The name of the Worker where the calculation will be submitted
+        The name of the Worker where the calculation will be submitted. If None, use the
+        first configured worker for this project.
     store
         A job store. Alternatively, if set to None, :obj:`JobflowSettings.JOB_STORE`
         will be used. Note, this could be different on the computer that submits the
@@ -46,6 +47,10 @@ def submit_flow(
     config_manager = ConfigManager()
 
     proj_obj = config_manager.get_project(project)
+    if worker is None:
+        if not proj_obj.workers:
+            raise ConfigError("No workers configured for this project.")
+        worker = next(iter(proj_obj.workers.keys()))
 
     # try to load the worker and exec_config to check that the values are well defined
     config_manager.get_worker(worker_name=worker, project_name=project)
