@@ -19,7 +19,7 @@ def get_job_info_table(jobs_info: list[JobInfo], verbosity: int):
     table.add_column("DB id")
     table.add_column("Name")
     table.add_column("State [Remote]")
-    table.add_column("Job id")
+    table.add_column("Job id  (Index)")
 
     table.add_column("Worker")
     table.add_column("Last updated")
@@ -50,7 +50,7 @@ def get_job_info_table(jobs_info: list[JobInfo], verbosity: int):
             str(ji.db_id),
             ji.name,
             Text.from_markup(state),
-            ji.job_id,
+            f"{ji.job_id}  ({ji.job_index})",
             ji.worker,
             ji.last_updated.strftime(fmt_datetime),
         ]

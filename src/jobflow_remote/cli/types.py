@@ -152,6 +152,10 @@ reverse_sort_flag_opt = Annotated[
 
 job_id_arg = Annotated[str, typer.Argument(help="The ID of the job (i.e. the uuid)")]
 
+db_id_arg = Annotated[
+    int, typer.Argument(help="The DB id of the job (i.e. an integer)")
+]
+
 
 db_id_flag_opt = Annotated[
     bool,

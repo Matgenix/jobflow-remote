@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from jobflow import Job, JobStore
 
 from jobflow_remote.fireworks.launchpad import (
+    FW_INDEX_PATH,
     FW_UUID_PATH,
     REMOTE_DOC_PATH,
     get_job_doc,
@@ -29,6 +30,7 @@ class JobData:
 job_info_projection = {
     "fw_id": 1,
     FW_UUID_PATH: 1,
+    FW_INDEX_PATH: 1,
     "state": 1,
     f"{REMOTE_DOC_PATH}.state": 1,
     "name": 1,
@@ -51,6 +53,7 @@ job_info_projection = {
 class JobInfo:
     db_id: int
     job_id: str
+    job_index: int
     state: JobState
     name: str
     last_updated: datetime
@@ -129,6 +132,7 @@ class JobInfo:
         return cls(
             db_id=d["fw_id"],
             job_id=d["spec"]["_tasks"][0]["job"]["uuid"],
+            job_index=d["spec"]["_tasks"][0]["job"]["index"],
             state=state,
             name=d["name"],
             last_updated=last_updated,
@@ -167,6 +171,7 @@ class JobInfo:
 flow_info_projection = {
     "fws.fw_id": 1,
     f"fws.{FW_UUID_PATH}": 1,
+    f"fws.{FW_INDEX_PATH}": 1,
     "fws.state": 1,
     "fws.name": 1,
     f"fws.{REMOTE_DOC_PATH}.state": 1,
@@ -182,6 +187,7 @@ flow_info_projection = {
 class FlowInfo:
     db_ids: list[int]
     job_ids: list[str]
+    job_indexes: list[int]
     flow_id: str
     state: FlowState
     name: str
@@ -204,11 +210,13 @@ class FlowInfo:
         job_names = []
         db_ids = []
         job_ids = []
+        job_indexes = []
         for fw_doc in fws:
             db_ids.append(fw_doc["fw_id"])
             job_doc = get_job_doc(fw_doc)
             remote_doc = get_remote_doc(fw_doc)
             job_ids.append(job_doc["uuid"])
+            job_indexes.append(job_doc["index"])
             job_names.append(fw_doc["name"])
             if remote_doc:
                 remote_state = RemoteState(remote_doc["state"])
@@ -223,6 +231,7 @@ class FlowInfo:
         return cls(
             db_ids=db_ids,
             job_ids=job_ids,
+            job_indexes=job_indexes,
             flow_id=flow_id,
             state=state,
             name=d["name"],

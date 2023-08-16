@@ -11,10 +11,9 @@ from jobflow_remote.cli.jf import app
 from jobflow_remote.cli.jfr_typer import JFRTyper
 from jobflow_remote.cli.types import (
     days_opt,
-    db_id_flag_opt,
+    db_id_arg,
     db_ids_opt,
     end_date_opt,
-    job_id_arg,
     job_ids_opt,
     job_state_opt,
     locked_opt,
@@ -32,7 +31,6 @@ from jobflow_remote.cli.utils import (
     check_incompatible_opt,
     exit_with_error_msg,
     exit_with_warning_msg,
-    get_job_db_ids,
     loading_spinner,
     out_console,
     print_success_msg,
@@ -118,8 +116,9 @@ def jobs_list(
 
 @app_job.command(name="info")
 def job_info(
-    job_id: job_id_arg,
-    db_id: db_id_flag_opt = False,
+    db_id: db_id_arg,
+    # job_id: job_id_arg,
+    # db_id: db_id_flag_opt = False,
     with_error: Annotated[
         bool,
         typer.Option(
@@ -145,11 +144,11 @@ def job_info(
 
         jc = JobController()
 
-        db_id_value, job_id_value = get_job_db_ids(db_id, job_id)
+        # db_id_value, job_id_value = get_job_db_ids(db_id, job_id)
 
         job_info = jc.get_job_info(
-            job_id=job_id_value,
-            db_id=db_id_value,
+            job_id=None,
+            db_id=db_id,
             full=with_error,
         )
     if not job_info:
@@ -160,8 +159,9 @@ def job_info(
 
 @app_job.command()
 def reset_failed(
-    job_id: job_id_arg,
-    db_id: db_id_flag_opt = False,
+    db_id: db_id_arg,
+    # job_id: job_id_arg,
+    # db_id: db_id_flag_opt = False,
 ):
     """
     For a job with a FAILED remote state reset it to the previous state
@@ -169,11 +169,11 @@ def reset_failed(
     with loading_spinner():
         jc = JobController()
 
-        db_id_value, job_id_value = get_job_db_ids(db_id, job_id)
+        # db_id_value, job_id_value = get_job_db_ids(db_id, job_id)
 
         succeeded = jc.reset_failed_state(
-            job_id=job_id_value,
-            db_id=db_id_value,
+            job_id=None,
+            db_id=db_id,
         )
 
     if not succeeded:
@@ -184,8 +184,9 @@ def reset_failed(
 
 @app_job.command()
 def reset_remote_attempts(
-    job_id: job_id_arg,
-    db_id: db_id_flag_opt = False,
+    db_id: db_id_arg,
+    # job_id: job_id_arg,
+    # db_id: db_id_flag_opt = False,
 ):
     """
     Resets the number of attempts to perform a remote action and eliminates
@@ -194,11 +195,11 @@ def reset_remote_attempts(
     with loading_spinner():
         jc = JobController()
 
-        db_id_value, job_id_value = get_job_db_ids(db_id, job_id)
+        # db_id_value, job_id_value = get_job_db_ids(db_id, job_id)
 
         succeeded = jc.reset_remote_attempts(
-            job_id=job_id_value,
-            db_id=db_id_value,
+            job_id=None,
+            db_id=db_id,
         )
 
     if not succeeded:
@@ -209,9 +210,10 @@ def reset_remote_attempts(
 
 @app_job.command()
 def set_remote_state(
-    job_id: job_id_arg,
+    db_id: db_id_arg,
     state: remote_state_arg,
-    db_id: db_id_flag_opt = False,
+    # job_id: job_id_arg,
+    # db_id: db_id_flag_opt = False,
 ):
     """
     Sets the remote state to an arbitrary value.
@@ -220,12 +222,12 @@ def set_remote_state(
     with loading_spinner():
         jc = JobController()
 
-        db_id_value, job_id_value = get_job_db_ids(db_id, job_id)
+        # db_id_value, job_id_value = get_job_db_ids(db_id, job_id)
 
         succeeded = jc.set_remote_state(
             state=state,
-            job_id=job_id_value,
-            db_id=db_id_value,
+            job_id=None,
+            db_id=db_id,
         )
 
     if not succeeded:
@@ -236,7 +238,7 @@ def set_remote_state(
 
 @app_job.command()
 def rerun(
-    job_id: job_ids_opt = None,
+    # job_id: job_ids_opt = None,
     db_id: db_ids_opt = None,
     state: job_state_opt = None,
     remote_state: remote_state_opt = None,
@@ -252,7 +254,7 @@ def rerun(
 
     with loading_spinner():
         fw_ids = jc.rerun_jobs(
-            job_ids=job_id,
+            # job_ids=job_id,
             db_ids=db_id,
             state=state,
             remote_state=remote_state,
@@ -265,18 +267,22 @@ def rerun(
 
 @app_job.command()
 def queue_out(
-    job_id: job_id_arg,
-    db_id: db_id_flag_opt = False,
+    db_id: db_id_arg,
+    # job_id: job_id_arg,
+    # db_id: db_id_flag_opt = False,
 ):
+    """
+    Print the content of the output files produced by the queue manager.
+    """
     with loading_spinner(processing=False) as progress:
         progress.add_task(description="Retrieving info...", total=None)
         jc = JobController()
 
-        db_id_value, job_id_value = get_job_db_ids(db_id, job_id)
+        # db_id_value, job_id_value = get_job_db_ids(db_id, job_id)
 
         job_data_list = jc.get_jobs_data(
-            job_ids=job_id_value,
-            db_ids=db_id_value,
+            job_ids=None,
+            db_ids=db_id,
         )
 
     if not job_data_list:

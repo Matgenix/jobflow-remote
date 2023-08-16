@@ -10,7 +10,7 @@ from fireworks.core.launchpad import WFLock, get_action_from_gridfs
 from fireworks.utilities.fw_serializers import reconstitute_dates, recursive_dict
 from maggma.core import Store
 from maggma.stores import MongoStore
-from pymongo import ASCENDING
+from pymongo import ASCENDING, DESCENDING
 from qtoolkit.core.data_objects import QState
 
 from jobflow_remote.jobs.state import RemoteState
@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 
 
 FW_UUID_PATH = "spec._tasks.job.uuid"
+FW_INDEX_PATH = "spec._tasks.job.index"
 REMOTE_DOC_PATH = "spec.remote"
 REMOTE_LOCK_PATH = f"{REMOTE_DOC_PATH}.{MongoLock.LOCK_KEY}"
 REMOTE_LOCK_TIME_PATH = f"{REMOTE_DOC_PATH}.{MongoLock.LOCK_TIME_KEY}"
@@ -123,7 +124,12 @@ class RemoteLaunchPad:
 
     def reset(self, password, require_password=True, max_reset_wo_password=25):
         self.lpad.reset(password, require_password, max_reset_wo_password)
-        self.fireworks.create_index(FW_UUID_PATH, unique=True, background=True)
+        self.fireworks.create_index(FW_UUID_PATH, background=True)
+        self.fireworks.create_index(
+            [(FW_UUID_PATH, ASCENDING), (FW_INDEX_PATH, DESCENDING)],
+            unique=True,
+            background=True,
+        )
 
     def forget_remote(self, fwid):
         """
