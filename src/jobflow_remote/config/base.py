@@ -111,8 +111,8 @@ class WorkerBase(BaseModel):
     scheduler_type: str = Field(
         description="Type of the scheduler. Depending on the values supported by QToolKit"
     )
-    work_dir: str = Field(
-        description="Path to the directory of the worker where subfolders for "
+    work_dir: Path = Field(
+        description="Absolute path of the directory of the worker where subfolders for "
         "executing the calculation will be created"
     )
     resources: dict | None = Field(
@@ -145,6 +145,12 @@ class WorkerBase(BaseModel):
         if scheduler_type not in scheduler_mapping:
             raise ValueError(f"Unknown scheduler type {scheduler_type}")
         return scheduler_type
+
+    @validator("work_dir", always=True)
+    def check_work_dir(cls, v) -> Path:
+        if not v.is_absolute():
+            raise ValueError("`work_dir` must be an absolute path")
+        return v
 
     def get_scheduler_io(self) -> BaseSchedulerIO:
         """

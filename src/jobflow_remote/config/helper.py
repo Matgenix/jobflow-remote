@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import traceback
+from pathlib import Path
 
 from jobflow import JobStore
 from maggma.core import Store
@@ -13,12 +14,12 @@ from jobflow_remote.config.base import (
     RemoteWorker,
     WorkerBase,
 )
+from jobflow_remote.remote.host import BaseHost
 
 logger = logging.getLogger(__name__)
 
 
 def generate_dummy_project(name: str, full: bool = False) -> Project:
-
     remote_worker = generate_dummy_worker(scheduler_type="slurm", host_type="remote")
     workers = {"example_worker": remote_worker}
     exec_config = {}
@@ -114,7 +115,36 @@ def generate_dummy_queue() -> dict:
     return lp_config
 
 
+def _check_workdir(worker: WorkerBase, host: BaseHost) -> str | None:
+    """Check that the configured workdir exists or is writable on the worker.
+
+    Parameters:
+        worker: The worker configuration.
+        host: A connected host.
+
+    """
+    try:
+        host_error = host.test()
+        if host_error:
+            return host_error
+    except Exception:
+        exc = traceback.format_exc()
+        return f"Error while testing worker:\n {exc}"
+
+    try:
+        canary_file = worker.work_dir / ".jf_heartbeat"
+        host.write_text_file(canary_file, "\n")
+    except FileNotFoundError as exc:
+        raise FileNotFoundError(
+            f"Could not write to {canary_file} on {worker.host}. Does the folder exist on the remote?\nThe folder should be specified as an absolute path with no shell expansions or environment variables."
+        ) from exc
+    finally:
+        # Must be enclosed in quotes with '!r' as the path may contain spaces
+        host.execute(f"rm {str(canary_file)!r}")
+
+
 def check_worker(worker: WorkerBase) -> str | None:
+    """Check that a connection to the configured worker can be made."""
     host = worker.get_host()
     try:
         host.connect()
@@ -126,6 +156,9 @@ def check_worker(worker: WorkerBase) -> str | None:
 
         qm = QueueManager(scheduler_io=worker.get_scheduler_io(), host=host)
         qm.get_jobs_list()
+
+        _check_workdir(worker=worker, host=host)
+
     except Exception:
         exc = traceback.format_exc()
         return f"Error while testing worker:\n {exc}"

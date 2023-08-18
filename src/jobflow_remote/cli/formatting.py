@@ -40,7 +40,6 @@ def get_job_info_table(jobs_info: list[JobInfo], verbosity: int):
     for ji in jobs_info:
         state = ji.state.name
         if ji.remote_state is not None and ji.state not in excluded_states:
-
             if ji.retry_time_limit is not None:
                 state += f" [[bold red]{ji.remote_state.name}[/]]"
             else:
@@ -136,6 +135,9 @@ def format_job_info(job_info: JobInfo, show_none: bool = False):
     error_remote = d.get("error_remote")
     if error_remote:
         d["error_remote"] = ReprStr(error_remote)
+    error_job = d.get("error_job")
+    if error_job:
+        d["error_job"] = ReprStr(error_job)
     return render_scope(d)
 
 
