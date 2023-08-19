@@ -285,7 +285,12 @@ class RemoteLaunchPad:
     def add_wf(self, wf):
         return self.lpad.add_wf(wf)
 
-    def get_fw_dict(self, fw_id: int | None = None, job_id: str | None = None):
+    def get_fw_dict(
+        self,
+        fw_id: int | None = None,
+        job_id: str | None = None,
+        job_index: int | None = None,
+    ):
         """
         Given a fw id or a job id, return firework dict.
 
@@ -301,8 +306,8 @@ class RemoteLaunchPad:
         dict
             The dictionary defining the Firework
         """
-        query = self._generate_id_query(fw_id, job_id)
-        fw_dict = self.fireworks.find_one(query)
+        query, sort = self.generate_id_query(fw_id, job_id, job_index)
+        fw_dict = self.fireworks.find_one(query, sort=sort)
         if not fw_dict:
             raise ValueError(
                 f"No Firework exists with fw id: {fw_id} or job_id {job_id}"
@@ -333,24 +338,43 @@ class RemoteLaunchPad:
         return fw_dict
 
     @staticmethod
-    def _generate_id_query(fw_id: int | None = None, job_id: str | None = None) -> dict:
+    def generate_id_query(
+        fw_id: int | None = None,
+        job_id: str | None = None,
+        job_index: int | None = None,
+    ) -> tuple[dict, list | None]:
         query: dict = {}
+        sort: list | None = None
         if fw_id:
             query["fw_id"] = fw_id
         if job_id:
             query[FW_UUID_PATH] = job_id
+            if job_index is None:
+                sort = [[FW_INDEX_PATH, DESCENDING]]
+            else:
+                query[FW_INDEX_PATH] = job_index
         if not query:
             raise ValueError("At least one among fw_id and job_id should be specified")
-        return query
+        return query, sort
 
-    def _check_ids(self, fw_id: int | None = None, job_id: str | None = None):
+    def _check_ids(
+        self,
+        fw_id: int | None = None,
+        job_id: str | None = None,
+        job_index: int | None = None,
+    ):
         if job_id is None and fw_id is None:
             raise ValueError("At least one among fw_id and job_id should be defined")
         if job_id:
-            fw_id = self.get_fw_id_from_job_id(job_id)
+            fw_id = self.get_fw_id_from_job_id(job_id, job_index)
         return fw_id, job_id
 
-    def get_fw(self, fw_id: int | None = None, job_id: str | None = None):
+    def get_fw(
+        self,
+        fw_id: int | None = None,
+        job_id: str | None = None,
+        job_index: int | None = None,
+    ):
         """
         Given a fw id or a job id, return the Firework object.
 
@@ -366,10 +390,11 @@ class RemoteLaunchPad:
         Firework
             The retrieved Firework
         """
-        return Firework.from_dict(self.get_fw_dict(fw_id, job_id))
+        return Firework.from_dict(self.get_fw_dict(fw_id, job_id, job_index))
 
-    def get_fw_id_from_job_id(self, job_id: str):
-        fw_dict = self.fireworks.find_one({FW_UUID_PATH: job_id}, projection=["fw_id"])
+    def get_fw_id_from_job_id(self, job_id: str, job_index: int | None = None):
+        query, sort = self.generate_id_query(job_id=job_id, job_index=job_index)
+        fw_dict = self.fireworks.find_one(query, projection=["fw_id"], sort=sort)
         if not fw_dict:
             raise ValueError(f"No Firework exists with id: {job_id}")
 
@@ -379,6 +404,7 @@ class RemoteLaunchPad:
         self,
         fw_id: int | None = None,
         job_id: str | None = None,
+        job_index: int | None = None,
         recover_launch: int | str | None = None,
         recover_mode: str | None = None,
     ):
@@ -396,15 +422,13 @@ class RemoteLaunchPad:
         Returns:
             [int]: list of firework ids that were rerun
         """
-        if job_id is None and fw_id is None:
-            raise ValueError("At least one among fw_id and job_id should be defined")
+        query, sort = self.generate_id_query(
+            fw_id=fw_id, job_id=job_id, job_index=job_index
+        )
 
-        if job_id:
-            m_fw = self.fireworks.find_one(
-                {FW_UUID_PATH: job_id}, {"state": 1, "fw_id": 1}
-            )
-        else:
-            m_fw = self.fireworks.find_one({"fw_id": fw_id}, {"state": 1, "fw_id": 1})
+        m_fw = self.fireworks.find_one(
+            query, projection={"state": 1, "fw_id": 1}, sort=sort
+        )
 
         if not m_fw:
             raise ValueError(f"FW with id: {fw_id or job_id} not found!")
@@ -466,14 +490,16 @@ class RemoteLaunchPad:
         values: dict,
         fw_id: int | None,
         job_id: str | None = None,
+        job_index: int | None = None,
         break_lock: bool = False,
     ) -> bool:
-        lock_filter = self._generate_id_query(fw_id, job_id)
+        lock_filter, sort = self.generate_id_query(fw_id, job_id, job_index)
         with MongoLock(
             collection=self.fireworks,
             filter=lock_filter,
             break_lock=break_lock,
             lock_subdoc=REMOTE_DOC_PATH,
+            sort=sort,
         ) as lock:
             if lock.locked_document:
                 values = {f"{REMOTE_DOC_PATH}.{k}": v for k, v in values.items()}
@@ -490,19 +516,32 @@ class RemoteLaunchPad:
         )
         return result.modified_count
 
-    def is_locked(self, fw_id: int | None = None, job_id: str | None = None) -> bool:
-        query = self._generate_id_query(fw_id, job_id)
-        result = self.fireworks.find_one(query, projection=[REMOTE_LOCK_PATH])
+    def is_locked(
+        self,
+        fw_id: int | None = None,
+        job_id: str | None = None,
+        job_index: int | None = None,
+    ) -> bool:
+        query, sort = self.generate_id_query(fw_id, job_id, job_index)
+        result = self.fireworks.find_one(
+            query, projection=[REMOTE_LOCK_PATH], sort=sort
+        )
         if not result:
             raise ValueError("No job matching id")
         return REMOTE_LOCK_PATH in result
 
     def reset_failed_state(
-        self, fw_id: int | None = None, job_id: str | None = None
+        self,
+        fw_id: int | None = None,
+        job_id: str | None = None,
+        job_index: int | None = None,
     ) -> bool:
-        lock_filter = self._generate_id_query(fw_id, job_id)
+        lock_filter, sort = self.generate_id_query(fw_id, job_id, job_index)
         with MongoLock(
-            collection=self.fireworks, filter=lock_filter, lock_subdoc=REMOTE_DOC_PATH
+            collection=self.fireworks,
+            filter=lock_filter,
+            lock_subdoc=REMOTE_DOC_PATH,
+            sort=sort,
         ) as lock:
             doc = lock.locked_document
             remote = get_remote_doc(doc)
@@ -540,6 +579,8 @@ class RemoteLaunchPad:
         Delete the workflow containing firework with the given id.
 
         """
+        # index is not needed here, since all the jobs with one job_id will
+        # belong to the same Workflow
         fw_id, job_id = self._check_ids(fw_id, job_id)
 
         links_dict = self.workflows.find_one({"nodes": fw_id})
@@ -553,26 +594,27 @@ class RemoteLaunchPad:
         self.workflows.delete_one({"nodes": fw_id})
 
     def get_remote_run(
-        self, fw_id: int | None = None, job_id: str | None = None
+        self,
+        fw_id: int | None = None,
+        job_id: str | None = None,
+        job_index: int | None = None,
     ) -> RemoteRun:
-        query: dict = {}
-        if job_id:
-            query[FW_UUID_PATH] = job_id
-        if fw_id:
-            query["fw_id"] = fw_id
 
-        if not query:
-            raise ValueError("At least one among fw_id and job_id should be defined")
+        query, sort = self.generate_id_query(fw_id, job_id, job_index)
 
         fw = self.fireworks.find_one(query)
         if not fw:
-            raise ValueError(f"No Job exists with fw id: {fw_id} or job_id {job_id}")
+            msg = f"No Job exists with fw id: {fw_id} or job_id {job_id}"
+            if job_index is not None:
+                msg += f" and job index {job_index}"
+            raise ValueError(msg)
 
         remote_dict = get_remote_doc(fw)
         if not remote_dict:
-            raise ValueError(
-                f"No Remote run exists with fw id: {fw_id} or job_id {job_id}"
-            )
+            msg = f"No Remote run exists with fw id: {fw_id} or job_id {job_id}"
+            if job_index is not None:
+                msg += f" and job index {job_index}"
+        raise ValueError(msg)
 
         return RemoteRun.from_db_dict(remote_dict)
 
@@ -590,7 +632,7 @@ class RemoteLaunchPad:
         self,
         query: dict | None = None,
         projection: dict | None = None,
-        sort: dict | None = None,
+        sort: list | None = None,
         limit: int = 0,
     ) -> list[tuple[Firework, RemoteRun | None]]:
         fws = self.fireworks.find(query, projection=projection, sort=sort, limit=limit)
@@ -626,16 +668,13 @@ class RemoteLaunchPad:
         return fw_ids
 
     def get_fw_remote_run_from_id(
-        self, fw_id: int | None = None, job_id: str | None = None
+        self,
+        fw_id: int | None = None,
+        job_id: str | None = None,
+        job_index: int | None = None,
     ) -> tuple[Firework, RemoteRun] | None:
-        if fw_id is None and job_id is None:
-            raise ValueError("at least one among fw_id and job_id should be defined")
-        query: dict = {}
-        if fw_id:
-            query["fw_id"] = fw_id
-        if job_id:
-            query[FW_UUID_PATH] = job_id
-        results = self.get_fw_remote_run(query=query)
+        query, sort = self.generate_id_query(fw_id, job_id, job_index)
+        results = self.get_fw_remote_run(query=query, sort=sort)
         if not results:
             return None
         return results[0]

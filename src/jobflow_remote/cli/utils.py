@@ -48,19 +48,19 @@ class ReprStr(str):
         return self
 
 
-def exit_with_error_msg(message, code=1, **kwargs):
+def exit_with_error_msg(message: str, code: int = 1, **kwargs):
     kwargs.setdefault("style", "red")
     err_console.print(message, **kwargs)
     raise typer.Exit(code)
 
 
-def exit_with_warning_msg(message, code=0, **kwargs):
+def exit_with_warning_msg(message: str, code: int = 0, **kwargs):
     kwargs.setdefault("style", "gold1")
     err_console.print(message, **kwargs)
     raise typer.Exit(code)
 
 
-def print_success_msg(message="operation completed", **kwargs):
+def print_success_msg(message: str = "operation completed", **kwargs):
     kwargs.setdefault("style", "green")
     out_console.print(message, **kwargs)
 
@@ -114,19 +114,38 @@ def loading_spinner(processing: bool = True):
         yield progress
 
 
-def get_job_db_ids(db_id, job_id):
-    if db_id:
-        try:
-            db_id_value = int(job_id)
-        except ValueError:
+def get_job_db_ids(job_db_id: str, job_index: int | None):
+    try:
+        db_id = int(job_db_id)
+        job_id = None
+    except ValueError:
+        db_id = None
+        job_id = job_db_id
+
+    if job_index and db_id is not None:
+        out_console.print(
+            "The index is defined even if an integer is passed as an ID. Will be ignored",
+            style="yellow",
+        )
+
+    return db_id, job_id
+
+
+def get_job_ids_indexes(job_ids: list[str] | None) -> list[tuple[str, int]] | None:
+    if not job_ids:
+        return None
+    job_ids_indexes = []
+    for j in job_ids:
+        split = j.split(":")
+        if len(split) != 2 or not split[1].isnumeric():
             raise typer.BadParameter(
-                "if --db-id is selected the ID should be an integer"
+                "The job id should be in the format UUID:INDEX "
+                "(e.g. e1d66c4f-81db-4fff-bda2-2bf1d79d5961:2). "
+                f"Wrong format for {j}"
             )
-        job_id_value = None
-    else:
-        job_id_value = job_id
-        db_id_value = None
-    return db_id_value, job_id_value
+        job_ids_indexes.append((split[0], int(split[1])))
+
+    return job_ids_indexes
 
 
 def cli_error_handler(func):
