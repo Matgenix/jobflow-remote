@@ -8,7 +8,7 @@ from typing_extensions import Annotated
 
 from jobflow_remote.cli.utils import SerializeFileFormat, SortOption
 from jobflow_remote.config.base import LogLevel
-from jobflow_remote.jobs.state import JobState, RemoteState
+from jobflow_remote.jobs.state import FlowState, JobState, RemoteState
 
 job_ids_indexes_opt = Annotated[
     Optional[List[str]],
@@ -59,6 +59,16 @@ job_state_opt = Annotated[
         "--state",
         "-s",
         help="One of the Job states",
+    ),
+]
+
+
+flow_state_opt = Annotated[
+    Optional[FlowState],
+    typer.Option(
+        "--state",
+        "-s",
+        help="One of the Flow states",
     ),
 ]
 

@@ -147,7 +147,7 @@ class JobController:
                 not_in_states = list(Firework.STATE_RANKS.keys())
                 not_in_states.remove("WAITING")
                 query["fws.state"] = {"$nin": not_in_states}
-            if state == FlowState.PAUSED:
+            elif state == FlowState.PAUSED:
                 not_in_states = list(Firework.STATE_RANKS.keys())
                 not_in_states.remove("PAUSED")
                 query["fws.state"] = {"$nin": not_in_states}
@@ -170,6 +170,8 @@ class JobController:
                         }
                     },
                 ]
+            else:
+                raise RuntimeError("Unknown flow state.")
 
         # at variance with Firework doc, the dates in the Workflow are Date objects
         if start_date:
