@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import functools
+import uuid
 from contextlib import contextmanager
 from enum import Enum
 
@@ -121,6 +122,7 @@ def get_job_db_ids(job_db_id: str, job_index: int | None):
     except ValueError:
         db_id = None
         job_id = job_db_id
+        check_valid_uuid(job_id)
 
     if job_index and db_id is not None:
         out_console.print(
@@ -143,6 +145,7 @@ def get_job_ids_indexes(job_ids: list[str] | None) -> list[tuple[str, int]] | No
                 "(e.g. e1d66c4f-81db-4fff-bda2-2bf1d79d5961:2). "
                 f"Wrong format for {j}"
             )
+        check_valid_uuid(split[0])
         job_ids_indexes.append((split[0], int(split[1])))
 
     return job_ids_indexes
@@ -170,3 +173,14 @@ def cli_error_handler(func):
                 )
 
     return wrapper
+
+
+def check_valid_uuid(uuid_str):
+    try:
+        uuid_obj = uuid.UUID(uuid_str)
+        if str(uuid_obj) == uuid_str:
+            return
+    except ValueError:
+        pass
+
+    raise typer.BadParameter(f"UUID {uuid_str} is in the wrong format.")

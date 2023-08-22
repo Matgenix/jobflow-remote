@@ -345,6 +345,12 @@ class RemoteLaunchPad:
     ) -> tuple[dict, list | None]:
         query: dict = {}
         sort: list | None = None
+
+        if (job_id is None) == (fw_id is None):
+            raise ValueError(
+                "One and only one among job_id and db_id should be defined"
+            )
+
         if fw_id:
             query["fw_id"] = fw_id
         if job_id:
@@ -363,8 +369,10 @@ class RemoteLaunchPad:
         job_id: str | None = None,
         job_index: int | None = None,
     ):
-        if job_id is None and fw_id is None:
-            raise ValueError("At least one among fw_id and job_id should be defined")
+        if (job_id is None) == (fw_id is None):
+            raise ValueError(
+                "One and only one among fw_id and job_id should be defined"
+            )
         if job_id:
             fw_id = self.get_fw_id_from_job_id(job_id, job_index)
         return fw_id, job_id

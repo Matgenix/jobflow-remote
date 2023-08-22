@@ -121,7 +121,7 @@ class JobController:
         self,
         job_ids: str | list[str] | None = None,
         db_ids: int | list[int] | None = None,
-        flow_id: str | None = None,
+        flow_ids: str | None = None,
         state: FlowState | None = None,
         start_date: datetime | None = None,
         end_date: datetime | None = None,
@@ -139,8 +139,8 @@ class JobController:
         if job_ids:
             query[f"fws.{FW_UUID_PATH}"] = {"$in": job_ids}
 
-        if flow_id:
-            query["metadata.flow_id"] = flow_id
+        if flow_ids:
+            query["metadata.flow_id"] = {"$in": flow_ids}
 
         if state:
             if state == FlowState.WAITING:
@@ -389,7 +389,7 @@ class JobController:
         self,
         job_ids: str | list[str] | None = None,
         db_ids: int | list[int] | None = None,
-        flow_id: str | None = None,
+        flow_ids: str | None = None,
         state: FlowState | None = None,
         start_date: datetime | None = None,
         end_date: datetime | None = None,
@@ -399,7 +399,7 @@ class JobController:
         query = self._build_query_wf(
             job_ids=job_ids,
             db_ids=db_ids,
-            flow_id=flow_id,
+            flow_ids=flow_ids,
             state=state,
             start_date=start_date,
             end_date=end_date,
