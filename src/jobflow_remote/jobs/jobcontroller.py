@@ -4,6 +4,7 @@ import io
 import logging
 from contextlib import redirect_stdout
 from datetime import datetime, timezone
+from typing import cast
 
 from fireworks import Firework
 from jobflow import JobStore
@@ -12,6 +13,7 @@ from monty.json import MontyDecoder
 from jobflow_remote.config.base import Project
 from jobflow_remote.config.manager import ConfigManager
 from jobflow_remote.fireworks.launchpad import (
+    FW_INDEX_PATH,
     FW_UUID_PATH,
     REMOTE_DOC_PATH,
     RemoteLaunchPad,
@@ -47,6 +49,7 @@ class JobController:
         self,
         job_id: str | None = None,
         db_id: str | None = None,
+        job_index: int | None = None,
         load_output: bool = False,
     ):
         fw, remote_run = self.rlpad.get_fw_remote_run_from_id(
@@ -63,7 +66,7 @@ class JobController:
 
     def _build_query_fw(
         self,
-        job_ids: str | list[str] | None = None,
+        job_ids: tuple[str, int] | list[tuple[str, int]] | None = None,
         db_ids: int | list[int] | None = None,
         state: JobState | None = None,
         remote_state: RemoteState | None = None,
@@ -76,8 +79,9 @@ class JobController:
         if remote_state is not None:
             remote_state = [remote_state]
 
-        if job_ids is not None and not isinstance(job_ids, (list, tuple)):
-            job_ids = [job_ids]
+        if job_ids and not any(isinstance(ji, (list, tuple)) for ji in job_ids):
+            # without these cast mypy is confused about the type
+            job_ids = cast(list[tuple[str, int]], [job_ids])
         if db_ids is not None and not isinstance(db_ids, (list, tuple)):
             db_ids = [db_ids]
 
@@ -86,7 +90,11 @@ class JobController:
         if db_ids:
             query["fw_id"] = {"$in": db_ids}
         if job_ids:
-            query[FW_UUID_PATH] = {"$in": job_ids}
+            job_ids = cast(list[tuple[str, int]], job_ids)
+            or_list = []
+            for job_id, job_index in job_ids:
+                or_list.append({FW_UUID_PATH: job_id, FW_INDEX_PATH: job_index})
+            query["$or"] = or_list
 
         if state:
             fw_states, remote_state = state.to_states()
@@ -113,7 +121,7 @@ class JobController:
         self,
         job_ids: str | list[str] | None = None,
         db_ids: int | list[int] | None = None,
-        flow_id: str | None = None,
+        flow_ids: str | None = None,
         state: FlowState | None = None,
         start_date: datetime | None = None,
         end_date: datetime | None = None,
@@ -131,8 +139,8 @@ class JobController:
         if job_ids:
             query[f"fws.{FW_UUID_PATH}"] = {"$in": job_ids}
 
-        if flow_id:
-            query["metadata.flow_id"] = flow_id
+        if flow_ids:
+            query["metadata.flow_id"] = {"$in": flow_ids}
 
         if state:
             if state == FlowState.WAITING:
@@ -175,7 +183,7 @@ class JobController:
 
     def get_jobs_data(
         self,
-        job_ids: str | list[str] | None = None,
+        job_ids: tuple[str, int] | list[tuple[str, int]] | None = None,
         db_ids: int | list[int] | None = None,
         state: JobState | None = None,
         remote_state: RemoteState | None = None,
@@ -243,7 +251,7 @@ class JobController:
 
     def get_jobs_info(
         self,
-        job_ids: str | list[str] | None = None,
+        job_ids: tuple[str, int] | list[tuple[str, int]] | None = None,
         db_ids: int | list[int] | None = None,
         state: JobState | None = None,
         remote_state: RemoteState | None = None,
@@ -265,10 +273,13 @@ class JobController:
         return self.get_jobs_info_query(query=query, sort=sort, limit=limit)
 
     def get_job_info(
-        self, job_id: str | None, db_id: int | None, full: bool = False
+        self,
+        job_id: str | None,
+        db_id: int | None,
+        job_index: int | None = None,
+        full: bool = False,
     ) -> JobInfo | None:
-        self.check_ids(job_id, db_id)
-        query = self._build_query_fw(job_ids=job_id, db_ids=db_id)
+        query, sort = self.rlpad.generate_id_query(db_id, job_id, job_index)
 
         if full:
             proj = dict(job_info_projection)
@@ -279,27 +290,24 @@ class JobController:
                 }
             )
             data = list(
-                self.rlpad.get_fw_launch_remote_run_data(query=query, projection=proj)
+                self.rlpad.get_fw_launch_remote_run_data(
+                    query=query, projection=proj, sort=sort, limit=1
+                )
             )
         else:
             data = list(
-                self.rlpad.fireworks.find(query, projection=job_info_projection)
+                self.rlpad.fireworks.find(
+                    query, projection=job_info_projection, sort=sort, limit=1
+                )
             )
         if not data:
             return None
 
         return JobInfo.from_fw_dict(data[0])
 
-    @staticmethod
-    def check_ids(job_id: str | None, db_id: int | None):
-        if (job_id is None) == (db_id is None):
-            raise ValueError(
-                "One and only one among job_id and db_id should be defined"
-            )
-
     def rerun_jobs(
         self,
-        job_ids: str | list[str] | None = None,
+        job_ids: tuple[str, int] | list[tuple[str, int]] | None = None,
         db_ids: int | list[int] | None = None,
         state: JobState | None = None,
         remote_state: RemoteState | None = None,
@@ -341,9 +349,12 @@ class JobController:
         return True
 
     def set_remote_state(
-        self, state: RemoteState, job_id: str | None, db_id: int | None
+        self,
+        state: RemoteState,
+        job_id: str | None,
+        db_id: int | None,
+        job_index: int | None = None,
     ) -> bool:
-        self.check_ids(job_id, db_id)
         values = {
             "state": state.value,
             "step_attempts": 0,
@@ -352,25 +363,33 @@ class JobController:
             "queue_state": None,
             "error": None,
         }
-        return self.rlpad.set_remote_values(values=values, job_id=job_id, fw_id=db_id)
+        return self.rlpad.set_remote_values(
+            values=values, job_id=job_id, fw_id=db_id, job_index=job_index
+        )
 
-    def reset_remote_attempts(self, job_id: str | None, db_id: int | None) -> bool:
-        self.check_ids(job_id, db_id)
+    def reset_remote_attempts(
+        self, job_id: str | None, db_id: int | None, job_index: int | None = None
+    ) -> bool:
         values = {
             "step_attempts": 0,
             "retry_time_limit": None,
         }
-        return self.rlpad.set_remote_values(values=values, job_id=job_id, fw_id=db_id)
+        return self.rlpad.set_remote_values(
+            values=values, job_id=job_id, fw_id=db_id, job_index=job_index
+        )
 
-    def reset_failed_state(self, job_id: str | None, db_id: int | None) -> bool:
-        self.check_ids(job_id, db_id)
-        return self.rlpad.reset_failed_state(job_id=job_id, fw_id=db_id)
+    def reset_failed_state(
+        self, job_id: str | None, db_id: int | None, job_index: int | None = None
+    ) -> bool:
+        return self.rlpad.reset_failed_state(
+            job_id=job_id, fw_id=db_id, job_index=job_index
+        )
 
     def get_flows_info(
         self,
         job_ids: str | list[str] | None = None,
         db_ids: int | list[int] | None = None,
-        flow_id: str | None = None,
+        flow_ids: str | None = None,
         state: FlowState | None = None,
         start_date: datetime | None = None,
         end_date: datetime | None = None,
@@ -380,7 +399,7 @@ class JobController:
         query = self._build_query_wf(
             job_ids=job_ids,
             db_ids=db_ids,
-            flow_id=flow_id,
+            flow_ids=flow_ids,
             state=state,
             start_date=start_date,
             end_date=end_date,
@@ -426,7 +445,7 @@ class JobController:
 
     def remove_lock(
         self,
-        job_ids: str | list[str] | None = None,
+        job_ids: tuple[str, int] | list[tuple[str, int]] | None = None,
         db_ids: int | list[int] | None = None,
         state: JobState | None = None,
         remote_state: RemoteState | None = None,

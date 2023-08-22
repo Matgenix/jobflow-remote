@@ -11,10 +11,11 @@ from jobflow_remote.cli.jf import app
 from jobflow_remote.cli.jfr_typer import JFRTyper
 from jobflow_remote.cli.types import (
     days_opt,
-    db_id_arg,
     db_ids_opt,
     end_date_opt,
-    job_ids_opt,
+    job_db_id_arg,
+    job_ids_indexes_opt,
+    job_index_arg,
     job_state_opt,
     locked_opt,
     max_results_opt,
@@ -31,6 +32,8 @@ from jobflow_remote.cli.utils import (
     check_incompatible_opt,
     exit_with_error_msg,
     exit_with_warning_msg,
+    get_job_db_ids,
+    get_job_ids_indexes,
     loading_spinner,
     out_console,
     print_success_msg,
@@ -48,7 +51,7 @@ app.add_typer(app_job)
 
 @app_job.command(name="list")
 def jobs_list(
-    job_id: job_ids_opt = None,
+    job_id: job_ids_indexes_opt = None,
     db_id: db_ids_opt = None,
     state: job_state_opt = None,
     remote_state: remote_state_opt = None,
@@ -69,6 +72,8 @@ def jobs_list(
     check_incompatible_opt({"start_date": start_date, "days": days})
     check_incompatible_opt({"end_date": end_date, "days": days})
 
+    job_ids_indexes = get_job_ids_indexes(job_id)
+
     jc = JobController()
 
     if days:
@@ -85,7 +90,7 @@ def jobs_list(
             )
         else:
             jobs_info = jc.get_jobs_info(
-                job_ids=job_id,
+                job_ids=job_ids_indexes,
                 db_ids=db_id,
                 state=state,
                 remote_state=remote_state,
@@ -116,9 +121,8 @@ def jobs_list(
 
 @app_job.command(name="info")
 def job_info(
-    db_id: db_id_arg,
-    # job_id: job_id_arg,
-    # db_id: db_id_flag_opt = False,
+    job_db_id: job_db_id_arg,
+    job_index: job_index_arg = None,
     with_error: Annotated[
         bool,
         typer.Option(
@@ -140,14 +144,15 @@ def job_info(
     Detail information on a specific job
     """
 
+    db_id, job_id = get_job_db_ids(job_db_id, job_index)
+
     with loading_spinner():
 
         jc = JobController()
 
-        # db_id_value, job_id_value = get_job_db_ids(db_id, job_id)
-
         job_info = jc.get_job_info(
-            job_id=None,
+            job_id=job_id,
+            job_index=job_index,
             db_id=db_id,
             full=with_error,
         )
@@ -159,20 +164,21 @@ def job_info(
 
 @app_job.command()
 def reset_failed(
-    db_id: db_id_arg,
-    # job_id: job_id_arg,
-    # db_id: db_id_flag_opt = False,
+    job_db_id: job_db_id_arg,
+    job_index: job_index_arg = None,
 ):
     """
     For a job with a FAILED remote state reset it to the previous state
     """
+
+    db_id, job_id = get_job_db_ids(job_db_id, job_index)
+
     with loading_spinner():
         jc = JobController()
 
-        # db_id_value, job_id_value = get_job_db_ids(db_id, job_id)
-
         succeeded = jc.reset_failed_state(
-            job_id=None,
+            job_id=job_id,
+            job_index=job_index,
             db_id=db_id,
         )
 
@@ -184,21 +190,22 @@ def reset_failed(
 
 @app_job.command()
 def reset_remote_attempts(
-    db_id: db_id_arg,
-    # job_id: job_id_arg,
-    # db_id: db_id_flag_opt = False,
+    job_db_id: job_db_id_arg,
+    job_index: job_index_arg = None,
 ):
     """
     Resets the number of attempts to perform a remote action and eliminates
     the delay in retrying. This will not restore a Jon from its failed state.
     """
+
+    db_id, job_id = get_job_db_ids(job_db_id, job_index)
+
     with loading_spinner():
         jc = JobController()
 
-        # db_id_value, job_id_value = get_job_db_ids(db_id, job_id)
-
         succeeded = jc.reset_remote_attempts(
-            job_id=None,
+            job_id=job_id,
+            job_index=job_index,
             db_id=db_id,
         )
 
@@ -210,23 +217,24 @@ def reset_remote_attempts(
 
 @app_job.command()
 def set_remote_state(
-    db_id: db_id_arg,
     state: remote_state_arg,
-    # job_id: job_id_arg,
-    # db_id: db_id_flag_opt = False,
+    job_db_id: job_db_id_arg,
+    job_index: job_index_arg = None,
 ):
     """
     Sets the remote state to an arbitrary value.
     WARNING: this can lead to inconsistencies in the DB. Use with care
     """
+
+    db_id, job_id = get_job_db_ids(job_db_id, job_index)
+
     with loading_spinner():
         jc = JobController()
 
-        # db_id_value, job_id_value = get_job_db_ids(db_id, job_id)
-
         succeeded = jc.set_remote_state(
             state=state,
-            job_id=None,
+            job_id=job_id,
+            job_index=job_index,
             db_id=db_id,
         )
 
@@ -238,7 +246,7 @@ def set_remote_state(
 
 @app_job.command()
 def rerun(
-    # job_id: job_ids_opt = None,
+    job_id: job_ids_indexes_opt = None,
     db_id: db_ids_opt = None,
     state: job_state_opt = None,
     remote_state: remote_state_opt = None,
@@ -250,11 +258,13 @@ def rerun(
     """
     check_incompatible_opt({"state": state, "remote-state": remote_state})
 
+    job_ids_indexes = get_job_ids_indexes(job_id)
+
     jc = JobController()
 
     with loading_spinner():
         fw_ids = jc.rerun_jobs(
-            # job_ids=job_id,
+            job_ids=job_ids_indexes,
             db_ids=db_id,
             state=state,
             remote_state=remote_state,
@@ -267,42 +277,43 @@ def rerun(
 
 @app_job.command()
 def queue_out(
-    db_id: db_id_arg,
-    # job_id: job_id_arg,
-    # db_id: db_id_flag_opt = False,
+    job_db_id: job_db_id_arg,
+    job_index: job_index_arg = None,
 ):
     """
     Print the content of the output files produced by the queue manager.
     """
+
+    db_id, job_id = get_job_db_ids(job_db_id, job_index)
+
     with loading_spinner(processing=False) as progress:
         progress.add_task(description="Retrieving info...", total=None)
         jc = JobController()
 
-        # db_id_value, job_id_value = get_job_db_ids(db_id, job_id)
-
-        job_data_list = jc.get_jobs_data(
-            job_ids=None,
-            db_ids=db_id,
+        job_info = jc.get_job_info(
+            job_id=job_id,
+            job_index=job_index,
+            db_id=db_id,
         )
 
-    if not job_data_list:
+    if not job_info:
         exit_with_error_msg("No data matching the request")
 
-    job_data = job_data_list[0]
-    info = job_data.info
-    if info.remote_state not in (
+    if job_info.remote_state not in (
         RemoteState.RUNNING,
         RemoteState.TERMINATED,
         RemoteState.DOWNLOADED,
         RemoteState.COMPLETED,
         RemoteState.FAILED,
     ):
-        remote_state_str = f"[{info.remote_state.value}]" if info.remote_state else ""
+        remote_state_str = (
+            f"[{job_info.remote_state.value}]" if job_info.remote_state else ""
+        )
         exit_with_warning_msg(
-            f"The Job is in state {info.state.value}{remote_state_str} and the queue output will not be present"
+            f"The Job is in state {job_info.state.value}{remote_state_str} and the queue output will not be present"
         )
 
-    remote_dir = info.run_dir
+    remote_dir = job_info.run_dir
 
     out_path = Path(remote_dir, OUT_FNAME)
     err_path = Path(remote_dir, ERR_FNAME)
@@ -313,7 +324,7 @@ def queue_out(
     with loading_spinner(processing=False) as progress:
         progress.add_task(description="Retrieving files...", total=None)
         cm = ConfigManager()
-        worker = cm.get_worker(info.worker)
+        worker = cm.get_worker(job_info.worker)
         host = worker.get_host()
 
         try:

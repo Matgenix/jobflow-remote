@@ -68,7 +68,7 @@ def flows_list(
         flows_info = jc.get_flows_info(
             job_ids=job_id,
             db_ids=db_id,
-            flow_id=flow_id,
+            flow_ids=flow_id,
             state=state,
             start_date=start_date,
             end_date=end_date,
@@ -112,7 +112,7 @@ def delete(
         flows_info = jc.get_flows_info(
             job_ids=job_id,
             db_ids=db_id,
-            flow_id=flow_id,
+            flow_ids=flow_id,
             state=state,
             start_date=start_date,
             end_date=end_date,

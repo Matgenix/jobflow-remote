@@ -10,12 +10,25 @@ from jobflow_remote.cli.utils import SerializeFileFormat, SortOption
 from jobflow_remote.config.base import LogLevel
 from jobflow_remote.jobs.state import JobState, RemoteState
 
+job_ids_indexes_opt = Annotated[
+    Optional[List[str]],
+    typer.Option(
+        "--job-id",
+        "-jid",
+        help="One or more pair of job ids (i.e. uuids) and job index formatted "
+        "as UUID:INDEX (e.g. e1d66c4f-81db-4fff-bda2-2bf1d79d5961:2). "
+        "The index is mandatory",
+    ),
+]
+
+
 job_ids_opt = Annotated[
     Optional[List[str]],
     typer.Option(
         "--job-id",
         "-jid",
-        help="One or more job ids (i.e. uuids)",
+        help="One or more job ids (i.e. uuids). Only the id is needed since "
+        "jobs with the same uuid belong to the same flow",
     ),
 ]
 
@@ -150,21 +163,18 @@ reverse_sort_flag_opt = Annotated[
 ]
 
 
-job_id_arg = Annotated[str, typer.Argument(help="The ID of the job (i.e. the uuid)")]
-
-db_id_arg = Annotated[
-    int, typer.Argument(help="The DB id of the job (i.e. an integer)")
+job_db_id_arg = Annotated[
+    str,
+    typer.Argument(
+        help="The ID of the job can the db id (i.e. an integer) or a string (i.e. the uuid)",
+        metavar="ID",
+    ),
 ]
-
-
-db_id_flag_opt = Annotated[
-    bool,
-    typer.Option(
-        "--db-id",
-        "-db",
-        help=(
-            "If set the id passed would be considered to be the DB id (i.e. an integer)"
-        ),
+job_index_arg = Annotated[
+    Optional[int],
+    typer.Argument(
+        help="The index of the job. If not defined the job with the largest index is selected",
+        metavar="INDEX",
     ),
 ]
 

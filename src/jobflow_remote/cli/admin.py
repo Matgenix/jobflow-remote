@@ -9,7 +9,7 @@ from jobflow_remote.cli.types import (
     db_ids_opt,
     end_date_opt,
     force_opt,
-    job_ids_opt,
+    job_ids_indexes_opt,
     job_state_opt,
     remote_state_opt,
     start_date_opt,
@@ -17,6 +17,7 @@ from jobflow_remote.cli.types import (
 from jobflow_remote.cli.utils import (
     check_incompatible_opt,
     exit_with_error_msg,
+    get_job_ids_indexes,
     loading_spinner,
     out_console,
 )
@@ -102,7 +103,7 @@ def reset(
 
 @app_admin.command()
 def remove_lock(
-    job_id: job_ids_opt = None,
+    job_id: job_ids_indexes_opt = None,
     db_id: db_ids_opt = None,
     state: job_state_opt = None,
     remote_state: remote_state_opt = None,
@@ -116,6 +117,8 @@ def remove_lock(
     """
     check_incompatible_opt({"state": state, "remote-state": remote_state})
 
+    job_ids_indexes = get_job_ids_indexes(job_id)
+
     jc = JobController()
     if not force:
         with loading_spinner(False) as progress:
@@ -124,7 +127,7 @@ def remove_lock(
             )
 
             jobs_info = jc.get_jobs_info(
-                job_ids=job_id,
+                job_ids=job_ids_indexes,
                 db_ids=db_id,
                 state=state,
                 remote_state=remote_state,
@@ -133,7 +136,7 @@ def remove_lock(
                 end_date=end_date,
             )
 
-        text = Text(
+        text = Text.from_markup(
             f"[red]This operation will [bold]remove the lock[/bold] for (roughly) [bold]{len(jobs_info)} Job(s)[/bold]. Proceed anyway?[/red]"
         )
         confirmed = Confirm.ask(text, default=False)
