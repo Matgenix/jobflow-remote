@@ -170,6 +170,8 @@ class JobController:
                         }
                     },
                 ]
+            elif state == FlowState.STOPPED:
+                query["fws.state"] = "DEFUSED"
             else:
                 raise RuntimeError("Unknown flow state.")
 
