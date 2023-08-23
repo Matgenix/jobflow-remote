@@ -164,6 +164,7 @@ class JobController:
             elif state == FlowState.FAILED:
                 query["$or"] = [
                     {"state": "FIZZLED"},
+                    {"$and": [{"state": "DEFUSED"}, {"fws.state": {"$in": ["FIZZLED"]}}]},
                     {
                         f"fws.{REMOTE_DOC_PATH}.state": {
                             "$in": [JobState.FAILED.value, JobState.REMOTE_ERROR.value]
@@ -171,7 +172,8 @@ class JobController:
                     },
                 ]
             elif state == FlowState.STOPPED:
-                query["fws.state"] = "DEFUSED"
+                query["state"] = "DEFUSED"
+                query["fws.state"] = {"$nin": ["FIZZLED"]}
             else:
                 raise RuntimeError("Unknown flow state.")
 
