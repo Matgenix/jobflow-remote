@@ -157,7 +157,9 @@ class JobController:
                 query["state"] = "COMPLETED"
             elif state == FlowState.ONGOING:
                 query["state"] = "RUNNING"
-                query["fws.state"] = {"$in": ["RUNNING", "RESERVED"]}
+                query["fws.state"] = {
+                    "$in": ["WAITING", "COMPLETED", "READY", "RUNNING", "RESERVED"]
+                }
                 query[f"fws.{REMOTE_DOC_PATH}.state"] = {
                     "$nin": [JobState.FAILED.value, JobState.REMOTE_ERROR.value]
                 }
