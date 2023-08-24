@@ -82,6 +82,28 @@ remote_state_opt = Annotated[
     ),
 ]
 
+name_opt = Annotated[
+    Optional[str],
+    typer.Option(
+        "--name",
+        "-n",
+        help="The name. A regex can be passed (e.g. .*test.*)",
+    ),
+]
+
+
+metadata_opt = Annotated[
+    Optional[str],
+    typer.Option(
+        "--metadata",
+        "-meta",
+        help="A string representing the metadata to be queried. Can be either"
+        " a single key=value pair or a string with the JSON representation "
+        "of a dictionary containing the mongoDB query for the metadata "
+        'subdocument (e.g \'{"key1.key2": 1, "key3": "test"}\')',
+    ),
+]
+
 
 remote_state_arg = Annotated[
     RemoteState, typer.Argument(help="One of the remote states")
@@ -176,7 +198,7 @@ reverse_sort_flag_opt = Annotated[
 job_db_id_arg = Annotated[
     str,
     typer.Argument(
-        help="The ID of the job can the db id (i.e. an integer) or a string (i.e. the uuid)",
+        help="The ID of the job. Can be the db id (i.e. an integer) or a string (i.e. the uuid)",
         metavar="ID",
     ),
 ]
@@ -185,6 +207,15 @@ job_index_arg = Annotated[
     typer.Argument(
         help="The index of the job. If not defined the job with the largest index is selected",
         metavar="INDEX",
+    ),
+]
+
+
+flow_db_id_arg = Annotated[
+    str,
+    typer.Argument(
+        help="The ID of the flow. Can the db id (i.e. an integer) or a string (i.e. the uuid)",
+        metavar="ID",
     ),
 ]
 
@@ -198,6 +229,16 @@ force_opt = Annotated[
     ),
 ]
 
+
+job_flow_id_flag_opt = Annotated[
+    bool,
+    typer.Option(
+        "--job",
+        "-j",
+        help="The passed ID will be the ID of one of the jobs"
+        " belonging to the flow, instead of the ID of the flow.",
+    ),
+]
 
 locked_opt = Annotated[
     bool,
