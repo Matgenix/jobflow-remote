@@ -51,7 +51,9 @@ class JobState(Enum):
     REMOTE_ERROR = "REMOTE_ERROR"
     COMPLETED = "COMPLETED"
     FAILED = "FAILED"
-    PAUSED = "PAUSED"
+    PAUSED = "PAUSED"  # Not yet used
+    STOPPED = "STOPPED"
+    CANCELLED = "CANCELLED"  # Not yet used
 
     @classmethod
     def from_states(
@@ -66,6 +68,10 @@ class JobState(Enum):
                 return JobState.ONGOING
         elif fw_state == "FIZZLED":
             return JobState.FAILED
+        # When stop_jobflow or stop_children is used in Response, the Firework with
+        # the corresponding job is set to a DEFUSED state.
+        elif fw_state == "DEFUSED":
+            return JobState.STOPPED
 
         raise ValueError(f"Unsupported FW state {fw_state}")
 
@@ -80,6 +86,8 @@ class JobState(Enum):
             return ["RESERVED", "RUNNING"], [RemoteState.FAILED]
         elif self == JobState.FAILED:
             return ["FIZZLED"], [RemoteState.COMPLETED]
+        elif self == JobState.STOPPED:
+            return ["DEFUSED"], None
 
         raise ValueError(f"Unhandled state {self}")
 
@@ -97,6 +105,7 @@ class FlowState(Enum):
     COMPLETED = "COMPLETED"
     FAILED = "FAILED"
     PAUSED = "PAUSED"
+    STOPPED = "STOPPED"
 
     @classmethod
     def from_jobs_states(cls, jobs_states: list[JobState]) -> FlowState:
@@ -110,5 +119,7 @@ class FlowState(Enum):
             return cls.FAILED
         elif all(js == JobState.PAUSED for js in jobs_states):
             return cls.PAUSED
+        elif any(js == JobState.STOPPED for js in jobs_states):
+            return cls.STOPPED
         else:
             return cls.ONGOING
