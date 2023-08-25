@@ -60,7 +60,7 @@ class JobController:
         state = JobState.from_states(fw.state, remote_run.state if remote_run else None)
         output = None
         jobstore = fw.tasks[0].get("store") or self.jobstore
-        if load_output and state == RemoteState.COMPLETED:
+        if load_output and state == JobState.COMPLETED:
             output = jobstore.query_one({"uuid": job_id}, load=True)
 
         return JobData(job=job, state=state, db_id=fw.fw_id, output=output)
@@ -258,7 +258,7 @@ class JobController:
             info = JobInfo.from_fw_dict(fw_dict)
 
             output = None
-            if state == RemoteState.COMPLETED and load_output:
+            if state == JobState.COMPLETED and load_output:
                 output = store.query_one({"uuid": job.uuid}, load=True)
             jobs_data.append(
                 JobData(
