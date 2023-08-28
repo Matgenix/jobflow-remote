@@ -87,7 +87,7 @@ name_opt = Annotated[
     typer.Option(
         "--name",
         "-n",
-        help="The name. A regex can be passed (e.g. .*test.*)",
+        help="The name. Default is an exact match, but all conventions from python fnmatch can be used (e.g. *test*)",
     ),
 ]
 

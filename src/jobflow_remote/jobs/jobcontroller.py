@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import fnmatch
 import io
 import logging
 from contextlib import redirect_stdout
@@ -125,7 +126,7 @@ class JobController:
             query[f"{REMOTE_DOC_PATH}.{MongoLock.LOCK_KEY}"] = {"$exists": True}
 
         if name:
-            query["name"] = {"$regex": name}
+            query["name"] = {"$regex": fnmatch.translate(name)}
 
         if metadata:
             metadata_dict = {
@@ -212,7 +213,7 @@ class JobController:
             query["updated_on"] = {"$lte": end_date_str}
 
         if name:
-            query["name"] = {"$regex": name}
+            query["name"] = {"$regex": fnmatch.translate(name)}
 
         return query
 
