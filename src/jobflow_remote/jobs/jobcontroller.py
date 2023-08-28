@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import fnmatch
 import io
 import logging
 from contextlib import redirect_stdout
@@ -14,6 +15,7 @@ from jobflow_remote.config.base import Project
 from jobflow_remote.config.manager import ConfigManager
 from jobflow_remote.fireworks.launchpad import (
     FW_INDEX_PATH,
+    FW_JOB_PATH,
     FW_UUID_PATH,
     REMOTE_DOC_PATH,
     RemoteLaunchPad,
@@ -53,13 +55,13 @@ class JobController:
         load_output: bool = False,
     ):
         fw, remote_run = self.rlpad.get_fw_remote_run_from_id(
-            job_id=job_id, fw_id=db_id
+            job_id=job_id, fw_id=db_id, job_index=job_index
         )
         job = fw.tasks[0].get("job")
         state = JobState.from_states(fw.state, remote_run.state if remote_run else None)
         output = None
         jobstore = fw.tasks[0].get("store") or self.jobstore
-        if load_output and state == RemoteState.COMPLETED:
+        if load_output and state == JobState.COMPLETED:
             output = jobstore.query_one({"uuid": job_id}, load=True)
 
         return JobData(job=job, state=state, db_id=fw.fw_id, output=output)
@@ -68,11 +70,14 @@ class JobController:
         self,
         job_ids: tuple[str, int] | list[tuple[str, int]] | None = None,
         db_ids: int | list[int] | None = None,
+        flow_ids: str | list[str] | None = None,
         state: JobState | None = None,
         remote_state: RemoteState | None = None,
         locked: bool = False,
         start_date: datetime | None = None,
         end_date: datetime | None = None,
+        name: str | None = None,
+        metadata: dict | None = None,
     ) -> dict:
         if state is not None and remote_state is not None:
             raise ValueError("state and remote_state cannot be queried simultaneously")
@@ -84,6 +89,8 @@ class JobController:
             job_ids = cast(list[tuple[str, int]], [job_ids])
         if db_ids is not None and not isinstance(db_ids, (list, tuple)):
             db_ids = [db_ids]
+        if flow_ids and not isinstance(flow_ids, (list, tuple)):
+            flow_ids = [flow_ids]
 
         query: dict = {}
 
@@ -95,6 +102,9 @@ class JobController:
             for job_id, job_index in job_ids:
                 or_list.append({FW_UUID_PATH: job_id, FW_INDEX_PATH: job_index})
             query["$or"] = or_list
+
+        if flow_ids:
+            query[f"{FW_JOB_PATH}.hosts"] = {"$in": flow_ids}
 
         if state:
             fw_states, remote_state = state.to_states()
@@ -115,6 +125,15 @@ class JobController:
         if locked:
             query[f"{REMOTE_DOC_PATH}.{MongoLock.LOCK_KEY}"] = {"$exists": True}
 
+        if name:
+            query["name"] = {"$regex": fnmatch.translate(name)}
+
+        if metadata:
+            metadata_dict = {
+                f"{FW_JOB_PATH}.metadata.{k}": v for k, v in metadata.items()
+            }
+            query.update(metadata_dict)
+
         return query
 
     def _build_query_wf(
@@ -125,6 +144,7 @@ class JobController:
         state: FlowState | None = None,
         start_date: datetime | None = None,
         end_date: datetime | None = None,
+        name: str | None = None,
     ) -> dict:
 
         if job_ids is not None and not isinstance(job_ids, (list, tuple)):
@@ -166,7 +186,12 @@ class JobController:
             elif state == FlowState.FAILED:
                 query["$or"] = [
                     {"state": "FIZZLED"},
-                    {"$and": [{"state": "DEFUSED"}, {"fws.state": {"$in": ["FIZZLED"]}}]},
+                    {
+                        "$and": [
+                            {"state": "DEFUSED"},
+                            {"fws.state": {"$in": ["FIZZLED"]}},
+                        ]
+                    },
                     {
                         f"fws.{REMOTE_DOC_PATH}.state": {
                             "$in": [JobState.FAILED.value, JobState.REMOTE_ERROR.value]
@@ -187,16 +212,22 @@ class JobController:
             end_date_str = end_date.astimezone(timezone.utc)
             query["updated_on"] = {"$lte": end_date_str}
 
+        if name:
+            query["name"] = {"$regex": fnmatch.translate(name)}
+
         return query
 
     def get_jobs_data(
         self,
         job_ids: tuple[str, int] | list[tuple[str, int]] | None = None,
         db_ids: int | list[int] | None = None,
+        flow_ids: str | list[str] | None = None,
         state: JobState | None = None,
         remote_state: RemoteState | None = None,
         start_date: datetime | None = None,
         end_date: datetime | None = None,
+        name: str | None = None,
+        metadata: dict | None = None,
         sort: dict | None = None,
         limit: int = 0,
         load_output: bool = False,
@@ -204,10 +235,13 @@ class JobController:
         query = self._build_query_fw(
             job_ids=job_ids,
             db_ids=db_ids,
+            flow_ids=flow_ids,
             state=state,
             remote_state=remote_state,
             start_date=start_date,
             end_date=end_date,
+            name=name,
+            metadata=metadata,
         )
 
         data = self.rlpad.fireworks.find(query, sort=sort, limit=limit)
@@ -225,7 +259,7 @@ class JobController:
             info = JobInfo.from_fw_dict(fw_dict)
 
             output = None
-            if state == RemoteState.COMPLETED and load_output:
+            if state == JobState.COMPLETED and load_output:
                 output = store.query_one({"uuid": job.uuid}, load=True)
             jobs_data.append(
                 JobData(
@@ -261,10 +295,13 @@ class JobController:
         self,
         job_ids: tuple[str, int] | list[tuple[str, int]] | None = None,
         db_ids: int | list[int] | None = None,
+        flow_ids: str | list[str] | None = None,
         state: JobState | None = None,
         remote_state: RemoteState | None = None,
         start_date: datetime | None = None,
         end_date: datetime | None = None,
+        name: str | None = None,
+        metadata: dict | None = None,
         locked: bool = False,
         sort: list[tuple] | None = None,
         limit: int = 0,
@@ -272,11 +309,14 @@ class JobController:
         query = self._build_query_fw(
             job_ids=job_ids,
             db_ids=db_ids,
+            flow_ids=flow_ids,
             state=state,
             remote_state=remote_state,
             locked=locked,
             start_date=start_date,
             end_date=end_date,
+            name=name,
+            metadata=metadata,
         )
         return self.get_jobs_info_query(query=query, sort=sort, limit=limit)
 
@@ -317,20 +357,26 @@ class JobController:
         self,
         job_ids: tuple[str, int] | list[tuple[str, int]] | None = None,
         db_ids: int | list[int] | None = None,
+        flow_ids: str | list[str] | None = None,
         state: JobState | None = None,
         remote_state: RemoteState | None = None,
         start_date: datetime | None = None,
         end_date: datetime | None = None,
+        name: str | None = None,
+        metadata: dict | None = None,
         sort: dict | None = None,
         limit: int = 0,
     ) -> list[int]:
         query = self._build_query_fw(
             job_ids=job_ids,
             db_ids=db_ids,
+            flow_ids=flow_ids,
             state=state,
             remote_state=remote_state,
             start_date=start_date,
             end_date=end_date,
+            name=name,
+            metadata=metadata,
         )
 
         fw_ids = self.rlpad.get_fw_ids(query=query, sort=sort, limit=limit)
@@ -401,6 +447,7 @@ class JobController:
         state: FlowState | None = None,
         start_date: datetime | None = None,
         end_date: datetime | None = None,
+        name: str | None = None,
         sort: list[tuple] | None = None,
         limit: int = 0,
     ) -> list[FlowInfo]:
@@ -411,6 +458,7 @@ class JobController:
             state=state,
             start_date=start_date,
             end_date=end_date,
+            name=name,
         )
 
         data = self.rlpad.get_wf_fw_data(
@@ -455,19 +503,25 @@ class JobController:
         self,
         job_ids: tuple[str, int] | list[tuple[str, int]] | None = None,
         db_ids: int | list[int] | None = None,
+        flow_ids: str | list[str] | None = None,
         state: JobState | None = None,
         remote_state: RemoteState | None = None,
         start_date: datetime | None = None,
         end_date: datetime | None = None,
+        name: str | None = None,
+        metadata: dict | None = None,
     ) -> int:
         query = self._build_query_fw(
             job_ids=job_ids,
             db_ids=db_ids,
+            flow_ids=flow_ids,
             state=state,
             remote_state=remote_state,
             start_date=start_date,
             end_date=end_date,
             locked=True,
+            name=name,
+            metadata=metadata,
         )
 
         return self.rlpad.remove_lock(query=query)

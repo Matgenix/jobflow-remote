@@ -141,6 +141,33 @@ def format_job_info(job_info: JobInfo, show_none: bool = False):
     return render_scope(d)
 
 
+def format_flow_info(flow_info: FlowInfo):
+
+    title = f"Flow: {flow_info.name} - {flow_info.flow_id} - {flow_info.state.name}"
+    table = Table(title=title)
+    table.title_style = "bold"
+    table.add_column("DB id")
+    table.add_column("Name")
+    table.add_column("State [Remote]")
+    table.add_column("Job id  (Index)")
+    table.add_column("Worker")
+
+    for i, job_id in enumerate(flow_info.job_ids):
+        state = flow_info.job_states[i].name
+
+        row = [
+            str(flow_info.db_ids[i]),
+            flow_info.job_names[i],
+            state,
+            f"{job_id}  ({flow_info.job_indexes[i]})",
+            flow_info.workers[i],
+        ]
+
+        table.add_row(*row)
+
+    return table
+
+
 def get_exec_config_table(exec_config: dict[str, ExecutionConfig], verbosity: int = 0):
     table = Table(title="Execution config", show_lines=verbosity > 0)
     table.add_column("Name")

@@ -13,12 +13,15 @@ from jobflow_remote.cli.types import (
     days_opt,
     db_ids_opt,
     end_date_opt,
+    flow_ids_opt,
     job_db_id_arg,
     job_ids_indexes_opt,
     job_index_arg,
     job_state_opt,
     locked_opt,
     max_results_opt,
+    metadata_opt,
+    name_opt,
     query_opt,
     remote_state_arg,
     remote_state_opt,
@@ -30,6 +33,7 @@ from jobflow_remote.cli.types import (
 from jobflow_remote.cli.utils import (
     SortOption,
     check_incompatible_opt,
+    convert_metadata,
     exit_with_error_msg,
     exit_with_warning_msg,
     get_job_db_ids,
@@ -53,10 +57,13 @@ app.add_typer(app_job)
 def jobs_list(
     job_id: job_ids_indexes_opt = None,
     db_id: db_ids_opt = None,
+    flow_id: flow_ids_opt = None,
     state: job_state_opt = None,
     remote_state: remote_state_opt = None,
     start_date: start_date_opt = None,
     end_date: end_date_opt = None,
+    name: name_opt = None,
+    metadata: metadata_opt = None,
     days: days_opt = None,
     verbosity: verbosity_opt = 0,
     max_results: max_results_opt = 100,
@@ -71,6 +78,7 @@ def jobs_list(
     check_incompatible_opt({"state": state, "remote-state": remote_state})
     check_incompatible_opt({"start_date": start_date, "days": days})
     check_incompatible_opt({"end_date": end_date, "days": days})
+    metadata_dict = convert_metadata(metadata)
 
     job_ids_indexes = get_job_ids_indexes(job_id)
 
@@ -92,11 +100,14 @@ def jobs_list(
             jobs_info = jc.get_jobs_info(
                 job_ids=job_ids_indexes,
                 db_ids=db_id,
+                flow_ids=flow_id,
                 state=state,
                 remote_state=remote_state,
                 start_date=start_date,
                 locked=locked,
                 end_date=end_date,
+                name=name,
+                metadata=metadata_dict,
                 limit=max_results,
                 sort=sort,
             )

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import functools
+import json
 import uuid
 from contextlib import contextmanager
 from enum import Enum
@@ -184,3 +185,19 @@ def check_valid_uuid(uuid_str):
         pass
 
     raise typer.BadParameter(f"UUID {uuid_str} is in the wrong format.")
+
+
+def convert_metadata(string_metadata: str | None) -> dict | None:
+    if not string_metadata:
+        return None
+
+    try:
+        metadata = json.loads(string_metadata)
+    except json.JSONDecodeError:
+        split = string_metadata.split("=")
+        if len(split) != 2:
+            raise typer.BadParameter(f"Wrong format for metadata {string_metadata}")
+
+        metadata = {split[0]: split[1]}
+
+    return metadata

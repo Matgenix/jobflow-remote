@@ -21,6 +21,7 @@ from jobflow_remote.utils.db import MongoLock
 logger = logging.getLogger(__name__)
 
 
+FW_JOB_PATH = "spec._tasks.job"
 FW_UUID_PATH = "spec._tasks.job.uuid"
 FW_INDEX_PATH = "spec._tasks.job.index"
 REMOTE_DOC_PATH = "spec.remote"

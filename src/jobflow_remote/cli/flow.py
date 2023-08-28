@@ -5,19 +5,21 @@ from rich.prompt import Confirm
 from rich.text import Text
 
 from jobflow_remote import SETTINGS
-from jobflow_remote.cli.formatting import get_flow_info_table
+from jobflow_remote.cli.formatting import format_flow_info, get_flow_info_table
 from jobflow_remote.cli.jf import app
 from jobflow_remote.cli.jfr_typer import JFRTyper
 from jobflow_remote.cli.types import (
     days_opt,
     db_ids_opt,
     end_date_opt,
+    flow_db_id_arg,
     flow_ids_opt,
     flow_state_opt,
     force_opt,
+    job_flow_id_flag_opt,
     job_ids_opt,
-    job_state_opt,
     max_results_opt,
+    name_opt,
     reverse_sort_flag_opt,
     sort_opt,
     start_date_opt,
@@ -26,7 +28,9 @@ from jobflow_remote.cli.types import (
 from jobflow_remote.cli.utils import (
     SortOption,
     check_incompatible_opt,
+    exit_with_error_msg,
     exit_with_warning_msg,
+    get_job_db_ids,
     loading_spinner,
     out_console,
 )
@@ -97,6 +101,7 @@ def delete(
     state: flow_state_opt = None,
     start_date: start_date_opt = None,
     end_date: end_date_opt = None,
+    name: name_opt = None,
     days: days_opt = None,
     force: force_opt = False,
 ):
@@ -117,6 +122,7 @@ def delete(
             state=state,
             start_date=start_date,
             end_date=end_date,
+            name=name,
         )
 
     if not flows_info:
@@ -140,3 +146,36 @@ def delete(
     out_console.print(
         f"Deleted Flow(s) with db_id: {', '.join(str(i) for i in to_delete)}"
     )
+
+
+@app_flow.command(name="info")
+def flow_info(
+    flow_db_id: flow_db_id_arg,
+    job_id_flag: job_flow_id_flag_opt = False,
+):
+    """
+    Provide detailed information on a Flow
+    """
+    db_id, jf_id = get_job_db_ids(flow_db_id, None)
+    db_ids = job_ids = flow_ids = None
+    if db_id is not None:
+        db_ids = [db_id]
+    elif job_id_flag:
+        job_ids = [jf_id]
+    else:
+        flow_ids = [jf_id]
+
+    with loading_spinner():
+
+        jc = JobController()
+
+        flows_info = jc.get_flows_info(
+            job_ids=job_ids,
+            db_ids=db_ids,
+            flow_ids=flow_ids,
+            limit=1,
+        )
+    if not flows_info:
+        exit_with_error_msg("No data matching the request")
+
+    out_console.print(format_flow_info(flows_info[0]))
