@@ -357,6 +357,8 @@ class RemoteLaunchPad:
         if job_id:
             query[FW_UUID_PATH] = job_id
             if job_index is None:
+                # note: this format is suitable for collection.find(sort=.),
+                # but not for $sort in an aggregation.
                 sort = [[FW_INDEX_PATH, DESCENDING]]
             else:
                 query[FW_INDEX_PATH] = job_index
@@ -623,7 +625,7 @@ class RemoteLaunchPad:
             msg = f"No Remote run exists with fw id: {fw_id} or job_id {job_id}"
             if job_index is not None:
                 msg += f" and job index {job_index}"
-        raise ValueError(msg)
+                raise ValueError(msg)
 
         return RemoteRun.from_db_dict(remote_dict)
 

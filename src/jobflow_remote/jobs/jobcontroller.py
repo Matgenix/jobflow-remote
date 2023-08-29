@@ -337,6 +337,9 @@ class JobController:
                     f"{REMOTE_DOC_PATH}.error": 1,
                 }
             )
+            if sort:
+                # needs to be converted when used in an aggregation
+                sort = dict(sort)
             data = list(
                 self.rlpad.get_fw_launch_remote_run_data(
                     query=query, projection=proj, sort=sort, limit=1
