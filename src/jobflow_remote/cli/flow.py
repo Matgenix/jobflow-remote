@@ -50,6 +50,7 @@ def flows_list(
     state: flow_state_opt = None,
     start_date: start_date_opt = None,
     end_date: end_date_opt = None,
+    name: name_opt = None,
     days: days_opt = None,
     verbosity: verbosity_opt = 0,
     max_results: max_results_opt = 100,
@@ -77,6 +78,7 @@ def flows_list(
             state=state,
             start_date=start_date,
             end_date=end_date,
+            name=name,
             limit=max_results,
             sort=sort,
         )

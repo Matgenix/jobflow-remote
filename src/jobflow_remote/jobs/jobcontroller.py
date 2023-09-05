@@ -126,7 +126,8 @@ class JobController:
             query[f"{REMOTE_DOC_PATH}.{MongoLock.LOCK_KEY}"] = {"$exists": True}
 
         if name:
-            query["name"] = {"$regex": fnmatch.translate(name)}
+            mongo_regex = "^" + fnmatch.translate(name).replace("\\\\", "\\")
+            query["name"] = {"$regex": mongo_regex}
 
         if metadata:
             metadata_dict = {
@@ -213,7 +214,8 @@ class JobController:
             query["updated_on"] = {"$lte": end_date_str}
 
         if name:
-            query["name"] = {"$regex": fnmatch.translate(name)}
+            mongo_regex = "^" + fnmatch.translate(name).replace("\\\\", "\\")
+            query["name"] = {"$regex": mongo_regex}
 
         return query
 
