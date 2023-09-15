@@ -207,10 +207,10 @@ class JobController:
 
         # at variance with Firework doc, the dates in the Workflow are Date objects
         if start_date:
-            start_date_str = start_date.astimezone(timezone.utc)
+            start_date_str = start_date.astimezone(timezone.utc).isoformat()
             query["updated_on"] = {"$gte": start_date_str}
         if end_date:
-            end_date_str = end_date.astimezone(timezone.utc)
+            end_date_str = end_date.astimezone(timezone.utc).isoformat()
             query["updated_on"] = {"$lte": end_date_str}
 
         if name:

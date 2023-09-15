@@ -1,5 +1,4 @@
 import io
-from datetime import datetime, timedelta
 from pathlib import Path
 
 import typer
@@ -14,6 +13,7 @@ from jobflow_remote.cli.types import (
     db_ids_opt,
     end_date_opt,
     flow_ids_opt,
+    hours_opt,
     job_db_id_arg,
     job_ids_indexes_opt,
     job_index_arg,
@@ -38,6 +38,7 @@ from jobflow_remote.cli.utils import (
     exit_with_warning_msg,
     get_job_db_ids,
     get_job_ids_indexes,
+    get_start_date,
     loading_spinner,
     out_console,
     print_success_msg,
@@ -65,6 +66,7 @@ def jobs_list(
     name: name_opt = None,
     metadata: metadata_opt = None,
     days: days_opt = None,
+    hours: hours_opt = None,
     verbosity: verbosity_opt = 0,
     max_results: max_results_opt = 100,
     sort: sort_opt = SortOption.UPDATED_ON.value,
@@ -76,16 +78,15 @@ def jobs_list(
     Get the list of Jobs in the database
     """
     check_incompatible_opt({"state": state, "remote-state": remote_state})
-    check_incompatible_opt({"start_date": start_date, "days": days})
-    check_incompatible_opt({"end_date": end_date, "days": days})
+    check_incompatible_opt({"start_date": start_date, "days": days, "hours": hours})
+    check_incompatible_opt({"end_date": end_date, "days": days, "hours": hours})
     metadata_dict = convert_metadata(metadata)
 
     job_ids_indexes = get_job_ids_indexes(job_id)
 
     jc = JobController()
 
-    if days:
-        start_date = datetime.now() - timedelta(days=days)
+    start_date = get_start_date(start_date, days, hours)
 
     sort = [(sort.query_field, 1 if reverse_sort else -1)]
 

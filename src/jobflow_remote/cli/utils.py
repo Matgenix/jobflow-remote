@@ -4,6 +4,7 @@ import functools
 import json
 import uuid
 from contextlib import contextmanager
+from datetime import datetime, timedelta
 from enum import Enum
 
 import typer
@@ -201,3 +202,20 @@ def convert_metadata(string_metadata: str | None) -> dict | None:
         metadata = {split[0]: split[1]}
 
     return metadata
+
+
+def get_start_date(start_date: datetime | None, days: int | None, hours: int | None):
+
+    if start_date and (start_date.year, start_date.month, start_date.day) == (
+        1900,
+        1,
+        1,
+    ):
+        now = datetime.now()
+        start_date = start_date.replace(year=now.year, month=now.month, day=now.day)
+    elif days:
+        start_date = datetime.now() - timedelta(days=days)
+    elif hours:
+        start_date = datetime.now() - timedelta(hours=hours)
+
+    return start_date

@@ -116,6 +116,7 @@ start_date_opt = Annotated[
         "--start-date",
         "-sdate",
         help="Initial date for last update field",
+        formats=["%Y-%m-%d", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d", "%H:%M:%S", "%H:%M:%S"],
     ),
 ]
 
@@ -136,6 +137,16 @@ days_opt = Annotated[
         "--days",
         "-ds",
         help="Last update field is in the last days",
+    ),
+]
+
+
+hours_opt = Annotated[
+    Optional[int],
+    typer.Option(
+        "--hours",
+        "-hs",
+        help="Last update field is in the last hours",
     ),
 ]
 

@@ -1,5 +1,3 @@
-from datetime import datetime, timedelta
-
 import typer
 from rich.prompt import Confirm
 from rich.text import Text
@@ -16,6 +14,7 @@ from jobflow_remote.cli.types import (
     flow_ids_opt,
     flow_state_opt,
     force_opt,
+    hours_opt,
     job_flow_id_flag_opt,
     job_ids_opt,
     max_results_opt,
@@ -31,6 +30,7 @@ from jobflow_remote.cli.utils import (
     exit_with_error_msg,
     exit_with_warning_msg,
     get_job_db_ids,
+    get_start_date,
     loading_spinner,
     out_console,
 )
@@ -52,6 +52,7 @@ def flows_list(
     end_date: end_date_opt = None,
     name: name_opt = None,
     days: days_opt = None,
+    hours: hours_opt = None,
     verbosity: verbosity_opt = 0,
     max_results: max_results_opt = 100,
     sort: sort_opt = SortOption.UPDATED_ON.value,
@@ -60,13 +61,12 @@ def flows_list(
     """
     Get the list of Jobs in the database
     """
-    check_incompatible_opt({"start_date": start_date, "days": days})
-    check_incompatible_opt({"end_date": end_date, "days": days})
+    check_incompatible_opt({"start_date": start_date, "days": days, "hours": hours})
+    check_incompatible_opt({"end_date": end_date, "days": days, "hours": hours})
 
     jc = JobController()
 
-    if days:
-        start_date = datetime.now() - timedelta(days=days)
+    start_date = get_start_date(start_date, days, hours)
 
     sort = [(sort.query_field, 1 if reverse_sort else -1)]
 
@@ -105,13 +105,16 @@ def delete(
     end_date: end_date_opt = None,
     name: name_opt = None,
     days: days_opt = None,
+    hours: hours_opt = None,
     force: force_opt = False,
 ):
     """
     Permanently delete Flows from the database
     """
-    check_incompatible_opt({"start_date": start_date, "days": days})
-    check_incompatible_opt({"end_date": end_date, "days": days})
+    check_incompatible_opt({"start_date": start_date, "days": days, "hours": hours})
+    check_incompatible_opt({"end_date": end_date, "days": days, "hours": hours})
+
+    start_date = get_start_date(start_date, days, hours)
 
     jc = JobController()
 
