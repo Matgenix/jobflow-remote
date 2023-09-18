@@ -213,6 +213,8 @@ def get_start_date(start_date: datetime | None, days: int | None, hours: int | N
     ):
         now = datetime.now()
         start_date = start_date.replace(year=now.year, month=now.month, day=now.day)
+        if start_date > now:
+            start_date = start_date - timedelta(days=1)
     elif days:
         start_date = datetime.now() - timedelta(days=days)
     elif hours:
