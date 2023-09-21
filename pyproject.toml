@@ -46,6 +46,7 @@ dev = [
 tests = [
     "pytest==7.2.1",
     "pytest-cov==4.0.0",
+    "docker~=6.0",
     ]
 maintain = [
     "git-changelog>=0.6",
