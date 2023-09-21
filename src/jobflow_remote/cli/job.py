@@ -207,7 +207,7 @@ def reset_remote_attempts(
 ):
     """
     Resets the number of attempts to perform a remote action and eliminates
-    the delay in retrying. This will not restore a Jon from its failed state.
+    the delay in retrying. This will not restore a Job from its failed state.
     """
 
     db_id, job_id = get_job_db_ids(job_db_id, job_index)
