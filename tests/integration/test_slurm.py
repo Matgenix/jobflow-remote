@@ -11,4 +11,19 @@ def test_project_init(random_project_name):
 def test_project_check():
     from jobflow_remote.cli.project import check
 
-    assert check(print_errors=True)
+    assert check(print_errors=True) is None
+
+
+def test_submit_flow(runner):
+    from jobflow_remote import submit_flow
+    from jobflow import job, Flow
+
+    @job
+    def add(a, b):
+        return a + b
+
+    add_first = add(1, 5)
+    add_second = add(add_first.output, 5)
+
+    flow = Flow([add_first, add_second])
+    submit_flow(flow)

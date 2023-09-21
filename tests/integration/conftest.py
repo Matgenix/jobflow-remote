@@ -71,7 +71,9 @@ def slurm_container(docker_client, slurm_ssh_port, db_port):
         yield container
     finally:
         try:
+            print(f"Stopping container {container.id}...")
             container.stop()
+            print("Done!")
         except:
             pass
 
@@ -150,3 +152,16 @@ def write_tmp_settings(
 
     yield
     shutil.rmtree(tmp_dir)
+
+
+@pytest.fixture(scope="session")
+def daemon_manager():
+    from jobflow_remote.jobs.daemon import DaemonManager
+
+    yield DaemonManager()
+
+
+@pytest.fixture(scope="function")
+def runner(daemon_manager):
+    yield daemon_manager.start()
+    daemon_manager.stop()
