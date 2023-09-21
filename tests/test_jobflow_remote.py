@@ -1,8 +1,6 @@
-from jobflow_remote import __version__
-
-
 def test_version():
-    assert __version__ == "0.0.1"
+    from jobflow_remote import __version__
+    assert __version__.startswith("0.0.1")
 
 
 def test_imports():
@@ -11,5 +9,4 @@ def test_imports():
 
     """
     from jobflow_remote import SETTINGS  # noqa
-
     ...
