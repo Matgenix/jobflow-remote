@@ -54,8 +54,11 @@ jobs:
           python -m pip install --upgrade pip
             pip install .[strict,tests,docs]
 
-      - name: Test
-        run: pytest --cov=jobflow_remote --cov-report=xml
+      - name: Unit tests
+        run: pytest --cov=jobflow_remote --cov-report=xml --ignore tests/integration
+      
+      - name: Integration tests
+        run: pytest --cov=jobflow_remote --cov-append --cov-report=xml tests/integration
 
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v3
