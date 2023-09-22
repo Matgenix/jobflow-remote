@@ -43,7 +43,7 @@ from jobflow_remote.remote.data import (
     get_remote_store_filenames,
 )
 from jobflow_remote.remote.host import BaseHost
-from jobflow_remote.remote.queue import QueueManager, set_name_out
+from jobflow_remote.remote.queue import ERR_FNAME, OUT_FNAME, QueueManager, set_name_out
 from jobflow_remote.utils.data import deep_merge_dict
 from jobflow_remote.utils.db import MongoLock
 from jobflow_remote.utils.log import initialize_runner_logger
@@ -373,14 +373,18 @@ class Runner:
         remote_doc = get_remote_doc(doc)
         fw_job_data = self.get_fw_data(doc)
 
-        remote_path = remote_doc["run_dir"]
+        remote_path = Path(remote_doc["run_dir"])
 
         script_commands = ["rlaunch singleshot --offline"]
 
         worker = fw_job_data.worker
         queue_manager = self.get_queue_manager(fw_job_data.worker_name)
         resources = fw_job_data.task.get("resources") or worker.resources or {}
-        set_name_out(resources, fw_job_data.job.name)
+        qout_fpath = remote_path / OUT_FNAME
+        qerr_fpath = remote_path / ERR_FNAME
+        set_name_out(
+            resources, fw_job_data.job.name, out_fpath=qout_fpath, err_fpath=qerr_fpath
+        )
         exec_config = fw_job_data.task.get("exec_config")
         if isinstance(exec_config, str):
             exec_config = self.config_manager.get_exec_config(
