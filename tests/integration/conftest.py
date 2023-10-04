@@ -41,13 +41,22 @@ def docker_client():
 def slurm_container(docker_client, slurm_ssh_port, db_port):
     """Build and launch a container running Slurm + SSH, exposed on a random available port."""
     try:
+        print("\n" + 20 * "=")
         image_name = "jobflow-slurm:latest"
-        image, logs = docker_client.images.build(
-            path=str(Path(__file__).parent), tag=image_name, rm=True, quiet=False
+
+        print(f"Building {image_name}")
+        _, logs = docker_client.images.build(
+            path=str(Path(__file__).parent),
+            dockerfile="./dockerfiles/Dockerfile.slurm",
+            tag=image_name,
+            rm=True,
+            quiet=False,
         )
+
         for step in logs:
             if step.get("stream"):
                 print(step["stream"], end="")
+
         print(f"Launching container for {image_name}...")
         container = docker_client.containers.run(
             image_name,
