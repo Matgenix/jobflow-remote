@@ -1,10 +1,11 @@
 import os
-from pathlib import Path
-import socket
 import random
-import time
 import shutil
+import socket
 import tempfile
+import time
+from pathlib import Path
+from typing import Dict, Optional
 
 import docker
 import pytest
@@ -39,9 +40,9 @@ def docker_client():
 
 def build_and_launch_container(
     docker_client: docker.client.DockerClient,
-    dockerfile: os.PathLike | None = None,
-    image_name: str | None = None,
-    ports: dict[str, int] | None = None,
+    dockerfile: Optional[os.PathLike] = None,
+    image_name: Optional[str] = None,
+    ports: Optional[Dict[str, int]] = None,
 ):
     """Builds and/or launches a container, returning the container object.
 
