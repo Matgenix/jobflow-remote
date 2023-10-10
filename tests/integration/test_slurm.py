@@ -17,10 +17,7 @@ def test_project_check():
 def test_submit_flow(runner):
     from jobflow_remote import submit_flow
     from jobflow import job, Flow
-
-    @job
-    def add(a, b):
-        return a + b
+    from jobflow_remote.testing import add
 
     add_first = add(1, 5)
     add_second = add(add_first.output, 5)

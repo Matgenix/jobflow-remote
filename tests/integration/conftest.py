@@ -37,36 +37,44 @@ def docker_client():
     return docker.from_env()
 
 
-@pytest.fixture(scope="session", autouse=True)
-def slurm_container(docker_client, slurm_ssh_port, db_port):
-    """Build and launch a container running Slurm + SSH, exposed on a random available port."""
+def build_and_launch_container(
+    docker_client: docker.client.DockerClient,
+    dockerfile: os.PathLike | None = None,
+    image_name: str | None = None,
+    ports: dict[str, int] | None = None,
+):
+    """Builds and/or launches a container, returning the container object.
+
+    Parameters:
+        docker_client: The local docker client.
+        dockerfile: An optional location of a dockerfile to build.
+        image_name: Either the tag to attach to the built image, or an image
+            name to pull from the web (may require authenticated docker client).
+        ports: A port specification to use for the launched container.
+
+    Yields:
+        The launched container object, then stops the container after use.
+
+    """
+
     try:
-        print("\n" + 20 * "=")
-        image_name = "jobflow-slurm:latest"
+        if dockerfile is not None:
+            print(f"Building {image_name}")
+            _, logs = docker_client.images.build(
+                path=str(Path(__file__).parent.parent.parent.resolve()),
+                dockerfile=dockerfile,
+                tag=image_name,
+                rm=True,
+                quiet=False,
+            )
 
-        print(f"Building {image_name}")
-        _, logs = docker_client.images.build(
-            path=str(Path(__file__).parent),
-            dockerfile="./dockerfiles/Dockerfile.slurm",
-            tag=image_name,
-            rm=True,
-            quiet=False,
-        )
-
-        for step in logs:
-            if step.get("stream"):
-                print(step["stream"], end="")
+            for step in logs:
+                if step.get("stream"):
+                    print(step["stream"], end="")
 
         print(f"Launching container for {image_name}...")
         container = docker_client.containers.run(
-            image_name,
-            detach=True,
-            remove=True,
-            tty=True,
-            ports={
-                "22/tcp": slurm_ssh_port,
-                "27017/tcp": db_port,
-            },
+            image_name, detach=True, remove=True, tty=True, ports=ports
         )
         print("Waiting for container to be ready", end="")
         while container.status != "running":
@@ -87,6 +95,30 @@ def slurm_container(docker_client, slurm_ssh_port, db_port):
             pass
 
 
+@pytest.fixture(scope="session", autouse=True)
+def slurm_container(docker_client, slurm_ssh_port):
+    """Build and launch a container running Slurm + SSH, exposed on a random available port."""
+    ports = {"22/tcp": slurm_ssh_port}
+    yield from build_and_launch_container(
+        docker_client,
+        "./tests/integration/dockerfiles/Dockerfile.slurm",
+        "jobflow-slurm:latest",
+        ports=ports,
+    )
+
+
+@pytest.fixture(scope="session", autouse=True)
+def mongo_container(docker_client, db_port):
+    """Build and launch a container running MongoDB, exposed on a random available port."""
+    ports = {"27017/tcp": db_port}
+    yield from build_and_launch_container(
+        docker_client,
+        dockerfile=None,
+        image_name="mongo:7",
+        ports=ports,
+    )
+
+
 @pytest.fixture(scope="session")
 def random_project_name():
     return _get_random_name()
@@ -94,6 +126,11 @@ def random_project_name():
 
 @pytest.fixture(scope="session")
 def store_database_name():
+    return _get_random_name()
+
+
+@pytest.fixture(scope="session")
+def fw_database_name():
     return _get_random_name()
 
 
@@ -161,6 +198,20 @@ def write_tmp_settings(
 
     yield
     shutil.rmtree(tmp_dir)
+
+
+@pytest.fixture(scope="session", autouse=True)
+def fw_lpad(
+    store_database_name,
+    db_port,
+    mongo_container,
+):
+    """Set up a FireWorks LaunchPad with a fresh database in the db container."""
+    from fireworks import LaunchPad
+
+    lpad = LaunchPad(name=store_database_name, port=db_port)
+    lpad.reset("", require_password=False)
+    yield lpad
 
 
 @pytest.fixture(scope="session")
