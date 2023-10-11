@@ -32,7 +32,6 @@ def checkout_remote(
 
     launch_id = None
     try:
-
         fw, launch_id = rlpad.lpad.reserve_fw(fworker, ".", fw_id=fw_id)
         if not fw:
             logger.info("No jobs exist in the LaunchPad for submission to queue!")

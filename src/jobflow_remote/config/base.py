@@ -1,11 +1,9 @@
-from __future__ import annotations
-
 import abc
 import logging
 import traceback
 from enum import Enum
 from pathlib import Path
-from typing import Annotated, Literal
+from typing import Annotated, Literal, Optional, Union
 
 from jobflow import JobStore
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -36,7 +34,7 @@ class RunnerOptions(BaseModel):
         30,
         description="Delay between subsequent advancement of the job's remote state (seconds)",
     )
-    lock_timeout: int | None = Field(
+    lock_timeout: Optional[int] = Field(
         86400,
         description="Time to consider the lock on a document expired and can be overridden (seconds)",
     )
@@ -114,16 +112,16 @@ class WorkerBase(BaseModel):
         description="Absolute path of the directory of the worker where subfolders for "
         "executing the calculation will be created"
     )
-    resources: dict | None = Field(
+    resources: Optional[dict] = Field(
         None,
         description="A dictionary defining the default resources requested to the "
         "scheduler. Used to fill in the QToolKit template",
     )
-    pre_run: str | None = Field(
+    pre_run: Optional[str] = Field(
         None,
         description="String with commands that will be executed before the execution of the Job",
     )
-    post_run: str | None = Field(
+    post_run: Optional[str] = Field(
         None,
         description="String with commands that will be executed after the execution of the Job",
     )
@@ -229,39 +227,39 @@ class RemoteWorker(WorkerBase):
         "remote", description="The discriminator field to determine the worker type"
     )
     host: str = Field(description="The host to which to connect")
-    user: str | None = Field(None, description="Login username")
-    port: int | None = Field(None, description="Port number")
-    password: str | None = Field(None, description="Login password")
-    key_filename: str | list[str] | None = Field(
+    user: Optional[str] = Field(None, description="Login username")
+    port: Optional[int] = Field(None, description="Port number")
+    password: Optional[str] = Field(None, description="Login password")
+    key_filename: Optional[Union[str, list[str]]] = Field(
         None,
         description="The filename, or list of filenames, of optional private key(s) "
         "and/or certs to try for authentication",
     )
-    passphrase: str | None = Field(
+    passphrase: Optional[str] = Field(
         None, description="Passphrase used for decrypting private keys"
     )
-    gateway: str | None = Field(
+    gateway: Optional[str] = Field(
         None, description="A shell command string to use as a proxy or gateway"
     )
-    forward_agent: bool | None = Field(
+    forward_agent: Optional[bool] = Field(
         None, description="Whether to enable SSH agent forwarding"
     )
-    connect_timeout: int | None = Field(
+    connect_timeout: Optional[int] = Field(
         None, description="Connection timeout, in seconds"
     )
-    connect_kwargs: dict | None = Field(
+    connect_kwargs: Optional[dict] = Field(
         None,
         description="Other keyword arguments passed to paramiko.client.SSHClient.connect",
     )
-    inline_ssh_env: bool | None = Field(
+    inline_ssh_env: Optional[bool] = Field(
         None,
         description="Whether to send environment variables 'inline' as prefixes in "
         "front of command strings",
     )
-    keepalive: int | None = Field(
+    keepalive: Optional[int] = Field(
         60, description="Keepalive value in seconds passed to paramiko's transport"
     )
-    shell_cmd: str | None = Field(
+    shell_cmd: Optional[str] = Field(
         "bash",
         description="The shell command used to execute the command remotely. If None "
         "the command is executed directly",
@@ -317,7 +315,7 @@ class RemoteWorker(WorkerBase):
         )
 
 
-WorkerConfig = Annotated[LocalWorker | RemoteWorker, Field(discriminator="type")]
+WorkerConfig = Annotated[Union[LocalWorker, RemoteWorker], Field(discriminator="type")]
 
 
 class ExecutionConfig(BaseModel):
@@ -325,14 +323,16 @@ class ExecutionConfig(BaseModel):
     Configuration to be set before and after the execution of a Job.
     """
 
-    modules: list[str] | None = Field(None, description="list of modules to be loaded")
-    export: dict[str, str] | None = Field(
+    modules: Optional[list[str]] = Field(
+        None, description="list of modules to be loaded"
+    )
+    export: Optional[dict[str, str]] = Field(
         None, description="dictionary with variable to be exported"
     )
-    pre_run: str | None = Field(
+    pre_run: Optional[str] = Field(
         None, description="Other commands to be executed before the execution of a job"
     )
-    post_run: str | None = Field(
+    post_run: Optional[str] = Field(
         None, description="Commands to be executed after the execution of a job"
     )
     model_config = ConfigDict(extra="forbid")
@@ -344,23 +344,23 @@ class Project(BaseModel):
     """
 
     name: str = Field(description="The name of the project")
-    base_dir: str | None = Field(
+    base_dir: Optional[str] = Field(
         None,
         description="The base directory containing the project related files. Default "
         "is a folder with the project name inside the projects folder",
         validate_default=True,
     )
-    tmp_dir: str | None = Field(
+    tmp_dir: Optional[str] = Field(
         None,
         description="Folder where remote files are copied. Default a 'tmp' folder in base_dir",
         validate_default=True,
     )
-    log_dir: str | None = Field(
+    log_dir: Optional[str] = Field(
         None,
         description="Folder containing all the logs. Default a 'log' folder in base_dir",
         validate_default=True,
     )
-    daemon_dir: str | None = Field(
+    daemon_dir: Optional[str] = Field(
         None,
         description="Folder containing daemon related files. Default to a 'daemon' "
         "folder in base_dir",
@@ -393,11 +393,11 @@ class Project(BaseModel):
         "serialized dictionary or the Store int the Jobflow format",
         validate_default=True,
     )
-    metadata: dict | None = Field(
+    metadata: Optional[dict] = Field(
         None, description="A dictionary with metadata associated to the project"
     )
 
-    def get_jobstore(self) -> JobStore | None:
+    def get_jobstore(self) -> Optional[JobStore]:
         """
         Generate an instance of the JobStore based on the configuration
 

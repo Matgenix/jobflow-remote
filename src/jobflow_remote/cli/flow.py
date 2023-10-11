@@ -171,7 +171,6 @@ def flow_info(
         flow_ids = [jf_id]
 
     with loading_spinner():
-
         jc = JobController()
 
         flows_info = jc.get_flows_info(

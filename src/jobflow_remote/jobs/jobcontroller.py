@@ -147,7 +147,6 @@ class JobController:
         end_date: datetime | None = None,
         name: str | None = None,
     ) -> dict:
-
         if job_ids is not None and not isinstance(job_ids, (list, tuple)):
             job_ids = [job_ids]
         if db_ids is not None and not isinstance(db_ids, (list, tuple)):
@@ -391,7 +390,6 @@ class JobController:
         return fw_ids
 
     def reset(self, reset_output: bool = False, max_limit: int = 25) -> bool:
-
         password = datetime.now().strftime("%Y-%m-%d") if max_limit == 0 else None
         try:
             self.rlpad.reset(

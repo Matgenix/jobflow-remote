@@ -240,11 +240,11 @@ class Runner:
                 error, fail_now, set_output = function(doc)
             except ConfigError:
                 error = traceback.format_exc()
-                warnings.warn(error)
+                warnings.warn(error, stacklevel=2)
                 fail_now = True
             except Exception:
                 error = traceback.format_exc()
-                warnings.warn(error)
+                warnings.warn(error, stacklevel=2)
 
             lock.update_on_release = self._prepare_lock_update(
                 doc, error, fail_now, set_output, state.next
