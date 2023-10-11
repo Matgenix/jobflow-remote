@@ -5,7 +5,7 @@ import logging
 import traceback
 from enum import Enum
 from pathlib import Path
-from typing import Annotated, Literal
+from typing import Annotated, Literal, Union
 
 from jobflow import JobStore
 from pydantic import BaseModel, Extra, Field, validator
@@ -318,7 +318,7 @@ class RemoteWorker(WorkerBase):
         )
 
 
-WorkerConfig = Annotated[LocalWorker | RemoteWorker, Field(discriminator="type")]
+WorkerConfig = Annotated[Union[LocalWorker, RemoteWorker], Field(discriminator="type")]
 
 
 class ExecutionConfig(BaseModel):

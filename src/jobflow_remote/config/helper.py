@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 import traceback
-from pathlib import Path
 
 from jobflow import JobStore
 from maggma.core import Store
@@ -134,6 +133,7 @@ def _check_workdir(worker: WorkerBase, host: BaseHost) -> str | None:
     try:
         canary_file = worker.work_dir / ".jf_heartbeat"
         host.write_text_file(canary_file, "\n")
+        return None
     except FileNotFoundError as exc:
         raise FileNotFoundError(
             f"Could not write to {canary_file} on {worker.host}. Does the folder exist on the remote?\nThe folder should be specified as an absolute path with no shell expansions or environment variables."

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 #
 # Configuration file for the Sphinx documentation builder.
 #
@@ -28,6 +27,7 @@ author = "Guido Petretto, David Waroquiers"
 
 
 import jobflow_remote
+
 # The short X.Y version
 version = jobflow_remote.__version__
 # The full version, including alpha/beta/rc tags
@@ -49,16 +49,16 @@ extensions = [
     "sphinx.ext.todo",
     "sphinx.ext.viewcode",
     "sphinx.ext.napoleon",  # For Google Python Style Guide
-    'sphinx.ext.coverage',
-    'sphinx.ext.doctest',
-    'sphinx.ext.autosummary',
-    'sphinx.ext.graphviz',
-    'sphinx.ext.ifconfig',
-    'matplotlib.sphinxext.plot_directive',
-    'IPython.sphinxext.ipython_console_highlighting',
-    'IPython.sphinxext.ipython_directive',
-    'sphinx.ext.mathjax',
-    'sphinx_design',
+    "sphinx.ext.coverage",
+    "sphinx.ext.doctest",
+    "sphinx.ext.autosummary",
+    "sphinx.ext.graphviz",
+    "sphinx.ext.ifconfig",
+    "matplotlib.sphinxext.plot_directive",
+    "IPython.sphinxext.ipython_console_highlighting",
+    "IPython.sphinxext.ipython_directive",
+    "sphinx.ext.mathjax",
+    "sphinx_design",
 ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -78,7 +78,7 @@ master_doc = "index"
 #
 # This is also used if you do content translation via gettext catalogs.
 # Usually you set "language" from the command line for these cases.
-language = 'en'
+language = "en"
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
@@ -95,7 +95,7 @@ pygments_style = "sphinx"
 # a list of builtin themes.
 #
 # html_theme = 'sphinx_book_theme'
-html_theme = 'pydata_sphinx_theme'
+html_theme = "pydata_sphinx_theme"
 # html_favicon = '_static/favicon/favicon.ico'
 
 # Theme options are theme-specific and customize the look and feel of a theme
@@ -108,7 +108,7 @@ html_theme_options = {
     #       "image_dark": "index-image/contributor.svg",
     #   },
     "collapse_navigation": True,
-    'announcement': (
+    "announcement": (
         "<p>"
         "Jobflow-Remote is still in beta phase. The API may change at any time."
         "</p>"
@@ -137,14 +137,14 @@ html_static_path = ["_static"]
 # -- Options for HTMLHelp output ---------------------------------------------
 
 html_css_files = ["jobflow_remote.css"]
-html_title = "%s v%s Manual" % (project, version)
-html_last_updated_fmt = '%b %d, %Y'
+html_title = f"{project} v{version} Manual"
+html_last_updated_fmt = "%b %d, %Y"
 # html_css_files = ["numpy.css"]
 html_context = {"default_mode": "light"}
 html_use_modindex = True
 html_copy_source = False
 html_domain_indices = False
-html_file_suffix = '.html'
+html_file_suffix = ".html"
 
 # Output file base name for HTML help builder.
 htmlhelp_basename = "jobflow_remote_doc"
