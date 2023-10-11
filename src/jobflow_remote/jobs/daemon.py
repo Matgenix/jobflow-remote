@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 import subprocess
 from enum import Enum
@@ -56,7 +58,6 @@ class DaemonStatus(Enum):
 
 
 class DaemonManager:
-
     conf_template = Template(supervisord_conf_str)
 
     def __init__(

@@ -610,7 +610,6 @@ class RemoteLaunchPad:
         job_id: str | None = None,
         job_index: int | None = None,
     ) -> RemoteRun:
-
         query, sort = self.generate_id_query(fw_id, job_id, job_index)
 
         fw = self.fireworks.find_one(query)
@@ -697,7 +696,6 @@ class RemoteLaunchPad:
         sort: dict | None = None,
         limit: int = 0,
     ) -> list[dict]:
-
         pipeline: list[dict] = [
             {
                 "$lookup": {
@@ -767,7 +765,6 @@ class RemoteLaunchPad:
         sort: dict | None = None,
         limit: int = 0,
     ) -> list[dict]:
-
         # only take the most recent launch
         pipeline: list[dict] = [
             {

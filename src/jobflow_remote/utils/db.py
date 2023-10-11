@@ -12,7 +12,6 @@ logger = logging.getLogger(__name__)
 
 
 class MongoLock:
-
     LOCK_KEY = "_lock_id"
     LOCK_TIME_KEY = "_lock_time"
 
@@ -98,7 +97,7 @@ class MongoLock:
                 msg = (
                     f"The lock was broken. Previous lock id: {self.get_lock_id(result)}"
                 )
-                warnings.warn(msg)
+                warnings.warn(msg, stacklevel=2)
 
             self.locked_document = result
 
@@ -119,7 +118,7 @@ class MongoLock:
         # Check if the lock was successfully released
         if result.modified_count == 0:
             msg = f"Could not release lock for document {self.locked_document['_id']}"
-            warnings.warn(msg)
+            warnings.warn(msg, stacklevel=2)
 
         self.locked_document = None
 
@@ -128,6 +127,5 @@ class MongoLock:
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-
         if self.locked_document:
             self.release(exc_type, exc_val, exc_tb)

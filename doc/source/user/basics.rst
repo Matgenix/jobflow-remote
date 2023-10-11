@@ -9,4 +9,3 @@ fundamental Jobflow-Remote ideas and philosophy.
 ..
     .. toctree::
        :maxdepth: 1
-

@@ -11,4 +11,3 @@ Glossary
 
    Worker
        The description of a given resource where to execute flows.
-

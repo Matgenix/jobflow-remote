@@ -76,7 +76,6 @@ def get_remote_store_filenames(store: JobStore) -> list[str]:
 
 
 def update_store(store, remote_store, save):
-
     # TODO is it correct?
     data = list(remote_store.query(load=save))
     if len(data) > 1:

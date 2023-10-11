@@ -159,7 +159,6 @@ def job_info(
     db_id, job_id = get_job_db_ids(job_db_id, job_index)
 
     with loading_spinner():
-
         jc = JobController()
 
         job_info = jc.get_job_info(

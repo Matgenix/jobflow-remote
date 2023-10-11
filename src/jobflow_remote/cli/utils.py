@@ -205,7 +205,6 @@ def convert_metadata(string_metadata: str | None) -> dict | None:
 
 
 def get_start_date(start_date: datetime | None, days: int | None, hours: int | None):
-
     if start_date and (start_date.year, start_date.month, start_date.day) == (
         1900,
         1,
