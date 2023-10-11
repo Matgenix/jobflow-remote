@@ -58,7 +58,6 @@ class DaemonStatus(Enum):
 
 
 class DaemonManager:
-
     conf_template = Template(supervisord_conf_str)
 
     def __init__(
