@@ -336,7 +336,7 @@ class Runner:
             except Exception:
                 logging.error(f"error while closing the store {store}", exc_info=True)
 
-        remote_path = get_job_path(job.uuid, fw_job_data.worker.work_dir)
+        remote_path = get_job_path(job.uuid, job.index, fw_job_data.worker.work_dir)
 
         # Set the value of the original store for dynamical workflow. Usually it
         # will be None don't add the serializer, at this stage the default_orjson
@@ -436,7 +436,7 @@ class Runner:
 
         remote_path = remote_doc["run_dir"]
         loca_base_dir = Path(self.project.tmp_dir, "download")
-        local_path = get_job_path(job.uuid, loca_base_dir)
+        local_path = get_job_path(job.uuid, job.index, loca_base_dir)
 
         makedirs_p(local_path)
 
@@ -465,7 +465,9 @@ class Runner:
         fw_job_data = self.get_fw_data(doc)
 
         loca_base_dir = Path(self.project.tmp_dir, "download")
-        local_path = get_job_path(fw_job_data.job.uuid, loca_base_dir)
+        local_path = get_job_path(
+            fw_job_data.job.uuid, fw_job_data.job.index, loca_base_dir
+        )
 
         try:
             remote_data = loadfn(Path(local_path, "FW_offline.json"), cls=None)

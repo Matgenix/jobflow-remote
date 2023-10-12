@@ -77,7 +77,7 @@ def check_dict_keywords(obj: Any, keywords: list[str]) -> bool:
     return False
 
 
-def uuid_to_path(uuid: str, num_subdirs: int = 3, subdir_len: int = 2):
+def uuid_to_path(uuid: str, index: int = 1, num_subdirs: int = 3, subdir_len: int = 2):
     u = UUID(uuid)
     u_hex = u.hex
 
@@ -87,8 +87,11 @@ def uuid_to_path(uuid: str, num_subdirs: int = 3, subdir_len: int = 2):
         for i in range(0, num_subdirs * subdir_len, subdir_len)
     ]
 
+    # add the index to the final dir name
+    dir_name = f"{uuid}_{index}"
+
     # Combine root directory and subdirectories to form the final path
-    return os.path.join(*subdirs, uuid)
+    return os.path.join(*subdirs, dir_name)
 
 
 def store_from_dict(store_dict: dict) -> Store:
