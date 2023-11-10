@@ -727,7 +727,7 @@ class JobController:
                     )
                 raise ValueError(f"No Job matching criteria {lock_filter}")
             state = JobState(doc["state"])
-            if state != JobState.REMOTE_ERROR:
+            if state == JobState.REMOTE_ERROR:
                 previous_state = doc["previous_state"]
                 try:
                     JobState(previous_state)
