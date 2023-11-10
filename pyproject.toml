@@ -26,7 +26,7 @@ classifiers = [
 requires-python = ">=3.9"
 dependencies =[
     "jobflow[strict]",
-    "pydantic<2",
+    "pydantic>=2.0.1",
     "fireworks",
     "fabric",
     "tomlkit",
