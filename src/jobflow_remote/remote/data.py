@@ -1,12 +1,15 @@
 from __future__ import annotations
 
+import io
 import logging
 import os
 from pathlib import Path
 from typing import Any
 
+import orjson
 from jobflow.core.store import JobStore
 from maggma.stores.mongolike import JSONStore
+from monty.json import jsanitize
 
 from jobflow_remote.utils.data import uuid_to_path
 
@@ -21,14 +24,14 @@ def get_job_path(job_id: str, base_path: str | Path | None = None) -> str:
     return str(base_path / relative_path)
 
 
-def get_remote_files(fw, launch_id):
-    files = {
-        # TODO handle binary data?
-        "FW.json": fw.to_format(f_format="json"),
-        "FW_offline.json": f'{{"launch_id": {launch_id}}}',
-    }
-
-    return files
+def get_remote_in_file(job, remote_store, original_store):
+    d = jsanitize(
+        {"job": job, "store": remote_store, "original_store": original_store},
+        strict=True,
+        allow_bson=True,
+        enum_values=True,
+    )
+    return io.BytesIO(orjson.dumps(d, default=default_orjson_serializer))
 
 
 def default_orjson_serializer(obj: Any) -> Any:

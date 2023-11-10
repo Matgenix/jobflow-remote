@@ -10,7 +10,7 @@ from supervisor import childutils
 from supervisor.states import RUNNING_STATES, STOPPED_STATES, ProcessStates
 from supervisor.xmlrpc import Faults
 
-from jobflow_remote.config import ConfigManager
+from jobflow_remote.config import ConfigManager, Project
 
 logger = logging.getLogger(__name__)
 
@@ -61,18 +61,25 @@ class DaemonManager:
 
     def __init__(
         self,
-        daemon_dir: str | Path | None = None,
-        log_dir: str | Path | None = None,
-        project_name: str | None = None,
+        daemon_dir: str | Path,
+        log_dir: str | Path,
+        project: Project,
     ):
-        config_manager = ConfigManager()
-        self.project = config_manager.get_project(project_name)
-        if not daemon_dir:
-            daemon_dir = self.project.daemon_dir
+        self.project = project
         self.daemon_dir = Path(daemon_dir).absolute()
-        if not log_dir:
-            log_dir = self.project.log_dir
         self.log_dir = Path(log_dir).absolute()
+
+    @classmethod
+    def from_project(cls, project: Project):
+        daemon_dir = project.daemon_dir
+        log_dir = project.log_dir
+        return cls(daemon_dir, log_dir, project)
+
+    @classmethod
+    def from_project_name(cls, project_name: str):
+        config_manager = ConfigManager()
+        project = config_manager.get_project(project_name)
+        return cls.from_project(project)
 
     @property
     def conf_filepath(self) -> Path:

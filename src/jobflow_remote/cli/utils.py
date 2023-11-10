@@ -2,23 +2,68 @@ from __future__ import annotations
 
 import functools
 import json
+import logging
 import uuid
 from contextlib import contextmanager
 from datetime import datetime, timedelta
 from enum import Enum
+from typing import Callable
 
 import typer
 from click import ClickException
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
+from rich.prompt import Confirm
+from rich.text import Text
 
+from jobflow_remote import ConfigManager, JobController
 from jobflow_remote.config.base import ProjectUndefined
+from jobflow_remote.jobs.daemon import DaemonError, DaemonManager, DaemonStatus
+from jobflow_remote.jobs.state import JobState
+
+logger = logging.getLogger(__name__)
+
 
 err_console = Console(stderr=True)
 out_console = Console()
 
 
 fmt_datetime = "%Y-%m-%d %H:%M"
+
+
+# shared instances of the config manager and job controller, to avoid parsing
+# the files multiple times. Needs to be initialized with the
+# initialize_config_manager function.
+_shared_config_manager: ConfigManager | None = None
+_shared_job_controller: JobController | None = None
+
+
+def initialize_config_manager(*args, **kwargs):
+    global _shared_config_manager
+    _shared_config_manager = ConfigManager(*args, **kwargs)
+
+
+def get_config_manager() -> ConfigManager:
+    global _shared_config_manager
+    if not _shared_config_manager:
+        raise RuntimeError("The shared config manager needs to be initialized")
+    return _shared_config_manager
+
+
+def get_job_controller():
+    global _shared_job_controller
+    if _shared_job_controller is None:
+        cm = get_config_manager()
+        jc = JobController.from_project(cm.get_project())
+        _shared_job_controller = jc
+
+    return _shared_job_controller
+
+
+def cleanup_job_controller(*args, **kwargs):
+    global _shared_job_controller
+    if _shared_job_controller is not None:
+        _shared_job_controller.close()
 
 
 class SortOption(Enum):
@@ -117,7 +162,7 @@ def loading_spinner(processing: bool = True):
         yield progress
 
 
-def get_job_db_ids(job_db_id: str, job_index: int | None):
+def get_job_db_ids(job_db_id: str | int, job_index: int | None):
     try:
         db_id = int(job_db_id)
         job_id = None
@@ -188,20 +233,24 @@ def check_valid_uuid(uuid_str):
     raise typer.BadParameter(f"UUID {uuid_str} is in the wrong format.")
 
 
-def convert_metadata(string_metadata: str | None) -> dict | None:
-    if not string_metadata:
+def str_to_dict(string: str | None) -> dict | None:
+    if not string:
         return None
 
     try:
-        metadata = json.loads(string_metadata)
+        dictionary = json.loads(string)
     except json.JSONDecodeError:
-        split = string_metadata.split("=")
-        if len(split) != 2:
-            raise typer.BadParameter(f"Wrong format for metadata {string_metadata}")
+        dictionary = {}
+        for chunk in string.split(","):
+            split = chunk.split("=")
+            if len(split) != 2:
+                raise typer.BadParameter(
+                    f"Wrong format for dictionary-like field {string}"
+                )
 
-        metadata = {split[0]: split[1]}
+            dictionary[split[0]] = split[1]
 
-    return metadata
+    return dictionary
 
 
 def get_start_date(start_date: datetime | None, days: int | None, hours: int | None):
@@ -221,3 +270,129 @@ def get_start_date(start_date: datetime | None, days: int | None, hours: int | N
         start_date = datetime.now() - timedelta(hours=hours)
 
     return start_date
+
+
+def execute_multi_jobs_cmd(
+    single_cmd: Callable,
+    multi_cmd: Callable,
+    job_db_id: str | int | None = None,
+    job_index: int | None = None,
+    job_ids: list[str] | None = None,
+    db_ids: int | list[int] | None = None,
+    flow_ids: str | list[str] | None = None,
+    state: JobState | None = None,
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+    name: str | None = None,
+    metadata: str | None = None,
+    days: int | None = None,
+    hours: int | None = None,
+    verbosity: int = 0,
+    raise_on_error: bool = False,
+    **kwargs,
+):
+    query_values = [
+        job_ids,
+        db_ids,
+        flow_ids,
+        state,
+        start_date,
+        end_date,
+        name,
+        metadata,
+        days,
+        hours,
+    ]
+    try:
+        if job_db_id is not None:
+            if any(query_values):
+                msg = "If job_db_id is defined all the other query options should be disabled"
+                exit_with_error_msg(msg)
+            db_id, job_id = get_job_db_ids(job_db_id, job_index)
+            with loading_spinner():
+
+                modified_ids = single_cmd(
+                    job_id=job_id, job_index=job_index, db_id=db_id, **kwargs
+                )
+                if not modified_ids:
+                    exit_with_error_msg("Could not perform the requested operation")
+        else:
+            check_incompatible_opt(
+                {"start_date": start_date, "days": days, "hours": hours}
+            )
+            check_incompatible_opt({"end_date": end_date, "days": days, "hours": hours})
+            metadata_dict = str_to_dict(metadata)
+
+            job_ids_indexes = get_job_ids_indexes(job_ids)
+            start_date = get_start_date(start_date, days, hours)
+
+            if not any(
+                (
+                    job_ids_indexes,
+                    db_ids,
+                    flow_ids,
+                    state,
+                    start_date,
+                    end_date,
+                    name,
+                    metadata,
+                )
+            ):
+                text = Text.from_markup(
+                    "[yellow]No filter has been set. This will apply the change to all "
+                    "the jobs in the DB. Proceed anyway?[/yellow]"
+                )
+
+                confirmed = Confirm.ask(text, default=False)
+                if not confirmed:
+                    raise typer.Exit(0)
+
+            with loading_spinner():
+                modified_ids = multi_cmd(
+                    job_ids=job_ids_indexes,
+                    db_ids=db_ids,
+                    flow_ids=flow_ids,
+                    state=state,
+                    start_date=start_date,
+                    end_date=end_date,
+                    name=name,
+                    metadata=metadata_dict,
+                    raise_on_error=raise_on_error,
+                    **kwargs,
+                )
+
+        if verbosity:
+            print_success_msg(f"Operation completed. Modified jobs: {modified_ids}")
+        else:
+            print_success_msg(f"Operation completed: {len(modified_ids)} jobs modified")
+    except Exception:
+        logger.error("Error executing the operation", exc_info=True)
+
+
+def check_stopped_runner(error: bool = True):
+    cm = get_config_manager()
+    dm = DaemonManager.from_project(cm.get_project())
+    try:
+        with loading_spinner(False) as progress:
+            progress.add_task(description="Checking the Daemon status...", total=None)
+            current_status = dm.check_status()
+
+    except DaemonError as e:
+        exit_with_error_msg(
+            f"Error while checking the status of the daemon: {getattr(e, 'message', str(e))}"
+        )
+    if current_status not in (DaemonStatus.STOPPED, DaemonStatus.SHUT_DOWN):
+        if error:
+            exit_with_error_msg(
+                f"The status of the daemon is {current_status.value}. "
+                "The daemon should not be running while resetting the database"
+            )
+        else:
+            text = Text.from_markup(
+                "[red]The Runner is active. This operation may lead to "
+                "inconsistencies in this case. Proceed anyway?[/red]"
+            )
+
+            confirmed = Confirm.ask(text, default=False)
+            if not confirmed:
+                raise typer.Exit(0)

@@ -5,7 +5,6 @@ from qtoolkit.core.data_objects import QResources
 
 from jobflow_remote.config.base import ConfigError, ExecutionConfig
 from jobflow_remote.config.manager import ConfigManager
-from jobflow_remote.fireworks.convert import flow_to_workflow
 
 
 def submit_flow(
@@ -63,14 +62,12 @@ def submit_flow(
             exec_config_name=exec_config, project_name=project
         )
 
-    wf = flow_to_workflow(
-        flow,
+    jc = proj_obj.get_job_controller()
+
+    jc.add_flow(
+        flow=flow,
         worker=worker,
-        store=store,
         exec_config=exec_config,
         resources=resources,
         allow_external_references=allow_external_references,
     )
-
-    rlpad = proj_obj.get_launchpad()
-    rlpad.add_wf(wf)

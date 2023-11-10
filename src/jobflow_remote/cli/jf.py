@@ -3,8 +3,15 @@ from rich.text import Text
 from typing_extensions import Annotated
 
 from jobflow_remote.cli.jfr_typer import JFRTyper
-from jobflow_remote.cli.utils import exit_with_error_msg, out_console
-from jobflow_remote.config import ConfigError, ConfigManager
+from jobflow_remote.cli.utils import (
+    cleanup_job_controller,
+    exit_with_error_msg,
+    get_config_manager,
+    initialize_config_manager,
+    out_console,
+)
+from jobflow_remote.config import ConfigError
+from jobflow_remote.utils.log import initialize_cli_logger
 
 app = JFRTyper(
     name="jf",
@@ -15,7 +22,7 @@ app = JFRTyper(
 )
 
 
-@app.callback()
+@app.callback(result_callback=cleanup_job_controller)
 def main(
     project: Annotated[
         str,
@@ -41,7 +48,17 @@ def main(
     """
     from jobflow_remote import SETTINGS
 
-    cm = ConfigManager()
+    if full_exc:
+        SETTINGS.cli_full_exc = True
+
+    initialize_cli_logger(
+        level=SETTINGS.cli_log_level.to_logging(), full_exc_info=SETTINGS.cli_full_exc
+    )
+
+    # initialize the ConfigManager only once, to avoid parsing the configuration
+    # files multiple times when the command is executed.
+    initialize_config_manager()
+    cm = get_config_manager()
     if project:
         if project not in cm.projects_data:
             exit_with_error_msg(
@@ -49,9 +66,6 @@ def main(
             )
 
         SETTINGS.project = project
-
-    if full_exc:
-        SETTINGS.cli_full_exc = True
 
     try:
         project_data = cm.get_project_data()

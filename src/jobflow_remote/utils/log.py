@@ -4,26 +4,24 @@ import logging
 import logging.config
 from pathlib import Path
 
+from monty.os import makedirs_p
+
 
 def initialize_runner_logger(log_folder: str | Path, level: int = logging.INFO):
-    """Initialize the default logger.
+    """
+    Initialize the runner logger.
 
     Parameters
     ----------
     level
         The log level.
-
-    Returns
-    -------
-    Logger
-        A logging instance with customized formatter and handlers.
     """
 
-    # TODO expose other configuration options?
-
-    # TODO if the directory it is not present it does not initialize the logger with
-    # an unclear error message. It may be worth leaving this:
-    # makedirs_p(log_folder)
+    # If the directory it is not present it does not initialize the logger with
+    # an unclear error message. Since this is only for the runner logger
+    # it should not be a problem to check that the directory exists when the
+    # runner is started.
+    makedirs_p(log_folder)
 
     config = {
         "version": 1,
@@ -60,3 +58,56 @@ def initialize_runner_logger(log_folder: str | Path, level: int = logging.INFO):
     }
 
     logging.config.dictConfig(config)
+
+
+def initialize_cli_logger(level: int = logging.WARNING, full_exc_info: bool = True):
+    """
+    Initialize the logger for the CLI based on rich.
+
+    Parameters
+    ----------
+    level
+        The log level.
+    """
+
+    config = {
+        "version": 1,
+        "disable_existing_loggers": True,
+        "formatters": {
+            # "standard": {"format": "%(message)s", "datefmt": "[%X]"},
+            "cli_formatter": {
+                "()": lambda: CLIFormatter(
+                    log_exception_trace=full_exc_info, datefmt="[%X]"
+                ),
+            }
+        },
+        "handlers": {
+            "rich": {
+                "class": "rich.logging.RichHandler",
+                "level": level,
+                "formatter": "cli_formatter",
+                "show_path": False,
+            },
+        },
+        "loggers": {
+            "jobflow_remote": {  # root logger
+                "handlers": ["rich"],
+                "level": level,
+                "propagate": False,
+            },
+        },
+    }
+
+    logging.config.dictConfig(config)
+
+
+class CLIFormatter(logging.Formatter):
+    def __init__(self, log_exception_trace: bool = True, **kwargs):
+        super().__init__(**kwargs)
+        self.log_exception_trace = log_exception_trace
+
+    def formatException(self, ei):
+        if self.log_exception_trace:
+            return super().formatException(ei)
+        else:
+            return f"{ei[0].__name__}: {str(ei[1])}"

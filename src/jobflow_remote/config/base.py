@@ -8,10 +8,10 @@ from pathlib import Path
 from typing import Annotated, Literal
 
 from jobflow import JobStore
+from maggma.stores import MongoStore
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from qtoolkit.io import BaseSchedulerIO, scheduler_mapping
 
-from jobflow_remote.fireworks.launchpad import RemoteLaunchPad
 from jobflow_remote.remote.host import BaseHost, LocalHost, RemoteHost
 from jobflow_remote.utils.data import store_from_dict
 
@@ -107,6 +107,10 @@ class WorkerBase(BaseModel):
     Base class defining the common field for the different types of Worker.
     """
 
+    type: str = Field(
+        description="The discriminator field to determine the worker type"
+    )
+
     scheduler_type: str = Field(
         description="Type of the scheduler. Depending on the values supported by QToolKit"
     )
@@ -131,6 +135,10 @@ class WorkerBase(BaseModel):
         60,
         description="Timeout for the execution of the commands in the worker "
         "(e.g. submitting a job)",
+    )
+    max_jobs: int | None = Field(
+        None,
+        description="The maximum number of jobs that can be submitted to the queue.",
     )
     model_config = ConfigDict(extra="forbid")
 
@@ -379,7 +387,8 @@ class Project(BaseModel):
         default_factory=dict,
         description="Dictionary describing a maggma Store used for the queue data. "
         "Can contain the monty serialized dictionary or a dictionary with a 'type' "
-        "specifying the Store subclass",
+        "specifying the Store subclass. Should be subclass of a MongoStore, as it "
+        "requires to perform MongoDB actions.",
         validate_default=True,
     )
     exec_config: dict[str, ExecutionConfig] = Field(
@@ -422,15 +431,32 @@ class Project(BaseModel):
         """
         return store_from_dict(self.queue)
 
-    def get_launchpad(self) -> RemoteLaunchPad:
+    # def get_launchpad(self) -> RemoteLaunchPad:
+    #     """
+    #     Provide an instance of a RemoteLaunchPad based on the queue Store.
+    #
+    #     Returns
+    #     -------
+    #     A RemoteLaunchPad
+    #     """
+    #     return RemoteLaunchPad(self.get_queue_store())
+
+    def get_jobs_queue(self):
         """
-        Provide an instance of a RemoteLaunchPad based on the queue Store.
+        Provide an instance of the Queue object to manage jobs based on the queue store.
 
         Returns
         -------
-        A RemoteLaunchPad
+        A Queue
         """
-        return RemoteLaunchPad(self.get_queue_store())
+        from jobflow_remote.queue.queue import Queue
+
+        return Queue(self.get_queue_store())
+
+    def get_job_controller(self):
+        from jobflow_remote.jobs.jobcontroller import JobController
+
+        return JobController.from_project(self)
 
     @field_validator("base_dir")
     def check_base_dir(cls, base_dir: str, values: dict) -> str:
@@ -494,11 +520,13 @@ class Project(BaseModel):
         """
         if queue:
             try:
-                store_from_dict(queue)
+                store = store_from_dict(queue)
             except Exception as e:
                 raise ValueError(
                     f"error while converting queue to a maggma store. Error: {traceback.format_exc()}"
                 ) from e
+            if not isinstance(store, MongoStore):
+                raise ValueError("The queue store should be a subclass of a MongoStore")
         return queue
 
     model_config = ConfigDict(extra="forbid")

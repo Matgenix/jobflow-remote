@@ -5,6 +5,8 @@ from pathlib import Path
 from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from jobflow_remote.config.base import LogLevel
+
 DEFAULT_PROJECTS_FOLDER = Path("~/.jfremote").expanduser().as_posix()
 
 DEFAULT_CONFIG_FILE_PATH = Path("~/.jfremote.yaml").expanduser().as_posix()
@@ -27,6 +29,10 @@ class JobflowRemoteSettings(BaseSettings):
     cli_suggestions: bool = Field(
         True, description="If True prints some suggestions in the CLI commands."
     )
+    cli_log_level: LogLevel = Field(
+        LogLevel.WARN, description="The level set for logging in the CLI"
+    )
+
     model_config = SettingsConfigDict(env_prefix="jfremote_")
 
     @model_validator(mode="before")

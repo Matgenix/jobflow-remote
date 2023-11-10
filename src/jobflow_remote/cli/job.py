@@ -2,6 +2,7 @@ import io
 from pathlib import Path
 
 import typer
+from qtoolkit.core.data_objects import QResources
 from typing_extensions import Annotated
 
 from jobflow_remote import SETTINGS
@@ -9,6 +10,7 @@ from jobflow_remote.cli.formatting import format_job_info, get_job_info_table
 from jobflow_remote.cli.jf import app
 from jobflow_remote.cli.jfr_typer import JFRTyper
 from jobflow_remote.cli.types import (
+    break_lock_opt,
     days_opt,
     db_ids_opt,
     end_date_opt,
@@ -17,35 +19,36 @@ from jobflow_remote.cli.types import (
     job_db_id_arg,
     job_ids_indexes_opt,
     job_index_arg,
+    job_state_arg,
     job_state_opt,
     locked_opt,
     max_results_opt,
     metadata_opt,
     name_opt,
     query_opt,
-    remote_state_arg,
-    remote_state_opt,
+    raise_on_error_opt,
     reverse_sort_flag_opt,
     sort_opt,
     start_date_opt,
     verbosity_opt,
+    wait_lock_opt,
 )
 from jobflow_remote.cli.utils import (
     SortOption,
     check_incompatible_opt,
-    convert_metadata,
+    check_stopped_runner,
+    execute_multi_jobs_cmd,
     exit_with_error_msg,
-    exit_with_warning_msg,
+    get_config_manager,
+    get_job_controller,
     get_job_db_ids,
     get_job_ids_indexes,
     get_start_date,
     loading_spinner,
     out_console,
     print_success_msg,
+    str_to_dict,
 )
-from jobflow_remote.config import ConfigManager
-from jobflow_remote.jobs.jobcontroller import JobController
-from jobflow_remote.jobs.state import RemoteState
 from jobflow_remote.remote.queue import ERR_FNAME, OUT_FNAME
 
 app_job = JFRTyper(
@@ -60,7 +63,6 @@ def jobs_list(
     db_id: db_ids_opt = None,
     flow_id: flow_ids_opt = None,
     state: job_state_opt = None,
-    remote_state: remote_state_opt = None,
     start_date: start_date_opt = None,
     end_date: end_date_opt = None,
     name: name_opt = None,
@@ -77,14 +79,13 @@ def jobs_list(
     """
     Get the list of Jobs in the database
     """
-    check_incompatible_opt({"state": state, "remote-state": remote_state})
     check_incompatible_opt({"start_date": start_date, "days": days, "hours": hours})
     check_incompatible_opt({"end_date": end_date, "days": days, "hours": hours})
-    metadata_dict = convert_metadata(metadata)
+    metadata_dict = str_to_dict(metadata)
 
     job_ids_indexes = get_job_ids_indexes(job_id)
 
-    jc = JobController()
+    jc = get_job_controller()
 
     start_date = get_start_date(start_date, days, hours)
 
@@ -103,7 +104,6 @@ def jobs_list(
                 db_ids=db_id,
                 flow_ids=flow_id,
                 state=state,
-                remote_state=remote_state,
                 start_date=start_date,
                 locked=locked,
                 end_date=end_date,
@@ -122,11 +122,11 @@ def jobs_list(
                 f"The number of Jobs printed may be limited by the maximum selected: {max_results}",
                 style="yellow",
             )
-        if any(ji.retry_time_limit is not None for ji in jobs_info):
+        if any(ji.remote.retry_time_limit is not None for ji in jobs_info):
             text = (
-                "Some jobs (remote state in red) have failed while interacting with"
+                "Some jobs (state in red) have failed while interacting with"
                 " the worker, but will be retried again.\nGet more information about"
-                " the error with 'jf job info -err JOB_ID'"
+                " the error with 'jf job info JOB_ID'"
             )
             out_console.print(text, style="yellow")
 
@@ -140,7 +140,7 @@ def job_info(
         typer.Option(
             "--with-error",
             "-err",
-            help="Also fetch and display information about errors",
+            help="DEPRECATED: not needed anymore to fetch errors",
         ),
     ] = False,
     show_none: Annotated[
@@ -158,15 +158,20 @@ def job_info(
 
     db_id, job_id = get_job_db_ids(job_db_id, job_index)
 
+    if with_error:
+        out_console.print(
+            "The --with-error option is deprecated and not needed anymore to show error messages",
+            style="yellow",
+        )
+
     with loading_spinner():
 
-        jc = JobController()
+        jc = get_job_controller()
 
         job_info = jc.get_job_info(
             job_id=job_id,
             job_index=job_index,
             db_id=db_id,
-            full=with_error,
         )
     if not job_info:
         exit_with_error_msg("No data matching the request")
@@ -175,75 +180,22 @@ def job_info(
 
 
 @app_job.command()
-def reset_failed(
+def set_state(
+    state: job_state_arg,
     job_db_id: job_db_id_arg,
     job_index: job_index_arg = None,
 ):
     """
-    For a job with a FAILED remote state reset it to the previous state
+    Sets the state of a Job to an arbitrary value.
+    WARNING: No checks. This can lead to inconsistencies in the DB. Use with care
     """
 
     db_id, job_id = get_job_db_ids(job_db_id, job_index)
 
     with loading_spinner():
-        jc = JobController()
+        jc = get_job_controller()
 
-        succeeded = jc.reset_failed_state(
-            job_id=job_id,
-            job_index=job_index,
-            db_id=db_id,
-        )
-
-    if not succeeded:
-        exit_with_error_msg("Could not reset failed state")
-
-    print_success_msg()
-
-
-@app_job.command()
-def reset_remote_attempts(
-    job_db_id: job_db_id_arg,
-    job_index: job_index_arg = None,
-):
-    """
-    Resets the number of attempts to perform a remote action and eliminates
-    the delay in retrying. This will not restore a Job from its failed state.
-    """
-
-    db_id, job_id = get_job_db_ids(job_db_id, job_index)
-
-    with loading_spinner():
-        jc = JobController()
-
-        succeeded = jc.reset_remote_attempts(
-            job_id=job_id,
-            job_index=job_index,
-            db_id=db_id,
-        )
-
-    if not succeeded:
-        exit_with_error_msg("Could not reset the remote attempts")
-
-    print_success_msg()
-
-
-@app_job.command()
-def set_remote_state(
-    state: remote_state_arg,
-    job_db_id: job_db_id_arg,
-    job_index: job_index_arg = None,
-):
-    """
-    Sets the remote state to an arbitrary value.
-    WARNING: this can lead to inconsistencies in the DB. Use with care
-    """
-
-    db_id, job_id = get_job_db_ids(job_db_id, job_index)
-
-    with loading_spinner():
-        jc = JobController()
-
-        succeeded = jc.set_remote_state(
+        succeeded = jc.set_job_state(
             state=state,
             job_id=job_id,
             job_index=job_index,
@@ -258,33 +210,261 @@ def set_remote_state(
 
 @app_job.command()
 def rerun(
+    job_db_id: job_db_id_arg = None,
+    job_index: job_index_arg = None,
     job_id: job_ids_indexes_opt = None,
     db_id: db_ids_opt = None,
+    flow_id: flow_ids_opt = None,
     state: job_state_opt = None,
-    remote_state: remote_state_opt = None,
     start_date: start_date_opt = None,
     end_date: end_date_opt = None,
+    name: name_opt = None,
+    metadata: metadata_opt = None,
+    days: days_opt = None,
+    hours: hours_opt = None,
+    verbosity: verbosity_opt = 0,
+    wait: wait_lock_opt = None,
+    break_lock: break_lock_opt = False,
+    force: Annotated[
+        bool,
+        typer.Option(
+            "--force",
+            "-f",
+            help=(
+                "Force the rerun even if some conditions would normally prevent it (e.g. "
+                "state usually not allowed or children already executed). Can lead to "
+                "inconsistencies. Advanced users."
+            ),
+        ),
+    ] = False,
+    raise_on_error: raise_on_error_opt = False,
 ):
     """
-    Rerun Jobs
+    Rerun a Job. By default, this is limited to jobs that failed and children did
+    not start or jobs that are running. The rerun Job is set to READY and children
+    Jobs to WAITING. If possible, the associated job submitted to the remote queue
+    will be cancelled. Most of the limitations can be overridden by the 'force'
+    option. This could lead to inconsistencies in the overall state of the Jobs of
+    the Flow.
     """
-    check_incompatible_opt({"state": state, "remote-state": remote_state})
+    if force or break_lock:
+        check_stopped_runner(error=False)
 
-    job_ids_indexes = get_job_ids_indexes(job_id)
+    jc = get_job_controller()
 
-    jc = JobController()
+    execute_multi_jobs_cmd(
+        single_cmd=jc.rerun_job,
+        multi_cmd=jc.rerun_jobs,
+        job_db_id=job_db_id,
+        job_index=job_index,
+        job_ids=job_id,
+        db_ids=db_id,
+        flow_ids=flow_id,
+        state=state,
+        start_date=start_date,
+        end_date=end_date,
+        name=name,
+        metadata=metadata,
+        days=days,
+        hours=hours,
+        verbosity=verbosity,
+        wait=wait,
+        break_lock=break_lock,
+        force=force,
+        raise_on_error=raise_on_error,
+    )
 
-    with loading_spinner():
-        fw_ids = jc.rerun_jobs(
-            job_ids=job_ids_indexes,
-            db_ids=db_id,
-            state=state,
-            remote_state=remote_state,
-            start_date=start_date,
-            end_date=end_date,
-        )
 
-    out_console.print(f"{len(fw_ids)} Jobs were rerun: {fw_ids}")
+@app_job.command()
+def retry(
+    job_db_id: job_db_id_arg = None,
+    job_index: job_index_arg = None,
+    job_id: job_ids_indexes_opt = None,
+    db_id: db_ids_opt = None,
+    flow_id: flow_ids_opt = None,
+    state: job_state_opt = None,
+    start_date: start_date_opt = None,
+    end_date: end_date_opt = None,
+    name: name_opt = None,
+    metadata: metadata_opt = None,
+    days: days_opt = None,
+    hours: hours_opt = None,
+    verbosity: verbosity_opt = 0,
+    wait: wait_lock_opt = None,
+    break_lock: break_lock_opt = False,
+    raise_on_error: raise_on_error_opt = False,
+):
+    """
+    Retry to perform the operation that failed for a job in a REMOTE_ERROR state
+    or reset the number of attempts at remote action, in order to allow the
+    runner to try it again immediately.
+    """
+    if break_lock:
+        check_stopped_runner(error=False)
+
+    jc = get_job_controller()
+
+    execute_multi_jobs_cmd(
+        single_cmd=jc.retry_job,
+        multi_cmd=jc.retry_jobs,
+        job_db_id=job_db_id,
+        job_index=job_index,
+        job_ids=job_id,
+        db_ids=db_id,
+        flow_ids=flow_id,
+        state=state,
+        start_date=start_date,
+        end_date=end_date,
+        name=name,
+        metadata=metadata,
+        days=days,
+        hours=hours,
+        verbosity=verbosity,
+        wait=wait,
+        break_lock=break_lock,
+        raise_on_error=raise_on_error,
+    )
+
+
+@app_job.command()
+def pause(
+    job_db_id: job_db_id_arg = None,
+    job_index: job_index_arg = None,
+    job_id: job_ids_indexes_opt = None,
+    db_id: db_ids_opt = None,
+    flow_id: flow_ids_opt = None,
+    state: job_state_opt = None,
+    start_date: start_date_opt = None,
+    end_date: end_date_opt = None,
+    name: name_opt = None,
+    metadata: metadata_opt = None,
+    days: days_opt = None,
+    hours: hours_opt = None,
+    verbosity: verbosity_opt = 0,
+    wait: wait_lock_opt = None,
+    raise_on_error: raise_on_error_opt = False,
+):
+    """
+    Pause a Job. Only READY and WAITING Jobs can be paused. The operation is reversible.
+    """
+
+    jc = get_job_controller()
+
+    execute_multi_jobs_cmd(
+        single_cmd=jc.pause_job,
+        multi_cmd=jc.pause_jobs,
+        job_db_id=job_db_id,
+        job_index=job_index,
+        job_ids=job_id,
+        db_ids=db_id,
+        flow_ids=flow_id,
+        state=state,
+        start_date=start_date,
+        end_date=end_date,
+        name=name,
+        metadata=metadata,
+        days=days,
+        hours=hours,
+        verbosity=verbosity,
+        wait=wait,
+        raise_on_error=raise_on_error,
+    )
+
+
+@app_job.command()
+def play(
+    job_db_id: job_db_id_arg = None,
+    job_index: job_index_arg = None,
+    job_id: job_ids_indexes_opt = None,
+    db_id: db_ids_opt = None,
+    flow_id: flow_ids_opt = None,
+    state: job_state_opt = None,
+    start_date: start_date_opt = None,
+    end_date: end_date_opt = None,
+    name: name_opt = None,
+    metadata: metadata_opt = None,
+    days: days_opt = None,
+    hours: hours_opt = None,
+    verbosity: verbosity_opt = 0,
+    wait: wait_lock_opt = None,
+    raise_on_error: raise_on_error_opt = False,
+):
+    """
+    Resume a Job that was previously PAUSED.
+    """
+
+    jc = get_job_controller()
+
+    execute_multi_jobs_cmd(
+        single_cmd=jc.play_job,
+        multi_cmd=jc.play_jobs,
+        job_db_id=job_db_id,
+        job_index=job_index,
+        job_ids=job_id,
+        db_ids=db_id,
+        flow_ids=flow_id,
+        state=state,
+        start_date=start_date,
+        end_date=end_date,
+        name=name,
+        metadata=metadata,
+        days=days,
+        hours=hours,
+        verbosity=verbosity,
+        wait=wait,
+        raise_on_error=raise_on_error,
+    )
+
+
+@app_job.command()
+def cancel(
+    job_db_id: job_db_id_arg = None,
+    job_index: job_index_arg = None,
+    job_id: job_ids_indexes_opt = None,
+    db_id: db_ids_opt = None,
+    flow_id: flow_ids_opt = None,
+    state: job_state_opt = None,
+    start_date: start_date_opt = None,
+    end_date: end_date_opt = None,
+    name: name_opt = None,
+    metadata: metadata_opt = None,
+    days: days_opt = None,
+    hours: hours_opt = None,
+    verbosity: verbosity_opt = 0,
+    wait: wait_lock_opt = None,
+    break_lock: break_lock_opt = False,
+    raise_on_error: raise_on_error_opt = False,
+):
+    """
+    Cancel a Job. Only Jobs that did not complete or had an error can be cancelled.
+    The operation is irreversible.
+    If possible, the associated job submitted to the remote queue will be cancelled.
+    """
+    if break_lock:
+        check_stopped_runner(error=False)
+
+    jc = get_job_controller()
+
+    execute_multi_jobs_cmd(
+        single_cmd=jc.cancel_job,
+        multi_cmd=jc.cancel_jobs,
+        job_db_id=job_db_id,
+        job_index=job_index,
+        job_ids=job_id,
+        db_ids=db_id,
+        flow_ids=flow_id,
+        state=state,
+        start_date=start_date,
+        end_date=end_date,
+        name=name,
+        metadata=metadata,
+        days=days,
+        hours=hours,
+        verbosity=verbosity,
+        wait=wait,
+        break_lock=break_lock,
+        raise_on_error=raise_on_error,
+    )
 
 
 @app_job.command()
@@ -298,9 +478,11 @@ def queue_out(
 
     db_id, job_id = get_job_db_ids(job_db_id, job_index)
 
+    cm = get_config_manager()
+
     with loading_spinner(processing=False) as progress:
         progress.add_task(description="Retrieving info...", total=None)
-        jc = JobController()
+        jc = get_job_controller()
 
         job_info = jc.get_job_info(
             job_id=job_id,
@@ -310,20 +492,6 @@ def queue_out(
 
     if not job_info:
         exit_with_error_msg("No data matching the request")
-
-    if job_info.remote_state not in (
-        RemoteState.RUNNING,
-        RemoteState.TERMINATED,
-        RemoteState.DOWNLOADED,
-        RemoteState.COMPLETED,
-        RemoteState.FAILED,
-    ):
-        remote_state_str = (
-            f"[{job_info.remote_state.value}]" if job_info.remote_state else ""
-        )
-        exit_with_warning_msg(
-            f"The Job is in state {job_info.state.value}{remote_state_str} and the queue output will not be present"
-        )
 
     remote_dir = job_info.run_dir
 
@@ -335,7 +503,6 @@ def queue_out(
     err_error = None
     with loading_spinner(processing=False) as progress:
         progress.add_task(description="Retrieving files...", total=None)
-        cm = ConfigManager()
         worker = cm.get_worker(job_info.worker)
         host = worker.get_host()
 
@@ -376,3 +543,180 @@ def queue_out(
     else:
         out_console.print(f"Queue error from {str(err_path)}:\n")
         out_console.print(err)
+
+
+app_job_set = JFRTyper(
+    name="set", help="Commands for managing the jobs", no_args_is_help=True
+)
+app_job.add_typer(app_job_set)
+
+
+@app_job_set.command()
+def worker(
+    worker_name: Annotated[
+        str,
+        typer.Argument(
+            help="The name of the worker",
+            metavar="WORKER",
+        ),
+    ],
+    job_id: job_ids_indexes_opt = None,
+    db_id: db_ids_opt = None,
+    flow_id: flow_ids_opt = None,
+    state: job_state_opt = None,
+    start_date: start_date_opt = None,
+    end_date: end_date_opt = None,
+    name: name_opt = None,
+    metadata: metadata_opt = None,
+    days: days_opt = None,
+    hours: hours_opt = None,
+    verbosity: verbosity_opt = 0,
+    raise_on_error: raise_on_error_opt = False,
+):
+    """
+    Set the worker for the selected Jobs. Only READY or WAITING Jobs.
+    """
+
+    jc = get_job_controller()
+    execute_multi_jobs_cmd(
+        single_cmd=jc.set_job_run_properties,
+        multi_cmd=jc.set_job_run_properties,
+        job_db_id=None,
+        job_index=None,
+        job_ids=job_id,
+        db_ids=db_id,
+        flow_ids=flow_id,
+        state=state,
+        start_date=start_date,
+        end_date=end_date,
+        name=name,
+        metadata=metadata,
+        days=days,
+        hours=hours,
+        verbosity=verbosity,
+        raise_on_error=raise_on_error,
+        worker=worker_name,
+    )
+
+
+@app_job_set.command()
+def exec_config(
+    exec_config_value: Annotated[
+        str,
+        typer.Argument(
+            help="The name of the exec_config",
+            metavar="EXEC_CONFIG",
+        ),
+    ],
+    job_id: job_ids_indexes_opt = None,
+    db_id: db_ids_opt = None,
+    flow_id: flow_ids_opt = None,
+    state: job_state_opt = None,
+    start_date: start_date_opt = None,
+    end_date: end_date_opt = None,
+    name: name_opt = None,
+    metadata: metadata_opt = None,
+    days: days_opt = None,
+    hours: hours_opt = None,
+    verbosity: verbosity_opt = 0,
+    raise_on_error: raise_on_error_opt = False,
+):
+    """
+    Set the exec_config for the selected Jobs. Only READY or WAITING Jobs.
+    """
+
+    jc = get_job_controller()
+    execute_multi_jobs_cmd(
+        single_cmd=jc.set_job_run_properties,
+        multi_cmd=jc.set_job_run_properties,
+        job_db_id=None,
+        job_index=None,
+        job_ids=job_id,
+        db_ids=db_id,
+        flow_ids=flow_id,
+        state=state,
+        start_date=start_date,
+        end_date=end_date,
+        name=name,
+        metadata=metadata,
+        days=days,
+        hours=hours,
+        verbosity=verbosity,
+        raise_on_error=raise_on_error,
+        exec_config_value=exec_config_value,
+    )
+
+
+@app_job_set.command()
+def resources(
+    resources_value: Annotated[
+        str,
+        typer.Argument(
+            help="The resources to be specified. Can be either a list of"
+            "comma separated key=value pairs or a string with the JSON "
+            "representation of a dictionary "
+            '(e.g \'{"key1.key2": 1, "key3": "test"}\')',
+            metavar="EXEC_CONFIG",
+        ),
+    ],
+    replace: Annotated[
+        bool,
+        typer.Option(
+            "--replace",
+            "-r",
+            help="If present the value will replace entirely those present "
+            "instead of updating the DB, otherwise only the selected keys "
+            "will be updated",
+        ),
+    ] = False,
+    qresources: Annotated[
+        bool,
+        typer.Option(
+            "--qresources",
+            "-qr",
+            help="If present the values will be interpreted as arguments for a QResources object",
+        ),
+    ] = False,
+    job_id: job_ids_indexes_opt = None,
+    db_id: db_ids_opt = None,
+    flow_id: flow_ids_opt = None,
+    state: job_state_opt = None,
+    start_date: start_date_opt = None,
+    end_date: end_date_opt = None,
+    name: name_opt = None,
+    metadata: metadata_opt = None,
+    days: days_opt = None,
+    hours: hours_opt = None,
+    verbosity: verbosity_opt = 0,
+    raise_on_error: raise_on_error_opt = False,
+):
+    """
+    Set the worker for the selected Jobs. Only READY or WAITING Jobs.
+    """
+
+    resources_value = str_to_dict(resources_value)
+
+    if qresources:
+        resources_value = QResources(**resources_value)
+
+    jc = get_job_controller()
+    execute_multi_jobs_cmd(
+        single_cmd=jc.set_job_run_properties,
+        multi_cmd=jc.set_job_run_properties,
+        job_db_id=None,
+        job_index=None,
+        job_ids=job_id,
+        db_ids=db_id,
+        flow_ids=flow_id,
+        state=state,
+        start_date=start_date,
+        end_date=end_date,
+        name=name,
+        metadata=metadata,
+        days=days,
+        hours=hours,
+        verbosity=verbosity,
+        raise_on_error=raise_on_error,
+        resources=resources_value,
+        update=not replace,
+    )

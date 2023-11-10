@@ -7,16 +7,15 @@ import signal
 import time
 import traceback
 import uuid
-import warnings
 from collections import defaultdict, namedtuple
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 
-from fireworks import Firework, FWorker
+from fireworks import FWorker
 from monty.os import makedirs_p
-from monty.serialization import loadfn
 from qtoolkit.core.data_objects import QState, SubmissionStatus
 
+from jobflow_remote import JobController
 from jobflow_remote.config.base import (
     ConfigError,
     ExecutionConfig,
@@ -26,26 +25,16 @@ from jobflow_remote.config.base import (
     WorkerBase,
 )
 from jobflow_remote.config.manager import ConfigManager
-from jobflow_remote.fireworks.launcher import rapidfire_checkout
-from jobflow_remote.fireworks.launchpad import (
-    FW_UUID_PATH,
-    REMOTE_DOC_PATH,
-    RemoteLaunchPad,
-    get_job_doc,
-    get_remote_doc,
-)
-from jobflow_remote.fireworks.tasks import RemoteJobFiretask
-from jobflow_remote.jobs.state import RemoteState
+from jobflow_remote.jobs.data import IN_FILENAME, OUT_FILENAME, JobDoc, RemoteError
+from jobflow_remote.jobs.state import JobState
 from jobflow_remote.remote.data import (
     get_job_path,
-    get_remote_files,
+    get_remote_in_file,
     get_remote_store,
     get_remote_store_filenames,
 )
 from jobflow_remote.remote.host import BaseHost
 from jobflow_remote.remote.queue import ERR_FNAME, OUT_FNAME, QueueManager, set_name_out
-from jobflow_remote.utils.data import deep_merge_dict
-from jobflow_remote.utils.db import MongoLock
 from jobflow_remote.utils.log import initialize_runner_logger
 
 logger = logging.getLogger(__name__)
@@ -69,7 +58,7 @@ class Runner:
         self.config_manager: ConfigManager = ConfigManager()
         self.project_name = project_name
         self.project: Project = self.config_manager.get_project(project_name)
-        self.rlpad: RemoteLaunchPad = self.project.get_launchpad()
+        self.job_controller: JobController = JobController.from_project(self.project)
         self.fworker: FWorker = FWorker()
         self.workers: dict[str, WorkerBase] = self.project.workers
         # Build the dictionary of hosts. The reference is the worker name.
@@ -89,6 +78,10 @@ class Runner:
             log_folder=self.project.log_dir,
             level=log_level.to_logging(),
         )
+        # TODO it could be better to create a pool of stores that are connected
+        # How to deal with cases where the connection gets closed?
+        # how to deal with file based stores?
+        self.jobstore = self.project.get_jobstore()
 
     @property
     def runner_options(self) -> RunnerOptions:
@@ -119,28 +112,8 @@ class Runner:
             )
         return self.queue_managers[worker_name]
 
-    def get_fw_data(self, fw_doc: dict) -> JobFWData:
-        # remove the launches to be able to create the FW instance without
-        # accessing the DB again
-        fw_doc_no_launches = dict(fw_doc)
-        fw_doc_no_launches["launches"] = []
-        fw_doc_no_launches["archived_launches"] = []
-        fw = Firework.from_dict(fw_doc_no_launches)
-        task = fw.tasks[0]
-        if len(fw.tasks) != 1 and not isinstance(task, RemoteJobFiretask):
-            raise RuntimeError(f"jobflow-remote cannot handle task {task}")
-        job = task.get("job")
-        store = task.get("store")
-        original_store = store
-        if store is None:
-            store = self.project.get_jobstore()
-        worker_name = task["worker"]
-        worker = self.get_worker(worker_name)
-        host = self.get_host(worker_name)
-
-        return JobFWData(
-            fw, task, job, store, worker_name, worker, host, original_store
-        )
+    def get_store(self, job_doc: JobDoc):
+        return job_doc.store or self.jobstore
 
     def run(self):
         signal.signal(signal.SIGTERM, self.handle_signal)
@@ -170,13 +143,7 @@ class Runner:
                     or last_advance_status + self.runner_options.delay_advance_status
                     < now
                 ):
-                    states = [
-                        RemoteState.CHECKED_OUT.value,
-                        RemoteState.UPLOADED.value,
-                        RemoteState.TERMINATED.value,
-                        RemoteState.DOWNLOADED.value,
-                    ]
-                    updated = self.lock_and_update(states)
+                    updated = self.advance_state()
                     wait_advance_status = not updated
                     if not updated:
                         last_advance_status = time.time()
@@ -185,148 +152,48 @@ class Runner:
         finally:
             self.cleanup()
 
-    def lock_and_update(
-        self,
-        states,
-        job_id=None,
-        additional_filter=None,
-        update=None,
-        timeout=None,
-        **kwargs,
-    ):
-        if not isinstance(states, (list, tuple)):
-            states = tuple(states)
+    def advance_state(self):
+        states = [
+            JobState.CHECKED_OUT.value,
+            JobState.UPLOADED.value,
+            JobState.TERMINATED.value,
+            JobState.DOWNLOADED.value,
+        ]
 
         states_methods = {
-            RemoteState.CHECKED_OUT: self.upload,
-            RemoteState.UPLOADED: self.submit,
-            RemoteState.TERMINATED: self.download,
-            RemoteState.DOWNLOADED: self.complete_launch,
+            JobState.CHECKED_OUT: self.upload,
+            JobState.UPLOADED: self.submit,
+            JobState.TERMINATED: self.download,
+            JobState.DOWNLOADED: self.complete_job,
         }
 
-        db_filter = {
-            f"{REMOTE_DOC_PATH}.state": {"$in": states},
-            f"{REMOTE_DOC_PATH}.retry_time_limit": {"$not": {"$gt": datetime.utcnow()}},
-        }
-        if job_id is not None:
-            db_filter[FW_UUID_PATH] = job_id
-        if additional_filter:
-            db_filter = deep_merge_dict(db_filter, additional_filter)
-
-        collection = self.rlpad.fireworks
-        with MongoLock(
-            collection=collection,
-            filter=db_filter,
-            update=update,
-            timeout=timeout,
-            lock_id=self.runner_id,
-            lock_subdoc=REMOTE_DOC_PATH,
-            **kwargs,
+        with self.job_controller.lock_job_for_update(
+            states=states,
+            max_step_attempts=self.runner_options.max_step_attempts,
+            delta_retry=self.runner_options.delta_retry,
         ) as lock:
             doc = lock.locked_document
             if not doc:
                 return False
-            remote_doc = get_remote_doc(doc)
-            if not remote_doc:
-                return False
 
-            state = RemoteState(remote_doc["state"])
+            state = JobState(doc["state"])
 
-            function = states_methods[state]
+            states_methods[state](lock)
+            return True
 
-            fail_now = False
-            set_output = None
-            try:
-                error, fail_now, set_output = function(doc)
-            except ConfigError:
-                error = traceback.format_exc()
-                warnings.warn(error)
-                fail_now = True
-            except Exception:
-                error = traceback.format_exc()
-                warnings.warn(error)
+    def upload(self, lock):
+        doc = lock.locked_document
+        db_id = doc["db_id"]
+        logger.debug(f"upload db_id: {db_id}")
 
-            lock.update_on_release = self._prepare_lock_update(
-                doc, error, fail_now, set_output, state.next
-            )
+        job_doc = JobDoc(**doc)
+        job = job_doc.job
 
-        return True
-
-    def _prepare_lock_update(
-        self,
-        doc: dict,
-        error: str,
-        fail_now: bool,
-        set_output: dict | None,
-        next_state: RemoteState,
-    ):
-        """
-        Helper function for preparing the update_on_release for the lock.
-        Handle the different cases of failures and the retry attempts.
-
-        Parameters
-        ----------
-        doc
-        error
-        fail_now
-        set_output
-        next_state
-
-        Returns
-        -------
-
-        """
-        update_on_release = {}
-        if not error:
-            # the state.next.value is correct as SUBMITTED is not dealt with here.
-            succeeded_update = {
-                "$set": {
-                    f"{REMOTE_DOC_PATH}.state": next_state.value,
-                    f"{REMOTE_DOC_PATH}.step_attempts": 0,
-                    f"{REMOTE_DOC_PATH}.retry_time_limit": None,
-                    f"{REMOTE_DOC_PATH}.error": None,
-                }
-            }
-            update_on_release = deep_merge_dict(succeeded_update, set_output or {})
-        else:
-            remote_doc = get_remote_doc(doc)
-            step_attempts = remote_doc["step_attempts"]
-            fail_now = (
-                fail_now or step_attempts >= self.runner_options.max_step_attempts
-            )
-            if fail_now:
-                update_on_release = {
-                    "$set": {
-                        f"{REMOTE_DOC_PATH}.state": RemoteState.FAILED.value,
-                        f"{REMOTE_DOC_PATH}.previous_state": remote_doc["state"],
-                        f"{REMOTE_DOC_PATH}.error": error,
-                    }
-                }
-            else:
-                step_attempts += 1
-                delta = self.runner_options.get_delta_retry(step_attempts)
-                retry_time_limit = datetime.utcnow() + timedelta(seconds=delta)
-                update_on_release = {
-                    "$set": {
-                        f"{REMOTE_DOC_PATH}.step_attempts": step_attempts,
-                        f"{REMOTE_DOC_PATH}.retry_time_limit": retry_time_limit,
-                        f"{REMOTE_DOC_PATH}.error": error,
-                    }
-                }
-        if "$set" in update_on_release:
-            update_on_release["$set"]["updated_on"] = datetime.utcnow().isoformat()
-            self.ping_wf_doc(doc["fw_id"])
-
-        return update_on_release
-
-    def upload(self, doc):
-        fw_id = doc["fw_id"]
-        remote_doc = get_remote_doc(doc)
-        logger.debug(f"upload fw_id: {fw_id}")
-        fw_job_data = self.get_fw_data(doc)
-
-        job = fw_job_data.job
-        store = fw_job_data.store
+        worker = self.get_worker(job_doc.worker)
+        host = self.get_host(job_doc.worker)
+        store = self.get_store(job_doc)
+        # TODO would it be better/feasible to keep a pool of the required
+        # Stores already connected, to avoid opening and closing them?
         store.connect()
         try:
             job.resolve_args(store=store, inplace=True)
@@ -336,63 +203,62 @@ class Runner:
             except Exception:
                 logging.error(f"error while closing the store {store}", exc_info=True)
 
-        remote_path = get_job_path(job.uuid, fw_job_data.worker.work_dir)
+        remote_path = get_job_path(job.uuid, worker.work_dir)
 
         # Set the value of the original store for dynamical workflow. Usually it
         # will be None don't add the serializer, at this stage the default_orjson
         # serializer could undergo refactoring and this could break deserialization
         # of older FWs. It is set in the FireTask at runtime.
-        fw = fw_job_data.fw
         remote_store = get_remote_store(
             store=store, launch_dir=remote_path, add_orjson_serializer=False
         )
-        fw.tasks[0]["store"] = remote_store
-        fw.tasks[0]["original_store"] = fw_job_data.original_store
 
-        files = get_remote_files(fw, remote_doc["launch_id"])
-        self.rlpad.lpad.change_launch_dir(remote_doc["launch_id"], remote_path)
-
-        created = fw_job_data.host.mkdir(remote_path)
+        created = host.mkdir(remote_path)
         if not created:
             err_msg = (
-                f"Could not create remote directory {remote_path} for fw_id {fw_id}"
+                f"Could not create remote directory {remote_path} for db_id {db_id}"
             )
             logger.error(err_msg)
-            return err_msg, False, None
+            raise RemoteError(err_msg, no_retry=False)
 
-        for fname, fcontent in files.items():
-            path_file = Path(remote_path, fname)
-            fw_job_data.host.write_text_file(path_file, fcontent)
+        serialized_input = get_remote_in_file(job, remote_store, job_doc.store)
 
-        set_output = {"$set": {f"{REMOTE_DOC_PATH}.run_dir": remote_path}}
+        path_file = Path(remote_path, IN_FILENAME)
+        host.put(serialized_input, str(path_file))
 
-        return None, False, set_output
+        set_output = {
+            "$set": {"run_dir": remote_path, "state": JobState.UPLOADED.value}
+        }
+        lock.update_on_release = set_output
 
-    def submit(self, doc):
-        logger.debug(f"submit fw_id: {doc['fw_id']}")
-        remote_doc = get_remote_doc(doc)
-        fw_job_data = self.get_fw_data(doc)
+    def submit(self, lock):
+        doc = lock.locked_document
+        logger.debug(f"submit db_id: {doc['db_id']}")
 
-        remote_path = Path(remote_doc["run_dir"])
+        job_doc = JobDoc(**doc)
+        job = job_doc.job
 
-        script_commands = ["rlaunch singleshot --offline"]
+        worker = self.get_worker(job_doc.worker)
 
-        worker = fw_job_data.worker
-        queue_manager = self.get_queue_manager(fw_job_data.worker_name)
-        resources = fw_job_data.task.get("resources") or worker.resources or {}
+        remote_path = Path(job_doc.run_dir)
+
+        script_commands = [f"jf execution run {remote_path}"]
+
+        queue_manager = self.get_queue_manager(job_doc.worker)
+        resources = job_doc.resources or worker.resources or {}
         qout_fpath = remote_path / OUT_FNAME
         qerr_fpath = remote_path / ERR_FNAME
-        set_name_out(
-            resources, fw_job_data.job.name, out_fpath=qout_fpath, err_fpath=qerr_fpath
-        )
-        exec_config = fw_job_data.task.get("exec_config")
+        set_name_out(resources, job.name, out_fpath=qout_fpath, err_fpath=qerr_fpath)
+
+        exec_config = job_doc.exec_config
         if isinstance(exec_config, str):
             exec_config = self.config_manager.get_exec_config(
                 exec_config_name=exec_config, project_name=self.project_name
             )
         elif isinstance(exec_config, dict):
-            exec_config = ExecutionConfig.parse_obj(exec_config)
+            exec_config = ExecutionConfig.parse_obj(job_doc.exec_config)
 
+        # define an empty default if it is not set
         exec_config = exec_config or ExecutionConfig()
 
         pre_run = worker.pre_run or ""
@@ -415,124 +281,115 @@ class Runner:
 
         if submit_result.status == SubmissionStatus.FAILED:
             err_msg = f"submission failed. {repr(submit_result)}"
-            return err_msg, False, None
+            raise RemoteError(err_msg, False)
         elif submit_result.status == SubmissionStatus.JOB_ID_UNKNOWN:
             err_msg = f"submission succeeded but ID not known. Job may be running but status cannot be checked. {repr(submit_result)}"
-            return err_msg, True, None
+            raise RemoteError(err_msg, True)
         elif submit_result.status == SubmissionStatus.SUCCESSFUL:
-            set_output = {
-                "$set": {f"{REMOTE_DOC_PATH}.process_id": str(submit_result.job_id)}
-            }
-
-            return None, False, set_output
-
-        raise RuntimeError(f"unhandled submission status {submit_result.status}")
-
-    def download(self, doc):
-        remote_doc = get_remote_doc(doc)
-        logger.debug(f"download fw_id: {doc['fw_id']}")
-        fw_job_data = self.get_fw_data(doc)
-        job = fw_job_data.job
-
-        remote_path = remote_doc["run_dir"]
-        loca_base_dir = Path(self.project.tmp_dir, "download")
-        local_path = get_job_path(job.uuid, loca_base_dir)
-
-        makedirs_p(local_path)
-
-        store = fw_job_data.store
-
-        fnames = ["FW_offline.json"]
-        fnames.extend(get_remote_store_filenames(store))
-
-        for fname in fnames:
-            # in principle fabric should work by just passing the destination folder,
-            # but it fails
-            remote_file_path = str(Path(remote_path, fname))
-            try:
-                fw_job_data.host.get(remote_file_path, str(Path(local_path, fname)))
-            except FileNotFoundError:
-                # if files are missing it should not retry
-                err_msg = f"file {remote_file_path} for job {job.uuid} does not exist"
-                logger.error(err_msg)
-                return err_msg, True, None
-
-        return None, False, None
-
-    def complete_launch(self, doc):
-        remote_doc = get_remote_doc(doc)
-        logger.debug(f"complete launch fw_id: {doc['fw_id']}")
-        fw_job_data = self.get_fw_data(doc)
-
-        loca_base_dir = Path(self.project.tmp_dir, "download")
-        local_path = get_job_path(fw_job_data.job.uuid, loca_base_dir)
-
-        try:
-            remote_data = loadfn(Path(local_path, "FW_offline.json"), cls=None)
-
-            store = fw_job_data.store
-            save = {
-                k: "output" if v is True else v
-                for k, v in fw_job_data.job._kwargs.items()
-            }
-
-            # TODO add ping data?
-            remote_store = get_remote_store(store, local_path)
-            remote_store.connect()
-            launch, completed = self.rlpad.recover_remote(
-                remote_status=remote_data,
-                store=store,
-                remote_store=remote_store,
-                save=save,
-                launch_id=remote_doc["launch_id"],
-                terminated=True,
-            )
-
-            set_output = {
+            lock.update_on_release = {
                 "$set": {
-                    f"{REMOTE_DOC_PATH}.start_time": launch.time_start or None,
-                    f"{REMOTE_DOC_PATH}.end_time": launch.time_end or None,
+                    "remote.process_id": str(submit_result.job_id),
+                    "state": JobState.SUBMITTED.value,
                 }
             }
+        else:
+            raise RemoteError(
+                f"unhandled submission status {submit_result.status}", True
+            )
+
+    def download(self, lock):
+        doc = lock.locked_document
+        logger.debug(f"download db_id: {doc['db_id']}")
+
+        job_doc = JobDoc(**doc)
+        job = job_doc.job
+
+        # If the worker is local do not copy the files in the temporary folder
+        # TODO it could be possible to go directly from
+        #  SUBMITTED/RUNNING to DOWNLOADED instead
+        worker = self.get_worker(job_doc.worker)
+        if worker.type != "local":
+            host = self.get_host(job_doc.worker)
+            store = self.get_store(job_doc)
+
+            remote_path = job_doc.run_dir
+            local_base_dir = Path(self.project.tmp_dir, "download")
+            local_path = get_job_path(job.uuid, local_base_dir)
+
+            makedirs_p(local_path)
+
+            fnames = [OUT_FILENAME]
+            fnames.extend(get_remote_store_filenames(store))
+
+            for fname in fnames:
+                # in principle fabric should work by just passing the
+                # destination folder, but it fails
+                remote_file_path = str(Path(remote_path, fname))
+                try:
+                    host.get(remote_file_path, str(Path(local_path, fname)))
+                except FileNotFoundError:
+                    # if files are missing it should not retry
+                    err_msg = (
+                        f"file {remote_file_path} for job {job.uuid} does not exist"
+                    )
+                    logger.error(err_msg)
+                    raise RemoteError(err_msg, True)
+
+        lock.update_on_release = {"$set": {"state": JobState.DOWNLOADED.value}}
+
+    def complete_job(self, lock):
+        doc = lock.locked_document
+        logger.debug(f"complete job db_id: {doc['db_id']}")
+
+        # if the worker is local the files were not copied to the temporary
+        # folder, but the files could be directly updated
+        worker = self.get_worker(doc["worker"])
+        worker_is_local = worker.type == "local"
+        if worker_is_local:
+            local_path = doc["run_dir"]
+        else:
+            local_base_dir = Path(self.project.tmp_dir, "download")
+            local_path = get_job_path(doc["uuid"], local_base_dir)
+
+        try:
+            job_doc = JobDoc(**doc)
+            store = self.get_store(job_doc)
+            completed = self.job_controller.complete_job(job_doc, local_path, store)
+
         except json.JSONDecodeError:
             # if an empty file is copied this error can appear, do not retry
             err_msg = traceback.format_exc()
-            return err_msg, True, None
+            raise RemoteError(err_msg, True)
 
         # remove local folder with downloaded files if successfully completed
-        if completed and self.runner_options.delete_tmp_folder:
+        if completed and self.runner_options.delete_tmp_folder and not worker_is_local:
             shutil.rmtree(local_path, ignore_errors=True)
 
         if not completed:
             err_msg = "the parsed output does not contain the required information to complete the job"
-            return err_msg, True, None
-
-        return None, False, set_output
+            raise RemoteError(err_msg, True)
 
     def check_run_status(self):
         logger.debug("check_run_status")
         # check for jobs that could have changed state
         workers_ids_docs = defaultdict(dict)
         db_filter = {
-            f"{REMOTE_DOC_PATH}.state": {
-                "$in": [RemoteState.SUBMITTED.value, RemoteState.RUNNING.value]
-            },
-            f"{REMOTE_DOC_PATH}.{MongoLock.LOCK_KEY}": {"$exists": False},
-            f"{REMOTE_DOC_PATH}.retry_time_limit": {"$not": {"$gt": datetime.utcnow()}},
+            "state": {"$in": [JobState.SUBMITTED.value, JobState.RUNNING.value]},
+            "lock_id": None,
+            "remote.retry_time_limit": {"$not": {"$gt": datetime.utcnow()}},
         }
         projection = [
-            "fw_id",
-            f"{REMOTE_DOC_PATH}.launch_id",
-            FW_UUID_PATH,
-            f"{REMOTE_DOC_PATH}.process_id",
-            f"{REMOTE_DOC_PATH}.state",
-            f"{REMOTE_DOC_PATH}.step_attempts",
-            "spec._tasks.worker",
+            "db_id",
+            "uuid",
+            "index",
+            "remote",
+            "worker",
+            "state",
         ]
-        for doc in self.rlpad.fireworks.find(db_filter, projection):
-            worker_name = doc["spec"]["_tasks"][0]["worker"]
-            remote_doc = get_remote_doc(doc)
-            workers_ids_docs[worker_name][remote_doc["process_id"]] = (doc, remote_doc)
+        for doc in self.job_controller.get_jobs(db_filter, projection):
+            worker_name = doc["worker"]
+            remote_doc = doc["remote"]
+            workers_ids_docs[worker_name][remote_doc["process_id"]] = doc
 
         for worker_name, ids_docs in workers_ids_docs.items():
             error = None
@@ -552,24 +409,24 @@ class Runner:
                 )
                 error = traceback.format_exc()
 
-            for doc_id, (doc, remote_doc) in ids_docs.items():
+            for doc_id, doc in ids_docs.items():
                 # TODO if failed should maybe be handled differently?
+                remote_doc = doc["remote"]
                 qjob = qjobs_dict.get(doc_id)
                 qstate = qjob.state if qjob else None
-                collection = self.rlpad.fireworks
                 next_state = None
                 start_time = None
                 if (
                     qstate == QState.RUNNING
-                    and remote_doc["state"] == RemoteState.SUBMITTED.value
+                    and doc["state"] == JobState.SUBMITTED.value
                 ):
-                    next_state = RemoteState.RUNNING
+                    next_state = JobState.RUNNING
                     start_time = datetime.utcnow()
                     logger.debug(
                         f"remote job with id {remote_doc['process_id']} is running"
                     )
                 elif qstate in [None, QState.DONE, QState.FAILED]:
-                    next_state = RemoteState.TERMINATED
+                    next_state = JobState.TERMINATED
                     logger.debug(
                         f"terminated remote job with id {remote_doc['process_id']}"
                     )
@@ -577,40 +434,45 @@ class Runner:
                     # reset the step attempts if succeeding in case there was
                     # an error earlier. Setting the state to the same as the
                     # current triggers the update that cleans the state
-                    next_state = RemoteState(remote_doc["state"])
+                    next_state = JobState(remote_doc["state"])
 
                 # the document needs to be updated only in case of error or if a
-                # next state has been set
+                # next state has been set.
+                # Only update if the state did not change in the meanwhile
                 if next_state or error:
-                    lock_filter = {
-                        f"{REMOTE_DOC_PATH}.state": remote_doc["state"],
-                        FW_UUID_PATH: get_job_doc(doc)["uuid"],
-                    }
-                    with MongoLock(
-                        collection=collection,
-                        filter=lock_filter,
-                        lock_subdoc=REMOTE_DOC_PATH,
+                    lock_filter = {"uuid": doc["uuid"], "index": doc["index"]}
+                    with self.job_controller.lock_job_for_update(
+                        states=doc["state"],
+                        additional_filter=lock_filter,
+                        max_step_attempts=self.runner_options.max_step_attempts,
+                        delta_retry=self.runner_options.delta_retry,
                     ) as lock:
                         if lock.locked_document:
+                            if error:
+                                raise RemoteError(error, False)
                             set_output = {
                                 "$set": {
-                                    f"{REMOTE_DOC_PATH}.queue_state": qstate.value
+                                    "remote.queue_state": qstate.value
                                     if qstate
-                                    else None
+                                    else None,
+                                    "state": next_state.value,
                                 }
                             }
                             if start_time:
-                                set_output["$set"][
-                                    f"{REMOTE_DOC_PATH}.start_time"
-                                ] = start_time
-                            lock.update_on_release = self._prepare_lock_update(
-                                doc, error, False, set_output, next_state
-                            )
+                                set_output["$set"]["start_time"] = start_time
+                            lock.update_on_release = set_output
 
     def checkout(self):
-        logger.debug("checkout rapidfire")
-        n = rapidfire_checkout(self.rlpad, self.fworker)
-        logger.debug(f"checked out {n} jobs")
+        logger.debug("checkout jobs")
+        n_checked_out = 0
+        while True:
+            reserved = self.job_controller.checkout_job()
+            if not reserved:
+                break
+
+            n_checked_out += 1
+
+        logger.debug(f"checked out {n_checked_out} jobs")
 
     def cleanup(self):
         for worker_name, host in self.hosts.items():
@@ -621,8 +483,9 @@ class Runner:
                     f"error while closing connection to worker {worker_name}"
                 )
 
-    def ping_wf_doc(self, db_id: int):
-        # in the WF document the date is a real Date
-        self.rlpad.workflows.find_one_and_update(
-            {"nodes": db_id}, {"$set": {"updated_on": datetime.utcnow().isoformat()}}
-        )
+        try:
+            self.jobstore.close()
+        except Exception:
+            logging.exception("error while closing connection to jobstore")
+
+        self.job_controller.close()

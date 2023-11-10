@@ -8,7 +8,7 @@ from typing_extensions import Annotated
 
 from jobflow_remote.cli.utils import SerializeFileFormat, SortOption
 from jobflow_remote.config.base import LogLevel
-from jobflow_remote.jobs.state import FlowState, JobState, RemoteState
+from jobflow_remote.jobs.state import FlowState, JobState
 
 job_ids_indexes_opt = Annotated[
     Optional[List[str]],
@@ -73,15 +73,6 @@ flow_state_opt = Annotated[
 ]
 
 
-remote_state_opt = Annotated[
-    Optional[RemoteState],
-    typer.Option(
-        "--remote-state",
-        "-rs",
-        help="One of the remote states",
-    ),
-]
-
 name_opt = Annotated[
     Optional[str],
     typer.Option(
@@ -98,16 +89,14 @@ metadata_opt = Annotated[
         "--metadata",
         "-meta",
         help="A string representing the metadata to be queried. Can be either"
-        " a single key=value pair or a string with the JSON representation "
-        "of a dictionary containing the mongoDB query for the metadata "
-        'subdocument (e.g \'{"key1.key2": 1, "key3": "test"}\')',
+        " a list of comma separated key=value pairs or a string with the JSON"
+        " representation of a dictionary containing the mongoDB query for "
+        'the metadata subdocument (e.g \'{"key1.key2": 1, "key3": "test"}\')',
     ),
 ]
 
 
-remote_state_arg = Annotated[
-    RemoteState, typer.Argument(help="One of the remote states")
-]
+job_state_arg = Annotated[JobState, typer.Argument(help="One of the job states")]
 
 
 start_date_opt = Annotated[
@@ -267,6 +256,40 @@ serialize_file_format_opt = Annotated[
         "--format",
         "-f",
         help="File format",
+    ),
+]
+
+
+wait_lock_opt = Annotated[
+    int,
+    typer.Option(
+        "--wait",
+        "-w",
+        help="When trying to acquire the lock on the documents that need to "
+        "be modified, wait an amount of seconds equal to the value specified",
+    ),
+]
+
+
+break_lock_opt = Annotated[
+    bool,
+    typer.Option(
+        "--break-lock",
+        "-bl",
+        help="Forcibly break the lock for the documents that need to be modified. "
+        "Use with care and possibly when the runner is stopped. Can lead to "
+        "inconsistencies",
+    ),
+]
+
+
+raise_on_error_opt = Annotated[
+    bool,
+    typer.Option(
+        "--raise-on-error",
+        "-re",
+        help="If an error arises during any of the operations raise an exception "
+        "and stop the execution",
     ),
 ]
 

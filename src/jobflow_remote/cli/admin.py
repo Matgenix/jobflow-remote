@@ -11,19 +11,16 @@ from jobflow_remote.cli.types import (
     force_opt,
     job_ids_indexes_opt,
     job_state_opt,
-    remote_state_opt,
     start_date_opt,
 )
 from jobflow_remote.cli.utils import (
-    check_incompatible_opt,
-    exit_with_error_msg,
+    check_stopped_runner,
+    get_config_manager,
+    get_job_controller,
     get_job_ids_indexes,
     loading_spinner,
     out_console,
 )
-from jobflow_remote.config import ConfigManager
-from jobflow_remote.jobs.daemon import DaemonError, DaemonManager, DaemonStatus
-from jobflow_remote.jobs.jobcontroller import JobController
 
 app_admin = JFRTyper(
     name="admin", help="Commands for administering the database", no_args_is_help=True
@@ -36,7 +33,7 @@ def reset(
     reset_output: Annotated[
         bool,
         typer.Option(
-            "--reset-output",
+            "--output",
             "-o",
             help="Also delete all the documents in the current store",
         ),
@@ -44,8 +41,8 @@ def reset(
     max_limit: Annotated[
         int,
         typer.Option(
-            "--max-limit",
-            "-max",
+            "--max",
+            "-m",
             help=(
                 "The database will be reset only if the number of Flows is lower than the specified limit. 0 means no limit"
             ),
@@ -59,26 +56,10 @@ def reset(
     """
     from jobflow_remote import SETTINGS
 
-    dm = DaemonManager()
-
-    try:
-        with loading_spinner(False) as progress:
-            progress.add_task(description="Checking the Daemon status...", total=None)
-            current_status = dm.check_status()
-
-    except DaemonError as e:
-        exit_with_error_msg(
-            f"Error while checking the status of the daemon: {getattr(e, 'message', str(e))}"
-        )
-
-    if current_status not in (DaemonStatus.STOPPED, DaemonStatus.SHUT_DOWN):
-        exit_with_error_msg(
-            f"The status of the daemon is {current_status.value}. "
-            "The daemon should not be running while resetting the database"
-        )
+    check_stopped_runner(error=True)
 
     if not force:
-        cm = ConfigManager()
+        cm = get_config_manager()
         project_name = cm.get_project_data().project.name
         text = Text.from_markup(
             "[red]This operation will [bold]delete all the Jobs data[/bold] "
@@ -90,7 +71,7 @@ def reset(
             raise typer.Exit(0)
     with loading_spinner(False) as progress:
         progress.add_task(description="Resetting the DB...", total=None)
-        jc = JobController()
+        jc = get_job_controller()
         done = jc.reset(reset_output=reset_output, max_limit=max_limit)
     not_text = "" if done else "[bold]NOT [/bold]"
     out_console.print(f"The database was {not_text}reset")
@@ -106,7 +87,6 @@ def remove_lock(
     job_id: job_ids_indexes_opt = None,
     db_id: db_ids_opt = None,
     state: job_state_opt = None,
-    remote_state: remote_state_opt = None,
     start_date: start_date_opt = None,
     end_date: end_date_opt = None,
     force: force_opt = False,
@@ -115,11 +95,11 @@ def remove_lock(
     Forcibly removes the lock from the documents of the selected jobs.
     WARNING: can lead to inconsistencies if the processes is actually running
     """
-    check_incompatible_opt({"state": state, "remote-state": remote_state})
 
     job_ids_indexes = get_job_ids_indexes(job_id)
 
-    jc = JobController()
+    jc = get_job_controller()
+
     if not force:
         with loading_spinner(False) as progress:
             progress.add_task(
@@ -130,7 +110,6 @@ def remove_lock(
                 job_ids=job_ids_indexes,
                 db_ids=db_id,
                 state=state,
-                remote_state=remote_state,
                 start_date=start_date,
                 locked=True,
                 end_date=end_date,
@@ -149,11 +128,10 @@ def remove_lock(
                 description="Checking the number of locked documents...", total=None
             )
 
-            num_unlocked = jc.remove_lock(
+            num_unlocked = jc.remove_lock_job(
                 job_ids=job_id,
                 db_ids=db_id,
                 state=state,
-                remote_state=remote_state,
                 start_date=start_date,
                 end_date=end_date,
             )

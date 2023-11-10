@@ -107,7 +107,7 @@ class QueueManager:
             return "\n".join(pre_run)
         return pre_run
 
-    def get_export(self, exports: dict | None) -> str:
+    def get_export(self, exports: dict | None) -> str | None:
         if not exports:
             return None
         exports_str = []
@@ -115,7 +115,7 @@ class QueueManager:
             exports_str.append(f"export {k}={v}")
         return "\n".join(exports_str)
 
-    def get_modules(self, modules: list[str] | None) -> str:
+    def get_modules(self, modules: list[str] | None) -> str | None:
         if not modules:
             return None
         modules_str = []

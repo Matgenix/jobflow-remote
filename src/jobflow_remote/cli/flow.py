@@ -29,12 +29,12 @@ from jobflow_remote.cli.utils import (
     check_incompatible_opt,
     exit_with_error_msg,
     exit_with_warning_msg,
+    get_job_controller,
     get_job_db_ids,
     get_start_date,
     loading_spinner,
     out_console,
 )
-from jobflow_remote.jobs.jobcontroller import JobController
 
 app_flow = JFRTyper(
     name="flow", help="Commands for managing the flows", no_args_is_help=True
@@ -64,7 +64,7 @@ def flows_list(
     check_incompatible_opt({"start_date": start_date, "days": days, "hours": hours})
     check_incompatible_opt({"end_date": end_date, "days": days, "hours": hours})
 
-    jc = JobController()
+    jc = get_job_controller()
 
     start_date = get_start_date(start_date, days, hours)
 
@@ -81,6 +81,7 @@ def flows_list(
             name=name,
             limit=max_results,
             sort=sort,
+            full=verbosity > 0,
         )
 
         table = get_flow_info_table(flows_info, verbosity=verbosity)
@@ -116,7 +117,7 @@ def delete(
 
     start_date = get_start_date(start_date, days, hours)
 
-    jc = JobController()
+    jc = get_job_controller()
 
     with loading_spinner(False) as progress:
         progress.add_task(description="Fetching data...", total=None)
@@ -172,13 +173,14 @@ def flow_info(
 
     with loading_spinner():
 
-        jc = JobController()
+        jc = get_job_controller()
 
         flows_info = jc.get_flows_info(
             job_ids=job_ids,
             db_ids=db_ids,
             flow_ids=flow_ids,
             limit=1,
+            full=True,
         )
     if not flows_info:
         exit_with_error_msg("No data matching the request")
