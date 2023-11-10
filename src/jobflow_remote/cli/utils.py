@@ -254,7 +254,6 @@ def str_to_dict(string: str | None) -> dict | None:
 
 
 def get_start_date(start_date: datetime | None, days: int | None, hours: int | None):
-
     if start_date and (start_date.year, start_date.month, start_date.day) == (
         1900,
         1,
@@ -310,7 +309,6 @@ def execute_multi_jobs_cmd(
                 exit_with_error_msg(msg)
             db_id, job_id = get_job_db_ids(job_db_id, job_index)
             with loading_spinner():
-
                 modified_ids = single_cmd(
                     job_id=job_id, job_index=job_index, db_id=db_id, **kwargs
                 )

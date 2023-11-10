@@ -14,13 +14,13 @@ from monty.json import jsanitize
 from jobflow_remote.utils.data import uuid_to_path
 
 
-def get_job_path(job_id: str, base_path: str | Path | None = None) -> str:
+def get_job_path(job_id: str, index: int, base_path: str | Path | None = None) -> str:
     if base_path:
         base_path = Path(base_path)
     else:
         base_path = Path()
 
-    relative_path = uuid_to_path(job_id)
+    relative_path = uuid_to_path(job_id, index)
     return str(base_path / relative_path)
 
 
@@ -79,7 +79,6 @@ def get_remote_store_filenames(store: JobStore) -> list[str]:
 
 
 def update_store(store, remote_store, save):
-
     # TODO is it correct?
     data = list(remote_store.query(load=save))
     if len(data) > 1:

@@ -13,7 +13,6 @@ DEFAULT_CONFIG_FILE_PATH = Path("~/.jfremote.yaml").expanduser().as_posix()
 
 
 class JobflowRemoteSettings(BaseSettings):
-
     config_file: str = Field(
         DEFAULT_CONFIG_FILE_PATH,
         description="Location of the config file for jobflow remote.",

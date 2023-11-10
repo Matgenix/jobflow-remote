@@ -111,7 +111,6 @@ class JobController:
         name: str | None = None,
         metadata: dict | None = None,
     ) -> dict:
-
         if job_ids and not any(isinstance(ji, (list, tuple)) for ji in job_ids):
             # without these cast mypy is confused about the type
             job_ids = cast(list[tuple[str, int]], [job_ids])
@@ -167,7 +166,6 @@ class JobController:
         end_date: datetime | None = None,
         name: str | None = None,
     ) -> dict:
-
         if job_ids is not None and not isinstance(job_ids, (list, tuple)):
             job_ids = [job_ids]
         if db_ids is not None and not isinstance(db_ids, (list, tuple)):
@@ -589,7 +587,6 @@ class JobController:
         return job_doc_update, modified_jobs
 
     def _reset_remote(self, doc: dict) -> dict:
-
         if doc["state"] in [JobState.SUBMITTED.value, JobState.RUNNING.value]:
             # try cancelling the job submitted to the remote queue
             try:
@@ -653,7 +650,6 @@ class JobController:
         wait: int | None = None,
         break_lock: bool = False,
     ) -> list[int]:
-
         values = {
             "state": state.value,
             "remote.step_attempts": 0,
@@ -732,7 +728,6 @@ class JobController:
                 raise ValueError(f"No Job matching criteria {lock_filter}")
             state = JobState(doc["state"])
             if state != JobState.REMOTE_ERROR:
-
                 previous_state = doc["previous_state"]
                 try:
                     JobState(previous_state)
@@ -820,7 +815,6 @@ class JobController:
         wait: int | None = None,
         break_lock: bool = False,
     ) -> list[int]:
-
         job_lock_kwargs = dict(
             projection=["uuid", "index", "db_id", "state", "remote", "worker"]
         )
@@ -861,7 +855,6 @@ class JobController:
         job_index: int | None = None,
         wait: int | None = None,
     ) -> list[int]:
-
         job_lock_kwargs = dict(projection=["uuid", "index", "db_id", "state"])
         flow_lock_kwargs = dict(projection=["uuid"])
         with self.lock_job_flow(
@@ -920,7 +913,6 @@ class JobController:
         wait: int | None = None,
         break_lock: bool = False,
     ) -> list[int]:
-
         job_lock_kwargs = dict(
             projection=["uuid", "index", "db_id", "state", "job.config", "parents"]
         )
@@ -1033,7 +1025,6 @@ class JobController:
         sort: list[tuple] | None = None,
         limit: int = 0,
     ) -> list[dict]:
-
         pipeline: list[dict] = [
             {
                 "$lookup": {
@@ -1109,7 +1100,6 @@ class JobController:
         confirm: bool = False,
         delete_output: bool = False,
     ) -> int:
-
         if isinstance(flow_ids, str):
             flow_ids = [flow_ids]
 
@@ -1582,7 +1572,6 @@ class JobController:
         error: str | None = None,
         doc_update: dict | None = None,
     ):
-
         stored_data = None
         if response is None:
             new_state = JobState.FAILED.value
@@ -1730,7 +1719,6 @@ class JobController:
         sort: dict | None = None,
         limit: int = 0,
     ) -> list[dict]:
-
         pipeline: list[dict] = [
             {
                 "$lookup": {
@@ -1826,14 +1814,14 @@ class JobController:
                 yield lock
             except ConfigError:
                 error = traceback.format_exc()
-                warnings.warn(error)
+                warnings.warn(error, stacklevel=2)
                 no_retry = True
             except RemoteError as e:
                 error = f"Remote error: {e.msg}"
                 no_retry = e.no_retry
             except Exception:
                 error = traceback.format_exc()
-                warnings.warn(error)
+                warnings.warn(error, stacklevel=2)
 
             set_output = lock.update_on_release
 

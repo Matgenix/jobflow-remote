@@ -165,7 +165,6 @@ def job_info(
         )
 
     with loading_spinner():
-
         jc = get_job_controller()
 
         job_info = jc.get_job_info(

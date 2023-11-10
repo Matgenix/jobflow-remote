@@ -134,7 +134,6 @@ def format_job_info(job_info: JobInfo, show_none: bool = False):
 
 
 def format_flow_info(flow_info: FlowInfo):
-
     title = f"Flow: {flow_info.name} - {flow_info.flow_id} - {flow_info.state.name}"
     table = Table(title=title)
     table.title_style = "bold"
