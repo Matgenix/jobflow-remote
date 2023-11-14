@@ -1,9 +1,8 @@
-from __future__ import annotations
-
 from collections import defaultdict
 from datetime import datetime, timezone
 from enum import Enum
 from functools import cached_property
+from typing import Optional, Union
 
 from jobflow import Flow, Job, JobStore
 from monty.json import jsanitize
@@ -19,11 +18,11 @@ OUT_FILENAME = "jfremote_out.json"
 
 def get_initial_job_doc_dict(
     job: Job,
-    parents: list[str] | None,
+    parents: Optional[list[str]],
     db_id: int,
     worker: str,
-    exec_config: ExecutionConfig | None,
-    resources: dict | QResources | None,
+    exec_config: Optional[ExecutionConfig],
+    resources: Optional[Union[dict, QResources]],
 ):
     from monty.json import jsanitize
 
@@ -50,7 +49,6 @@ def get_initial_job_doc_dict(
 
 
 def get_initial_flow_doc_dict(flow: Flow, job_dicts: list[dict]):
-
     jobs = [j["uuid"] for j in job_dicts]
     ids = [(j["db_id"], j["uuid"], j["index"]) for j in job_dicts]
     parents = {j["uuid"]: {"1": j["parents"]} for j in job_dicts}
@@ -69,10 +67,10 @@ def get_initial_flow_doc_dict(flow: Flow, job_dicts: list[dict]):
 
 class RemoteInfo(BaseModel):
     step_attempts: int = 0
-    queue_state: QState | None = None
-    process_id: str | None = None
-    retry_time_limit: datetime | None = None
-    error: str | None = None
+    queue_state: Optional[QState] = None
+    process_id: Optional[str] = None
+    retry_time_limit: Optional[datetime] = None
+    error: Optional[str] = None
 
 
 class JobInfo(BaseModel):
@@ -83,32 +81,32 @@ class JobInfo(BaseModel):
     name: str
     state: JobState
     remote: RemoteInfo = RemoteInfo()
-    parents: list[str] | None = None
-    previous_state: JobState | None = None
-    error: str | None = None
-    lock_id: str | None = None
-    lock_time: datetime | None = None
-    run_dir: str | None = None
-    start_time: datetime | None = None
-    end_time: datetime | None = None
+    parents: Optional[list[str]] = None
+    previous_state: Optional[JobState] = None
+    error: Optional[str] = None
+    lock_id: Optional[str] = None
+    lock_time: Optional[datetime] = None
+    run_dir: Optional[str] = None
+    start_time: Optional[datetime] = None
+    end_time: Optional[datetime] = None
     created_on: datetime = datetime.utcnow()
     updated_on: datetime = datetime.utcnow()
     priority: int = 0
-    metadata: dict | None = None
+    metadata: Optional[dict] = None
 
     @property
     def is_locked(self) -> bool:
         return self.lock_id is not None
 
     @property
-    def run_time(self) -> float | None:
+    def run_time(self) -> Optional[float]:
         if self.start_time and self.end_time:
             return (self.end_time - self.start_time).total_seconds()
 
         return None
 
     @property
-    def estimated_run_time(self) -> float | None:
+    def estimated_run_time(self) -> Optional[float]:
         if self.start_time:
             return (
                 datetime.now(tz=self.start_time.tzinfo) - self.start_time
@@ -117,7 +115,7 @@ class JobInfo(BaseModel):
         return None
 
     @classmethod
-    def from_query_output(cls, d) -> JobInfo:
+    def from_query_output(cls, d) -> "JobInfo":
         job = d.pop("job")
         for k in ["name", "metadata"]:
             d[k] = job[k]
@@ -151,23 +149,23 @@ class JobDoc(BaseModel):
     # among the parents, all the index will still be parents.
     # Note that for just the uuid this condition is not true: JobDocs with
     # the same uuid but different indexes may have different parents
-    parents: list[str] | None = None
-    previous_state: JobState | None = None
-    error: str | None = None  # TODO is there a better way to serialize it?
-    lock_id: str | None = None
-    lock_time: datetime | None = None
-    run_dir: str | None = None
-    start_time: datetime | None = None
-    end_time: datetime | None = None
+    parents: Optional[list[str]] = None
+    previous_state: Optional[JobState] = None
+    error: Optional[str] = None  # TODO is there a better way to serialize it?
+    lock_id: Optional[str] = None
+    lock_time: Optional[datetime] = None
+    run_dir: Optional[str] = None
+    start_time: Optional[datetime] = None
+    end_time: Optional[datetime] = None
     created_on: datetime = datetime.utcnow()
     updated_on: datetime = datetime.utcnow()
     priority: int = 0
-    store: JobStore | None = None
-    exec_config: ExecutionConfig | str | None = None
-    resources: QResources | dict | None = None
+    store: Optional[JobStore] = None
+    exec_config: Optional[Union[ExecutionConfig, str]] = None
+    resources: Optional[Union[QResources, dict]] = None
 
-    stored_data: dict | None = None
-    history: list[str] | None = None  # ?
+    stored_data: Optional[dict] = None
+    history: Optional[list[str]] = None  # ?
 
     def as_db_dict(self):
         # required since the resources are not serialized otherwise
@@ -189,8 +187,8 @@ class FlowDoc(BaseModel):
     jobs: list[str]
     state: FlowState
     name: str
-    lock_id: str | None = None
-    lock_time: datetime | None = None
+    lock_id: Optional[str] = None
+    lock_time: Optional[datetime] = None
     created_on: datetime = datetime.utcnow()
     updated_on: datetime = datetime.utcnow()
     metadata: dict = Field(default_factory=dict)

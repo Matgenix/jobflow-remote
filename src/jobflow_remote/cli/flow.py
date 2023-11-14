@@ -143,14 +143,14 @@ def delete(
         if not confirmed:
             raise typer.Exit(0)
 
-    to_delete = [fi.db_ids[0] for fi in flows_info]
+    to_delete = [fi.flow_id for fi in flows_info]
     with loading_spinner(False) as progress:
         progress.add_task(description="Deleting...", total=None)
 
-        jc.delete_flows(db_ids=to_delete)
+        jc.delete_flows(flow_ids=to_delete)
 
     out_console.print(
-        f"Deleted Flow(s) with db_id: {', '.join(str(i) for i in to_delete)}"
+        f"Deleted Flow(s) with id: {', '.join(str(i) for i in to_delete)}"
     )
 
 
