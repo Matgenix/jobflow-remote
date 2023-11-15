@@ -7,10 +7,11 @@ from typing_extensions import Annotated
 
 from jobflow_remote.cli.jf import app
 from jobflow_remote.cli.jfr_typer import JFRTyper
-from jobflow_remote.cli.types import log_level_opt, runner_num_procs_opt
+from jobflow_remote.cli.types import log_level_opt
 from jobflow_remote.cli.utils import (
     exit_with_error_msg,
     exit_with_warning_msg,
+    get_config_manager,
     loading_spinner,
     out_console,
 )
@@ -34,7 +35,39 @@ def run(
             "-pid",
             help="Set the runner id to the current process pid",
         ),
-    ] = True,
+    ] = False,
+    transfer: Annotated[
+        bool,
+        typer.Option(
+            "--transfer",
+            "-t",
+            help="Enable the transfer option in the runner",
+        ),
+    ] = False,
+    complete: Annotated[
+        bool,
+        typer.Option(
+            "--complete",
+            "-com",
+            help="Enable the complete option in the runner",
+        ),
+    ] = False,
+    slurm: Annotated[
+        bool,
+        typer.Option(
+            "--slurm",
+            "-s",
+            help="Enable the slurm option in the runner",
+        ),
+    ] = False,
+    checkout: Annotated[
+        bool,
+        typer.Option(
+            "--checkout",
+            "-cho",
+            help="Enable the checkout option in the runner",
+        ),
+    ] = False,
 ):
     """
     Execute the Runner in the foreground.
@@ -43,23 +76,54 @@ def run(
     """
     runner_id = os.getpid() if set_pid else None
     runner = Runner(log_level=log_level, runner_id=str(runner_id))
-    runner.run()
+    if not (transfer or complete or slurm or checkout):
+        transfer = complete = slurm = checkout = True
+
+    runner.run(transfer=transfer, complete=complete, slurm=slurm, checkout=checkout)
 
 
 @app_runner.command()
 def start(
-    num_procs: runner_num_procs_opt = 1,
+    transfer: Annotated[
+        int,
+        typer.Option(
+            "--transfer",
+            "-t",
+            help="The number of processes dedicated to completing jobs",
+        ),
+    ] = 1,
+    complete: Annotated[
+        int,
+        typer.Option(
+            "--complete",
+            "-com",
+            help="The number of processes dedicated to completing jobs",
+        ),
+    ] = 1,
+    single: Annotated[
+        bool,
+        typer.Option(
+            "--single",
+            "-s",
+            help="Use a single process for the runner",
+        ),
+    ] = False,
     log_level: log_level_opt = LogLevel.INFO.value,
 ):
     """
     Start the Runner as a daemon
     """
-    dm = DaemonManager()
+    cm = get_config_manager()
+    dm = DaemonManager.from_project(cm.get_project())
     with loading_spinner(False) as progress:
         progress.add_task(description="Starting the daemon...", total=None)
         try:
             dm.start(
-                log_level=log_level.value, num_procs=num_procs, raise_on_error=True
+                num_procs_transfer=transfer,
+                num_procs_complete=complete,
+                single=single,
+                log_level=log_level.value,
+                raise_on_error=True,
             )
         except DaemonError as e:
             exit_with_error_msg(
@@ -85,7 +149,8 @@ def stop(
     Each of the Runner processes will stop when finished the task being executed.
     By default, return immediately
     """
-    dm = DaemonManager()
+    cm = get_config_manager()
+    dm = DaemonManager.from_project(cm.get_project())
     with loading_spinner(False) as progress:
         progress.add_task(description="Stopping the daemon...", total=None)
         try:
@@ -109,7 +174,8 @@ def kill():
     Send a kill signal to the Runner processes.
     Return immediately, does not wait for processes to be killed.
     """
-    dm = DaemonManager()
+    cm = get_config_manager()
+    dm = DaemonManager.from_project(cm.get_project())
     with loading_spinner(False) as progress:
         progress.add_task(description="Killing the daemon...", total=None)
         try:
@@ -126,7 +192,8 @@ def shutdown():
     Shuts down the supervisord process.
     Note that if the daemon is running it will wait for the daemon to stop.
     """
-    dm = DaemonManager()
+    cm = get_config_manager()
+    dm = DaemonManager.from_project(cm.get_project())
     with loading_spinner(False) as progress:
         progress.add_task(description="Shutting down supervisor...", total=None)
         try:
@@ -142,7 +209,10 @@ def status():
     """
     Fetch the status of the daemon runner
     """
-    dm = DaemonManager()
+    from jobflow_remote import SETTINGS
+
+    cm = get_config_manager()
+    dm = DaemonManager.from_project(cm.get_project())
     with loading_spinner():
         try:
             current_status = dm.check_status()
@@ -154,36 +224,47 @@ def status():
         DaemonStatus.STOPPED: "red",
         DaemonStatus.STOPPING: "gold1",
         DaemonStatus.SHUT_DOWN: "red",
+        DaemonStatus.PARTIALLY_RUNNING: "gold1",
         DaemonStatus.RUNNING: "green",
     }[current_status]
     text = Text()
     text.append("Daemon status: ")
     text.append(current_status.value.lower(), style=color)
     out_console.print(text)
+    if current_status == DaemonStatus.PARTIALLY_RUNNING and SETTINGS.cli_suggestions:
+        out_console.print(
+            f"The {current_status.value.lower()} may be present due to the "
+            "runner stopping or signal a problem with one of the processes "
+            "of the runner. If the state should be RUNNING, check the detailed"
+            " status with the 'info'  command and consider restarting the runner.",
+            style="yellow",
+        )
 
 
 @app_runner.command()
-def pids():
+def info():
     """
-    Fetch the process ids of the daemon.
-    Both the supervisord process and the processing running the Runner.
+    Fetch the information about the process of the daemon.
+    Contain the supervisord process and the processes running the Runner.
     """
-    dm = DaemonManager()
-    pids_dict = None
+    cm = get_config_manager()
+    dm = DaemonManager.from_project(cm.get_project())
+    procs_info_dict = None
     try:
         with loading_spinner():
-            pids_dict = dm.get_pids()
+            procs_info_dict = dm.get_processes_info()
     except DaemonError as e:
         exit_with_error_msg(
             f"Error while stopping the daemon: {getattr(e, 'message', e)}"
         )
-    if not pids_dict:
+    if not procs_info_dict:
         exit_with_warning_msg("Daemon is not running")
     table = Table()
     table.add_column("Process")
     table.add_column("PID")
+    table.add_column("State")
 
-    for name, pid in pids_dict.items():
-        table.add_row(name, str(pid))
+    for name, proc_info in procs_info_dict.items():
+        table.add_row(name, str(proc_info["pid"]), str(proc_info["state"]))
 
     out_console.print(table)

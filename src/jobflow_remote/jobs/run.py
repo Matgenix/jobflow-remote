@@ -24,7 +24,6 @@ def run_remote_job(run_dir: str | Path = "."):
 
     start_time = datetime.datetime.utcnow()
     with cd(run_dir):
-
         error = None
         try:
             dumpfn({"start_time": start_time}, OUT_FILENAME)

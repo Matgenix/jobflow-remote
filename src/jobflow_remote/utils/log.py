@@ -9,7 +9,9 @@ from pathlib import Path
 from monty.os import makedirs_p
 
 
-def initialize_runner_logger(log_folder: str | Path, level: int = logging.INFO):
+def initialize_runner_logger(
+    log_folder: str | Path, level: int = logging.INFO, runner_id: str | None = None
+):
     """
     Initialize the runner logger.
 
@@ -25,11 +27,16 @@ def initialize_runner_logger(log_folder: str | Path, level: int = logging.INFO):
     # runner is started.
     makedirs_p(log_folder)
 
+    if runner_id:
+        msg_format = f"%(asctime)s [%(levelname)s] ID {runner_id} %(name)s: %(message)s"
+    else:
+        msg_format = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+
     config = {
         "version": 1,
         "disable_existing_loggers": True,
         "formatters": {
-            "standard": {"format": "%(asctime)s [%(levelname)s] %(name)s: %(message)s"},
+            "standard": {"format": msg_format},
         },
         "handlers": {
             "default": {

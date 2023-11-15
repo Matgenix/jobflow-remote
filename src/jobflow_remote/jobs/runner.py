@@ -77,6 +77,7 @@ class Runner:
         initialize_runner_logger(
             log_folder=self.project.log_dir,
             level=log_level.to_logging(),
+            runner_id=runner_id,
         )
         # TODO it could be better to create a pool of stores that are connected
         # How to deal with cases where the connection gets closed?
@@ -115,12 +116,31 @@ class Runner:
     def get_store(self, job_doc: JobDoc):
         return job_doc.store or self.jobstore
 
-    def run(self):
+    def run(
+        self,
+        transfer: bool = True,
+        complete: bool = True,
+        slurm: bool = True,
+        checkout: bool = True,
+    ):
         signal.signal(signal.SIGTERM, self.handle_signal)
-        last_checkout_time = 0
-        last_check_run_status_time = 0
+        last_checkout_time = 0.0
+        last_check_run_status_time = 0.0
         wait_advance_status = False
-        last_advance_status = 0
+        last_advance_status = 0.0
+
+        states = []
+        if transfer:
+            states.append(JobState.CHECKED_OUT.value)
+            states.append(JobState.TERMINATED.value)
+        if complete:
+            states.append(JobState.DOWNLOADED.value)
+        if slurm:
+            states.append(JobState.UPLOADED.value)
+
+        logger.info(
+            f"Runner run options: transfer: {transfer} complete: {complete} slurm: {slurm} checkout: {checkout}"
+        )
 
         try:
             while True:
@@ -128,22 +148,25 @@ class Runner:
                     logger.info("stopping due to sigterm")
                     break
                 now = time.time()
-                if last_checkout_time + self.runner_options.delay_checkout < now:
+                if (
+                    checkout
+                    and last_checkout_time + self.runner_options.delay_checkout < now
+                ):
                     self.checkout()
                     last_checkout_time = time.time()
-                elif (
+                elif slurm and (
                     last_check_run_status_time
                     + self.runner_options.delay_check_run_status
                     < now
                 ):
                     self.check_run_status()
                     last_check_run_status_time = time.time()
-                elif (
+                elif (transfer or complete or slurm) and (
                     not wait_advance_status
                     or last_advance_status + self.runner_options.delay_advance_status
                     < now
                 ):
-                    updated = self.advance_state()
+                    updated = self.advance_state(states)
                     wait_advance_status = not updated
                     if not updated:
                         last_advance_status = time.time()
@@ -152,14 +175,7 @@ class Runner:
         finally:
             self.cleanup()
 
-    def advance_state(self):
-        states = [
-            JobState.CHECKED_OUT.value,
-            JobState.UPLOADED.value,
-            JobState.TERMINATED.value,
-            JobState.DOWNLOADED.value,
-        ]
-
+    def advance_state(self, states: list[str]):
         states_methods = {
             JobState.CHECKED_OUT: self.upload,
             JobState.UPLOADED: self.submit,
