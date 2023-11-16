@@ -7,7 +7,7 @@ from typing import Annotated, Literal, Optional, Union
 
 from jobflow import JobStore
 from maggma.stores import MongoStore
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator
 from qtoolkit.io import BaseSchedulerIO, scheduler_mapping
 
 from jobflow_remote.remote.host import BaseHost, LocalHost, RemoteHost
@@ -33,6 +33,11 @@ class RunnerOptions(BaseModel):
     delay_advance_status: int = Field(
         30,
         description="Delay between subsequent advancement of the job's remote state (seconds)",
+    )
+    delay_refresh_limited: int = Field(
+        600,
+        description="Delay between subsequent refresh from the DB of the number of submitted "
+        "and running jobs (seconds). Only use if a worker with max_jobs is present",
     )
     lock_timeout: Optional[int] = Field(
         86400,
@@ -137,11 +142,12 @@ class WorkerBase(BaseModel):
     max_jobs: Optional[int] = Field(
         None,
         description="The maximum number of jobs that can be submitted to the queue.",
+        ge=0,
     )
     model_config = ConfigDict(extra="forbid")
 
     @field_validator("scheduler_type")
-    def check_scheduler_type(cls, scheduler_type: str, values: dict) -> str:
+    def check_scheduler_type(cls, scheduler_type: str) -> str:
         """
         Validator to set the default of scheduler_type
         """
@@ -437,45 +443,45 @@ class Project(BaseModel):
         return JobController.from_project(self)
 
     @field_validator("base_dir")
-    def check_base_dir(cls, base_dir: str, values: dict) -> str:
+    def check_base_dir(cls, base_dir: str, info: ValidationInfo) -> str:
         """
         Validator to set the default of base_dir based on the project name
         """
         if not base_dir:
             from jobflow_remote import SETTINGS
 
-            return str(Path(SETTINGS.projects_folder, values["name"]))
+            return str(Path(SETTINGS.projects_folder, info.data["name"]))
         return base_dir
 
     @field_validator("tmp_dir")
-    def check_tmp_dir(cls, tmp_dir: str, values: dict) -> str:
+    def check_tmp_dir(cls, tmp_dir: str, info: ValidationInfo) -> str:
         """
         Validator to set the default of tmp_dir based on the base_dir
         """
         if not tmp_dir:
-            return str(Path(values["base_dir"], "tmp"))
+            return str(Path(info.data["base_dir"], "tmp"))
         return tmp_dir
 
     @field_validator("log_dir")
-    def check_log_dir(cls, log_dir: str, values: dict) -> str:
+    def check_log_dir(cls, log_dir: str, info: ValidationInfo) -> str:
         """
         Validator to set the default of log_dir based on the base_dir
         """
         if not log_dir:
-            return str(Path(values["base_dir"], "log"))
+            return str(Path(info.data["base_dir"], "log"))
         return log_dir
 
     @field_validator("daemon_dir")
-    def check_daemon_dir(cls, daemon_dir: str, values: dict) -> str:
+    def check_daemon_dir(cls, daemon_dir: str, info: ValidationInfo) -> str:
         """
         Validator to set the default of daemon_dir based on the base_dir
         """
         if not daemon_dir:
-            return str(Path(values["base_dir"], "daemon"))
+            return str(Path(info.data["base_dir"], "daemon"))
         return daemon_dir
 
     @field_validator("jobstore")
-    def check_jobstore(cls, jobstore: dict, values: dict) -> dict:
+    def check_jobstore(cls, jobstore: dict) -> dict:
         """
         Check that the jobstore configuration could be converted to a JobStore.
         """
@@ -492,7 +498,7 @@ class Project(BaseModel):
         return jobstore
 
     @field_validator("queue")
-    def check_queue(cls, queue: dict, values: dict) -> dict:
+    def check_queue(cls, queue: dict) -> dict:
         """
         Check that the queue configuration could be converted to a Store.
         """

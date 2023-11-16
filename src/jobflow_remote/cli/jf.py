@@ -42,6 +42,16 @@ def main(
             is_eager=True,
         ),
     ] = False,
+    profile: Annotated[
+        bool,
+        typer.Option(
+            "--profile",
+            "-prof",
+            help="Profile the command execution and provide a report at the end. For developers",
+            is_eager=True,
+            hidden=True,
+        ),
+    ] = False,
 ):
     """
     The controller CLI for jobflow-remote
@@ -50,6 +60,12 @@ def main(
 
     if full_exc:
         SETTINGS.cli_full_exc = True
+
+    if profile:
+        from cProfile import Profile
+
+        profiler = Profile()
+        profiler.enable()
 
     initialize_cli_logger(
         level=SETTINGS.cli_log_level.to_logging(), full_exc_info=SETTINGS.cli_full_exc
@@ -75,3 +91,10 @@ def main(
         out_console.print(text)
     except ConfigError as e:
         out_console.print(f"Current project could not be determined: {e}", style="red")
+
+    if profile:
+        profiler.disable()
+        import pstats
+
+        stats = pstats.Stats(profiler).sort_stats("cumtime")
+        stats.print_stats()

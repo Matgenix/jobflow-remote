@@ -34,7 +34,8 @@ dependencies =[
     "rich",
     "psutil",
     "supervisor",
-    "ruamel.yaml"
+    "ruamel.yaml",
+    "schedule"
 ]
 
 [project.optional-dependencies]

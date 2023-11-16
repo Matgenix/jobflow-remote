@@ -11,6 +11,7 @@ from collections import defaultdict, namedtuple
 from datetime import datetime
 from pathlib import Path
 
+import schedule
 from fireworks import FWorker
 from monty.os import makedirs_p
 from qtoolkit.core.data_objects import QState, SubmissionStatus
@@ -72,6 +73,11 @@ class Runner:
                     break
             else:
                 self.hosts[wname] = new_host
+        self.limited_workers = {
+            name: {"max": w.max_jobs, "current": 0}
+            for name, w in self.workers.items()
+            if w.max_jobs
+        }
         self.queue_managers: dict = {}
         log_level = log_level if log_level is not None else self.project.log_level
         initialize_runner_logger(
@@ -124,10 +130,6 @@ class Runner:
         checkout: bool = True,
     ):
         signal.signal(signal.SIGTERM, self.handle_signal)
-        last_checkout_time = 0.0
-        last_check_run_status_time = 0.0
-        wait_advance_status = False
-        last_advance_status = 0.0
 
         states = []
         if transfer:
@@ -142,38 +144,77 @@ class Runner:
             f"Runner run options: transfer: {transfer} complete: {complete} slurm: {slurm} checkout: {checkout}"
         )
 
+        # run a first call for each case, since schedule will wait for the delay
+        # to make the first execution.
+        if checkout:
+            self.checkout()
+            schedule.every(self.runner_options.delay_checkout).seconds.do(self.checkout)
+
+        if transfer or slurm or complete:
+            self.advance_state(states)
+            schedule.every(self.runner_options.delay_advance_status).seconds.do(
+                self.advance_state, states=states
+            )
+
+        if slurm:
+            self.check_run_status()
+            schedule.every(self.runner_options.delay_check_run_status).seconds.do(
+                self.check_run_status
+            )
+            # Limited workers will only affect the process interacting with the queue
+            # manager. When a job is submitted or terminated the count in the
+            # limited_workers can be directly updated, since by construction only one
+            # process will take care of the queue state.
+            # The refresh can be run on a relatively high delay since it should only
+            # account for actions from the user (e.g. rerun, cancel), that can alter
+            # the number of submitted/running jobs.
+            if self.limited_workers:
+                self.refresh_num_current_jobs()
+                schedule.every(self.runner_options.delay_refresh_limited).seconds.do(
+                    self.refresh_num_current_jobs
+                )
+
+        if complete:
+            self.advance_state(states)
+            schedule.every(self.runner_options.delay_advance_status).seconds.do(
+                self.advance_state, states=states
+            )
+
+        logger.debug(f"ALL JOBS: {schedule.get_jobs()}")
+
         try:
             while True:
                 if self.stop_signal:
                     logger.info("stopping due to sigterm")
                     break
-                now = time.time()
-                if (
-                    checkout
-                    and last_checkout_time + self.runner_options.delay_checkout < now
-                ):
-                    self.checkout()
-                    last_checkout_time = time.time()
-                elif slurm and (
-                    last_check_run_status_time
-                    + self.runner_options.delay_check_run_status
-                    < now
-                ):
-                    self.check_run_status()
-                    last_check_run_status_time = time.time()
-                elif (transfer or complete or slurm) and (
-                    not wait_advance_status
-                    or last_advance_status + self.runner_options.delay_advance_status
-                    < now
-                ):
-                    updated = self.advance_state(states)
-                    wait_advance_status = not updated
-                    if not updated:
-                        last_advance_status = time.time()
-
+                schedule.run_pending()
                 time.sleep(1)
         finally:
             self.cleanup()
+
+    def _get_limited_worker_query(self, states: list[str]) -> dict | None:
+        states = [s for s in states if s != JobState.UPLOADED.value]
+
+        available_workers = [w for w in self.workers if w not in self.limited_workers]
+        for worker, status in self.limited_workers.items():
+            if status["current"] < status["max"]:
+                available_workers.append(worker)
+
+        states_query = {"state": {"$in": states}}
+        uploaded_query = {
+            "state": JobState.UPLOADED.value,
+            "worker": {"$in": available_workers},
+        }
+
+        if states and available_workers:
+            query = {"$or": [states_query, uploaded_query]}
+            return query
+        elif states:
+            return states_query
+        elif available_workers:
+            return uploaded_query
+
+        return None
 
     def advance_state(self, states: list[str]):
         states_methods = {
@@ -183,19 +224,29 @@ class Runner:
             JobState.DOWNLOADED: self.complete_job,
         }
 
-        with self.job_controller.lock_job_for_update(
-            states=states,
-            max_step_attempts=self.runner_options.max_step_attempts,
-            delta_retry=self.runner_options.delta_retry,
-        ) as lock:
-            doc = lock.locked_document
-            if not doc:
-                return False
+        while True:
+            # handle the case of workers with limited number of jobs
+            if self.limited_workers and JobState.UPLOADED.value in states:
+                logger.debug(f"LIMITED WORKER: {self.limited_workers}")
+                query = self._get_limited_worker_query(states=states)
+                logger.debug(f"QUERY: {query}")
+                if not query:
+                    return
+            else:
+                query = {"state": {"$in": states}}
 
-            state = JobState(doc["state"])
+            with self.job_controller.lock_job_for_update(
+                query=query,
+                max_step_attempts=self.runner_options.max_step_attempts,
+                delta_retry=self.runner_options.delta_retry,
+            ) as lock:
+                doc = lock.locked_document
+                if not doc:
+                    return
 
-            states_methods[state](lock)
-            return True
+                state = JobState(doc["state"])
+
+                states_methods[state](lock)
 
     def upload(self, lock):
         doc = lock.locked_document
@@ -308,6 +359,8 @@ class Runner:
                     "state": JobState.SUBMITTED.value,
                 }
             }
+            if job_doc.worker in self.limited_workers:
+                self.limited_workers[job_doc.worker]["current"] += 1
         else:
             raise RemoteError(
                 f"unhandled submission status {submit_result.status}", True
@@ -321,8 +374,8 @@ class Runner:
         job = job_doc.job
 
         # If the worker is local do not copy the files in the temporary folder
-        # TODO it could be possible to go directly from
-        #  SUBMITTED/RUNNING to DOWNLOADED instead
+        # It should not arrive to this point, since it should go directly
+        # from SUBMITTED/RUNNING to DOWNLOADED in case of local worker
         worker = self.get_worker(job_doc.worker)
         if worker.type != "local":
             host = self.get_host(job_doc.worker)
@@ -442,7 +495,13 @@ class Runner:
                         f"remote job with id {remote_doc['process_id']} is running"
                     )
                 elif qstate in [None, QState.DONE, QState.FAILED]:
-                    next_state = JobState.TERMINATED
+                    worker = self.get_worker(worker_name)
+                    # if the worker is local go directly to DOWNLOADED, as files
+                    # are not copied locally
+                    if worker.type != "local":
+                        next_state = JobState.TERMINATED
+                    else:
+                        next_state = JobState.DOWNLOADED
                     logger.debug(
                         f"terminated remote job with id {remote_doc['process_id']}"
                     )
@@ -456,10 +515,13 @@ class Runner:
                 # next state has been set.
                 # Only update if the state did not change in the meanwhile
                 if next_state or error:
-                    lock_filter = {"uuid": doc["uuid"], "index": doc["index"]}
+                    lock_filter = {
+                        "uuid": doc["uuid"],
+                        "index": doc["index"],
+                        "state": doc["state"],
+                    }
                     with self.job_controller.lock_job_for_update(
-                        states=doc["state"],
-                        additional_filter=lock_filter,
+                        query=lock_filter,
                         max_step_attempts=self.runner_options.max_step_attempts,
                         delta_retry=self.runner_options.delta_retry,
                     ) as lock:
@@ -477,6 +539,12 @@ class Runner:
                             if start_time:
                                 set_output["$set"]["start_time"] = start_time
                             lock.update_on_release = set_output
+                    # decrease the amount of jobs running if it is a limited worker
+                    if (
+                        next_state in (JobState.TERMINATED, JobState.DOWNLOADED)
+                        and worker_name in self.limited_workers
+                    ):
+                        self.limited_workers[doc["worker"]]["current"] -= 1
 
     def checkout(self):
         logger.debug("checkout jobs")
@@ -489,6 +557,14 @@ class Runner:
             n_checked_out += 1
 
         logger.debug(f"checked out {n_checked_out} jobs")
+
+    def refresh_num_current_jobs(self):
+        for name, state in self.limited_workers.items():
+            query = {
+                "state": {"$in": [JobState.SUBMITTED.value, JobState.RUNNING.value]},
+                "worker": name,
+            }
+            state["current"] = self.job_controller.count_jobs(query)
 
     def cleanup(self):
         for worker_name, host in self.hosts.items():

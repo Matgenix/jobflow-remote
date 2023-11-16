@@ -1274,6 +1274,9 @@ class JobController:
     def get_jobs(self, query, projection: list | dict | None = None):
         return list(self.jobs.find(query, projection=projection))
 
+    def count_jobs(self, query):
+        return self.jobs.count_documents(query)
+
     def get_jobs_info_by_flow_uuid(
         self, flow_uuid, projection: list | dict | None = None
     ):
@@ -1780,21 +1783,13 @@ class JobController:
     @contextlib.contextmanager
     def lock_job_for_update(
         self,
-        states,
+        query,
         max_step_attempts,
         delta_retry,
-        additional_filter=None,
         **kwargs,
     ):
-        if not isinstance(states, (list, tuple)):
-            states = [states]
-
-        db_filter = {
-            "state": {"$in": states},
-            "remote.retry_time_limit": {"$not": {"$gt": datetime.utcnow()}},
-        }
-        if additional_filter:
-            db_filter = deep_merge_dict(db_filter, additional_filter)
+        db_filter = dict(query)
+        db_filter["remote.retry_time_limit"] = {"$not": {"$gt": datetime.utcnow()}}
 
         if "sort" not in kwargs:
             kwargs["sort"] = [
