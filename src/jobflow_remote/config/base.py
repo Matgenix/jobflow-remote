@@ -3,7 +3,7 @@ import logging
 import traceback
 from enum import Enum
 from pathlib import Path
-from typing import Annotated, Literal, Optional, Union
+from typing import TYPE_CHECKING, Annotated, Literal, Optional, Union
 
 from jobflow import JobStore
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -14,6 +14,9 @@ from jobflow_remote.remote.host import BaseHost, LocalHost, RemoteHost
 from jobflow_remote.utils.data import store_from_dict
 
 DEFAULT_JOBSTORE = {"docs_store": {"type": "MemoryStore"}}
+
+if TYPE_CHECKING:
+    from pydantic import ValidationInfo
 
 
 class RunnerOptions(BaseModel):
@@ -133,7 +136,7 @@ class WorkerBase(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     @field_validator("scheduler_type")
-    def check_scheduler_type(cls, scheduler_type: str, values: dict) -> str:
+    def check_scheduler_type(cls, scheduler_type: str, values: ValidationInfo) -> str:
         """
         Validator to set the default of scheduler_type
         """
@@ -433,45 +436,45 @@ class Project(BaseModel):
         return RemoteLaunchPad(self.get_queue_store())
 
     @field_validator("base_dir")
-    def check_base_dir(cls, base_dir: str, values: dict) -> str:
+    def check_base_dir(cls, base_dir: str, values: ValidationInfo) -> str:
         """
         Validator to set the default of base_dir based on the project name
         """
         if not base_dir:
             from jobflow_remote import SETTINGS
 
-            return str(Path(SETTINGS.projects_folder, values["name"]))
+            return str(Path(SETTINGS.projects_folder, values.data["name"]))
         return base_dir
 
     @field_validator("tmp_dir")
-    def check_tmp_dir(cls, tmp_dir: str, values: dict) -> str:
+    def check_tmp_dir(cls, tmp_dir: str, values: ValidationInfo) -> str:
         """
         Validator to set the default of tmp_dir based on the base_dir
         """
         if not tmp_dir:
-            return str(Path(values["base_dir"], "tmp"))
+            return str(Path(values.data["base_dir"], "tmp"))
         return tmp_dir
 
     @field_validator("log_dir")
-    def check_log_dir(cls, log_dir: str, values: dict) -> str:
+    def check_log_dir(cls, log_dir: str, values: ValidationInfo) -> str:
         """
         Validator to set the default of log_dir based on the base_dir
         """
         if not log_dir:
-            return str(Path(values["base_dir"], "log"))
+            return str(Path(values.data["base_dir"], "log"))
         return log_dir
 
     @field_validator("daemon_dir")
-    def check_daemon_dir(cls, daemon_dir: str, values: dict) -> str:
+    def check_daemon_dir(cls, daemon_dir: str, values: ValidationInfo) -> str:
         """
         Validator to set the default of daemon_dir based on the base_dir
         """
         if not daemon_dir:
-            return str(Path(values["base_dir"], "daemon"))
+            return str(Path(values.data["base_dir"], "daemon"))
         return daemon_dir
 
     @field_validator("jobstore")
-    def check_jobstore(cls, jobstore: dict, values: dict) -> dict:
+    def check_jobstore(cls, jobstore: dict, values: ValidationInfo) -> dict:
         """
         Check that the jobstore configuration could be converted to a JobStore.
         """
@@ -488,7 +491,7 @@ class Project(BaseModel):
         return jobstore
 
     @field_validator("queue")
-    def check_queue(cls, queue: dict, values: dict) -> dict:
+    def check_queue(cls, queue: dict, values: ValidationInfo) -> dict:
         """
         Check that the queue configuration could be converted to a Store.
         """
