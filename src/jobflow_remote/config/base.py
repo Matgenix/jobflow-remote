@@ -3,10 +3,10 @@ import logging
 import traceback
 from enum import Enum
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, Literal, Optional, Union
+from typing import Annotated, Literal, Optional, Union
 
 from jobflow import JobStore
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator
 from qtoolkit.io import BaseSchedulerIO, scheduler_mapping
 
 from jobflow_remote.fireworks.launchpad import RemoteLaunchPad
@@ -14,9 +14,6 @@ from jobflow_remote.remote.host import BaseHost, LocalHost, RemoteHost
 from jobflow_remote.utils.data import store_from_dict
 
 DEFAULT_JOBSTORE = {"docs_store": {"type": "MemoryStore"}}
-
-if TYPE_CHECKING:
-    from pydantic import ValidationInfo
 
 
 class RunnerOptions(BaseModel):
