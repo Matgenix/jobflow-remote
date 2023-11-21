@@ -227,6 +227,16 @@ class RemoteHost(BaseHost):
         self.connect()
         return remote_cmd(*args, **kwargs)
 
+    def listdir(self, path: str | Path):
+        self._check_connected()
+
+        self._execute_remote_func(self.connection.sftp().listdir, str(path))
+
+    def remove(self, path: str | Path):
+        self._check_connected()
+
+        self._execute_remote_func(self.connection.sftp().remove, str(path))
+
     def _check_connected(self) -> bool:
         """
         Helper method to determine if fabric consider the connection open and

@@ -83,7 +83,6 @@ def initialize_cli_logger(level: int = logging.WARNING, full_exc_info: bool = Tr
         "version": 1,
         "disable_existing_loggers": True,
         "formatters": {
-            # "standard": {"format": "%(message)s", "datefmt": "[%X]"},
             "cli_formatter": {
                 "()": lambda: CLIFormatter(
                     log_exception_trace=full_exc_info, datefmt="[%X]"
@@ -101,6 +100,42 @@ def initialize_cli_logger(level: int = logging.WARNING, full_exc_info: bool = Tr
         "loggers": {
             "jobflow_remote": {  # root logger
                 "handlers": ["rich"],
+                "level": level,
+                "propagate": False,
+            },
+        },
+    }
+
+    logging.config.dictConfig(config)
+
+
+def initialize_remote_run_log(level: int = logging.INFO):
+    """
+    Initialize the logger for the execution of the jobs.
+
+    Parameters
+    ----------
+    level
+        The log level.
+    """
+
+    config = {
+        "version": 1,
+        "disable_existing_loggers": True,
+        "formatters": {
+            "standard": {"format": "%(asctime)s [%(levelname)s] %(name)s: %(message)s"},
+        },
+        "handlers": {
+            "stream": {
+                "level": level,
+                "formatter": "standard",
+                "class": "logging.StreamHandler",
+                "stream": "ext://sys.stdout",  # Default is stderr
+            },
+        },
+        "loggers": {
+            "jobflow_remote": {  # root logger
+                "handlers": ["stream"],
                 "level": level,
                 "propagate": False,
             },

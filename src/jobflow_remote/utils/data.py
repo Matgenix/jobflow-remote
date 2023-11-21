@@ -77,7 +77,9 @@ def check_dict_keywords(obj: Any, keywords: list[str]) -> bool:
     return False
 
 
-def uuid_to_path(uuid: str, index: int = 1, num_subdirs: int = 3, subdir_len: int = 2):
+def uuid_to_path(
+    uuid: str, index: int | None = 1, num_subdirs: int = 3, subdir_len: int = 2
+):
     u = UUID(uuid)
     u_hex = u.hex
 
@@ -88,7 +90,9 @@ def uuid_to_path(uuid: str, index: int = 1, num_subdirs: int = 3, subdir_len: in
     ]
 
     # add the index to the final dir name
-    dir_name = f"{uuid}_{index}"
+    dir_name = f"{uuid}"
+    if index is not None:
+        dir_name += f"_{index}"
 
     # Combine root directory and subdirectories to form the final path
     return os.path.join(*subdirs, dir_name)

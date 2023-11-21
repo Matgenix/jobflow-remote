@@ -53,21 +53,21 @@ class JobController:
         queue_store: MongoStore,
         jobstore: JobStore,
         flows_collection: str = "flows",
-        id_generator_collection: str = "job_id_generator",
+        auxiliary_collection: str = "jf_auxiliary",
         project: Project | None = None,
     ):
         self.queue_store = queue_store
         self.jobstore = jobstore
         self.jobs_collection = self.queue_store.collection_name
         self.flows_collection = flows_collection
-        self.id_generator_collection = id_generator_collection
+        self.auxiliary_collection = auxiliary_collection
         # TODO should it connect here? Or the passed stored should be connected?
         self.queue_store.connect()
         self.jobstore.connect()
         self.db = self.queue_store._collection.database
         self.jobs = self.queue_store._collection
         self.flows = self.db[self.flows_collection]
-        self.id_generator = self.db[self.id_generator_collection]
+        self.auxiliary = self.db[self.auxiliary_collection]
         self.project = project
 
     @classmethod
@@ -1177,8 +1177,8 @@ class JobController:
 
         self.jobs.drop()
         self.flows.drop()
-        self.id_generator.drop()
-        self.id_generator.insert_one({"next_id": 1})
+        self.auxiliary.drop()
+        self.auxiliary.insert_one({"next_id": 1})
         self.build_indexes()
         return True
 
@@ -1301,8 +1301,10 @@ class JobController:
         jobs_list = list(flow.iterflow())
         job_dicts = []
         n_jobs = len(jobs_list)
-        first_id = self.id_generator.find_one_and_update(
-            {}, {"$inc": {"next_id": n_jobs}}
+        # TODO check if output is None. In that case the DB has not been reset
+        # raise an error to signal it and propose the solution.
+        first_id = self.auxiliary.find_one_and_update(
+            {"next_id": {"$exists": True}}, {"$inc": {"next_id": n_jobs}}
         )["next_id"]
         db_ids = []
         for (job, parents), db_id in zip(jobs_list, range(first_id, first_id + n_jobs)):
@@ -1360,8 +1362,8 @@ class JobController:
         # add new jobs
         jobs_list = list(new_flow.iterflow())
         n_new_jobs = len(jobs_list)
-        first_id = self.id_generator.find_one_and_update(
-            {}, {"$inc": {"next_id": n_new_jobs}}
+        first_id = self.auxiliary.find_one_and_update(
+            {"next_id": {"$exists": True}}, {"$inc": {"next_id": n_new_jobs}}
         )["next_id"]
         job_dicts = []
         for (job, parents), db_id in zip(
@@ -1944,6 +1946,26 @@ class JobController:
                 logger.warning(
                     f"The connection to host {host} could not be closed.", exc_info=True
                 )
+
+    def get_batch_processes(self, worker: str) -> dict[str, str]:
+        result = self.auxiliary.find_one({"batch_processes": {"$exists": True}})
+        if result:
+            return result["batch_processes"].get(worker)
+        return {}
+
+    def add_batch_process(self, process_id: str, process_uuid: str, worker: str):
+        self.auxiliary.find_one_and_update(
+            {"batch_processes": {"$exists": True}},
+            {"$push": {f"batch_processes.{worker}.{process_id}": process_uuid}},
+            upsert=True,
+        )
+
+    def remove_batch_process(self, process_id: str, worker: str):
+        self.auxiliary.find_one_and_update(
+            {"batch_processes": {"$exists": True}},
+            {"$unset": {f"batch_processes.{worker}.{process_id}": ""}},
+            upsert=True,
+        )
 
 
 def get_flow_leafs(job_docs: list[dict]) -> list[dict]:

@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import datetime
 import glob
+import logging
 import os
+import subprocess
+import time
 import traceback
 from pathlib import Path
 
@@ -12,15 +15,22 @@ from monty.os import cd
 from monty.serialization import dumpfn, loadfn
 from monty.shutil import decompress_file
 
+from jobflow_remote.jobs.batch import LocalBatchManager
 from jobflow_remote.jobs.data import IN_FILENAME, OUT_FILENAME
 from jobflow_remote.remote.data import (
     default_orjson_serializer,
+    get_job_path,
     get_remote_store_filenames,
 )
+from jobflow_remote.utils.log import initialize_remote_run_log
+
+logger = logging.getLogger(__name__)
 
 
 def run_remote_job(run_dir: str | Path = "."):
     """Run the job"""
+
+    initialize_remote_run_log()
 
     start_time = datetime.datetime.utcnow()
     with cd(run_dir):
@@ -70,6 +80,70 @@ def run_remote_job(run_dir: str | Path = "."):
                 "end_time": datetime.datetime.utcnow(),
             }
             dumpfn(output, OUT_FILENAME)
+
+
+def run_batch_jobs(
+    base_run_dir: str | Path,
+    files_dir: str | Path,
+    process_uuid: str,
+    max_time: int | None = None,
+    max_wait: int = 60,
+    max_jobs: int | None = None,
+):
+    initialize_remote_run_log()
+
+    # TODO the ID should be somehow linked to the queue job
+    bm = LocalBatchManager(files_dir=files_dir, process_id=process_uuid)
+
+    t0 = time.time()
+    wait = 0
+    sleep_time = 10
+    count = 0
+    while True:
+        if max_time and max_time < time.time() - t0:
+            logger.info("Stopping due to max_time")
+            return
+
+        if max_wait and wait > max_wait:
+            logger.info(f"No jobs available for more than {max_wait}. Stopping.")
+            return
+
+        if max_jobs and count >= max_jobs:
+            logger.info(f"Maximum number of jobs reached ({max_jobs}). Stopping.")
+            return
+
+        job_str = bm.get_job()
+        if not job_str:
+            time.sleep(sleep_time)
+            wait += sleep_time
+        else:
+            wait = 0
+            count += 1
+            job_id, index = job_str.split("_")
+            index = int(index)
+            logger.info(f"Starting job with id {job_id} and index {index}")
+            job_path = get_job_path(job_id=job_id, index=index, base_path=base_run_dir)
+            try:
+                with cd(job_path):
+                    result = subprocess.run(
+                        ["bash", "submit.sh"],
+                        check=True,
+                        text=True,
+                        capture_output=True,
+                    )
+                    if result.returncode:
+                        logger.warning(
+                            f"Process for job with id {job_id} and index {index} finished with an error"
+                        )
+                # run_remote_job(job_path)
+                bm.terminate_job(job_id, index)
+            except Exception:
+                logger.error(
+                    "Error while running job with id {job_id} and index {index}",
+                    exc_info=True,
+                )
+            else:
+                logger.info(f"Completed job with id {job_id} and index {index}")
 
 
 def decompress_files(store: JobStore):

@@ -14,7 +14,9 @@ from monty.json import jsanitize
 from jobflow_remote.utils.data import uuid_to_path
 
 
-def get_job_path(job_id: str, index: int, base_path: str | Path | None = None) -> str:
+def get_job_path(
+    job_id: str, index: int | None, base_path: str | Path | None = None
+) -> str:
     if base_path:
         base_path = Path(base_path)
     else:

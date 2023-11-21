@@ -105,6 +105,26 @@ class LogLevel(str, Enum):
         }[self]
 
 
+class BatchConfig(BaseModel):
+    jobs_handle_dir: Path = Field(
+        description="Absolute path to a folder that will be used to store information to share with the jobs being executed"
+    )
+    work_dir: Path = Field(
+        description="Absolute path to a folder where the batch jobs will be executed"
+    )
+    max_jobs: Optional[int] = Field(
+        None, description="Maximum number of jobs executed in a single run in the queue"
+    )
+    max_wait: Optional[int] = Field(
+        60,
+        description="Maximum time to wait before stopping if no new jobs are available to run (seconds)",
+    )
+    max_time: Optional[int] = Field(
+        None,
+        description="Maximum time after which a job will not submit more jobs (seconds). To help avoid hitting the walltime",
+    )
+
+
 class WorkerBase(BaseModel):
     """
     Base class defining the common field for the different types of Worker.
@@ -143,6 +163,10 @@ class WorkerBase(BaseModel):
         None,
         description="The maximum number of jobs that can be submitted to the queue.",
         ge=0,
+    )
+    batch: Optional[BatchConfig] = Field(
+        None,
+        description="Options for batch execution. If define the worker will be considered a batch worker",
     )
     model_config = ConfigDict(extra="forbid")
 
@@ -190,6 +214,10 @@ class WorkerBase(BaseModel):
         -------
         A dictionary with the Worker short information.
         """
+
+    @property
+    def is_local(self) -> bool:
+        return self.type == "local"
 
 
 class LocalWorker(WorkerBase):

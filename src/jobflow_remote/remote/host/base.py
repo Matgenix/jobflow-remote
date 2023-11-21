@@ -79,6 +79,14 @@ class BaseHost(MSONable):
 
         return msg
 
+    @abc.abstractmethod
+    def listdir(self, path: str | Path):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def remove(self, path: str | Path):
+        raise NotImplementedError
+
 
 class HostError(Exception):
     pass

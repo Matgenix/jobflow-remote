@@ -18,6 +18,8 @@ class JobState(Enum):
     PAUSED = "PAUSED"
     STOPPED = "STOPPED"
     CANCELLED = "CANCELLED"
+    BATCH_SUBMITTED = "BATCH_SUBMITTED"
+    BATCH_RUNNING = "BATCH_RUNNING"
 
     @property
     def short_value(self) -> str:
