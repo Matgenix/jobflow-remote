@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import datetime
+import time
+
 from monty.json import jsanitize
 from rich.scope import render_scope
 from rich.table import Table
@@ -9,9 +12,12 @@ from jobflow_remote.cli.utils import ReprStr, fmt_datetime
 from jobflow_remote.config.base import ExecutionConfig, WorkerBase
 from jobflow_remote.jobs.data import FlowInfo, JobInfo
 from jobflow_remote.jobs.state import JobState
+from jobflow_remote.utils.data import convert_utc_time
 
 
 def get_job_info_table(jobs_info: list[JobInfo], verbosity: int):
+    time_zone_str = f" [{time.tzname[0]}]"
+
     table = Table(title="Jobs info")
     table.add_column("DB id")
     table.add_column("Name")
@@ -19,19 +25,19 @@ def get_job_info_table(jobs_info: list[JobInfo], verbosity: int):
     table.add_column("Job id  (Index)")
 
     table.add_column("Worker")
-    table.add_column("Last updated")
+    table.add_column("Last updated" + time_zone_str)
 
     if verbosity >= 1:
         table.add_column("Queue id")
         table.add_column("Run time")
-        table.add_column("Retry time")
+        table.add_column("Retry time" + time_zone_str)
         table.add_column("Prev state")
         if verbosity < 2:
             table.add_column("Locked")
 
     if verbosity >= 2:
         table.add_column("Lock id")
-        table.add_column("Lock time")
+        table.add_column("Lock time" + time_zone_str)
 
     for ji in jobs_info:
         state = ji.state.name
@@ -45,7 +51,7 @@ def get_job_info_table(jobs_info: list[JobInfo], verbosity: int):
             Text.from_markup(state),
             f"{ji.uuid}  ({ji.index})",
             ji.worker,
-            ji.updated_on.strftime(fmt_datetime),
+            convert_utc_time(ji.updated_on).strftime(fmt_datetime),
         ]
 
         if verbosity >= 1:
@@ -63,7 +69,7 @@ def get_job_info_table(jobs_info: list[JobInfo], verbosity: int):
             else:
                 row.append("")
             row.append(
-                ji.remote.retry_time_limit.strftime(fmt_datetime)
+                convert_utc_time(ji.remote.retry_time_limit).strftime(fmt_datetime)
                 if ji.remote.retry_time_limit
                 else None
             )
@@ -73,7 +79,11 @@ def get_job_info_table(jobs_info: list[JobInfo], verbosity: int):
 
         if verbosity >= 2:
             row.append(str(ji.lock_id))
-            row.append(ji.lock_time.strftime(fmt_datetime) if ji.lock_time else None)
+            row.append(
+                convert_utc_time(ji.lock_time).strftime(fmt_datetime)
+                if ji.lock_time
+                else None
+            )
 
         table.add_row(*row)
 
@@ -81,13 +91,15 @@ def get_job_info_table(jobs_info: list[JobInfo], verbosity: int):
 
 
 def get_flow_info_table(flows_info: list[FlowInfo], verbosity: int):
+    time_zone_str = f" [{time.tzname[0]}]"
+
     table = Table(title="Flows info")
     table.add_column("DB id")
     table.add_column("Name")
     table.add_column("State")
     table.add_column("Flow id")
     table.add_column("Num Jobs")
-    table.add_column("Last updated")
+    table.add_column("Last updated" + time_zone_str)
 
     if verbosity >= 1:
         table.add_column("Workers")
@@ -104,7 +116,7 @@ def get_flow_info_table(flows_info: list[FlowInfo], verbosity: int):
             fi.state.name,
             fi.flow_id,
             str(len(fi.job_ids)),
-            fi.updated_on.strftime(fmt_datetime),
+            convert_utc_time(fi.updated_on).strftime(fmt_datetime),
         ]
 
         if verbosity >= 1:
@@ -119,7 +131,11 @@ def get_flow_info_table(flows_info: list[FlowInfo], verbosity: int):
 
 
 def format_job_info(job_info: JobInfo, show_none: bool = False):
-    d = job_info.dict(exclude_none=True)
+    d = job_info.dict(exclude_none=not show_none)
+
+    for k, v in d.items():
+        if isinstance(v, datetime.datetime):
+            d[k] = convert_utc_time(v)
 
     d = jsanitize(d, allow_bson=False, enum_values=True)
     error = d.get("error")

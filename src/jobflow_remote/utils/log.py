@@ -27,6 +27,7 @@ def initialize_runner_logger(
     # runner is started.
     makedirs_p(log_folder)
 
+    print("!!!", runner_id)
     if runner_id:
         msg_format = f"%(asctime)s [%(levelname)s] ID {runner_id} %(name)s: %(message)s"
     else:

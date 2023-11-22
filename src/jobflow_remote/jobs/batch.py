@@ -45,6 +45,11 @@ class RemoteBatchManager:
 
     def _init_files_dir(self):
         self.host.connect()
+        # Note that the check of the creation of the folders on a remote host
+        # slows down the start of the runner by a few seconds.
+        # If this proves to be an issue the folder creation should be moved
+        # somewhere else and guaranteed in some other way (e.g. a CLI command
+        # for the user?).
         self.host.mkdir(self.files_dir)
         self.host.mkdir(self.submitted_dir)
         self.host.mkdir(self.running_dir)
@@ -54,7 +59,7 @@ class RemoteBatchManager:
     def submit_job(self, job_id: str, index: int):
         self.host.write_text_file(self.submitted_dir / f"{job_id}_{index}", "")
 
-    def get_submitted(self) -> int:
+    def get_submitted(self) -> list[str]:
         return self.host.listdir(self.submitted_dir)
 
     def get_terminated(self) -> list[tuple[str, int, str]]:
@@ -67,8 +72,8 @@ class RemoteBatchManager:
 
     def get_running(self) -> list[tuple[str, int, str]]:
         running = []
-        for i in self.host.listdir(self.running_dir):
-            job_id, index, process_uuid = i.split("_")
+        for filename in self.host.listdir(self.running_dir):
+            job_id, index, process_uuid = filename.split("_")
             index = int(index)
             running.append((job_id, index, process_uuid))
         return running

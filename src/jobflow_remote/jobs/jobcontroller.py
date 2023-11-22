@@ -235,7 +235,7 @@ class JobController:
         )
         return self.get_jobs_info_query(query=query, sort=sort, limit=limit)
 
-    def get_jobs_doc_query(self, query: dict = None, **kwargs) -> list[JobInfo]:
+    def get_jobs_doc_query(self, query: dict = None, **kwargs) -> list[JobDoc]:
         data = self.jobs.find(query, **kwargs)
 
         jobs_data = []
@@ -257,7 +257,7 @@ class JobController:
         locked: bool = False,
         sort: list[tuple] | None = None,
         limit: int = 0,
-    ) -> list[JobInfo]:
+    ) -> list[JobDoc]:
         query = self._build_query_job(
             job_ids=job_ids,
             db_ids=db_ids,
@@ -1301,11 +1301,16 @@ class JobController:
         jobs_list = list(flow.iterflow())
         job_dicts = []
         n_jobs = len(jobs_list)
-        # TODO check if output is None. In that case the DB has not been reset
-        # raise an error to signal it and propose the solution.
-        first_id = self.auxiliary.find_one_and_update(
+
+        doc_next_id = self.auxiliary.find_one_and_update(
             {"next_id": {"$exists": True}}, {"$inc": {"next_id": n_jobs}}
-        )["next_id"]
+        )
+        if doc_next_id is None:
+            raise ValueError(
+                "It seems that the database has not been initialised. If that is the"
+                " case run `jf admin reset` or use the reset() method of JobController"
+            )
+        first_id = doc_next_id["next_id"]
         db_ids = []
         for (job, parents), db_id in zip(jobs_list, range(first_id, first_id + n_jobs)):
             db_ids.append(db_id)
@@ -1950,7 +1955,7 @@ class JobController:
     def get_batch_processes(self, worker: str) -> dict[str, str]:
         result = self.auxiliary.find_one({"batch_processes": {"$exists": True}})
         if result:
-            return result["batch_processes"].get(worker)
+            return result["batch_processes"].get(worker, {})
         return {}
 
     def add_batch_process(self, process_id: str, process_uuid: str, worker: str):

@@ -11,7 +11,6 @@ from collections import defaultdict, namedtuple
 from datetime import datetime
 from pathlib import Path
 
-import schedule
 from fireworks import FWorker
 from jobflow.utils import suuid
 from monty.os import makedirs_p
@@ -39,6 +38,7 @@ from jobflow_remote.remote.data import (
 from jobflow_remote.remote.host import BaseHost
 from jobflow_remote.remote.queue import ERR_FNAME, OUT_FNAME, QueueManager, set_name_out
 from jobflow_remote.utils.log import initialize_runner_logger
+from jobflow_remote.utils.schedule import SafeScheduler
 
 logger = logging.getLogger(__name__)
 
@@ -91,7 +91,7 @@ class Runner:
         initialize_runner_logger(
             log_folder=self.project.log_dir,
             level=log_level.to_logging(),
-            runner_id=runner_id,
+            runner_id=self.runner_id,
         )
         # TODO it could be better to create a pool of stores that are connected
         # How to deal with cases where the connection gets closed?
@@ -127,9 +127,6 @@ class Runner:
             )
         return self.queue_managers[worker_name]
 
-    def get_store(self, job_doc: JobDoc):
-        return job_doc.store or self.jobstore
-
     def run(
         self,
         transfer: bool = True,
@@ -152,21 +149,25 @@ class Runner:
             f"Runner run options: transfer: {transfer} complete: {complete} slurm: {slurm} checkout: {checkout}"
         )
 
+        scheduler = SafeScheduler(seconds_after_failure=120)
+
         # run a first call for each case, since schedule will wait for the delay
         # to make the first execution.
         if checkout:
             self.checkout()
-            schedule.every(self.runner_options.delay_checkout).seconds.do(self.checkout)
+            scheduler.every(self.runner_options.delay_checkout).seconds.do(
+                self.checkout
+            )
 
         if transfer or slurm or complete:
             self.advance_state(states)
-            schedule.every(self.runner_options.delay_advance_status).seconds.do(
+            scheduler.every(self.runner_options.delay_advance_status).seconds.do(
                 self.advance_state, states=states
             )
 
         if slurm:
             self.check_run_status()
-            schedule.every(self.runner_options.delay_check_run_status).seconds.do(
+            scheduler.every(self.runner_options.delay_check_run_status).seconds.do(
                 self.check_run_status
             )
             # Limited workers will only affect the process interacting with the queue
@@ -178,18 +179,18 @@ class Runner:
             # the number of submitted/running jobs.
             if self.limited_workers:
                 self.refresh_num_current_jobs()
-                schedule.every(self.runner_options.delay_refresh_limited).seconds.do(
+                scheduler.every(self.runner_options.delay_refresh_limited).seconds.do(
                     self.refresh_num_current_jobs
                 )
             if self.batch_workers:
                 self.update_batch_jobs()
-                schedule.every(self.runner_options.delay_check_run_status).seconds.do(
+                scheduler.every(self.runner_options.delay_update_batch).seconds.do(
                     self.update_batch_jobs
                 )
 
         if complete:
             self.advance_state(states)
-            schedule.every(self.runner_options.delay_advance_status).seconds.do(
+            scheduler.every(self.runner_options.delay_advance_status).seconds.do(
                 self.advance_state, states=states
             )
 
@@ -198,7 +199,7 @@ class Runner:
                 if self.stop_signal:
                     logger.info("stopping due to sigterm")
                     break
-                schedule.run_pending()
+                scheduler.run_pending()
                 time.sleep(1)
         finally:
             self.cleanup()
@@ -267,7 +268,7 @@ class Runner:
 
         worker = self.get_worker(job_doc.worker)
         host = self.get_host(job_doc.worker)
-        store = self.get_store(job_doc)
+        store = self.jobstore
         # TODO would it be better/feasible to keep a pool of the required
         # Stores already connected, to avoid opening and closing them?
         store.connect()
@@ -297,7 +298,7 @@ class Runner:
             logger.error(err_msg)
             raise RemoteError(err_msg, no_retry=False)
 
-        serialized_input = get_remote_in_file(job, remote_store, job_doc.store)
+        serialized_input = get_remote_in_file(job, remote_store)
 
         path_file = Path(remote_path, IN_FILENAME)
         host.put(serialized_input, str(path_file))
@@ -417,7 +418,7 @@ class Runner:
         worker = self.get_worker(job_doc.worker)
         if not worker.is_local:
             host = self.get_host(job_doc.worker)
-            store = self.get_store(job_doc)
+            store = self.jobstore
 
             remote_path = job_doc.run_dir
             local_base_dir = Path(self.project.tmp_dir, "download")
@@ -459,7 +460,7 @@ class Runner:
 
         try:
             job_doc = JobDoc(**doc)
-            store = self.get_store(job_doc)
+            store = self.jobstore
             completed = self.job_controller.complete_job(job_doc, local_path, store)
 
         except json.JSONDecodeError:
@@ -607,173 +608,170 @@ class Runner:
         logger.debug("update batch jobs")
         for worker_name, batch_manager in self.batch_workers.items():
             worker = self.get_worker(worker_name)
-            try:
-                # first check the processes that are running from the folder
-                #  and set them to running if needed
-                running_jobs = batch_manager.get_running()
-                for job_id, job_index, process_running_uuid in running_jobs:
-                    lock_filter = {
-                        "uuid": job_id,
-                        "index": job_index,
-                        "state": JobState.BATCH_SUBMITTED.value,
-                    }
-                    with self.job_controller.lock_job_for_update(
-                        query=lock_filter,
-                        max_step_attempts=self.runner_options.max_step_attempts,
-                        delta_retry=self.runner_options.delta_retry,
-                    ) as lock:
-                        if lock.locked_document:
-                            set_output = {
-                                "$set": {
-                                    "state": JobState.BATCH_RUNNING.value,
-                                    "start_time": datetime.utcnow(),
-                                    "remote.process_id": process_running_uuid,
-                                }
+            # first check the processes that are running from the folder
+            #  and set them to running if needed
+            running_jobs = batch_manager.get_running()
+            for job_id, job_index, process_running_uuid in running_jobs:
+                lock_filter = {
+                    "uuid": job_id,
+                    "index": job_index,
+                    "state": JobState.BATCH_SUBMITTED.value,
+                }
+                with self.job_controller.lock_job_for_update(
+                    query=lock_filter,
+                    max_step_attempts=self.runner_options.max_step_attempts,
+                    delta_retry=self.runner_options.delta_retry,
+                ) as lock:
+                    if lock.locked_document:
+                        set_output = {
+                            "$set": {
+                                "state": JobState.BATCH_RUNNING.value,
+                                "start_time": datetime.utcnow(),
+                                "remote.process_id": process_running_uuid,
                             }
-                            lock.update_on_release = set_output
-                # Check the processes that should be running on the remote queue
-                # and update the state in the DB if something changed
-                batch_processes_data = self.job_controller.get_batch_processes(
-                    worker_name
-                )
-                processes = list(batch_processes_data.keys())
-                queue_manager = self.get_queue_manager(worker_name)
-                if processes:
-                    qjobs = queue_manager.get_jobs_list(processes)
-                    running_processes = {qjob.job_id for qjob in qjobs}
-                    stopped_processes = set(processes) - running_processes
-                    for pid in stopped_processes:
-                        self.job_controller.remove_batch_process(pid, worker_name)
-                        # check if there are jobs that were in the running folder of a
-                        # process that finished and set them to remote error
-                        for job_id, job_index, process_running_uuid in running_jobs:
-                            if batch_processes_data[pid] == process_running_uuid:
-                                lock_filter = {
-                                    "uuid": job_id,
-                                    "index": job_index,
-                                    "state": {
-                                        "$in": (
-                                            JobState.BATCH_SUBMITTED.value,
-                                            JobState.BATCH_RUNNING.value,
-                                        )
-                                    },
-                                }
-                                with self.job_controller.lock_job_for_update(
-                                    query=lock_filter,
-                                    max_step_attempts=self.runner_options.max_step_attempts,
-                                    delta_retry=self.runner_options.delta_retry,
-                                ) as lock:
-                                    if lock.locked_document:
-                                        raise RuntimeError(
-                                            f"The batch process that was running the job (process_id: {pid}, uuid: {process_running_uuid} was likely killed before terminating the job execution"
-                                        )
-
-                    processes = list(running_processes)
-                # check that enough processes are submitted and submit the required
-                # amount to reach max_jobs, if needed.
-                n_jobs = self.job_controller.count_jobs(
-                    {
-                        "state": {
-                            "$in": (
-                                JobState.BATCH_SUBMITTED.value,
-                                JobState.BATCH_RUNNING.value,
-                            )
                         }
-                    }
-                )
-                n_processes = len(processes)
-                n_jobs_to_submit = min(
-                    max(worker.max_jobs - n_processes, 0), max(n_jobs - n_processes, 0)
-                )
-                logger.debug(f"submitting {n_jobs_to_submit} batch jobs")
-                for _ in range(n_jobs_to_submit):
-                    resources = worker.resources or {}
-                    process_running_uuid = suuid()
-                    remote_path = Path(
-                        get_job_path(process_running_uuid, None, worker.batch.work_dir)
-                    )
-                    qout_fpath = remote_path / OUT_FNAME
-                    qerr_fpath = remote_path / ERR_FNAME
-                    set_name_out(
-                        resources,
-                        f"batch_{process_running_uuid}",
-                        out_fpath=qout_fpath,
-                        err_fpath=qerr_fpath,
-                    )
+                        lock.update_on_release = set_output
 
-                    # note that here the worker.work_dir needs to be passed,
-                    # not the worker.batch.work_dir
-                    command = f"jf execution run-batch {worker.work_dir} {worker.batch.jobs_handle_dir} {process_running_uuid}"
-                    if worker.batch.max_jobs:
-                        command += f" -mj {worker.batch.max_jobs}"
-                    if worker.batch.max_time:
-                        command += f" -mt {worker.batch.max_time}"
-                    if worker.batch.max_wait:
-                        command += f" -mw {worker.batch.max_wait}"
-
-                    submit_result = queue_manager.submit(
-                        commands=[command],
-                        pre_run=worker.pre_run,
-                        post_run=worker.post_run,
-                        options=resources,
-                        work_dir=remote_path,
-                        create_submit_dir=True,
-                    )
-
-                    if submit_result.status == SubmissionStatus.FAILED:
-                        logger.error(f"submission failed. {repr(submit_result)}")
-                    elif submit_result.status == SubmissionStatus.JOB_ID_UNKNOWN:
-                        logger.error(
-                            f"submission succeeded but ID not known. Job may be running but status cannot be checked. {repr(submit_result)}"
-                        )
-
-                    elif submit_result.status == SubmissionStatus.SUCCESSFUL:
-                        self.job_controller.add_batch_process(
-                            submit_result.job_id, process_running_uuid, worker_name
-                        )
-                    else:
-                        logger.error(
-                            f"unhandled submission status {submit_result.status}", True
-                        )
-
-                # check for jobs that have terminated in the batch runner and
-                # update the DB state accordingly
-                terminated_jobs = batch_manager.get_terminated()
-                for job_id, job_index, process_running_uuid in terminated_jobs:
-                    lock_filter = {
-                        "uuid": job_id,
-                        "index": job_index,
-                        "state": {
-                            "$in": (
-                                JobState.BATCH_SUBMITTED.value,
-                                JobState.BATCH_RUNNING.value,
-                            )
-                        },
-                    }
-                    with self.job_controller.lock_job_for_update(
-                        query=lock_filter,
-                        max_step_attempts=self.runner_options.max_step_attempts,
-                        delta_retry=self.runner_options.delta_retry,
-                    ) as lock:
-                        if lock.locked_document:
-                            if not worker.is_local:
-                                next_state = JobState.TERMINATED
-                            else:
-                                next_state = JobState.DOWNLOADED
-                            set_output = {
-                                "$set": {
-                                    "state": next_state.value,
-                                    "remote.process_id": process_running_uuid,
-                                }
+            # Check the processes that should be running on the remote queue
+            # and update the state in the DB if something changed
+            batch_processes_data = self.job_controller.get_batch_processes(worker_name)
+            processes = list(batch_processes_data.keys())
+            queue_manager = self.get_queue_manager(worker_name)
+            if processes:
+                qjobs = queue_manager.get_jobs_list(processes)
+                running_processes = {qjob.job_id for qjob in qjobs}
+                stopped_processes = set(processes) - running_processes
+                for pid in stopped_processes:
+                    self.job_controller.remove_batch_process(pid, worker_name)
+                    # check if there are jobs that were in the running folder of a
+                    # process that finished and set them to remote error
+                    for job_id, job_index, process_running_uuid in running_jobs:
+                        if batch_processes_data[pid] == process_running_uuid:
+                            lock_filter = {
+                                "uuid": job_id,
+                                "index": job_index,
+                                "state": {
+                                    "$in": (
+                                        JobState.BATCH_SUBMITTED.value,
+                                        JobState.BATCH_RUNNING.value,
+                                    )
+                                },
                             }
-                            lock.update_on_release = set_output
-                    batch_manager.delete_terminated(
-                        [(job_id, job_index, process_running_uuid)]
+                            with self.job_controller.lock_job_for_update(
+                                query=lock_filter,
+                                max_step_attempts=self.runner_options.max_step_attempts,
+                                delta_retry=self.runner_options.delta_retry,
+                            ) as lock:
+                                if lock.locked_document:
+                                    raise RuntimeError(
+                                        f"The batch process that was running the job (process_id: {pid}, uuid: {process_running_uuid} was likely killed before terminating the job execution"
+                                    )
+
+                processes = list(running_processes)
+
+            # check that enough processes are submitted and submit the required
+            # amount to reach max_jobs, if needed.
+            n_jobs = self.job_controller.count_jobs(
+                {
+                    "state": {
+                        "$in": (
+                            JobState.BATCH_SUBMITTED.value,
+                            JobState.BATCH_RUNNING.value,
+                        )
+                    },
+                    "worker": worker_name,
+                }
+            )
+            n_processes = len(processes)
+            n_jobs_to_submit = min(
+                max(worker.max_jobs - n_processes, 0), max(n_jobs - n_processes, 0)
+            )
+            logger.debug(
+                f"submitting {n_jobs_to_submit} batch jobs for worker {worker_name}"
+            )
+            for _ in range(n_jobs_to_submit):
+                resources = worker.resources or {}
+                process_running_uuid = suuid()
+                remote_path = Path(
+                    get_job_path(process_running_uuid, None, worker.batch.work_dir)
+                )
+                qout_fpath = remote_path / OUT_FNAME
+                qerr_fpath = remote_path / ERR_FNAME
+                set_name_out(
+                    resources,
+                    f"batch_{process_running_uuid}",
+                    out_fpath=qout_fpath,
+                    err_fpath=qerr_fpath,
+                )
+
+                # note that here the worker.work_dir needs to be passed,
+                # not the worker.batch.work_dir
+                command = f"jf execution run-batch {worker.work_dir} {worker.batch.jobs_handle_dir} {process_running_uuid}"
+                if worker.batch.max_jobs:
+                    command += f" -mj {worker.batch.max_jobs}"
+                if worker.batch.max_time:
+                    command += f" -mt {worker.batch.max_time}"
+                if worker.batch.max_wait:
+                    command += f" -mw {worker.batch.max_wait}"
+
+                submit_result = queue_manager.submit(
+                    commands=[command],
+                    pre_run=worker.pre_run,
+                    post_run=worker.post_run,
+                    options=resources,
+                    work_dir=remote_path,
+                    create_submit_dir=True,
+                )
+
+                if submit_result.status == SubmissionStatus.FAILED:
+                    logger.error(f"submission failed. {repr(submit_result)}")
+                elif submit_result.status == SubmissionStatus.JOB_ID_UNKNOWN:
+                    logger.error(
+                        f"submission succeeded but ID not known. Job may be running but status cannot be checked. {repr(submit_result)}"
                     )
-            except Exception:
-                logger.error(
-                    f"error while handling the batch submission for: {worker_name}",
-                    exc_info=True,
+
+                elif submit_result.status == SubmissionStatus.SUCCESSFUL:
+                    self.job_controller.add_batch_process(
+                        submit_result.job_id, process_running_uuid, worker_name
+                    )
+                else:
+                    logger.error(
+                        f"unhandled submission status {submit_result.status}", True
+                    )
+
+            # check for jobs that have terminated in the batch runner and
+            # update the DB state accordingly
+            terminated_jobs = batch_manager.get_terminated()
+            for job_id, job_index, process_running_uuid in terminated_jobs:
+                lock_filter = {
+                    "uuid": job_id,
+                    "index": job_index,
+                    "state": {
+                        "$in": (
+                            JobState.BATCH_SUBMITTED.value,
+                            JobState.BATCH_RUNNING.value,
+                        )
+                    },
+                }
+                with self.job_controller.lock_job_for_update(
+                    query=lock_filter,
+                    max_step_attempts=self.runner_options.max_step_attempts,
+                    delta_retry=self.runner_options.delta_retry,
+                ) as lock:
+                    if lock.locked_document:
+                        if not worker.is_local:
+                            next_state = JobState.TERMINATED
+                        else:
+                            next_state = JobState.DOWNLOADED
+                        set_output = {
+                            "$set": {
+                                "state": next_state.value,
+                                "remote.process_id": process_running_uuid,
+                            }
+                        }
+                        lock.update_on_release = set_output
+                batch_manager.delete_terminated(
+                    [(job_id, job_index, process_running_uuid)]
                 )
 
     def cleanup(self):

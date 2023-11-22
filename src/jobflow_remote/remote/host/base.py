@@ -80,7 +80,7 @@ class BaseHost(MSONable):
         return msg
 
     @abc.abstractmethod
-    def listdir(self, path: str | Path):
+    def listdir(self, path: str | Path) -> list[str]:
         raise NotImplementedError
 
     @abc.abstractmethod

@@ -113,8 +113,11 @@ class LocalHost(BaseHost):
     def copy(self, src, dst):
         shutil.copy(src, dst)
 
-    def listdir(self, path: str | Path):
-        return os.listdir(path)
+    def listdir(self, path: str | Path) -> list[str]:
+        try:
+            return os.listdir(path)
+        except FileNotFoundError:
+            return []
 
     def remove(self, path: str | Path):
         os.remove(path)

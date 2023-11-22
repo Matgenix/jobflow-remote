@@ -230,7 +230,10 @@ class RemoteHost(BaseHost):
     def listdir(self, path: str | Path):
         self._check_connected()
 
-        self._execute_remote_func(self.connection.sftp().listdir, str(path))
+        try:
+            return self._execute_remote_func(self.connection.sftp().listdir, str(path))
+        except FileNotFoundError:
+            return []
 
     def remove(self, path: str | Path):
         self._check_connected()

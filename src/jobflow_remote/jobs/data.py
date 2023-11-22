@@ -1,10 +1,10 @@
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import datetime
 from enum import Enum
 from functools import cached_property
 from typing import Optional, Union
 
-from jobflow import Flow, Job, JobStore
+from jobflow import Flow, Job
 from monty.json import jsanitize
 from pydantic import BaseModel, Field
 from qtoolkit.core.data_objects import QResources, QState
@@ -160,12 +160,12 @@ class JobDoc(BaseModel):
     created_on: datetime = datetime.utcnow()
     updated_on: datetime = datetime.utcnow()
     priority: int = 0
-    store: Optional[JobStore] = None
+    # store: Optional[JobStore] = None
     exec_config: Optional[Union[ExecutionConfig, str]] = None
     resources: Optional[Union[QResources, dict]] = None
 
     stored_data: Optional[dict] = None
-    history: Optional[list[str]] = None  # ?
+    # history: Optional[list[str]] = None
 
     def as_db_dict(self):
         # required since the resources are not serialized otherwise
@@ -273,9 +273,7 @@ class FlowInfo(BaseModel):
 
     @classmethod
     def from_query_dict(cls, d):
-        # the dates should be in utc time. Convert them to the system time
         updated_on = d["updated_on"]
-        updated_on = updated_on.replace(tzinfo=timezone.utc).astimezone(tz=None)
         flow_id = d["uuid"]
 
         db_ids, job_ids, job_indexes = list(zip(*d["ids"]))

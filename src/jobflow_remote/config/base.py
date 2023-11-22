@@ -39,6 +39,11 @@ class RunnerOptions(BaseModel):
         description="Delay between subsequent refresh from the DB of the number of submitted "
         "and running jobs (seconds). Only use if a worker with max_jobs is present",
     )
+    delay_update_batch: int = Field(
+        60,
+        description="Delay between subsequent refresh from the DB of the number of submitted "
+        "and running jobs (seconds). Only use if a worker with max_jobs is present",
+    )
     lock_timeout: Optional[int] = Field(
         86400,
         description="Time to consider the lock on a document expired and can be overridden (seconds)",

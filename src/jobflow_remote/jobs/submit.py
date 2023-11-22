@@ -10,7 +10,6 @@ from jobflow_remote.config.manager import ConfigManager
 def submit_flow(
     flow: jobflow.Flow | jobflow.Job | list[jobflow.Job],
     worker: str | None = None,
-    store: str | jobflow.JobStore | None = None,
     project: str | None = None,
     exec_config: str | ExecutionConfig | None = None,
     resources: dict | QResources | None = None,
@@ -29,11 +28,6 @@ def submit_flow(
     worker
         The name of the Worker where the calculation will be submitted. If None, use the
         first configured worker for this project.
-    store
-        A job store. Alternatively, if set to None, :obj:`JobflowSettings.JOB_STORE`
-        will be used. Note, this could be different on the computer that submits the
-        workflow and the computer which runs the workflow. The value of ``JOB_STORE`` on
-        the computer that runs the workflow will be used.
     project
         the name of the project to which the Flow should be submitted. If None the
         current project will be used.

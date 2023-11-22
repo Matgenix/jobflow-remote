@@ -2,6 +2,8 @@ import io
 from pathlib import Path
 
 import typer
+from monty.json import jsanitize
+from monty.serialization import dumpfn
 from qtoolkit.core.data_objects import QResources
 from typing_extensions import Annotated
 
@@ -719,3 +721,58 @@ def resources(
         resources=resources_value,
         update=not replace,
     )
+
+
+@app_job.command(name="dump", hidden=True)
+def job_dump(
+    job_db_id: job_db_id_arg = None,
+    job_index: job_index_arg = None,
+    job_id: job_ids_indexes_opt = None,
+    db_id: db_ids_opt = None,
+    flow_id: flow_ids_opt = None,
+    state: job_state_opt = None,
+    start_date: start_date_opt = None,
+    end_date: end_date_opt = None,
+    name: name_opt = None,
+    metadata: metadata_opt = None,
+    days: days_opt = None,
+    hours: hours_opt = None,
+    file_path: Annotated[
+        str,
+        typer.Option(
+            "--path",
+            "-p",
+            help="Path to where the file should be dumped",
+        ),
+    ] = "jobs_dump.json",
+):
+    """
+    Dump to json the documents of the selected Jobs from the DB. For debugging.
+    """
+
+    check_incompatible_opt({"start_date": start_date, "days": days, "hours": hours})
+    check_incompatible_opt({"end_date": end_date, "days": days, "hours": hours})
+    metadata_dict = str_to_dict(metadata)
+
+    job_ids_indexes = get_job_ids_indexes(job_id)
+
+    jc = get_job_controller()
+
+    start_date = get_start_date(start_date, days, hours)
+
+    with loading_spinner():
+        jobs_doc = jc.get_jobs_doc(
+            job_ids=job_ids_indexes,
+            db_ids=db_id,
+            flow_ids=flow_id,
+            state=state,
+            start_date=start_date,
+            end_date=end_date,
+            name=name,
+            metadata=metadata_dict,
+        )
+        if jobs_doc:
+            dumpfn(jsanitize(jobs_doc, strict=True, enum_values=True), file_path)
+
+    if not jobs_doc:
+        exit_with_error_msg("No data matching the request")

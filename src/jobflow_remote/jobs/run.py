@@ -105,7 +105,9 @@ def run_batch_jobs(
             return
 
         if max_wait and wait > max_wait:
-            logger.info(f"No jobs available for more than {max_wait}. Stopping.")
+            logger.info(
+                f"No jobs available for more than {max_wait} seconds. Stopping."
+            )
             return
 
         if max_jobs and count >= max_jobs:
@@ -135,7 +137,6 @@ def run_batch_jobs(
                         logger.warning(
                             f"Process for job with id {job_id} and index {index} finished with an error"
                         )
-                # run_remote_job(job_path)
                 bm.terminate_job(job_id, index)
             except Exception:
                 logger.error(

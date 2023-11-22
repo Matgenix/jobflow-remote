@@ -26,9 +26,9 @@ def get_job_path(
     return str(base_path / relative_path)
 
 
-def get_remote_in_file(job, remote_store, original_store):
+def get_remote_in_file(job, remote_store):
     d = jsanitize(
-        {"job": job, "store": remote_store, "original_store": original_store},
+        {"job": job, "store": remote_store},
         strict=True,
         allow_bson=True,
         enum_values=True,
