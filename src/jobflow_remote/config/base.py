@@ -3,7 +3,7 @@ import logging
 import traceback
 from enum import Enum
 from pathlib import Path
-from typing import Annotated, Literal, Optional, Union
+from typing import Annotated, Any, Literal, Optional, Union
 
 from jobflow import JobStore
 from maggma.stores import MongoStore
@@ -373,7 +373,7 @@ class ExecutionConfig(BaseModel):
     modules: Optional[list[str]] = Field(
         None, description="list of modules to be loaded"
     )
-    export: Optional[dict[str, str]] = Field(
+    export: Optional[dict[str, Any]] = Field(
         None, description="dictionary with variable to be exported"
     )
     pre_run: Optional[str] = Field(

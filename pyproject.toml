@@ -35,7 +35,8 @@ dependencies =[
     "psutil",
     "supervisor",
     "ruamel.yaml",
-    "schedule"
+    "schedule",
+    "flufl.lock"
 ]
 
 [project.optional-dependencies]
