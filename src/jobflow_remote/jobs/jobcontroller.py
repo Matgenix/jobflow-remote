@@ -61,7 +61,7 @@ class JobController:
         self.jobs_collection = self.queue_store.collection_name
         self.flows_collection = flows_collection
         self.auxiliary_collection = auxiliary_collection
-        # TODO should it connect here? Or the passed stored should be connected?
+        # TODO should it connect here? Or the passed stores should be connected?
         self.queue_store.connect()
         self.jobstore.connect()
         self.db = self.queue_store._collection.database
@@ -1274,8 +1274,55 @@ class JobController:
     def get_jobs(self, query, projection: list | dict | None = None):
         return list(self.jobs.find(query, projection=projection))
 
-    def count_jobs(self, query):
+    def count_jobs(
+        self,
+        query: dict | None = None,
+        job_ids: tuple[str, int] | list[tuple[str, int]] | None = None,
+        db_ids: int | list[int] | None = None,
+        flow_ids: str | list[str] | None = None,
+        state: JobState | None = None,
+        locked: bool = False,
+        start_date: datetime | None = None,
+        end_date: datetime | None = None,
+        name: str | None = None,
+        metadata: dict | None = None,
+    ):
+        if query is None:
+            query = self._build_query_job(
+                job_ids=job_ids,
+                db_ids=db_ids,
+                flow_ids=flow_ids,
+                state=state,
+                locked=locked,
+                start_date=start_date,
+                end_date=end_date,
+                name=name,
+                metadata=metadata,
+            )
         return self.jobs.count_documents(query)
+
+    def count_flows(
+        self,
+        query: dict | None = None,
+        job_ids: str | list[str] | None = None,
+        db_ids: int | list[int] | None = None,
+        flow_ids: str | None = None,
+        state: FlowState | None = None,
+        start_date: datetime | None = None,
+        end_date: datetime | None = None,
+        name: str | None = None,
+    ):
+        if not query:
+            query = self._build_query_flow(
+                job_ids=job_ids,
+                db_ids=db_ids,
+                flow_ids=flow_ids,
+                state=state,
+                start_date=start_date,
+                end_date=end_date,
+                name=name,
+            )
+        return self.flows.count_documents(query)
 
     def get_jobs_info_by_flow_uuid(
         self, flow_uuid, projection: list | dict | None = None
@@ -1360,9 +1407,12 @@ class JobController:
         if job_doc.job.hosts:
             new_flow.add_hosts_uuids(job_doc.job.hosts)
 
+        flow_updates: dict[str, dict[str, Any]] = {}
+
         # add new jobs to flow
         flow_dict = dict(flow_dict)
-        flow_dict["jobs"].extend(new_flow.job_uuids)
+        # flow_dict["jobs"].extend(new_flow.job_uuids)
+        flow_updates = {"$push": {"jobs": {"$each": new_flow.job_uuids}}}
 
         # add new jobs
         jobs_list = list(new_flow.iterflow())
@@ -1371,6 +1421,8 @@ class JobController:
             {"next_id": {"$exists": True}}, {"$inc": {"next_id": n_new_jobs}}
         )["next_id"]
         job_dicts = []
+        flow_updates["$set"] = {}
+        ids_to_push = []
         for (job, parents), db_id in zip(
             jobs_list, range(first_id, first_id + n_new_jobs)
         ):
@@ -1386,11 +1438,14 @@ class JobController:
                     resources=resources,
                 )
             )
-            if job.index > 1:
-                flow_dict["parents"][job.uuid][str(job.index)] = parents
-            else:
-                flow_dict["parents"][job.uuid] = {str(job.index): parents}
-            flow_dict["ids"].append((job_dicts[-1]["db_id"], job.uuid, job.index))
+            # if job.index > 1:
+            #     flow_dict["parents"][job.uuid][str(job.index)] = parents
+            # else:
+            #     flow_dict["parents"][job.uuid] = {str(job.index): parents}
+            flow_updates["$set"][f"parents.{job.uuid}.{job.index}"] = parents
+            # flow_dict["ids"].append((job_dicts[-1]["db_id"], job.uuid, job.index))
+            ids_to_push.append((job_dicts[-1]["db_id"], job.uuid, job.index))
+        flow_updates["$push"]["ids"] = {"$each": ids_to_push}
 
         if response_type == DynamicResponseType.DETOUR:
             # if detour, update the parents of the child jobs
@@ -1399,10 +1454,11 @@ class JobController:
                 {"parents": job_doc.uuid}, {"$push": {"parents": {"$each": leaf_uuids}}}
             )
 
-        flow_dict["updated_on"] = datetime.utcnow()
+        # flow_dict["updated_on"] = datetime.utcnow()
+        flow_updates["$set"]["updated_on"] = datetime.utcnow()
 
         # TODO, this could be replaced by the actual change, instead of the replace
-        self.flows.find_one_and_replace(flow_dict, key="uuid")
+        self.flows.update_one({"uuid": flow_dict["uuid"]}, flow_updates)
         self.jobs.insert_many(job_dicts)
 
         logger.info(f"Appended flow ({new_flow.uuid}) with jobs: {new_flow.job_uuids}")
@@ -1485,6 +1541,8 @@ class JobController:
 
         return reserved_uuid, reserved_index
 
+    # TODO if jobstore is not an option anymore, the "store" argument
+    # can be removed and just use self.jobstore.
     def complete_job(
         self, job_doc: JobDoc, local_path: Path | str, store: JobStore
     ) -> bool:
@@ -1510,8 +1568,6 @@ class JobController:
                     self.update_flow_state(job_doc.job.hosts[-1])
                     return True
 
-                # Do not deserialize the Response to avoid deserializing the
-                # stored_data
                 out = loadfn(out_path)
                 doc_update = {"start_time": out["start_time"]}
                 # update the time of the JobDoc, will be used in the checkin
@@ -1639,29 +1695,32 @@ class JobController:
         )
         if result.modified_count == 0:
             raise RuntimeError(
-                f"The job {job_doc.uuid} has not been updated in the database"
+                f"The job {job_doc.uuid} index {job_doc.index} has not been updated in the database"
             )
 
+        # TODO it should be fine to replace this query by constructing the list of
+        # job uuids from the original + those added. Should be verified.
         job_uuids = self.get_flow_info_by_job_uuid(job_doc.uuid, ["jobs"])["jobs"]
         return len(self.refresh_children(job_uuids)) + 1
 
     # TODO should this refresh all the kind of states? Or just set to ready?
     def refresh_children(self, job_uuids):
-        # go through and look for jobs whose state we can update to ready
-        # need to ensure that all parent uuids with all indices are completed
-        # first find state of all jobs; ensure larger indices are returned last
-        children = self.jobs.find(
+        # go through and look for jobs whose state we can update to ready.
+        # Need to ensure that all parent uuids with all indices are completed
+        # first find state of all jobs; ensure larger indices are returned last.
+        flow_jobs = self.jobs.find(
             {"uuid": {"$in": job_uuids}},
             sort=[("index", 1)],
-            projection=["uuid", "index", "parents", "state", "job.config"],
+            projection=["uuid", "index", "parents", "state", "job.config", "db_id"],
         )
-        mapping = {r["uuid"]: r for r in children}
+        # the mapping only contains jobs with the larger index
+        jobs_mapping = {j["uuid"]: j for j in flow_jobs}
 
         # Now find jobs that are queued and whose parents are all completed
-        # and ready them. Assume that none of the children can be in a running
-        # state and thus no need to lock them.
+        # (or allowed to fail) and ready them. Assume that none of the children
+        # can be in a running state and thus no need to lock them.
         to_ready = []
-        for uuid, job in mapping.items():
+        for _, job in jobs_mapping.items():
             allowed_states = [JobState.COMPLETED.value]
             on_missing_ref = (
                 job.get("job", {}).get("config", {}).get("on_missing_references", None)
@@ -1669,9 +1728,11 @@ class JobController:
             if on_missing_ref == jobflow.OnMissing.NONE.value:
                 allowed_states.extend((JobState.FAILED.value, JobState.CANCELLED.value))
             if job["state"] == JobState.WAITING.value and all(
-                [mapping[p]["state"] in allowed_states for p in job["parents"]]
+                [jobs_mapping[p]["state"] in allowed_states for p in job["parents"]]
             ):
-                to_ready.append(uuid)
+                # Use the db_id to identify the children, since the uuid alone is not
+                # enough in some cases.
+                to_ready.append(job["db_id"])
 
         # Here it is assuming that there will be only one job with each uuid, as
         # it should be when switching state to READY the first time.
@@ -1679,7 +1740,7 @@ class JobController:
         # to this should always be consistent.
         if len(to_ready) > 0:
             self.jobs.update_many(
-                {"uuid": {"$in": to_ready}}, {"$set": {"state": JobState.READY.value}}
+                {"db_id": {"$in": to_ready}}, {"$set": {"state": JobState.READY.value}}
             )
         return to_ready
 

@@ -197,10 +197,10 @@ class FlowDoc(BaseModel):
     # be parents of the job with index=i+1, but will not be parents of
     # the job with index i.
     # index is stored as string, since mongodb needs string keys
+    # This dictionary include {job uuid: {job index: [parent's uuids]}}
     parents: dict[str, dict[str, list[str]]] = Field(default_factory=dict)
     # ids correspond to db_id, uuid, index for each JobDoc
     ids: list[tuple[int, str, int]] = Field(default_factory=list)
-    # jobs_states: dict[str, FlowState]
 
     def as_db_dict(self):
         d = jsanitize(
@@ -270,23 +270,37 @@ class FlowInfo(BaseModel):
     workers: list[str]
     job_states: list[JobState]
     job_names: list[str]
+    parents: list[list[str]]
 
     @classmethod
     def from_query_dict(cls, d):
         updated_on = d["updated_on"]
         flow_id = d["uuid"]
-
-        db_ids, job_ids, job_indexes = list(zip(*d["ids"]))
-
         jobs_data = d.get("jobs_list") or []
+
         workers = []
         job_states = []
         job_names = []
-        for job_doc in jobs_data:
-            job_names.append(job_doc["job"]["name"])
-            state = job_doc["state"]
-            job_states.append(JobState(state))
-            workers.append(job_doc["worker"])
+        parents = []
+
+        if jobs_data:
+            db_ids = []
+            job_ids = []
+            job_indexes = []
+            for job_doc in jobs_data:
+                db_ids.append(job_doc["db_id"])
+                job_ids.append(job_doc["uuid"])
+                job_indexes.append(job_doc["index"])
+                job_names.append(job_doc["job"]["name"])
+                state = job_doc["state"]
+                job_states.append(JobState(state))
+                workers.append(job_doc["worker"])
+                parents.append(job_doc["parents"] or [])
+        else:
+            db_ids, job_ids, job_indexes = list(zip(*d["ids"]))
+            # parents could be determined in this case as well from the Flow document.
+            # However, to match the correct order it would require lopping over them.
+            # To keep the generation faster add this only if a use case shows up.
 
         state = FlowState(d["state"])
 
@@ -301,7 +315,31 @@ class FlowInfo(BaseModel):
             workers=workers,
             job_states=job_states,
             job_names=job_names,
+            parents=parents,
         )
+
+    @cached_property
+    def ids_mapping(self) -> dict[str, dict[int, int]]:
+        d: dict = defaultdict(dict)
+
+        for db_id, job_id, index in zip(self.db_ids, self.job_ids, self.job_indexes):
+            d[job_id][int(index)] = db_id
+
+        return dict(d)
+
+    def iter_job_prop(self):
+        n_jobs = len(self.job_ids)
+        for i in range(n_jobs):
+            d = {
+                "db_id": self.db_ids[i],
+                "uuid": self.job_ids[i],
+                "index": self.job_indexes[i],
+            }
+            if self.job_names:
+                d["name"] = self.job_names[i]
+                d["state"] = self.job_states[i]
+                d["parents"] = self.parents[i]
+            yield d
 
 
 class DynamicResponseType(Enum):

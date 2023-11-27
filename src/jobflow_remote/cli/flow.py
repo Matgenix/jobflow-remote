@@ -1,4 +1,7 @@
+from typing import Annotated, Optional
+
 import typer
+from jobflow.utils.graph import draw_graph
 from rich.prompt import Confirm
 from rich.text import Text
 
@@ -35,6 +38,7 @@ from jobflow_remote.cli.utils import (
     loading_spinner,
     out_console,
 )
+from jobflow_remote.jobs.graph import get_graph
 
 app_flow = JFRTyper(
     name="flow", help="Commands for managing the flows", no_args_is_help=True
@@ -68,7 +72,7 @@ def flows_list(
 
     start_date = get_start_date(start_date, days, hours)
 
-    sort = [(sort.query_field, 1 if reverse_sort else -1)]
+    sort = [(sort.value, 1 if reverse_sort else -1)]
 
     with loading_spinner():
         flows_info = jc.get_flows_info(
@@ -185,3 +189,56 @@ def flow_info(
         exit_with_error_msg("No data matching the request")
 
     out_console.print(format_flow_info(flows_info[0]))
+
+
+@app_flow.command()
+def graph(
+    flow_db_id: flow_db_id_arg,
+    job_id_flag: job_flow_id_flag_opt = False,
+    label: Annotated[
+        Optional[str],
+        typer.Option(
+            "--label",
+            "-l",
+            help="The label used to identify the nodes",
+        ),
+    ] = "name",
+    file_path: Annotated[
+        Optional[str],
+        typer.Option(
+            "--path",
+            "-p",
+            help="If defined, the graph will be dumped to a file",
+        ),
+    ] = None,
+):
+    """
+    Provide detailed information on a Flow
+    """
+    db_id, jf_id = get_job_db_ids(flow_db_id, None)
+    db_ids = job_ids = flow_ids = None
+    if db_id is not None:
+        db_ids = [db_id]
+    elif job_id_flag:
+        job_ids = [jf_id]
+    else:
+        flow_ids = [jf_id]
+
+    with loading_spinner():
+        jc = get_job_controller()
+
+        flows_info = jc.get_flows_info(
+            job_ids=job_ids,
+            db_ids=db_ids,
+            flow_ids=flow_ids,
+            limit=1,
+            full=True,
+        )
+    if not flows_info:
+        exit_with_error_msg("No data matching the request")
+
+    plt = draw_graph(get_graph(flows_info[0], label=label))
+    if file_path:
+        plt.savefig(file_path)
+    else:
+        plt.show()

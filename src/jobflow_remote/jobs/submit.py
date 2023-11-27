@@ -14,7 +14,7 @@ def submit_flow(
     exec_config: str | ExecutionConfig | None = None,
     resources: dict | QResources | None = None,
     allow_external_references: bool = False,
-):
+) -> list[int]:
     """
     Submit a flow for calculation to the selected Worker.
 
@@ -40,6 +40,11 @@ def submit_flow(
     allow_external_references
         If False all the references to other outputs should be from other Jobs
         of the Flow.
+
+    Returns
+    -------
+    List of int
+        The list of db_ids of the submitted Jobs.
     """
     config_manager = ConfigManager()
 
@@ -58,7 +63,7 @@ def submit_flow(
 
     jc = proj_obj.get_job_controller()
 
-    jc.add_flow(
+    return jc.add_flow(
         flow=flow,
         worker=worker,
         exec_config=exec_config,

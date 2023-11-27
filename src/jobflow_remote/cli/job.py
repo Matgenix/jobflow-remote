@@ -1,10 +1,12 @@
 import io
 from pathlib import Path
+from typing import Optional
 
 import typer
 from monty.json import jsanitize
 from monty.serialization import dumpfn
 from qtoolkit.core.data_objects import QResources
+from rich.pretty import pprint
 from typing_extensions import Annotated
 
 from jobflow_remote import SETTINGS
@@ -91,7 +93,7 @@ def jobs_list(
 
     start_date = get_start_date(start_date, days, hours)
 
-    sort = [(sort.query_field, 1 if reverse_sort else -1)]
+    sort = [(sort.value, 1 if reverse_sort else -1)]
 
     with loading_spinner():
         if custom_query:
@@ -725,8 +727,6 @@ def resources(
 
 @app_job.command(name="dump", hidden=True)
 def job_dump(
-    job_db_id: job_db_id_arg = None,
-    job_index: job_index_arg = None,
     job_id: job_ids_indexes_opt = None,
     db_id: db_ids_opt = None,
     flow_id: flow_ids_opt = None,
@@ -776,3 +776,56 @@ def job_dump(
 
     if not jobs_doc:
         exit_with_error_msg("No data matching the request")
+
+
+@app_job.command()
+def output(
+    job_db_id: job_db_id_arg,
+    job_index: job_index_arg = None,
+    file_path: Annotated[
+        Optional[str],
+        typer.Option(
+            "--path",
+            "-p",
+            help="If defined, the output will be dumped to this file based on the extension (json or yaml)",
+        ),
+    ] = None,
+    load: Annotated[
+        bool,
+        typer.Option(
+            "--load",
+            "-",
+            help="If enabled all the data from additional stores are also loaded ",
+        ),
+    ] = False,
+):
+    """
+    Detail information on a specific job
+    """
+
+    db_id, job_id = get_job_db_ids(job_db_id, job_index)
+
+    with loading_spinner():
+        jc = get_job_controller()
+
+        if db_id:
+            job_info = jc.get_job_info(
+                job_id=job_id,
+                job_index=job_index,
+                db_id=db_id,
+            )
+            if job_info:
+                job_id = job_info.uuid
+                job_index = job_info.index
+
+        job_output = None
+        if job_id:
+            job_output = jc.jobstore.get_output(job_id, job_index or "last", load=load)
+
+    if not job_output:
+        exit_with_error_msg("No data matching the request")
+
+    if file_path:
+        dumpfn(job_output, file_path)
+    else:
+        pprint(job_output)

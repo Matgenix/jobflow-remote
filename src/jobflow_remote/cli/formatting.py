@@ -107,7 +107,7 @@ def get_flow_info_table(flows_info: list[FlowInfo], verbosity: int):
         table.add_column("Job states")
 
     for fi in flows_info:
-        # show the smallest fw_id as db_id
+        # show the smallest Job db_id as db_id
         db_id = min(fi.db_ids)
 
         row = [

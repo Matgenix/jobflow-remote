@@ -71,12 +71,6 @@ class SortOption(Enum):
     UPDATED_ON = "updated_on"
     DB_ID = "db_id"
 
-    @property
-    def query_field(self) -> str:
-        if self == SortOption.DB_ID:
-            return "fw_id"
-        return self.value
-
 
 class SerializeFileFormat(Enum):
     JSON = "json"
