@@ -38,7 +38,7 @@ from jobflow_remote.cli.utils import (
     loading_spinner,
     out_console,
 )
-from jobflow_remote.jobs.graph import get_graph
+from jobflow_remote.jobs.graph import get_graph, plot_dash
 
 app_flow = JFRTyper(
     name="flow", help="Commands for managing the flows", no_args_is_help=True
@@ -211,6 +211,14 @@ def graph(
             help="If defined, the graph will be dumped to a file",
         ),
     ] = None,
+    dash_plot: Annotated[
+        bool,
+        typer.Option(
+            "--dash",
+            "-d",
+            help="Show the graph in a dash app",
+        ),
+    ] = False,
 ):
     """
     Provide detailed information on a Flow
@@ -237,8 +245,11 @@ def graph(
     if not flows_info:
         exit_with_error_msg("No data matching the request")
 
-    plt = draw_graph(get_graph(flows_info[0], label=label))
-    if file_path:
-        plt.savefig(file_path)
+    if dash_plot:
+        plot_dash(flows_info[0])
     else:
-        plt.show()
+        plt = draw_graph(get_graph(flows_info[0], label=label))
+        if file_path:
+            plt.savefig(file_path)
+        else:
+            plt.show()

@@ -1079,6 +1079,7 @@ class JobController:
             # TODO reduce the projection to the bare minimum to reduce the amount of
             # fecthed data?
             projection = {f"jobs_list.{f}": 1 for f in projection_job_info}
+            projection["jobs_list.job.hosts"] = 1
             for k in FlowDoc.model_fields.keys():
                 projection[k] = 1
 
@@ -1399,20 +1400,17 @@ class JobController:
 
         new_flow = get_flow(new_flow, allow_external_references=True)
 
-        # get job parents and set the previous hosts
+        # get job parents
         if response_type == DynamicResponseType.REPLACE:
             job_parents = job_doc.parents
         else:
             job_parents = [(job_doc.uuid, job_doc.index)]
-        if job_doc.job.hosts:
-            new_flow.add_hosts_uuids(job_doc.job.hosts)
-
-        flow_updates: dict[str, dict[str, Any]] = {}
 
         # add new jobs to flow
         flow_dict = dict(flow_dict)
-        # flow_dict["jobs"].extend(new_flow.job_uuids)
-        flow_updates = {"$push": {"jobs": {"$each": new_flow.job_uuids}}}
+        flow_updates: dict[str, dict[str, Any]] = {
+            "$push": {"jobs": {"$each": new_flow.job_uuids}}
+        }
 
         # add new jobs
         jobs_list = list(new_flow.iterflow())

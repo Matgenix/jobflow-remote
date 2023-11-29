@@ -41,6 +41,8 @@ short_state_mapping = {
     JobState.PAUSED: "P",
     JobState.STOPPED: "ST",
     JobState.CANCELLED: "CA",
+    JobState.BATCH_SUBMITTED: "BS",
+    JobState.BATCH_RUNNING: "BR",
 }
 
 

@@ -271,6 +271,7 @@ class FlowInfo(BaseModel):
     job_states: list[JobState]
     job_names: list[str]
     parents: list[list[str]]
+    hosts: list[list[str]]
 
     @classmethod
     def from_query_dict(cls, d):
@@ -282,6 +283,7 @@ class FlowInfo(BaseModel):
         job_states = []
         job_names = []
         parents = []
+        job_hosts = []
 
         if jobs_data:
             db_ids = []
@@ -296,6 +298,7 @@ class FlowInfo(BaseModel):
                 job_states.append(JobState(state))
                 workers.append(job_doc["worker"])
                 parents.append(job_doc["parents"] or [])
+                job_hosts.append(job_doc["job"]["hosts"] or [])
         else:
             db_ids, job_ids, job_indexes = list(zip(*d["ids"]))
             # parents could be determined in this case as well from the Flow document.
@@ -316,6 +319,7 @@ class FlowInfo(BaseModel):
             job_states=job_states,
             job_names=job_names,
             parents=parents,
+            hosts=job_hosts,
         )
 
     @cached_property
@@ -339,6 +343,7 @@ class FlowInfo(BaseModel):
                 d["name"] = self.job_names[i]
                 d["state"] = self.job_states[i]
                 d["parents"] = self.parents[i]
+                d["hosts"] = self.hosts[i]
             yield d
 
 
