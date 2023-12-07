@@ -86,11 +86,13 @@ def main(
     try:
         project_data = cm.get_project_data()
         text = Text.from_markup(
-            f"The selected project is [green]{project_data.project.name}[/green] from config file [green]{project_data.filepath}[/green]"
+            f"The selected project is [green]{project_data.project.name}[/green] "
+            f"from config file [green]{project_data.filepath}[/green]"
         )
         out_console.print(text)
-    except ConfigError as e:
-        out_console.print(f"Current project could not be determined: {e}", style="red")
+    except ConfigError:
+        # no warning printed if not needed as this seems to be confusing for the user
+        pass
 
     if profile:
         profiler.disable()

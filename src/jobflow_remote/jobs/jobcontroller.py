@@ -1258,19 +1258,19 @@ class JobController:
             raise ValueError(f"job_index value: {job_index} is not supported")
         return self.jobs.find_one(query, projection=projection, sort=sort)
 
-    def get_job_doc_by_job_uuid(self, job_uuid: str, job_index: int | str = "last"):
-        query: dict[str, Any] = {"uuid": job_uuid}
-        sort = None
-        if isinstance(job_index, int):
-            query["index"] = job_index
-        elif job_index == "last":
-            sort = [("index", -1)]
-        else:
-            raise ValueError(f"job_index value: {job_index} is not supported")
-        doc = self.jobs.find_one(query, sort=sort)
-        if doc:
-            return JobDoc.model_validate(doc)
-        return None
+    def get_job_doc(
+        self,
+        job_id: str | None = None,
+        db_id: int | None = None,
+        job_index: int | None = None,
+    ) -> JobDoc | None:
+        query, sort = self.generate_job_id_query(db_id, job_id, job_index)
+
+        data = list(self.jobs.find(query, sort=sort, limit=1))
+        if not data:
+            return None
+
+        return JobDoc.model_validate(data[0])
 
     def get_jobs(self, query, projection: list | dict | None = None):
         return list(self.jobs.find(query, projection=projection))
@@ -1436,12 +1436,7 @@ class JobController:
                     resources=resources,
                 )
             )
-            # if job.index > 1:
-            #     flow_dict["parents"][job.uuid][str(job.index)] = parents
-            # else:
-            #     flow_dict["parents"][job.uuid] = {str(job.index): parents}
             flow_updates["$set"][f"parents.{job.uuid}.{job.index}"] = parents
-            # flow_dict["ids"].append((job_dicts[-1]["db_id"], job.uuid, job.index))
             ids_to_push.append((job_dicts[-1]["db_id"], job.uuid, job.index))
         flow_updates["$push"]["ids"] = {"$each": ids_to_push}
 
@@ -1649,6 +1644,8 @@ class JobController:
                     response.replace,
                     response_type=DynamicResponseType.REPLACE,
                     worker=job_doc.worker,
+                    exec_config=job_doc.exec_config,
+                    resources=job_doc.resources,
                 )
 
             if response.addition is not None:
@@ -1658,6 +1655,8 @@ class JobController:
                     response.addition,
                     response_type=DynamicResponseType.ADDITION,
                     worker=job_doc.worker,
+                    exec_config=job_doc.exec_config,
+                    resources=job_doc.resources,
                 )
 
             if response.detour is not None:
@@ -1667,6 +1666,8 @@ class JobController:
                     response.detour,
                     response_type=DynamicResponseType.DETOUR,
                     worker=job_doc.worker,
+                    exec_config=job_doc.exec_config,
+                    resources=job_doc.resources,
                 )
 
             if response.stored_data is not None:

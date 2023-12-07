@@ -219,6 +219,14 @@ def graph(
             help="Show the graph in a dash app",
         ),
     ] = False,
+    print_mermaid: Annotated[
+        bool,
+        typer.Option(
+            "--mermaid",
+            "-m",
+            help="Print the mermaid graph",
+        ),
+    ] = False,
 ):
     """
     Provide detailed information on a Flow
@@ -244,6 +252,11 @@ def graph(
         )
     if not flows_info:
         exit_with_error_msg("No data matching the request")
+
+    if print_mermaid:
+        from jobflow_remote.jobs.graph import get_mermaid
+
+        print(get_mermaid(flows_info[0]))
 
     if dash_plot:
         plot_dash(flows_info[0])

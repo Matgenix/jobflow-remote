@@ -10,7 +10,7 @@ from rich.text import Text
 
 from jobflow_remote.cli.utils import ReprStr, fmt_datetime
 from jobflow_remote.config.base import ExecutionConfig, WorkerBase
-from jobflow_remote.jobs.data import FlowInfo, JobInfo
+from jobflow_remote.jobs.data import FlowInfo, JobDoc, JobInfo
 from jobflow_remote.jobs.state import JobState
 from jobflow_remote.utils.data import convert_utc_time
 
@@ -130,14 +130,24 @@ def get_flow_info_table(flows_info: list[FlowInfo], verbosity: int):
     return table
 
 
-def format_job_info(job_info: JobInfo, show_none: bool = False):
+def format_job_info(
+    job_info: JobInfo | JobDoc, verbosity: int, show_none: bool = False
+):
     d = job_info.dict(exclude_none=not show_none)
+    if verbosity == 1:
+        d.pop("job", None)
 
+    # convert dates at the first level and for the remote error
     for k, v in d.items():
         if isinstance(v, datetime.datetime):
-            d[k] = convert_utc_time(v)
+            d[k] = convert_utc_time(v).strftime(fmt_datetime)
 
-    d = jsanitize(d, allow_bson=False, enum_values=True)
+    if d["remote"]["retry_time_limit"]:
+        d["remote"]["retry_time_limit"] = convert_utc_time(
+            d["remote"]["retry_time_limit"]
+        ).strftime(fmt_datetime)
+
+    d = jsanitize(d, allow_bson=True, enum_values=True, strict=True)
     error = d.get("error")
     if error:
         d["error"] = ReprStr(error)

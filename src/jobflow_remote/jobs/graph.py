@@ -154,10 +154,71 @@ def plot_dash(flow: FlowInfo):
     app.run(debug=True)
 
 
+def get_mermaid(flow: FlowInfo, show_subflows: bool = True):
+    nodes, edges, hosts = get_graph_elements(flow)
+    from monty.collections import tree
+
+    hosts_hierarchy = tree()
+    for db_id, job_hosts in hosts.items():
+        d = hosts_hierarchy
+        for host in reversed(job_hosts):
+            d = d[host]
+        d[db_id] = None
+
+    lines = ["flowchart TD"]
+
+    # add style classes
+    for state, color in COLOR_MAPPING.items():
+        # this could be optimised by compressing in one line and using a
+        # same class for states with the same color
+        lines.append(f"    classDef {state} fill:{color}")
+
+    # add edges
+    for parent_db_id, child_db_id in edges:
+        parent = nodes[parent_db_id]
+        child = nodes[child_db_id]
+        line = (
+            f"    {parent_db_id}({parent['name']}) --> {child_db_id}({child['name']})"
+        )
+        lines.append(line)
+
+    subgraph_styles = []
+
+    # add subgraphs
+    def add_subgraph(nested_hosts_hierarchy, indent_level=0):
+        if show_subflows:
+            prefix = "    " * indent_level
+        else:
+            prefix = "    "
+
+        for ref_id in sorted(nested_hosts_hierarchy, key=lambda x: str(x)):
+            subhosts = nested_hosts_hierarchy[ref_id]
+            if subhosts:
+                if indent_level > 0 and show_subflows:
+                    # don't  put any title
+                    lines.append(f"{prefix}subgraph {ref_id}['']")
+                    subgraph_styles.append(
+                        f"    style {ref_id} fill:#2B65EC,opacity:0.2"
+                    )
+
+                add_subgraph(subhosts, indent_level=indent_level + 1)
+
+                if indent_level > 0 and show_subflows:
+                    lines.append(f"{prefix}end")
+            else:
+                job = nodes[ref_id]
+                lines.append(f"{prefix}{ref_id}:::{job['state'].value}")
+
+    add_subgraph(hosts_hierarchy)
+    lines.extend(subgraph_styles)
+
+    return "\n".join(lines)
+
+
 BLUE_COLOR = "#5E6BFF"
 RED_COLOR = "#fC3737"
 COLOR_MAPPING = {
-    JobState.WAITING.value: "grey",
+    JobState.WAITING.value: "#aaaaaa",
     JobState.READY.value: "#DAF7A6",
     JobState.CHECKED_OUT.value: BLUE_COLOR,
     JobState.UPLOADED.value: BLUE_COLOR,

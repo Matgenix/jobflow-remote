@@ -155,6 +155,7 @@ def job_info(
             help="Show the data whose values are None. Usually hidden",
         ),
     ] = False,
+    verbosity: verbosity_opt = 0,
 ):
     """
     Detail information on a specific job
@@ -171,15 +172,23 @@ def job_info(
     with loading_spinner():
         jc = get_job_controller()
 
-        job_info = jc.get_job_info(
-            job_id=job_id,
-            job_index=job_index,
-            db_id=db_id,
-        )
-    if not job_info:
+        if verbosity > 0:
+            job_data = jc.get_job_doc(
+                job_id=job_id,
+                job_index=job_index,
+                db_id=db_id,
+            )
+        else:
+            job_data = jc.get_job_info(
+                job_id=job_id,
+                job_index=job_index,
+                db_id=db_id,
+            )
+
+    if not job_data:
         exit_with_error_msg("No data matching the request")
 
-    out_console.print(format_job_info(job_info, show_none=show_none))
+    out_console.print(format_job_info(job_data, verbosity, show_none=show_none))
 
 
 @app_job.command()
