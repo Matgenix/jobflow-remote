@@ -7,7 +7,7 @@ import uuid
 from contextlib import contextmanager
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Callable
+from typing import TYPE_CHECKING, Callable
 
 import typer
 from click import ClickException
@@ -20,6 +20,9 @@ from jobflow_remote import ConfigManager, JobController
 from jobflow_remote.config.base import ProjectUndefined
 from jobflow_remote.jobs.daemon import DaemonError, DaemonManager, DaemonStatus
 from jobflow_remote.jobs.state import JobState
+
+if TYPE_CHECKING:
+    from cProfile import Profile
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +39,8 @@ fmt_datetime = "%Y-%m-%d %H:%M"
 # initialize_config_manager function.
 _shared_config_manager: ConfigManager | None = None
 _shared_job_controller: JobController | None = None
+
+_profiler: Profile | None = None
 
 
 def initialize_config_manager(*args, **kwargs):
@@ -60,10 +65,28 @@ def get_job_controller():
     return _shared_job_controller
 
 
-def cleanup_job_controller(*args, **kwargs):
+def cleanup_job_controller():
     global _shared_job_controller
     if _shared_job_controller is not None:
         _shared_job_controller.close()
+
+
+def start_profiling():
+    global _profiler
+    from cProfile import Profile
+
+    _profiler = Profile()
+    _profiler.enable()
+
+
+def complete_profiling():
+    global _profiler
+
+    _profiler.disable()
+    import pstats
+
+    stats = pstats.Stats(_profiler).sort_stats("cumtime")
+    stats.print_stats()
 
 
 class SortOption(Enum):

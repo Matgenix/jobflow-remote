@@ -5,10 +5,12 @@ from typing_extensions import Annotated
 from jobflow_remote.cli.jfr_typer import JFRTyper
 from jobflow_remote.cli.utils import (
     cleanup_job_controller,
+    complete_profiling,
     exit_with_error_msg,
     get_config_manager,
     initialize_config_manager,
     out_console,
+    start_profiling,
 )
 from jobflow_remote.config import ConfigError
 from jobflow_remote.utils.log import initialize_cli_logger
@@ -22,7 +24,18 @@ app = JFRTyper(
 )
 
 
-@app.callback(result_callback=cleanup_job_controller)
+def main_result_callback(*args, **kwargs):
+    """
+    Callback executed after the main command is completed.
+    Allowing to make cleanup and other final actions.
+    """
+    cleanup_job_controller()
+    profile = kwargs.get("profile", False)
+    if profile:
+        complete_profiling()
+
+
+@app.callback(result_callback=main_result_callback)
 def main(
     project: Annotated[
         str,
@@ -62,10 +75,7 @@ def main(
         SETTINGS.cli_full_exc = True
 
     if profile:
-        from cProfile import Profile
-
-        profiler = Profile()
-        profiler.enable()
+        start_profiling()
 
     initialize_cli_logger(
         level=SETTINGS.cli_log_level.to_logging(), full_exc_info=SETTINGS.cli_full_exc
@@ -93,10 +103,3 @@ def main(
     except ConfigError:
         # no warning printed if not needed as this seems to be confusing for the user
         pass
-
-    if profile:
-        profiler.disable()
-        import pstats
-
-        stats = pstats.Stats(profiler).sort_stats("cumtime")
-        stats.print_stats()

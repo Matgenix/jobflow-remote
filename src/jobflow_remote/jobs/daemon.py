@@ -5,6 +5,7 @@ import subprocess
 from enum import Enum
 from pathlib import Path
 from string import Template
+from xmlrpc.client import Fault
 
 import psutil
 from monty.os import makedirs_p
@@ -232,7 +233,18 @@ class DaemonManager:
             )
 
         interface = self.get_interface()
-        proc_info = interface.supervisor.getAllProcessInfo()
+        try:
+            proc_info = interface.supervisor.getAllProcessInfo()
+        except Fault as e:
+            # catch this exception as it may be raised if the status is queried while
+            # the supervisord process is shutting down. The error is quite cryptic, so
+            # replace with one that is clearer. Also see a related issue in supervisord:
+            # https://github.com/Supervisor/supervisor/issues/48
+            if e.faultString == "SHUTDOWN_STATE":
+                raise DaemonError(
+                    "The daemon is likely shutting down and the actual state cannot be determined"
+                )
+            raise
         if not proc_info:
             raise DaemonError(
                 "supervisord process is running but no daemon process is present"

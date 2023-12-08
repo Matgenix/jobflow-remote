@@ -142,7 +142,7 @@ def format_job_info(
         if isinstance(v, datetime.datetime):
             d[k] = convert_utc_time(v).strftime(fmt_datetime)
 
-    if d["remote"]["retry_time_limit"]:
+    if d["remote"].get("retry_time_limit"):
         d["remote"]["retry_time_limit"] = convert_utc_time(
             d["remote"]["retry_time_limit"]
         ).strftime(fmt_datetime)

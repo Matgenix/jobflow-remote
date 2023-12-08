@@ -48,6 +48,17 @@ logger = logging.getLogger(__name__)
 
 
 class JobController:
+    """
+    Main entry point for all the interactions with the Stores.
+
+    Maintains a connection to both the queue Store and the results JobStore.
+    It is required that the queue Store is a MongoStore, as it will access
+    the database, and work with different collections.
+
+    The main functionalities are those for updating the state of the database
+    and querying the Jobs and Flows status information.
+    """
+
     def __init__(
         self,
         queue_store: MongoStore,
@@ -56,6 +67,24 @@ class JobController:
         auxiliary_collection: str = "jf_auxiliary",
         project: Project | None = None,
     ):
+        """
+        Parameters
+        ----------
+        queue_store
+            The Store used to save information about the status of the Jobs.
+            Should be a MongoStore and other collections are used from the same
+            database.
+        jobstore
+            The JobStore containing the output of the jobflow Flows.
+        flows_collection
+            The name of the collection used to store the Flows data.
+            Uses the DB defined in the queue_store.
+        auxiliary_collection
+            The name of the collection used to store other auxiliary data.
+            Uses the DB defined in the queue_store.
+        project
+            The project where the Stores were defined.
+        """
         self.queue_store = queue_store
         self.jobstore = jobstore
         self.jobs_collection = self.queue_store.collection_name
@@ -71,7 +100,18 @@ class JobController:
         self.project = project
 
     @classmethod
-    def from_project_name(cls, project_name: str | None = None):
+    def from_project_name(cls, project_name: str | None = None) -> JobController:
+        """
+        Generate an instance of JobController from the project name.
+
+        Parameters
+        ----------
+        project_name
+            The name of the project. If None the default project will be used.
+        Returns
+        -------
+            An instance of JobController associated with the project.
+        """
         config_manager: ConfigManager = ConfigManager()
         project: Project = config_manager.get_project(project_name)
         queue_store = project.get_queue_store()
@@ -79,12 +119,27 @@ class JobController:
         return cls(queue_store=queue_store, jobstore=jobstore, project=project)
 
     @classmethod
-    def from_project(cls, project: Project):
+    def from_project(cls, project: Project) -> JobController:
+        """
+        Generate an instance of JobController from a Project object.
+
+        Parameters
+        ----------
+        project
+            The project used to generate the JobController. If None the default
+            project will be used.
+        Returns
+        -------
+            An instance of JobController associated with the project.
+        """
         queue_store = project.get_queue_store()
         jobstore = project.get_jobstore()
         return cls(queue_store=queue_store, jobstore=jobstore, project=project)
 
     def close(self):
+        """
+        Close the connections to all the Stores in JobController.
+        """
         try:
             self.queue_store.close()
         except Exception:
@@ -111,6 +166,40 @@ class JobController:
         name: str | None = None,
         metadata: dict | None = None,
     ) -> dict:
+        """
+        Build a query to search for Jobs, based on standard parameters.
+        The Jobs will need to satisfy all the defined conditions.
+
+        Parameters
+        ----------
+        job_ids
+            One or more tuples, each containing the (uuid, index) pair of the
+            Jobs to retrieve.
+        db_ids
+            One or more db_ids of the Jobs to retrieve.
+        flow_ids
+            One or more Flow uuids to which the Jobs to retrieve belong.
+        state
+            The state of the Jobs.
+        locked
+            If True only locked Jobs will be selected.
+        start_date
+            Filter Jobs that were updated_on after this date.
+            Should be in the machine local time zone. It will be converted to UTC.
+        end_date
+            Filter Jobs that were updated_on before this date.
+            Should be in the machine local time zone. It will be converted to UTC.
+        name
+            Pattern matching the name of Job. Default is an exact match, but all
+            conventions from python fnmatch can be used (e.g. *test*)
+        metadata
+            A dictionary of the values of the metadata to match. Should be an
+            exact match for all the values provided.
+        Returns
+        -------
+            A dictionary with the query to be applied to a collection
+            containing JobDocs.
+        """
         if job_ids and not any(isinstance(ji, (list, tuple)) for ji in job_ids):
             # without these cast mypy is confused about the type
             job_ids = cast(list[tuple[str, int]], [job_ids])
@@ -147,6 +236,8 @@ class JobController:
             query["lock_id"] = {"$ne": None}
 
         if name:
+            # Add the beginning of the line, so that it will match the string
+            # exactly if no wildcard is given. Otherwise will match substrings.
             mongo_regex = "^" + fnmatch.translate(name).replace("\\\\", "\\")
             query["name"] = {"$regex": mongo_regex}
 
@@ -165,7 +256,39 @@ class JobController:
         start_date: datetime | None = None,
         end_date: datetime | None = None,
         name: str | None = None,
+        locked: bool = False,
     ) -> dict:
+        """
+        Build a query to search for Flows, based on standard parameters.
+        The Flows will need to satisfy all the defined conditions.
+
+        Parameters
+        ----------
+        job_ids
+            One or more strings with uuids of Jobs belonging to the Flow.
+        db_ids
+            One or more db_ids of Jobs belonging to the Flow.
+        flow_ids
+            One or more Flow uuids.
+        state
+            The state of the Flows.
+        start_date
+            Filter Flows that were updated_on after this date.
+            Should be in the machine local time zone. It will be converted to UTC.
+        end_date
+            Filter Flows that were updated_on before this date.
+            Should be in the machine local time zone. It will be converted to UTC.
+        name
+            Pattern matching the name of Flow. Default is an exact match, but all
+            conventions from python fnmatch can be used (e.g. *test*)
+        locked
+            If True only locked Flows will be selected.
+
+        Returns
+        -------
+            A dictionary with the query to be applied to a collection
+            containing FlowDocs.
+        """
         if job_ids is not None and not isinstance(job_ids, (list, tuple)):
             job_ids = [job_ids]
         if db_ids is not None and not isinstance(db_ids, (list, tuple)):
@@ -197,6 +320,9 @@ class JobController:
             mongo_regex = "^" + fnmatch.translate(name).replace("\\\\", "\\")
             query["name"] = {"$regex": mongo_regex}
 
+        if locked:
+            query["lock_id"] = {"$ne": None}
+
         return query
 
     def get_jobs_info_query(self, query: dict = None, **kwargs) -> list[JobInfo]:
@@ -222,6 +348,44 @@ class JobController:
         sort: list[tuple] | None = None,
         limit: int = 0,
     ) -> list[JobInfo]:
+        """
+        Query for Jobs based on standard parameters and return a list of JobInfo.
+
+        Parameters
+        ----------
+        job_ids
+            One or more tuples, each containing the (uuid, index) pair of the
+            Jobs to retrieve.
+        db_ids
+            One or more db_ids of the Jobs to retrieve.
+        flow_ids
+            One or more Flow uuids to which the Jobs to retrieve belong.
+        state
+            The state of the Jobs.
+        locked
+            If True only locked Jobs will be selected.
+        start_date
+            Filter Jobs that were updated_on after this date.
+            Should be in the machine local time zone. It will be converted to UTC.
+        end_date
+            Filter Jobs that were updated_on before this date.
+            Should be in the machine local time zone. It will be converted to UTC.
+        name
+            Pattern matching the name of Job. Default is an exact match, but all
+            conventions from python fnmatch can be used (e.g. *test*)
+        metadata
+            A dictionary of the values of the metadata to match. Should be an
+            exact match for all the values provided.
+        sort
+            A list of (key, direction) pairs specifying the sort order for this
+            query. Follows pymongo conventions.
+        limit
+            Maximum number of entries to retrieve. 0 means no limit.
+
+        Returns
+        -------
+            A list of JobInfo objects for the Jobs matching the criteria.
+        """
         query = self._build_query_job(
             job_ids=job_ids,
             db_ids=db_ids,
@@ -236,6 +400,19 @@ class JobController:
         return self.get_jobs_info_query(query=query, sort=sort, limit=limit)
 
     def get_jobs_doc_query(self, query: dict = None, **kwargs) -> list[JobDoc]:
+        """
+        Query for Jobs based on a generic filter and return a list of JobDoc.
+
+        Parameters
+        ----------
+        query
+            A dictionary representing the filter.
+        kwargs
+            All arguments passed to pymongo's Collection.find() method.
+        Returns
+        -------
+            A list of JobDoc objects for the Jobs matching the criteria.
+        """
         data = self.jobs.find(query, **kwargs)
 
         jobs_data = []
@@ -258,6 +435,44 @@ class JobController:
         sort: list[tuple] | None = None,
         limit: int = 0,
     ) -> list[JobDoc]:
+        """
+        Query for Jobs based on standard parameters and return a list of JobDoc.
+
+        Parameters
+        ----------
+        job_ids
+            One or more tuples, each containing the (uuid, index) pair of the
+            Jobs to retrieve.
+        db_ids
+            One or more db_ids of the Jobs to retrieve.
+        flow_ids
+            One or more Flow uuids to which the Jobs to retrieve belong.
+        state
+            The state of the Jobs.
+        locked
+            If True only locked Jobs will be selected.
+        start_date
+            Filter Jobs that were updated_on after this date.
+            Should be in the machine local time zone. It will be converted to UTC.
+        end_date
+            Filter Jobs that were updated_on before this date.
+            Should be in the machine local time zone. It will be converted to UTC.
+        name
+            Pattern matching the name of Job. Default is an exact match, but all
+            conventions from python fnmatch can be used (e.g. *test*)
+        metadata
+            A dictionary of the values of the metadata to match. Should be an
+            exact match for all the values provided.
+        sort
+            A list of (key, direction) pairs specifying the sort order for this
+            query. Follows pymongo conventions.
+        limit
+            Maximum number of entries to retrieve. 0 means no limit.
+
+        Returns
+        -------
+            A list of JobDoc objects for the Jobs matching the criteria.
+        """
         query = self._build_query_job(
             job_ids=job_ids,
             db_ids=db_ids,
@@ -277,6 +492,24 @@ class JobController:
         job_id: str | None = None,
         job_index: int | None = None,
     ) -> tuple[dict, list | None]:
+        """
+        Generate a query for a single Job based on db_id or uuid+index.
+        Only one among db_id and job_id should be defined.
+
+        Parameters
+        ----------
+        db_id
+            The db_id of the Job.
+        job_id
+            The uuid of the Job.
+        job_index
+            The index of the Job. If None the Job the sorting will be
+            added to get the highest index.
+        Returns
+        -------
+            A dict and an optional list to be used as query and sort,
+            respectively, in a query for a single Job.
+        """
         query: dict = {}
         sort: list | None = None
 
@@ -305,6 +538,24 @@ class JobController:
         db_id: int | None = None,
         job_index: int | None = None,
     ) -> JobInfo | None:
+        """
+        Get the JobInfo for a single Job based on db_id or uuid+index.
+        Only one among db_id and job_id should be defined.
+
+        Parameters
+        ----------
+        db_id
+            The db_id of the Job.
+        job_id
+            The uuid of the Job.
+        job_index
+            The index of the Job. If None the Job with the largest index
+            will be selected.
+
+        Returns
+        -------
+            A JobInfo, or None if no Job matches the criteria.
+        """
         query, sort = self.generate_job_id_query(db_id, job_id, job_index)
 
         data = list(
@@ -330,6 +581,51 @@ class JobController:
         raise_on_error: bool = True,
         **method_kwargs,
     ) -> list[int]:
+        """
+        Helper method to query Jobs based on criteria and sequentially apply an
+        action on all those retrieved.
+
+        Used to provide a common interface between all the methods that
+        should be applied on a list of jobs sequentially.
+
+        Parameters
+        ----------
+        method
+            The function that should be applied on a single Job.
+        action_description
+            A description of the action being performed. For logging purposes.
+        job_ids
+            One or more tuples, each containing the (uuid, index) pair of the
+            Jobs to retrieve.
+        db_ids
+            One or more db_ids of the Jobs to retrieve.
+        flow_ids
+            One or more Flow uuids to which the Jobs to retrieve belong.
+        state
+            The state of the Jobs.
+        locked
+            If True only locked Jobs will be selected.
+        start_date
+            Filter Jobs that were updated_on after this date.
+            Should be in the machine local time zone. It will be converted to UTC.
+        end_date
+            Filter Jobs that were updated_on before this date.
+            Should be in the machine local time zone. It will be converted to UTC.
+        name
+            Pattern matching the name of Job. Default is an exact match, but all
+            conventions from python fnmatch can be used (e.g. *test*)
+        metadata
+            A dictionary of the values of the metadata to match. Should be an
+            exact match for all the values provided.
+        raise_on_error
+            If True raise in case of error on one job error and stop the loop.
+            Otherwise, just log the error and proceed.
+        method_kwargs
+            Kwargs passed to the method called on each Job
+        Returns
+        -------
+            List of db_ids of the updated Jobs.
+        """
         query = self._build_query_job(
             job_ids=job_ids,
             db_ids=db_ids,
@@ -374,6 +670,51 @@ class JobController:
         wait: int | None = None,
         break_lock: bool = False,
     ) -> list[int]:
+        """
+        Rerun a list of selected Jobs, i.e. bring their state back to READY.
+        See the docs of `rerun_job` for more details.
+
+        Parameters
+        ----------
+        job_ids
+            One or more tuples, each containing the (uuid, index) pair of the
+            Jobs to retrieve.
+        db_ids
+            One or more db_ids of the Jobs to retrieve.
+        flow_ids
+            One or more Flow uuids to which the Jobs to retrieve belong.
+        state
+            The state of the Jobs.
+        start_date
+            Filter Jobs that were updated_on after this date.
+            Should be in the machine local time zone. It will be converted to UTC.
+        end_date
+            Filter Jobs that were updated_on before this date.
+            Should be in the machine local time zone. It will be converted to UTC.
+        name
+            Pattern matching the name of Job. Default is an exact match, but all
+            conventions from python fnmatch can be used (e.g. *test*)
+        metadata
+            A dictionary of the values of the metadata to match. Should be an
+            exact match for all the values provided.
+        raise_on_error
+            If True raise in case of error on one job error and stop the loop.
+            Otherwise, just log the error and proceed.
+        force
+            Bypass the limitation that only failed Jobs can be rerun.
+        wait
+            In case the Flow or Jobs that need to be updated are locked,
+            wait this time (in seconds) for the lock to be released.
+            Raise an error if lock is not released.
+        break_lock
+            Forcibly break the lock on locked documents. Use with care and
+            verify that the lock has been set by a process that is not running
+            anymore. Doing otherwise will likely lead to inconsistencies in the DB.
+
+        Returns
+        -------
+            List of db_ids of the updated Jobs.
+        """
         return self._many_jobs_action(
             method=self.rerun_job,
             action_description="rerunning",
@@ -400,6 +741,50 @@ class JobController:
         wait: int | None = None,
         break_lock: bool = False,
     ) -> list[int]:
+        """
+        Rerun a single Job, i.e. bring its state back to READY.
+        Selected by db_id or uuid+index. Only one among db_id
+        and job_id should be defined.
+
+        By default, only Jobs in one of the running states (CHECKED_OUT,
+        UPLOADED, ...), in the REMOTE_ERROR state or FAILED with
+        children in the READY or WAITING state can be rerun.
+        This should guarantee that no unexpected inconsistencies due to
+        dynamic Jobs generation should appear. This limitation can be bypassed
+        with the `force` option.
+        In any case, no Job with children with index > 1 can be rerun, as there
+        is no sensible way of handling it.
+
+        Rerunning a Job in a REMOTE_ERROR or on an intermediate STATE also
+        results in a reset of the remote attempts and errors.
+        When rerunning a Job in a SUBMITTED or RUNNING state the system also
+        tries to cancel the process in the worker.
+        Rerunning a FAILED Job also lead to change of state in its children.
+        The full list of modified Jobs is returned.
+
+        Parameters
+        ----------
+        db_id
+            The db_id of the Job.
+        job_id
+            The uuid of the Job.
+        job_index
+            The index of the Job. If None: the Job with the highest index.
+        force
+            Bypass the limitation that only Jobs in a certain state can be rerun.
+        wait
+            In case the Flow or Jobs that need to be updated are locked,
+            wait this time (in seconds) for the lock to be released.
+            Raise an error if lock is not released.
+        break_lock
+            Forcibly break the lock on locked documents. Use with care and
+            verify that the lock has been set by a process that is not running
+            anymore. Doing otherwise will likely lead to inconsistencies in the DB.
+
+        Returns
+        -------
+            List of db_ids of the updated Jobs.
+        """
         lock_filter, sort = self.generate_job_id_query(db_id, job_id, job_index)
         sleep = None
         if wait:
@@ -463,6 +848,32 @@ class JobController:
         break_lock: bool = False,
         force: bool = False,
     ) -> tuple[dict, list[int]]:
+        """
+        Perform the full rerun of Job, in case a Job is FAILED or in one of the
+        usually not admissible states. This requires actions on the original
+        Job's children and will need to acquire the lock on all of them as well
+        as on the Flow.
+
+        Parameters
+        ----------
+        doc
+            The dict of the JobDoc associated to the Job to rerun.
+            Just the "uuid", "index", "db_id", "state" values are required.
+        sleep
+            Amounts of seconds to wait between checks that the lock has been released.
+        wait
+            In case the Flow or Jobs that need to be updated are locked,
+            wait this time (in seconds) for the lock to be released.
+            Raise an error if lock is not released.
+        break_lock
+            Forcibly break the lock on locked documents.
+        force
+            Bypass the limitation that only Jobs in a certain state can be rerun.
+        Returns
+        -------
+            Updates to be set on the rerun Job upon lock release and the list
+            of db_ids of the modified Jobs.
+        """
         job_id = doc["uuid"]
         job_index = doc["index"]
         modified_jobs = []
@@ -587,6 +998,20 @@ class JobController:
         return job_doc_update, modified_jobs
 
     def _reset_remote(self, doc: dict) -> dict:
+        """
+        Simple reset of a Job in a running state or REMOTE_ERROR.
+        Does not require additional locking on the Flow or other Jobs.
+
+        Parameters
+        ----------
+        doc
+            The dict of the JobDoc associated to the Job to rerun.
+            Just the "uuid", "index", "state" values are required.
+
+        Returns
+        -------
+
+        """
         if doc["state"] in [JobState.SUBMITTED.value, JobState.RUNNING.value]:
             # try cancelling the job submitted to the remote queue
             try:
@@ -612,6 +1037,37 @@ class JobController:
         break_lock: bool = False,
         acceptable_states: list[JobState] | None = None,
     ) -> list[int]:
+        """
+        Helper to set multiple values in a JobDoc while locking the Job.
+        Selected by db_id or uuid+index. Only one among db_id
+        and job_id should be defined.
+
+        Parameters
+        ----------
+        values
+            Dictionary with the values to be set. Will be passed to a pymongo
+            `find_one_and_update` method.
+        db_id
+            The db_id of the Job.
+        job_id
+            The uuid of the Job.
+        job_index
+            The index of the Job. If None the Job with the largest index
+            will be selected.
+        wait
+            In case the Flow or Jobs that need to be updated are locked,
+            wait this time (in seconds) for the lock to be released.
+            Raise an error if lock is not released.
+        break_lock
+            Forcibly break the lock on locked documents.
+        acceptable_states
+            List of JobState for which the Job values can be changed.
+            If None all states are acceptable.
+        Returns
+        -------
+            List of db_ids of updated Jobs. Could be an empty list or a list
+            with a single element.
+        """
         sleep = None
         if wait:
             sleep = 10
@@ -650,6 +1106,34 @@ class JobController:
         wait: int | None = None,
         break_lock: bool = False,
     ) -> list[int]:
+        """
+        Set the state of a Job to an arbitrary JobState.
+        Selected by db_id or uuid+index. Only one among db_id
+        and job_id should be defined.
+
+        No check is performed! Any job can be set to any state.
+        Only for advanced users or for debugging purposes.
+
+        Parameters
+        ----------
+        db_id
+            The db_id of the Job.
+        job_id
+            The uuid of the Job.
+        job_index
+            The index of the Job. If None the Job with the largest index
+            will be selected.
+        wait
+            In case the Flow or Jobs that need to be updated are locked,
+            wait this time (in seconds) for the lock to be released.
+            Raise an error if lock is not released.
+        break_lock
+            Forcibly break the lock on locked documents.
+        Returns
+        -------
+            List of db_ids of updated Jobs. Could be an empty list or a list
+            with a single element.
+        """
         values = {
             "state": state.value,
             "remote.step_attempts": 0,
@@ -682,6 +1166,49 @@ class JobController:
         wait: int | None = None,
         break_lock: bool = False,
     ):
+        """
+        Retry selected Jobs, i.e. bring them back to its previous state if REMOTE_ERROR,
+        or reset the remote attempts and time of retry if in another running state.
+
+        Parameters
+        ----------
+        job_ids
+            One or more tuples, each containing the (uuid, index) pair of the
+            Jobs to retrieve.
+        db_ids
+            One or more db_ids of the Jobs to retrieve.
+        flow_ids
+            One or more Flow uuids to which the Jobs to retrieve belong.
+        state
+            The state of the Jobs.
+        start_date
+            Filter Jobs that were updated_on after this date.
+            Should be in the machine local time zone. It will be converted to UTC.
+        end_date
+            Filter Jobs that were updated_on before this date.
+            Should be in the machine local time zone. It will be converted to UTC.
+        name
+            Pattern matching the name of Job. Default is an exact match, but all
+            conventions from python fnmatch can be used (e.g. *test*)
+        metadata
+            A dictionary of the values of the metadata to match. Should be an
+            exact match for all the values provided.
+        raise_on_error
+            If True raise in case of error on one job error and stop the loop.
+            Otherwise, just log the error and proceed.
+        wait
+            In case the Flow or Jobs that need to be updated are locked,
+            wait this time (in seconds) for the lock to be released.
+            Raise an error if lock is not released.
+        break_lock
+            Forcibly break the lock on locked documents. Use with care and
+            verify that the lock has been set by a process that is not running
+            anymore. Doing otherwise will likely lead to inconsistencies in the DB.
+
+        Returns
+        -------
+            List of db_ids of the updated Jobs.
+        """
         return self._many_jobs_action(
             method=self.retry_job,
             action_description="rerunning",
@@ -706,6 +1233,36 @@ class JobController:
         wait: int | None = None,
         break_lock: bool = False,
     ) -> list[int]:
+        """
+        Retry a single Job, i.e. bring it back to its previous state if REMOTE_ERROR,
+        or reset the remote attempts and time of retry if in another running state.
+        Jobs in other states cannot be retried.
+        The Job is selected by db_id or uuid+index. Only one among db_id
+        and job_id should be defined.
+
+        Only locking of the retried Job is required.
+
+        Parameters
+        ----------
+        db_id
+            The db_id of the Job.
+        job_id
+            The uuid of the Job.
+        job_index
+            The index of the Job. If None: the Job with the highest index.
+        wait
+            In case the Flow or Jobs that need to be updated are locked,
+            wait this time (in seconds) for the lock to be released.
+            Raise an error if lock is not released.
+        break_lock
+            Forcibly break the lock on locked documents. Use with care and
+            verify that the lock has been set by a process that is not running
+            anymore. Doing otherwise will likely lead to inconsistencies in the DB.
+
+        Returns
+        -------
+            List containing the db_id of the updated Job.
+        """
         lock_filter, sort = self.generate_job_id_query(db_id, job_id, job_index)
         sleep = None
         if wait:
@@ -743,6 +1300,7 @@ class JobController:
                 set_dict = {
                     "remote.step_attempts": 0,
                     "remote.retry_time_limit": None,
+                    "remote.error": None,
                 }
                 lock.update_on_release = {"$set": set_dict}
             else:
@@ -762,6 +1320,45 @@ class JobController:
         raise_on_error: bool = True,
         wait: int | None = None,
     ) -> list[int]:
+        """
+        Pause selected Jobs. Only READY and WAITING Jobs can be paused.
+        The action is reversible.
+
+        Parameters
+        ----------
+        job_ids
+            One or more tuples, each containing the (uuid, index) pair of the
+            Jobs to retrieve.
+        db_ids
+            One or more db_ids of the Jobs to retrieve.
+        flow_ids
+            One or more Flow uuids to which the Jobs to retrieve belong.
+        state
+            The state of the Jobs.
+        start_date
+            Filter Jobs that were updated_on after this date.
+            Should be in the machine local time zone. It will be converted to UTC.
+        end_date
+            Filter Jobs that were updated_on before this date.
+            Should be in the machine local time zone. It will be converted to UTC.
+        name
+            Pattern matching the name of Job. Default is an exact match, but all
+            conventions from python fnmatch can be used (e.g. *test*)
+        metadata
+            A dictionary of the values of the metadata to match. Should be an
+            exact match for all the values provided.
+        raise_on_error
+            If True raise in case of error on one job error and stop the loop.
+            Otherwise, just log the error and proceed.
+        wait
+            In case the Flow or Jobs that need to be updated are locked,
+            wait this time (in seconds) for the lock to be released.
+            Raise an error if lock is not released.
+
+        Returns
+        -------
+            List of db_ids of the updated Jobs.
+        """
         return self._many_jobs_action(
             method=self.pause_job,
             action_description="pausing",
@@ -791,6 +1388,50 @@ class JobController:
         wait: int | None = None,
         break_lock: bool = False,
     ) -> list[int]:
+        """
+        Cancel selected Jobs. Only Jobs in the READY and all the running states
+        can be cancelled.
+        The action is not reversible.
+
+        Parameters
+        ----------
+        job_ids
+            One or more tuples, each containing the (uuid, index) pair of the
+            Jobs to retrieve.
+        db_ids
+            One or more db_ids of the Jobs to retrieve.
+        flow_ids
+            One or more Flow uuids to which the Jobs to retrieve belong.
+        state
+            The state of the Jobs.
+        start_date
+            Filter Jobs that were updated_on after this date.
+            Should be in the machine local time zone. It will be converted to UTC.
+        end_date
+            Filter Jobs that were updated_on before this date.
+            Should be in the machine local time zone. It will be converted to UTC.
+        name
+            Pattern matching the name of Job. Default is an exact match, but all
+            conventions from python fnmatch can be used (e.g. *test*)
+        metadata
+            A dictionary of the values of the metadata to match. Should be an
+            exact match for all the values provided.
+        raise_on_error
+            If True raise in case of error on one job error and stop the loop.
+            Otherwise, just log the error and proceed.
+        wait
+            In case the Flow or Jobs that need to be updated are locked,
+            wait this time (in seconds) for the lock to be released.
+            Raise an error if lock is not released.
+        break_lock
+            Forcibly break the lock on locked documents. Use with care and
+            verify that the lock has been set by a process that is not running
+            anymore. Doing otherwise will likely lead to inconsistencies in the DB.
+
+        Returns
+        -------
+            List of db_ids of the updated Jobs.
+        """
         return self._many_jobs_action(
             method=self.cancel_job,
             action_description="cancelling",
@@ -815,6 +1456,34 @@ class JobController:
         wait: int | None = None,
         break_lock: bool = False,
     ) -> list[int]:
+        """
+        Cancel a single Job. Only Jobs in the READY and all the running states
+        can be cancelled.
+        Selected by db_id or uuid+index. Only one among db_id
+        and job_id should be defined.
+        The action is not reversible.
+
+        Parameters
+        ----------
+        db_id
+            The db_id of the Job.
+        job_id
+            The uuid of the Job.
+        job_index
+            The index of the Job. If None: the Job with the highest index.
+        wait
+            In case the Flow or Jobs that need to be updated are locked,
+            wait this time (in seconds) for the lock to be released.
+            Raise an error if lock is not released.
+        break_lock
+            Forcibly break the lock on locked documents. Use with care and
+            verify that the lock has been set by a process that is not running
+            anymore. Doing otherwise will likely lead to inconsistencies in the DB.
+
+        Returns
+        -------
+            List of db_ids of the updated Jobs.
+        """
         job_lock_kwargs = dict(
             projection=["uuid", "index", "db_id", "state", "remote", "worker"]
         )
@@ -855,6 +1524,29 @@ class JobController:
         job_index: int | None = None,
         wait: int | None = None,
     ) -> list[int]:
+        """
+        Pause a single Job. Only READY and WAITING Jobs can be paused.
+        Selected by db_id or uuid+index. Only one among db_id
+        and job_id should be defined.
+        The action is reversible.
+
+        Parameters
+        ----------
+        db_id
+            The db_id of the Job.
+        job_id
+            The uuid of the Job.
+        job_index
+            The index of the Job. If None: the Job with the highest index.
+        wait
+            In case the Flow or Jobs that need to be updated are locked,
+            wait this time (in seconds) for the lock to be released.
+            Raise an error if lock is not released.
+
+        Returns
+        -------
+            List of db_ids of the updated Jobs.
+        """
         job_lock_kwargs = dict(projection=["uuid", "index", "db_id", "state"])
         flow_lock_kwargs = dict(projection=["uuid"])
         with self.lock_job_flow(
@@ -889,6 +1581,48 @@ class JobController:
         wait: int | None = None,
         break_lock: bool = False,
     ) -> list[int]:
+        """
+        Restart selected Jobs that were previously paused.
+
+        Parameters
+        ----------
+        job_ids
+            One or more tuples, each containing the (uuid, index) pair of the
+            Jobs to retrieve.
+        db_ids
+            One or more db_ids of the Jobs to retrieve.
+        flow_ids
+            One or more Flow uuids to which the Jobs to retrieve belong.
+        state
+            The state of the Jobs.
+        start_date
+            Filter Jobs that were updated_on after this date.
+            Should be in the machine local time zone. It will be converted to UTC.
+        end_date
+            Filter Jobs that were updated_on before this date.
+            Should be in the machine local time zone. It will be converted to UTC.
+        name
+            Pattern matching the name of Job. Default is an exact match, but all
+            conventions from python fnmatch can be used (e.g. *test*)
+        metadata
+            A dictionary of the values of the metadata to match. Should be an
+            exact match for all the values provided.
+        raise_on_error
+            If True raise in case of error on one job error and stop the loop.
+            Otherwise, just log the error and proceed.
+        wait
+            In case the Flow or Jobs that need to be updated are locked,
+            wait this time (in seconds) for the lock to be released.
+            Raise an error if lock is not released.
+        break_lock
+            Forcibly break the lock on locked documents. Use with care and
+            verify that the lock has been set by a process that is not running
+            anymore. Doing otherwise will likely lead to inconsistencies in the DB.
+
+        Returns
+        -------
+            List of db_ids of the updated Jobs.
+        """
         return self._many_jobs_action(
             method=self.play_job,
             action_description="playing",
@@ -913,6 +1647,32 @@ class JobController:
         wait: int | None = None,
         break_lock: bool = False,
     ) -> list[int]:
+        """
+        Restart a single Jobs that was previously paused.
+        Selected by db_id or uuid+index. Only one among db_id
+        and job_id should be defined.
+
+        Parameters
+        ----------
+        db_id
+            The db_id of the Job.
+        job_id
+            The uuid of the Job.
+        job_index
+            The index of the Job. If None: the Job with the highest index.
+        wait
+            In case the Flow or Jobs that need to be updated are locked,
+            wait this time (in seconds) for the lock to be released.
+            Raise an error if lock is not released.
+        break_lock
+            Forcibly break the lock on locked documents. Use with care and
+            verify that the lock has been set by a process that is not running
+            anymore. Doing otherwise will likely lead to inconsistencies in the DB.
+
+        Returns
+        -------
+            List of db_ids of the updated Jobs.
+        """
         job_lock_kwargs = dict(
             projection=["uuid", "index", "db_id", "state", "job.config", "parents"]
         )
@@ -970,6 +1730,52 @@ class JobController:
         metadata: dict | None = None,
         raise_on_error: bool = True,
     ) -> list[int]:
+        """
+        Set execution properties for selected Jobs:
+        worker, exec_config and resources.
+
+        Parameters
+        ----------
+        worker
+            The name of the worker to set.
+        exec_config
+            The name of the exec_config to set or an explicit value of
+            ExecutionConfig or dict.
+        resources
+            The resources to be set, either as a dict or a QResources instance.
+        update
+            If True, when setting exec_config and resources a passed dictionary
+            will be used to update already existing values.
+            If False it will replace the original values.
+        job_ids
+            One or more tuples, each containing the (uuid, index) pair of the
+            Jobs to retrieve.
+        db_ids
+            One or more db_ids of the Jobs to retrieve.
+        flow_ids
+            One or more Flow uuids to which the Jobs to retrieve belong.
+        state
+            The state of the Jobs.
+        start_date
+            Filter Jobs that were updated_on after this date.
+            Should be in the machine local time zone. It will be converted to UTC.
+        end_date
+            Filter Jobs that were updated_on before this date.
+            Should be in the machine local time zone. It will be converted to UTC.
+        name
+            Pattern matching the name of Job. Default is an exact match, but all
+            conventions from python fnmatch can be used (e.g. *test*)
+        metadata
+            A dictionary of the values of the metadata to match. Should be an
+            exact match for all the values provided.
+        raise_on_error
+            If True raise in case of error on one job error and stop the loop.
+            Otherwise, just log the error and proceed.
+
+        Returns
+        -------
+            List of db_ids of the updated Jobs.
+        """
         set_dict = {}
         if worker:
             if worker not in self.project.workers:
@@ -1025,6 +1831,26 @@ class JobController:
         sort: list[tuple] | None = None,
         limit: int = 0,
     ) -> list[dict]:
+        """
+        Retrieve data about Flows and all their Jobs through an aggregation.
+
+        In the aggregation the list of Jobs are identified as `jobs_list`.
+
+        Parameters
+        ----------
+        query
+            A dictionary representing the filter.
+        projection
+            Projection of the fields passed to the aggregation.
+        sort
+            A list of (key, direction) pairs specifying the sort order for this
+            query. Follows pymongo conventions.
+        limit
+            Maximum number of entries to retrieve. 0 means no limit.
+        Returns
+        -------
+            The list of dictionaries resulting from the query.
+        """
         pipeline: list[dict] = [
             {
                 "$lookup": {
@@ -1063,6 +1889,42 @@ class JobController:
         limit: int = 0,
         full: bool = False,
     ) -> list[FlowInfo]:
+        """
+        Query for Flows based on standard parameters and return a list of JobFlows.
+
+        Parameters
+        ----------
+        job_ids
+            One or more strings with uuids of Jobs belonging to the Flow.
+        db_ids
+            One or more db_ids of Jobs belonging to the Flow.
+        flow_ids
+            One or more Flow uuids.
+        state
+            The state of the Flows.
+        start_date
+            Filter Flows that were updated_on after this date.
+            Should be in the machine local time zone. It will be converted to UTC.
+        end_date
+            Filter Flows that were updated_on before this date.
+            Should be in the machine local time zone. It will be converted to UTC.
+        name
+            Pattern matching the name of Flow. Default is an exact match, but all
+            conventions from python fnmatch can be used (e.g. *test*)
+        sort
+            A list of (key, direction) pairs specifying the sort order for this
+            query. Follows pymongo conventions.
+        limit
+            Maximum number of entries to retrieve. 0 means no limit.
+        full
+            If True data is fetched from both the Flow collection and Job collection
+            with an aggregate. Otherwise, only the Job information in the Flow
+            document will be used.
+
+        Returns
+        -------
+            A list of JobFlows.
+        """
         query = self._build_query_flow(
             job_ids=job_ids,
             db_ids=db_ids,
@@ -1101,6 +1963,22 @@ class JobController:
         confirm: bool = False,
         delete_output: bool = False,
     ) -> int:
+        """
+        Delete a list of Flows based on the flow uuids.
+
+        Parameters
+        ----------
+        flow_ids
+            One or more Flow uuids.
+        confirm
+            If False only a maximum of 10 Flows can be deleted.
+        delete_output
+            If True also delete the associated output in the JobStore.
+
+        Returns
+        -------
+            Number of delete Flows.
+        """
         if isinstance(flow_ids, str):
             flow_ids = [flow_ids]
 
@@ -1120,6 +1998,16 @@ class JobController:
         return deleted
 
     def delete_flow(self, flow_id: str, delete_output: bool = False):
+        """
+        Delete a single Flow based on the uuid.
+
+        Parameters
+        ----------
+        flow_id
+            One or more Flow uuids.
+        delete_output
+            If True also delete the associated output in the JobStore.
+        """
         # TODO should this lock anything (FW does not lock)?
         flow = self.get_flow_info_by_flow_uuid(flow_id)
         if not flow:
@@ -1143,6 +2031,39 @@ class JobController:
         name: str | None = None,
         metadata: dict | None = None,
     ) -> int:
+        """
+        Forcibly remove the lock on a locked Job document.
+        This should be used only if a lock is a leftover of a process that is not
+        running anymore. Doing otherwise may result in inconsistencies.
+
+        Parameters
+        ----------
+        job_ids
+            One or more tuples, each containing the (uuid, index) pair of the
+            Jobs to retrieve.
+        db_ids
+            One or more db_ids of the Jobs to retrieve.
+        flow_ids
+            One or more Flow uuids to which the Jobs to retrieve belong.
+        state
+            The state of the Jobs.
+        start_date
+            Filter Jobs that were updated_on after this date.
+            Should be in the machine local time zone. It will be converted to UTC.
+        end_date
+            Filter Jobs that were updated_on before this date.
+            Should be in the machine local time zone. It will be converted to UTC.
+        name
+            Pattern matching the name of Job. Default is an exact match, but all
+            conventions from python fnmatch can be used (e.g. *test*)
+        metadata
+            A dictionary of the values of the metadata to match. Should be an
+            exact match for all the values provided.
+
+        Returns
+        -------
+            Number of modified Jobs.
+        """
         query = self._build_query_job(
             job_ids=job_ids,
             db_ids=db_ids,
@@ -1161,7 +2082,80 @@ class JobController:
         )
         return result.modified_count
 
+    def remove_lock_flow(
+        self,
+        job_ids: str | list[str] | None = None,
+        db_ids: int | list[int] | None = None,
+        flow_ids: str | None = None,
+        state: FlowState | None = None,
+        start_date: datetime | None = None,
+        end_date: datetime | None = None,
+        name: str | None = None,
+    ) -> list[FlowInfo]:
+        """
+        Forcibly remove the lock on a locked Flow document.
+        This should be used only if a lock is a leftover of a process that is not
+        running anymore. Doing otherwise may result in inconsistencies.
+
+        Parameters
+        ----------
+        job_ids
+            One or more strings with uuids of Jobs belonging to the Flow.
+        db_ids
+            One or more db_ids of Jobs belonging to the Flow.
+        flow_ids
+            One or more Flow uuids.
+        state
+            The state of the Flows.
+        start_date
+            Filter Flows that were updated_on after this date.
+            Should be in the machine local time zone. It will be converted to UTC.
+        end_date
+            Filter Flows that were updated_on before this date.
+            Should be in the machine local time zone. It will be converted to UTC.
+        name
+            Pattern matching the name of Flow. Default is an exact match, but all
+            conventions from python fnmatch can be used (e.g. *test*)
+
+        Returns
+        -------
+            Number of modified Flows.
+        """
+        query = self._build_query_flow(
+            job_ids=job_ids,
+            db_ids=db_ids,
+            flow_ids=flow_ids,
+            state=state,
+            start_date=start_date,
+            end_date=end_date,
+            locked=True,
+            name=name,
+        )
+
+        result = self.flows.update_many(
+            filter=query,
+            update={"$set": {"lock_id": None, "lock_time": None}},
+        )
+        return result.modified_count
+
     def reset(self, reset_output: bool = False, max_limit: int = 25):
+        """
+        Reset the content of the queue database and builds the indexes.
+        Optionally deletes the content of the JobStore with the outputs.
+        In this case all the data contained in the JobStore will be removed,
+        not just those associated to the data in the queue.
+
+        Parameters
+        ----------
+        reset_output
+            If True also reset the JobStore containing the outputs.
+        max_limit
+            Maximum number of Flows present in the DB. If number is larger
+            the database will not be reset. Set 0 for not limit.
+        Returns
+        -------
+            True if the database was reset, False otherwise.
+        """
         # TODO should it just delete docs related to job removed in the reset?
         # what if the outputs are in other stores? Should take those as well
         if max_limit:
@@ -1185,14 +2179,24 @@ class JobController:
 
     def build_indexes(
         self,
-        background=True,
+        background: bool = True,
         job_custom_indexes: list[str | list] | None = None,
         flow_custom_indexes: list[str | list] | None = None,
     ):
         """
-        Build indexes
-        """
+        Build indexes in the database
 
+        Parameters
+        ----------
+        background
+            If True, the indexes should be created in the background.
+        job_custom_indexes
+            List of custom indexes for the jobs collection. Each element is passed
+            to pymongo's create_index, thus following those conventions.
+        flow_custom_indexes
+            List of custom indexes for the flows collection.
+            Same as job_custom_indexes.
+        """
         self.jobs.create_index("db_id", unique=True, background=background)
 
         job_indexes = [
@@ -1229,6 +2233,9 @@ class JobController:
                 self.flows.create_index(idx, background=background)
 
     def compact(self):
+        """
+        Compact jobs and flows collections in MongoDB.
+        """
         self.db.command({"compact": self.jobs_collection})
         self.db.command({"compact": self.flows_collection})
 
