@@ -13,6 +13,7 @@ from pathlib import Path
 
 from fireworks import FWorker
 from jobflow.utils import suuid
+from monty.json import MontyDecoder
 from monty.os import makedirs_p
 from qtoolkit.core.data_objects import QState, SubmissionStatus
 
@@ -27,13 +28,14 @@ from jobflow_remote.config.base import (
 )
 from jobflow_remote.config.manager import ConfigManager
 from jobflow_remote.jobs.batch import RemoteBatchManager
-from jobflow_remote.jobs.data import IN_FILENAME, OUT_FILENAME, JobDoc, RemoteError
+from jobflow_remote.jobs.data import IN_FILENAME, OUT_FILENAME, RemoteError
 from jobflow_remote.jobs.state import JobState
 from jobflow_remote.remote.data import (
     get_job_path,
     get_remote_in_file,
     get_remote_store,
     get_remote_store_filenames,
+    resolve_job_dict_args,
 )
 from jobflow_remote.remote.host import BaseHost
 from jobflow_remote.remote.queue import ERR_FNAME, OUT_FNAME, QueueManager, set_name_out
@@ -263,17 +265,16 @@ class Runner:
         db_id = doc["db_id"]
         logger.debug(f"upload db_id: {db_id}")
 
-        job_doc = JobDoc(**doc)
-        job = job_doc.job
+        job_dict = doc["job"]
 
-        worker = self.get_worker(job_doc.worker)
-        host = self.get_host(job_doc.worker)
+        worker = self.get_worker(doc["worker"])
+        host = self.get_host(doc["worker"])
         store = self.jobstore
         # TODO would it be better/feasible to keep a pool of the required
         # Stores already connected, to avoid opening and closing them?
         store.connect()
         try:
-            job.resolve_args(store=store, inplace=True)
+            resolve_job_dict_args(job_dict, store)
         finally:
             try:
                 store.close()
@@ -281,10 +282,10 @@ class Runner:
                 logging.error(f"error while closing the store {store}", exc_info=True)
 
         # set the db_id in the job's metadata, so that it is available in the outputs
-        if "db_id" not in job.metadata:
-            job.metadata["db_id"] = db_id
+        if "db_id" not in job_dict["metadata"]:
+            job_dict["metadata"]["db_id"] = db_id
 
-        remote_path = get_job_path(job.uuid, job.index, worker.work_dir)
+        remote_path = get_job_path(job_dict["uuid"], job_dict["index"], worker.work_dir)
 
         # Set the value of the original store for dynamical workflow. Usually it
         # will be None don't add the serializer, at this stage the default_orjson
@@ -302,7 +303,7 @@ class Runner:
             logger.error(err_msg)
             raise RemoteError(err_msg, no_retry=False)
 
-        serialized_input = get_remote_in_file(job, remote_store)
+        serialized_input = get_remote_in_file(job_dict, remote_store)
 
         path_file = Path(remote_path, IN_FILENAME)
         host.put(serialized_input, str(path_file))
@@ -316,34 +317,34 @@ class Runner:
         doc = lock.locked_document
         logger.debug(f"submit db_id: {doc['db_id']}")
 
-        job_doc = JobDoc(**doc)
-        job = job_doc.job
+        job_dict = doc["job"]
 
-        worker = self.get_worker(job_doc.worker)
+        worker_name = doc["worker"]
+        worker = self.get_worker(worker_name)
 
-        remote_path = Path(job_doc.run_dir)
+        remote_path = Path(doc["run_dir"])
 
         script_commands = [f"jf execution run {remote_path}"]
 
-        queue_manager = self.get_queue_manager(job_doc.worker)
+        queue_manager = self.get_queue_manager(worker_name)
         qout_fpath = remote_path / OUT_FNAME
         qerr_fpath = remote_path / ERR_FNAME
 
-        exec_config = job_doc.exec_config
+        exec_config = doc["exec_config"]
         if isinstance(exec_config, str):
             exec_config = self.config_manager.get_exec_config(
                 exec_config_name=exec_config, project_name=self.project_name
             )
         elif isinstance(exec_config, dict):
-            exec_config = ExecutionConfig.parse_obj(job_doc.exec_config)
+            exec_config = ExecutionConfig.parse_obj(exec_config)
 
         # define an empty default if it is not set
         exec_config = exec_config or ExecutionConfig()
 
-        if job_doc.worker in self.batch_workers:
+        if worker_name in self.batch_workers:
             resources = {}
             set_name_out(
-                resources, job.name, out_fpath=qout_fpath, err_fpath=qerr_fpath
+                resources, job_dict["name"], out_fpath=qout_fpath, err_fpath=qerr_fpath
             )
             shell_manager = queue_manager.get_shell_manager()
             shell_manager.write_submission_script(
@@ -357,8 +358,8 @@ class Runner:
                 create_submit_dir=False,
             )
 
-            self.batch_workers[job_doc.worker].submit_job(
-                job_id=job_doc.uuid, index=job_doc.index
+            self.batch_workers[worker_name].submit_job(
+                job_id=doc["uuid"], index=doc["index"]
             )
             lock.update_on_release = {
                 "$set": {
@@ -366,9 +367,14 @@ class Runner:
                 }
             }
         else:
-            resources = job_doc.resources or worker.resources or {}
+            # decode in case it contains a QResources. It was not deserialized before.
+            resources = (
+                MontyDecoder().process_decoded(doc["resources"])
+                or worker.resources
+                or {}
+            )
             set_name_out(
-                resources, job.name, out_fpath=qout_fpath, err_fpath=qerr_fpath
+                resources, job_dict["name"], out_fpath=qout_fpath, err_fpath=qerr_fpath
             )
 
             pre_run = worker.pre_run or ""
@@ -402,8 +408,8 @@ class Runner:
                         "state": JobState.SUBMITTED.value,
                     }
                 }
-                if job_doc.worker in self.limited_workers:
-                    self.limited_workers[job_doc.worker]["current"] += 1
+                if worker_name in self.limited_workers:
+                    self.limited_workers[worker_name]["current"] += 1
             else:
                 raise RemoteError(
                     f"unhandled submission status {submit_result.status}", True
@@ -413,20 +419,22 @@ class Runner:
         doc = lock.locked_document
         logger.debug(f"download db_id: {doc['db_id']}")
 
-        job_doc = JobDoc(**doc)
-        job = job_doc.job
+        # job_doc = JobDoc(**doc)
+        job_dict = doc["job"]
 
         # If the worker is local do not copy the files in the temporary folder
         # It should not arrive to this point, since it should go directly
         # from SUBMITTED/RUNNING to DOWNLOADED in case of local worker
-        worker = self.get_worker(job_doc.worker)
+        worker = self.get_worker(doc["worker"])
         if not worker.is_local:
-            host = self.get_host(job_doc.worker)
+            host = self.get_host(doc["worker"])
             store = self.jobstore
 
-            remote_path = job_doc.run_dir
+            remote_path = doc["run_dir"]
             local_base_dir = Path(self.project.tmp_dir, "download")
-            local_path = get_job_path(job.uuid, job.index, local_base_dir)
+            local_path = get_job_path(
+                job_dict["uuid"], job_dict["index"], local_base_dir
+            )
 
             makedirs_p(local_path)
 
@@ -441,9 +449,7 @@ class Runner:
                     host.get(remote_file_path, str(Path(local_path, fname)))
                 except FileNotFoundError:
                     # if files are missing it should not retry
-                    err_msg = (
-                        f"file {remote_file_path} for job {job.uuid} does not exist"
-                    )
+                    err_msg = f"file {remote_file_path} for job {job_dict['uuid']} does not exist"
                     logger.error(err_msg)
                     raise RemoteError(err_msg, True)
 
@@ -463,9 +469,8 @@ class Runner:
             local_path = get_job_path(doc["uuid"], doc["index"], local_base_dir)
 
         try:
-            job_doc = JobDoc(**doc)
             store = self.jobstore
-            completed = self.job_controller.complete_job(job_doc, local_path, store)
+            completed = self.job_controller.complete_job(doc, local_path, store)
 
         except json.JSONDecodeError:
             # if an empty file is copied this error can appear, do not retry
