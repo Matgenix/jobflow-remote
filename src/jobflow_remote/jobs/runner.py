@@ -1,3 +1,5 @@
+"""The Runner orchestrating the Jobs execution"""
+
 from __future__ import annotations
 
 import json
@@ -7,7 +9,7 @@ import signal
 import time
 import traceback
 import uuid
-from collections import defaultdict, namedtuple
+from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
 
@@ -45,19 +47,42 @@ from jobflow_remote.utils.schedule import SafeScheduler
 logger = logging.getLogger(__name__)
 
 
-JobFWData = namedtuple(
-    "JobFWData",
-    ["fw", "task", "job", "store", "worker_name", "worker", "host", "original_store"],
-)
-
-
 class Runner:
+    """
+    Object orchestrating the execution of all the Jobs.
+
+    Advances the status of the Jobs, handles the communication with the workers
+    and updates the queue and output databases.
+
+    The main entry point is the `run` method. It is mainly supposed to be executed
+    if a daemon, but can also be run directly for testing purposes.
+    It allows to run all the steps required to advance the Job's states or even
+    a subset of them, to parallelize the different tasks.
+
+    The runner instantiates a pool of workers and hosts given in the project
+    definition. A single connection will be opened if multiple workers share
+    the same host.
+    """
+
     def __init__(
         self,
         project_name: str | None = None,
         log_level: LogLevel | None = None,
         runner_id: str | None = None,
     ):
+        """
+        Parameters
+        ----------
+        project_name
+            Name of the project. Used to retrieve all the configurations required
+            to execute the runner.
+        log_level
+            Logging level of the Runner.
+        runner_id
+            A unique identifier for the Runner process. Used to identify the
+            runner process in logging and in the DB locks.
+            If None a uuid will be generated.
+        """
         self.stop_signal = False
         self.runner_id: str = runner_id or str(uuid.uuid4())
         self.config_manager: ConfigManager = ConfigManager()
@@ -102,26 +127,68 @@ class Runner:
 
     @property
     def runner_options(self) -> RunnerOptions:
+        """
+        The Runner options defined in the project.
+        """
         return self.project.runner
 
     def handle_signal(self, signum, frame):
+        """
+        Handle the SIGTERM signal in the Runner.
+        Sets a variable that will stop the Runner loop.
+        """
         logger.info(f"Received signal: {signum}")
         self.stop_signal = True
 
     def get_worker(self, worker_name: str) -> WorkerBase:
+        """
+        Get the worker from the pool of workers instantiated by the Runner.
+
+        Parameters
+        ----------
+        worker_name
+            The name of the worker.
+
+        Returns
+        -------
+            An instance of the corresponding worker.
+        """
         if worker_name not in self.workers:
             raise ConfigError(
                 f"No worker {worker_name} is defined in project {self.project_name}"
             )
         return self.workers[worker_name]
 
-    def get_host(self, worker_name: str):
+    def get_host(self, worker_name: str) -> BaseHost:
+        """
+        Get the host associated to a worker from the pool of hosts instantiated
+        by the Runner.
+
+        Parameters
+        ----------
+        worker_name
+            The name of the worker.
+        Returns
+        -------
+            An instance of the Host associated to the worker.
+        """
         host = self.hosts[worker_name]
         if not host.is_connected:
             host.connect()
         return host
 
     def get_queue_manager(self, worker_name: str) -> QueueManager:
+        """
+        Get an instance of the queue manager associated to a worker, based on its host.
+
+        Parameters
+        ----------
+        worker_name
+            The name of the worker.
+        Returns
+        -------
+             An instance of the QueueManager associated to the worker.
+        """
         if worker_name not in self.queue_managers:
             worker = self.get_worker(worker_name)
             self.queue_managers[worker_name] = QueueManager(

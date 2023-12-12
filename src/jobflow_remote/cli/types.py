@@ -143,7 +143,11 @@ hours_opt = Annotated[
 verbosity_opt = Annotated[
     int,
     typer.Option(
-        "--verbosity", "-v", help="Set the verbosity of the output", count=True
+        "--verbosity",
+        "-v",
+        help="Set the verbosity of the output. Multiple -v options "
+        "increase the verbosity. (e.g. -vvv)",
+        count=True,
     ),
 ]
 

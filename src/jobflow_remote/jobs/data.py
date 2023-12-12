@@ -80,6 +80,8 @@ class JobInfo(BaseModel):
     worker: str
     name: str
     state: JobState
+    created_on: datetime
+    updated_on: datetime
     remote: RemoteInfo = RemoteInfo()
     parents: Optional[list[str]] = None
     previous_state: Optional[JobState] = None
@@ -89,8 +91,6 @@ class JobInfo(BaseModel):
     run_dir: Optional[str] = None
     start_time: Optional[datetime] = None
     end_time: Optional[datetime] = None
-    created_on: datetime = datetime.utcnow()
-    updated_on: datetime = datetime.utcnow()
     priority: int = 0
     metadata: Optional[dict] = None
 
@@ -157,8 +157,8 @@ class JobDoc(BaseModel):
     run_dir: Optional[str] = None
     start_time: Optional[datetime] = None
     end_time: Optional[datetime] = None
-    created_on: datetime = datetime.utcnow()
-    updated_on: datetime = datetime.utcnow()
+    created_on: datetime = Field(default_factory=datetime.utcnow)
+    updated_on: datetime = Field(default_factory=datetime.utcnow)
     priority: int = 0
     # store: Optional[JobStore] = None
     exec_config: Optional[Union[ExecutionConfig, str]] = None
@@ -189,8 +189,8 @@ class FlowDoc(BaseModel):
     name: str
     lock_id: Optional[str] = None
     lock_time: Optional[datetime] = None
-    created_on: datetime = datetime.utcnow()
-    updated_on: datetime = datetime.utcnow()
+    created_on: datetime = Field(default_factory=datetime.utcnow)
+    updated_on: datetime = Field(default_factory=datetime.utcnow)
     metadata: dict = Field(default_factory=dict)
     # parents need to include both the uuid and the index.
     # When dynamically replacing a Job with a Flow some new Jobs will
@@ -266,6 +266,7 @@ class FlowInfo(BaseModel):
     flow_id: str
     state: FlowState
     name: str
+    created_on: datetime
     updated_on: datetime
     workers: list[str]
     job_states: list[JobState]
@@ -275,6 +276,7 @@ class FlowInfo(BaseModel):
 
     @classmethod
     def from_query_dict(cls, d):
+        created_on = d["created_on"]
         updated_on = d["updated_on"]
         flow_id = d["uuid"]
         jobs_data = d.get("jobs_list") or []
@@ -314,6 +316,7 @@ class FlowInfo(BaseModel):
             flow_id=flow_id,
             state=state,
             name=d["name"],
+            created_on=created_on,
             updated_on=updated_on,
             workers=workers,
             job_states=job_states,
