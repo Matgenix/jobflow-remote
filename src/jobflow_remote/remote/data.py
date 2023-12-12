@@ -80,7 +80,7 @@ def get_remote_store_filenames(store: JobStore) -> list[str]:
     return filenames
 
 
-def update_store(store: JobStore, remote_store: JobStore):
+def update_store(store: JobStore, remote_store: JobStore, db_id: int):
     try:
         store.connect()
         remote_store.connect()
@@ -114,7 +114,11 @@ def update_store(store: JobStore, remote_store: JobStore):
             )
         main_doc = main_docs_list[0]
         main_doc.pop("_id", None)
-        store.docs_store.update(main_doc)
+        # Set the db_id here and not directly in the Job's metadata to prevent
+        # it from being propagated to its children/replacements.
+        if "db_id" not in main_doc["metadata"]:
+            main_doc["metadata"]["db_id"] = db_id
+        store.docs_store.update(main_doc, key=["uuid", "index"])
     finally:
         try:
             store.close()

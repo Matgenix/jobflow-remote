@@ -348,10 +348,6 @@ class Runner:
             except Exception:
                 logging.error(f"error while closing the store {store}", exc_info=True)
 
-        # set the db_id in the job's metadata, so that it is available in the outputs
-        if "db_id" not in job_dict["metadata"]:
-            job_dict["metadata"]["db_id"] = db_id
-
         remote_path = get_job_path(job_dict["uuid"], job_dict["index"], worker.work_dir)
 
         # Set the value of the original store for dynamical workflow. Usually it
