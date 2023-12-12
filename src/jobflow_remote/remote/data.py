@@ -80,11 +80,16 @@ def get_remote_store_filenames(store: JobStore) -> list[str]:
     return filenames
 
 
-def update_store(store, remote_store, save):
+def update_store(store, remote_store, save, db_id):
     # TODO is it correct?
     data = list(remote_store.query(load=save))
     if len(data) > 1:
         raise RuntimeError("something wrong with the remote store")
+
+    # Set the db_id here and not directly in the Job's metadata to avoid
+    # that it gets passed down to its children/replacements.
+    if "db_id" not in data[0]["metadata"]:
+        data[0]["metadata"]["db_id"] = db_id
 
     store.connect()
     try:

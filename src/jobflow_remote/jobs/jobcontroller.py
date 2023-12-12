@@ -2611,7 +2611,7 @@ class JobController:
 
                 remote_store = get_remote_store(store, local_path)
                 remote_store.connect()
-                update_store(store, remote_store, save)
+                update_store(store, remote_store, save, job_doc.db_id)
                 self.checkin_job(
                     job_doc,
                     flow_lock.locked_document,
