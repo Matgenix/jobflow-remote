@@ -83,13 +83,13 @@ numprocs=$num_procs_transfer
 process_name=run_jobflow_transfer%(process_num)s
 stopwaitsecs=86400
 
-[program:runner_daemon_slurm]
+[program:runner_daemon_queue]
 priority=100
-command=jf -p $project runner run -pid --slurm -log $loglevel
+command=jf -p $project runner run -pid --queue -log $loglevel
 autostart=true
 autorestart=false
 numprocs=1
-process_name=run_jobflow_slurm
+process_name=run_jobflow_queue
 stopwaitsecs=86400
 
 [program:runner_daemon_complete]

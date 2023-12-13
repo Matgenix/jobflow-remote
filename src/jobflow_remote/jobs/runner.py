@@ -12,8 +12,8 @@ import uuid
 from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
+from typing import TYPE_CHECKING
 
-from fireworks import FWorker
 from jobflow.utils import suuid
 from monty.os import makedirs_p
 from qtoolkit.core.data_objects import QState, SubmissionStatus
@@ -42,6 +42,9 @@ from jobflow_remote.remote.queue import ERR_FNAME, OUT_FNAME, QueueManager, set_
 from jobflow_remote.utils.log import initialize_runner_logger
 from jobflow_remote.utils.schedule import SafeScheduler
 
+if TYPE_CHECKING:
+    from jobflow_remote.utils.db import MongoLock
+
 logger = logging.getLogger(__name__)
 
 
@@ -52,14 +55,18 @@ class Runner:
     Advances the status of the Jobs, handles the communication with the workers
     and updates the queue and output databases.
 
-    The main entry point is the `run` method. It is mainly supposed to be executed
-    if a daemon, but can also be run directly for testing purposes.
+    The main entry point is the `run` method. It is supposed to be executed
+    by a daemon, but can also be run directly for testing purposes.
     It allows to run all the steps required to advance the Job's states or even
     a subset of them, to parallelize the different tasks.
 
     The runner instantiates a pool of workers and hosts given in the project
     definition. A single connection will be opened if multiple workers share
     the same host.
+
+    The Runner schedules the execution of the specific tasks at regular intervals
+    and relies on objects like QueueManager, BaseHost and JobController to
+    interact with workers and databases.
     """
 
     def __init__(
@@ -87,7 +94,6 @@ class Runner:
         self.project_name = project_name
         self.project: Project = self.config_manager.get_project(project_name)
         self.job_controller: JobController = JobController.from_project(self.project)
-        self.fworker: FWorker = FWorker()
         self.workers: dict[str, WorkerBase] = self.project.workers
         # Build the dictionary of hosts. The reference is the worker name.
         # If two hosts match, use the same instance
@@ -198,9 +204,25 @@ class Runner:
         self,
         transfer: bool = True,
         complete: bool = True,
-        slurm: bool = True,
+        queue: bool = True,
         checkout: bool = True,
     ):
+        """
+        Start the runner.
+
+        Which actions are being performed can be tuned by the arguments.
+
+        Parameters
+        ----------
+        transfer
+            If True actions related to file transfer are performed by the runner.
+        complete
+            If True Job completion is performed by the runner.
+        queue
+            If True interactions with the queue manager are handled by the Runner.
+        checkout
+            If True the checkout of Jobs is performed by the Runner.
+        """
         signal.signal(signal.SIGTERM, self.handle_signal)
 
         states = []
@@ -209,11 +231,11 @@ class Runner:
             states.append(JobState.TERMINATED.value)
         if complete:
             states.append(JobState.DOWNLOADED.value)
-        if slurm:
+        if queue:
             states.append(JobState.UPLOADED.value)
 
         logger.info(
-            f"Runner run options: transfer: {transfer} complete: {complete} slurm: {slurm} checkout: {checkout}"
+            f"Runner run options: transfer: {transfer} complete: {complete} queue: {queue} checkout: {checkout}"
         )
 
         scheduler = SafeScheduler(seconds_after_failure=120)
@@ -226,13 +248,13 @@ class Runner:
                 self.checkout
             )
 
-        if transfer or slurm or complete:
+        if transfer or queue or complete:
             self.advance_state(states)
             scheduler.every(self.runner_options.delay_advance_status).seconds.do(
                 self.advance_state, states=states
             )
 
-        if slurm:
+        if queue:
             self.check_run_status()
             scheduler.every(self.runner_options.delay_check_run_status).seconds.do(
                 self.check_run_status
@@ -272,6 +294,18 @@ class Runner:
             self.cleanup()
 
     def _get_limited_worker_query(self, states: list[str]) -> dict | None:
+        """
+        Generate the query to be used for fetching Jobs for workers with limited
+        number of Jobs allowed.
+
+        Parameters
+        ----------
+        states
+            The states to be used in the query.
+        Returns
+        -------
+            A dictionary with the query.
+        """
         states = [s for s in states if s != JobState.UPLOADED.value]
 
         available_workers = [w for w in self.workers if w not in self.limited_workers]
@@ -296,6 +330,14 @@ class Runner:
         return None
 
     def advance_state(self, states: list[str]):
+        """
+        Acquire the lock and advance the state of a single job.
+
+        Parameters
+        ----------
+        states
+            The state of the Jobs that can be queried.
+        """
         states_methods = {
             JobState.CHECKED_OUT: self.upload,
             JobState.UPLOADED: self.submit,
@@ -325,7 +367,16 @@ class Runner:
 
                 states_methods[state](lock)
 
-    def upload(self, lock):
+    def upload(self, lock: MongoLock):
+        """
+        Upload files for a locked Job in the CHECKED_OUT state.
+        If successful set the state to UPLOADED.
+
+        Parameters
+        ----------
+        lock
+            The MongoLock with the locked Job document.
+        """
         doc = lock.locked_document
         db_id = doc["db_id"]
         logger.debug(f"upload db_id: {db_id}")
@@ -375,7 +426,16 @@ class Runner:
         }
         lock.update_on_release = set_output
 
-    def submit(self, lock):
+    def submit(self, lock: MongoLock):
+        """
+        Submit to the queue for a locked Job in the UPLOADED state.
+        If successful set the state to SUBMITTED.
+
+        Parameters
+        ----------
+        lock
+            The MongoLock with the locked Job document.
+        """
         doc = lock.locked_document
         logger.debug(f"submit db_id: {doc['db_id']}")
 
@@ -404,7 +464,7 @@ class Runner:
         exec_config = exec_config or ExecutionConfig()
 
         if job_doc.worker in self.batch_workers:
-            resources = {}
+            resources: dict = {}
             set_name_out(
                 resources, job.name, out_fpath=qout_fpath, err_fpath=qerr_fpath
             )
@@ -473,6 +533,15 @@ class Runner:
                 )
 
     def download(self, lock):
+        """
+        Download the final files for a locked Job in the TERMINATED state.
+        If successful set the state to DOWNLOADED.
+
+        Parameters
+        ----------
+        lock
+            The MongoLock with the locked Job document.
+        """
         doc = lock.locked_document
         logger.debug(f"download db_id: {doc['db_id']}")
 
@@ -513,6 +582,15 @@ class Runner:
         lock.update_on_release = {"$set": {"state": JobState.DOWNLOADED.value}}
 
     def complete_job(self, lock):
+        """
+        Complete a locked Job in the DOWNLOADED state.
+        If successful set the state to COMPLETED, otherwise to FAILED.
+
+        Parameters
+        ----------
+        lock
+            The MongoLock with the locked Job document.
+        """
         doc = lock.locked_document
         logger.debug(f"complete job db_id: {doc['db_id']}")
 
@@ -544,6 +622,13 @@ class Runner:
             raise RemoteError(err_msg, True)
 
     def check_run_status(self):
+        """
+        Check the status of all the jobs submitted to a queue.
+
+        If Jobs started update their state from SUBMITTED to RUNNING.
+        If Jobs terminated set their state to TERMINATED if running on a remote
+        host. If on a local host set them directly to DOWNLOADED.
+        """
         logger.debug("check_run_status")
         # check for jobs that could have changed state
         workers_ids_docs = defaultdict(dict)
@@ -652,6 +737,9 @@ class Runner:
                         self.limited_workers[doc["worker"]]["current"] -= 1
 
     def checkout(self):
+        """
+        Checkout READY Jobs.
+        """
         logger.debug("checkout jobs")
         n_checked_out = 0
         while True:
@@ -664,6 +752,10 @@ class Runner:
         logger.debug(f"checked out {n_checked_out} jobs")
 
     def refresh_num_current_jobs(self):
+        """
+        Update the number of jobs currently running for worker with limited
+        number of Jobs.
+        """
         for name, state in self.limited_workers.items():
             query = {
                 "state": {"$in": [JobState.SUBMITTED.value, JobState.RUNNING.value]},
@@ -672,6 +764,13 @@ class Runner:
             state["current"] = self.job_controller.count_jobs(query)
 
     def update_batch_jobs(self):
+        """
+        Update the status of batch jobs.
+
+        Includes submitting to the remote queue, checking the status of
+        running jobs in the queue and handle the files with the Jobs information
+        about their status.
+        """
         logger.debug("update batch jobs")
         for worker_name, batch_manager in self.batch_workers.items():
             worker = self.get_worker(worker_name)
@@ -842,6 +941,9 @@ class Runner:
                 )
 
     def cleanup(self):
+        """
+        Close all the connections after stopping the Runner.
+        """
         for worker_name, host in self.hosts.items():
             try:
                 host.close()

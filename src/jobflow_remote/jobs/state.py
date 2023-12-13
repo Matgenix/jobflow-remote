@@ -4,6 +4,10 @@ from enum import Enum
 
 
 class JobState(Enum):
+    """
+    States of a Job
+    """
+
     WAITING = "WAITING"
     READY = "READY"
     CHECKED_OUT = "CHECKED_OUT"  # TODO should it be RESERVED?
@@ -70,6 +74,10 @@ RESETTABLE_STATES_V = RUNNING_STATES_V
 
 
 class FlowState(Enum):
+    """
+    States of a Flow.
+    """
+
     WAITING = "WAITING"
     READY = "READY"
     RUNNING = "RUNNING"
@@ -83,6 +91,22 @@ class FlowState(Enum):
     def from_jobs_states(
         cls, jobs_states: list[JobState], leaf_states: list[JobState]
     ) -> FlowState:
+        """
+        Generate the state of the Flow based on the states of the Jobs
+        composing it, and in particular the states of the leaf Jobs.
+
+        Parameters
+        ----------
+        jobs_states
+            List of JobStates of all the Jobs in the Flow.
+        leaf_states
+            List of JobStates of the leaf Jobs in the Flow.
+
+        Returns
+        -------
+        FlowState
+            The state of the Flow.
+        """
         if all(js == JobState.WAITING for js in jobs_states):
             return cls.WAITING
         elif all(js in (JobState.WAITING, JobState.READY) for js in jobs_states):

@@ -6,32 +6,133 @@ import time
 import warnings
 from collections import defaultdict
 from datetime import datetime
+from typing import TYPE_CHECKING, Any, Iterable, Mapping
 
 from jobflow.utils import suuid
 from pymongo import ReturnDocument
 
 from jobflow_remote.utils.data import deep_merge_dict
 
+if TYPE_CHECKING:
+    from pymongo.collection import Collection
+
 logger = logging.getLogger(__name__)
 
 
 class MongoLock:
+    """
+    Context manager to lock a document in a MongoDB database.
+
+    Main characteristics and functionalities:
+        * Lock is acquired by setting a lock_id and lock_time value in the
+          locked document.
+        * Filter the document to select based on a query and sorting.
+          It uses find_one_and_update, thus resulting in a single document locked.
+        * Can wait for a lock to be released.
+        * Can forcibly break an existing lock
+        * Can return the locked document even if the lock could not be acquired
+          (useful for determining if a document is locked or no document matches
+          the query)
+        * Accepts all the arguments that can be passed to find_one_and_update
+        * A custom update can be performed on the document when acquiring the lock.
+        * Allows to pass properties that will be set in the document at the moment
+          of releasing the lock.
+        * Lock id value can be customized. If not a randomly generated uuid is used.
+
+    Examples
+    --------
+
+    Trying to acquire the lock on a document based on the state
+    >>> with MongoLock(collection, {"state": "READY"}) as lock:
+    ...     print(lock.locked_document["state"])
+    READY
+
+    If lock cannot be acquired (no document matching filter or that
+    document is locked) the `lock.locked_document` is None.
+
+    >>> with MongoLock(collection, {"state": "READY"}) as lock:
+    ...     print(lock.locked_document)
+    None
+
+    Wait for 60 seconds in case the required document is already locked.
+    Check the status every 10 seconds. If lock cannot be acquired
+    locked_document is None
+
+    >>> with MongoLock(
+            collection,
+            {"uuid": "5b84228b-d019-47fe-b0a0-564b36aa85ed"},
+            sleep=10,
+            max_wait=60,
+        ) as lock:
+    ...     print(lock.locked_document)
+    None
+
+    In case lock cannot be acquired expose the locked document
+
+    >>> with MongoLock(
+            collection,
+            {"uuid": "5b84228b-d019-47fe-b0a0-564b36aa85ed"},
+            get_locked_doc=True,
+        ) as lock:
+    ...     print(lock.locked_document)
+    None
+    ...     print(lock.unavailable_document['lock_id'])
+    8d68404f-c77a-461b-859c-40bb0af1979f
+
+    Set values in the document upon lock release
+
+    >>> with MongoLock(collection, {"state": "READY"}) as lock:
+    ...     if lock.locked_document:
+    ...         # Perform some operations based on the job...
+    ...         lock.update_on_release = {"$set": {"state": "CHECKED_OUT"}}
+
+    """
+
     LOCK_KEY = "lock_id"
     LOCK_TIME_KEY = "lock_time"
 
     def __init__(
         self,
-        collection,
-        filter,
-        update=None,
-        break_lock=False,
-        lock_id=None,
-        sleep=None,
-        max_wait=600,
-        projection=None,
-        get_locked_doc=False,
+        collection: Collection,
+        filter: Mapping[str, Any],
+        update: Mapping[str, Any] | None = None,
+        break_lock: bool = False,
+        lock_id: str | None = None,
+        sleep: int | None = None,
+        max_wait: int = 600,
+        projection: Mapping[str, Any] | Iterable[str] | None = None,
+        get_locked_doc: bool = False,
         **kwargs,
     ):
+        """
+        Parameters
+        ----------
+        collection
+            The MongoDB collection containing the document to lock.
+        filter
+            A MongoDB query to select the document.
+        update
+            A dictionary that will be passed to find_one_and_update to update the
+            locked document at the moment of acquiring the lock.
+        break_lock
+            True if the context manager is allowed to forcibly break a lock.
+        lock_id
+            The is used for the lock in the document. If None a randomly generated
+            uuid will be used.
+        sleep
+            The amount of second to sleep between consecutive checks while waiting
+            for a lock to be released.
+        max_wait
+            The amount of seconds to wait for a lock to be released.
+        projection
+            The projection passed to the find_one_and_update that locks the document.
+        get_locked_doc
+            If True, if the lock cannot be acquired because the document matching
+            the filter is already locked, the locked document will be fetched and
+            set in the unavailable_document attribute.
+        kwargs
+            All the other args are passed to find_one_and_update.
+        """
         self.collection = collection
         self.filter = filter or {}
         self.update = update
@@ -46,13 +147,24 @@ class MongoLock:
         self.projection = projection
         self.get_locked_doc = get_locked_doc
 
-    def get_lock_time(self, d: dict):
-        return d.get(self.LOCK_TIME_KEY)
+    @classmethod
+    def get_lock_time(cls, d: dict):
+        """
+        Get the time the document was locked on a dictionary.
+        """
+        return d.get(cls.LOCK_TIME_KEY)
 
-    def get_lock_id(self, d: dict):
-        return d.get(self.LOCK_KEY)
+    @classmethod
+    def get_lock_id(cls, d: dict):
+        """
+        Get the lock id on a dictionary.
+        """
+        return d.get(cls.LOCK_KEY)
 
     def acquire(self):
+        """
+        Acquire the lock
+        """
         # Set the lock expiration time
         now = datetime.utcnow()
         db_filter = copy.deepcopy(self.filter)
@@ -129,6 +241,9 @@ class MongoLock:
                 break
 
     def release(self, exc_type, exc_val, exc_tb):
+        """
+        Release the lock.
+        """
         # Release the lock by removing the unique identifier and lock expiration time
         update = {"$set": {self.LOCK_KEY: None, self.LOCK_TIME_KEY: None}}
         # TODO maybe set on release only if no exception was raised?
@@ -160,11 +275,15 @@ class MongoLock:
 
 class LockedDocumentError(Exception):
     """
-    Exception to signal a problem when locking the document
+    Exception to signal a problem when locking the document.
     """
 
 
 class JobLockedError(LockedDocumentError):
+    """
+    Exception to signal a problem when locking a Job document.
+    """
+
     @classmethod
     def from_job_doc(cls, doc: dict, additional_msg: str | None = None):
         lock_id = doc[MongoLock.LOCK_KEY]
@@ -177,6 +296,10 @@ class JobLockedError(LockedDocumentError):
 
 
 class FlowLockedError(LockedDocumentError):
+    """
+    Exception to signal a problem when locking a Flow document.
+    """
+
     @classmethod
     def from_flow_doc(cls, doc: dict, additional_msg: str | None = None):
         lock_id = doc[MongoLock.LOCK_KEY]

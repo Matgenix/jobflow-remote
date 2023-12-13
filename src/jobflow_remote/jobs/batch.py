@@ -23,11 +23,10 @@ SUBMITTED_DIR = "submitted"
 
 class RemoteBatchManager:
     """
+    Manager of remote files containing information about Jobs to be handled by
+    a batch worker.
 
-    Attributes
-    ----------
-    host : BaseHost
-        Host where the command should be executed.
+    Used by the Runner.
     """
 
     def __init__(
@@ -35,6 +34,15 @@ class RemoteBatchManager:
         host: BaseHost,
         files_dir: str | Path,
     ):
+        """
+
+        Parameters
+        ----------
+        host
+            The host where the files are.
+        files_dir
+            The full path to directory where the files are stored.
+        """
         self.host = host
         self.files_dir = Path(files_dir)
         self.submitted_dir = self.files_dir / SUBMITTED_DIR
@@ -44,6 +52,9 @@ class RemoteBatchManager:
         self._init_files_dir()
 
     def _init_files_dir(self):
+        """
+        Initialize the file directory, creating all the subdiretories.
+        """
         self.host.connect()
         # Note that the check of the creation of the folders on a remote host
         # slows down the start of the runner by a few seconds.
@@ -57,12 +68,37 @@ class RemoteBatchManager:
         self.host.mkdir(self.lock_dir)
 
     def submit_job(self, job_id: str, index: int):
+        """
+        Submit a Job by uploading the corresponding file.
+
+        Parameters
+        ----------
+        job_id
+            Uuid of the Job.
+        index
+            Index of the Job.
+        """
         self.host.write_text_file(self.submitted_dir / f"{job_id}_{index}", "")
 
     def get_submitted(self) -> list[str]:
+        """
+        Get a list of files present in the submitted directory.
+
+        Returns
+        -------
+            The list of file names in the directory.
+        """
         return self.host.listdir(self.submitted_dir)
 
     def get_terminated(self) -> list[tuple[str, int, str]]:
+        """
+        Get job ids and process ids of the terminated jobs from the corresponding
+        directory.
+
+        Returns
+        -------
+
+        """
         terminated = []
         for i in self.host.listdir(self.terminated_dir):
             job_id, index, process_uuid = i.split("_")
@@ -84,6 +120,13 @@ class RemoteBatchManager:
 
 
 class LocalBatchManager:
+    """
+    Manager of local files  containing information about Jobs to be handled by
+    a batch worker.
+
+    Used in the worker to executes the batch Jobs.
+    """
+
     def __init__(self, files_dir: str | Path, process_id: str):
         self.process_id = process_id
         self.files_dir = Path(files_dir)

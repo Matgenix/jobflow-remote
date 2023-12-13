@@ -52,12 +52,12 @@ def run(
             help="Enable the complete option in the runner",
         ),
     ] = False,
-    slurm: Annotated[
+    queue: Annotated[
         bool,
         typer.Option(
-            "--slurm",
-            "-s",
-            help="Enable the slurm option in the runner",
+            "--queue",
+            "-q",
+            help="Enable the queue option in the runner",
         ),
     ] = False,
     checkout: Annotated[
@@ -76,10 +76,10 @@ def run(
     """
     runner_id = os.getpid() if set_pid else None
     runner = Runner(log_level=log_level, runner_id=str(runner_id))
-    if not (transfer or complete or slurm or checkout):
-        transfer = complete = slurm = checkout = True
+    if not (transfer or complete or queue or checkout):
+        transfer = complete = queue = checkout = True
 
-    runner.run(transfer=transfer, complete=complete, slurm=slurm, checkout=checkout)
+    runner.run(transfer=transfer, complete=complete, queue=queue, checkout=checkout)
 
 
 @app_runner.command()

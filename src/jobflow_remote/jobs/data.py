@@ -23,7 +23,29 @@ def get_initial_job_doc_dict(
     worker: str,
     exec_config: Optional[ExecutionConfig],
     resources: Optional[Union[dict, QResources]],
-):
+) -> dict:
+    """
+    Generate an instance of JobDoc for initial insertion in the DB.
+
+    Parameters
+    ----------
+    job:
+        The Job of the JobDoc.
+    parents
+        The parents of the Job.
+    db_id
+        The db_id.
+    worker
+        The worker where the Job should be executed.
+    exec_config
+        The ExecutionConfig used for execution.
+    resources
+        The resources used to run the Job.
+    Returns
+    -------
+    JobDoc
+        A new JobDoc.
+    """
     from monty.json import jsanitize
 
     # take the resources either from the job, if they are defined
@@ -48,7 +70,21 @@ def get_initial_job_doc_dict(
     return job_doc.as_db_dict()
 
 
-def get_initial_flow_doc_dict(flow: Flow, job_dicts: list[dict]):
+def get_initial_flow_doc_dict(flow: Flow, job_dicts: list[dict]) -> dict:
+    """
+    Generate a serialized FlowDoc for initial insertion in the DB.
+
+    Parameters
+    ----------
+    flow
+        The Flow used to generate the FlowDoc.
+    job_dicts
+        The dictionaries of the Jobs composing the Flow.
+    Returns
+    -------
+    dict
+        A serialized version of a new FlowDoc.
+    """
     jobs = [j["uuid"] for j in job_dicts]
     ids = [(j["db_id"], j["uuid"], j["index"]) for j in job_dicts]
     parents = {j["uuid"]: {"1": j["parents"]} for j in job_dicts}
@@ -66,6 +102,10 @@ def get_initial_flow_doc_dict(flow: Flow, job_dicts: list[dict]):
 
 
 class RemoteInfo(BaseModel):
+    """
+    Model with data describing the remote state of a Job.
+    """
+
     step_attempts: int = 0
     queue_state: Optional[QState] = None
     process_id: Optional[str] = None
@@ -74,6 +114,11 @@ class RemoteInfo(BaseModel):
 
 
 class JobInfo(BaseModel):
+    """
+    Model with information extracted from a JobDoc.
+    Mainly for visualization purposes.
+    """
+
     uuid: str
     index: int
     db_id: int
@@ -100,6 +145,14 @@ class JobInfo(BaseModel):
 
     @property
     def run_time(self) -> Optional[float]:
+        """
+        Calculate the run time based on start and end time.
+
+        Returns
+        -------
+        float
+            The run time in seconds
+        """
         if self.start_time and self.end_time:
             return (self.end_time - self.start_time).total_seconds()
 
@@ -107,6 +160,14 @@ class JobInfo(BaseModel):
 
     @property
     def estimated_run_time(self) -> Optional[float]:
+        """
+        Estimate the current run time based on the start time and the current time.
+
+        Returns
+        -------
+        float
+            The estimated run time in seconds.
+        """
         if self.start_time:
             return (
                 datetime.now(tz=self.start_time.tzinfo) - self.start_time
@@ -116,6 +177,18 @@ class JobInfo(BaseModel):
 
     @classmethod
     def from_query_output(cls, d) -> "JobInfo":
+        """
+        Generate an instance from the output of a query to the JobDoc collection.
+
+        Parameters
+        ----------
+        d
+            The dictionary with the queried data.
+        Returns
+        -------
+        JobInfo
+            The instance of JobInfo based on the data
+        """
         job = d.pop("job")
         for k in ["name", "metadata"]:
             d[k] = job[k]
@@ -123,6 +196,14 @@ class JobInfo(BaseModel):
 
 
 def _projection_db_info() -> list[str]:
+    """
+    Generate a list of fields used for projection, depending on the JobInfo model.
+
+    Returns
+    -------
+    list
+        The list of fields to use in a query.
+    """
     projection = list(JobInfo.model_fields.keys())
     projection.remove("name")
     projection.append("job.name")
@@ -130,10 +211,15 @@ def _projection_db_info() -> list[str]:
     return projection
 
 
+# generate the list only once.
 projection_job_info = _projection_db_info()
 
 
 class JobDoc(BaseModel):
+    """
+    Model for the standard representation of a Job in the queue database.
+    """
+
     # TODO consider defining this as a dict and provide a get_job() method to
     # get the real Job. This would avoid (de)serializing jobs if this document
     # is used often to interact with the DB.
@@ -167,22 +253,32 @@ class JobDoc(BaseModel):
     stored_data: Optional[dict] = None
     # history: Optional[list[str]] = None
 
-    def as_db_dict(self):
-        # required since the resources are not serialized otherwise
-        if isinstance(self.resources, QResources):
-            resources_dict = self.resources.as_dict()
+    def as_db_dict(self) -> dict:
+        """
+        Generate a dict representation suitable to be inserted in the database.
+
+        Returns
+        -------
+        dict
+            The dict representing the JobDoc.
+        """
         d = jsanitize(
             self.model_dump(mode="python"),
             strict=True,
             allow_bson=True,
             enum_values=True,
         )
+        # required since the resources are not serialized otherwise
         if isinstance(self.resources, QResources):
-            d["resources"] = resources_dict
+            d["resources"] = self.resources.as_dict()
         return d
 
 
 class FlowDoc(BaseModel):
+    """
+    Model for the standard representation of a Flow in the queue database.
+    """
+
     uuid: str
     jobs: list[str]
     state: FlowState
@@ -202,7 +298,15 @@ class FlowDoc(BaseModel):
     # ids correspond to db_id, uuid, index for each JobDoc
     ids: list[tuple[int, str, int]] = Field(default_factory=list)
 
-    def as_db_dict(self):
+    def as_db_dict(self) -> dict:
+        """
+        Generate a dict representation suitable to be inserted in the database.
+
+        Returns
+        -------
+        dict
+            The dict representing the FlowDoc.
+        """
         d = jsanitize(
             self.model_dump(mode="python"),
             strict=True,
@@ -254,12 +358,21 @@ class FlowDoc(BaseModel):
 
 
 class RemoteError(RuntimeError):
+    """
+    An exception signaling errors during the update of the remote states.
+    """
+
     def __init__(self, msg, no_retry=False):
         self.msg = msg
         self.no_retry = no_retry
 
 
 class FlowInfo(BaseModel):
+    """
+    Model with information extracted from a FlowDoc.
+    Mainly for visualization purposes.
+    """
+
     db_ids: list[int]
     job_ids: list[str]
     job_indexes: list[int]
@@ -275,7 +388,7 @@ class FlowInfo(BaseModel):
     hosts: list[list[str]]
 
     @classmethod
-    def from_query_dict(cls, d):
+    def from_query_dict(cls, d) -> "FlowInfo":
         created_on = d["created_on"]
         updated_on = d["updated_on"]
         flow_id = d["uuid"]
@@ -351,6 +464,10 @@ class FlowInfo(BaseModel):
 
 
 class DynamicResponseType(Enum):
+    """
+    Types of dynamic responses in jobflow.
+    """
+
     REPLACE = "replace"
     DETOUR = "detour"
     ADDITION = "addition"
@@ -358,11 +475,12 @@ class DynamicResponseType(Enum):
 
 def get_reset_job_base_dict() -> dict:
     """
-    Return a dictionary with the basic properties to update in case of reset.
+    Generate a dictionary with the basic properties to update in case of reset.
 
     Returns
     -------
-
+    dict
+        Data to be reset.
     """
     d = {
         "remote.step_attempts": 0,

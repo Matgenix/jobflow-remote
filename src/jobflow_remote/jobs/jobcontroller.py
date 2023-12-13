@@ -8,7 +8,7 @@ import warnings
 from contextlib import ExitStack
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Callable, cast
+from typing import TYPE_CHECKING, Any, Callable, cast
 
 import jobflow
 import pymongo
@@ -43,6 +43,10 @@ from jobflow_remote.remote.data import get_remote_store, update_store
 from jobflow_remote.remote.queue import QueueManager
 from jobflow_remote.utils.data import deep_merge_dict
 from jobflow_remote.utils.db import FlowLockedError, JobLockedError, MongoLock
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
+
 
 logger = logging.getLogger(__name__)
 
@@ -110,6 +114,7 @@ class JobController:
             The name of the project. If None the default project will be used.
         Returns
         -------
+        JobController
             An instance of JobController associated with the project.
         """
         config_manager: ConfigManager = ConfigManager()
@@ -130,6 +135,7 @@ class JobController:
             project will be used.
         Returns
         -------
+        JobController
             An instance of JobController associated with the project.
         """
         queue_store = project.get_queue_store()
@@ -197,6 +203,7 @@ class JobController:
             exact match for all the values provided.
         Returns
         -------
+        dict
             A dictionary with the query to be applied to a collection
             containing JobDocs.
         """
@@ -286,6 +293,7 @@ class JobController:
 
         Returns
         -------
+        dict
             A dictionary with the query to be applied to a collection
             containing FlowDocs.
         """
@@ -326,6 +334,21 @@ class JobController:
         return query
 
     def get_jobs_info_query(self, query: dict = None, **kwargs) -> list[JobInfo]:
+        """
+        Get a list of JobInfo based on a generic query.
+
+        Parameters
+        ----------
+        query
+            The query to be performed.
+        kwargs
+            arguments passed to MongoDB find().
+
+        Returns
+        -------
+        list
+            A list of JobInfo matching the criteria.
+        """
         data = self.jobs.find(query, projection=projection_job_info, **kwargs)
 
         jobs_data = []
@@ -384,6 +407,7 @@ class JobController:
 
         Returns
         -------
+        list
             A list of JobInfo objects for the Jobs matching the criteria.
         """
         query = self._build_query_job(
@@ -411,6 +435,7 @@ class JobController:
             All arguments passed to pymongo's Collection.find() method.
         Returns
         -------
+        list
             A list of JobDoc objects for the Jobs matching the criteria.
         """
         data = self.jobs.find(query, **kwargs)
@@ -471,6 +496,7 @@ class JobController:
 
         Returns
         -------
+        list
             A list of JobDoc objects for the Jobs matching the criteria.
         """
         query = self._build_query_job(
@@ -507,6 +533,7 @@ class JobController:
             added to get the highest index.
         Returns
         -------
+        dict, list
             A dict and an optional list to be used as query and sort,
             respectively, in a query for a single Job.
         """
@@ -554,6 +581,7 @@ class JobController:
 
         Returns
         -------
+        JobInfo
             A JobInfo, or None if no Job matches the criteria.
         """
         query, sort = self.generate_job_id_query(db_id, job_id, job_index)
@@ -624,6 +652,7 @@ class JobController:
             Kwargs passed to the method called on each Job
         Returns
         -------
+        list
             List of db_ids of the updated Jobs.
         """
         query = self._build_query_job(
@@ -713,6 +742,7 @@ class JobController:
 
         Returns
         -------
+        list
             List of db_ids of the updated Jobs.
         """
         return self._many_jobs_action(
@@ -783,6 +813,7 @@ class JobController:
 
         Returns
         -------
+        list
             List of db_ids of the updated Jobs.
         """
         lock_filter, sort = self.generate_job_id_query(db_id, job_id, job_index)
@@ -871,6 +902,7 @@ class JobController:
             Bypass the limitation that only Jobs in a certain state can be rerun.
         Returns
         -------
+        dict, list
             Updates to be set on the rerun Job upon lock release and the list
             of db_ids of the modified Jobs.
         """
@@ -1010,7 +1042,8 @@ class JobController:
 
         Returns
         -------
-
+        dict
+            Updates to be set on the Job upon lock release.
         """
         if doc["state"] in [JobState.SUBMITTED.value, JobState.RUNNING.value]:
             # try cancelling the job submitted to the remote queue
@@ -1065,6 +1098,7 @@ class JobController:
             If None all states are acceptable.
         Returns
         -------
+        list
             List of db_ids of updated Jobs. Could be an empty list or a list
             with a single element.
         """
@@ -1131,6 +1165,7 @@ class JobController:
             Forcibly break the lock on locked documents.
         Returns
         -------
+        list
             List of db_ids of updated Jobs. Could be an empty list or a list
             with a single element.
         """
@@ -1165,7 +1200,7 @@ class JobController:
         raise_on_error: bool = True,
         wait: int | None = None,
         break_lock: bool = False,
-    ):
+    ) -> list[int]:
         """
         Retry selected Jobs, i.e. bring them back to its previous state if REMOTE_ERROR,
         or reset the remote attempts and time of retry if in another running state.
@@ -1207,6 +1242,7 @@ class JobController:
 
         Returns
         -------
+        list
             List of db_ids of the updated Jobs.
         """
         return self._many_jobs_action(
@@ -1261,6 +1297,7 @@ class JobController:
 
         Returns
         -------
+        list
             List containing the db_id of the updated Job.
         """
         lock_filter, sort = self.generate_job_id_query(db_id, job_id, job_index)
@@ -1357,6 +1394,7 @@ class JobController:
 
         Returns
         -------
+        list
             List of db_ids of the updated Jobs.
         """
         return self._many_jobs_action(
@@ -1430,6 +1468,7 @@ class JobController:
 
         Returns
         -------
+        list
             List of db_ids of the updated Jobs.
         """
         return self._many_jobs_action(
@@ -1482,6 +1521,7 @@ class JobController:
 
         Returns
         -------
+        list
             List of db_ids of the updated Jobs.
         """
         job_lock_kwargs = dict(
@@ -1545,6 +1585,7 @@ class JobController:
 
         Returns
         -------
+        list
             List of db_ids of the updated Jobs.
         """
         job_lock_kwargs = dict(projection=["uuid", "index", "db_id", "state"])
@@ -1621,6 +1662,7 @@ class JobController:
 
         Returns
         -------
+        list
             List of db_ids of the updated Jobs.
         """
         return self._many_jobs_action(
@@ -1671,6 +1713,7 @@ class JobController:
 
         Returns
         -------
+        list
             List of db_ids of the updated Jobs.
         """
         job_lock_kwargs = dict(
@@ -1774,6 +1817,7 @@ class JobController:
 
         Returns
         -------
+        list
             List of db_ids of the updated Jobs.
         """
         set_dict = {}
@@ -1849,6 +1893,7 @@ class JobController:
             Maximum number of entries to retrieve. 0 means no limit.
         Returns
         -------
+        list
             The list of dictionaries resulting from the query.
         """
         pipeline: list[dict] = [
@@ -1923,6 +1968,7 @@ class JobController:
 
         Returns
         -------
+        list
             A list of JobFlows.
         """
         query = self._build_query_flow(
@@ -1977,6 +2023,7 @@ class JobController:
 
         Returns
         -------
+        int
             Number of delete Flows.
         """
         if isinstance(flow_ids, str):
@@ -2062,6 +2109,7 @@ class JobController:
 
         Returns
         -------
+        int
             Number of modified Jobs.
         """
         query = self._build_query_job(
@@ -2091,7 +2139,7 @@ class JobController:
         start_date: datetime | None = None,
         end_date: datetime | None = None,
         name: str | None = None,
-    ) -> list[FlowInfo]:
+    ) -> int:
         """
         Forcibly remove the lock on a locked Flow document.
         This should be used only if a lock is a leftover of a process that is not
@@ -2119,6 +2167,7 @@ class JobController:
 
         Returns
         -------
+        int
             Number of modified Flows.
         """
         query = self._build_query_flow(
@@ -2138,7 +2187,7 @@ class JobController:
         )
         return result.modified_count
 
-    def reset(self, reset_output: bool = False, max_limit: int = 25):
+    def reset(self, reset_output: bool = False, max_limit: int = 25) -> bool:
         """
         Reset the content of the queue database and builds the indexes.
         Optionally deletes the content of the JobStore with the outputs.
@@ -2154,6 +2203,7 @@ class JobController:
             the database will not be reset. Set 0 for not limit.
         Returns
         -------
+        bool
             True if the database was reset, False otherwise.
         """
         # TODO should it just delete docs related to job removed in the reset?
@@ -2710,7 +2760,19 @@ class JobController:
         return len(self.refresh_children(job_uuids)) + 1
 
     # TODO should this refresh all the kind of states? Or just set to ready?
-    def refresh_children(self, job_uuids):
+    def refresh_children(self, job_uuids: list[str]) -> list[int]:
+        """
+        Set the state of Jobs children to READY following the completion of a Job.
+
+        Parameters
+        ----------
+        job_uuids
+            List of Jobs uuids belonging to a Flow.
+
+        Returns
+        -------
+            List of db_ids of modified Jobs.
+        """
         # go through and look for jobs whose state we can update to ready.
         # Need to ensure that all parent uuids with all indices are completed
         # first find state of all jobs; ensure larger indices are returned last.
@@ -2743,7 +2805,7 @@ class JobController:
         # Here it is assuming that there will be only one job with each uuid, as
         # it should be when switching state to READY the first time.
         # The code forbids rerunning a job that have children with index larger than 1,
-        # to this should always be consistent.
+        # so this should always be consistent.
         if len(to_ready) > 0:
             self.jobs.update_many(
                 {"db_id": {"$in": to_ready}}, {"$set": {"state": JobState.READY.value}}
@@ -2751,6 +2813,17 @@ class JobController:
         return to_ready
 
     def stop_children(self, job_uuid: str) -> int:
+        """
+        Stop the direct children of a Job in the WAITING state.
+
+        Parameters
+        ----------
+        job_uuid
+            The uuid of the Job.
+        Returns
+        -------
+            The number of modified Jobs.
+        """
         result = self.jobs.update_many(
             {"parents": job_uuid, "state": JobState.WAITING.value},
             {"$set": {"state": JobState.STOPPED.value}},
@@ -2758,6 +2831,19 @@ class JobController:
         return result.modified_count
 
     def stop_jobflow(self, job_uuid: str = None, flow_uuid: str = None) -> int:
+        """
+        Stop all the WAITING Jobs in a Flow.
+
+        Parameters
+        ----------
+        job_uuid
+            The uuid of Job to identify the Flow. Incompatible with flow_uuid.
+        flow_uuid
+            The Flow uuid. Incompatible with job_uuid.
+        Returns
+        -------
+            The number of modified Jobs.
+        """
         if job_uuid is None and flow_uuid is None:
             raise ValueError("Either job_uuid or flow_uuid must be set.")
 
@@ -2782,6 +2868,17 @@ class JobController:
         return result.modified_count
 
     def get_job_uuids(self, flow_uuids: list[str]) -> list[str]:
+        """
+        Get the list of Jobs belonging to Flows, based on their uuid.
+
+        Parameters
+        ----------
+        flow_uuids
+            A list of Flow uuids.
+        Returns
+        -------
+            A list of uuids of Jobs belong to the selected Flows.
+        """
         job_uuids = []
         for flow in self.flows.find_one(
             {"uuid": {"$in": flow_uuids}}, projection=["jobs"]
@@ -2796,6 +2893,25 @@ class JobController:
         sort: dict | None = None,
         limit: int = 0,
     ) -> list[dict]:
+        """
+        Get the data of Flows and their Jobs from the DB using an aggregation.
+
+        In the aggregation the Jobs are identified as "jobs".
+
+        Parameters
+        ----------
+        query
+            The query to filter the Flow.
+        projection
+            The projection for the Flow and Job data.
+        sort
+            Sorting passed to the aggregation.
+        limit
+            The maximum number of results returned.
+        Returns
+        -------
+            A list of dictionaries with the result of the query.
+        """
         pipeline: list[dict] = [
             {
                 "$lookup": {
@@ -2826,6 +2942,19 @@ class JobController:
         flow_uuid: str,
         updated_states: dict[str, dict[int, JobState]] | None = None,
     ):
+        """
+        Update the state of a Flow in the DB based on the Job's states.
+
+        The Flow should be locked while performing this operation.
+
+        Parameters
+        ----------
+        flow_uuid
+            The uuid of the Flow to update.
+        updated_states
+            A dictionary with the updated states of Jobs that have not been
+            stored in the DB yet. In the form {job_uuid: JobState value}.
+        """
         updated_states = updated_states or {}
         projection = ["uuid", "index", "parents", "state"]
         flow_jobs = self.get_jobs_info_by_flow_uuid(
@@ -2845,12 +2974,40 @@ class JobController:
         self.flows.find_one_and_update({"uuid": flow_uuid}, set_state)
 
     @contextlib.contextmanager
-    def lock_job(self, **lock_kwargs):
+    def lock_job(self, **lock_kwargs) -> Generator[MongoLock, None, None]:
+        """
+        Lock a Job document.
+
+        See MongoLock context manager for more details about the locking options.
+
+        Parameters
+        ----------
+        lock_kwargs
+            Kwargs passed to the MongoLock context manager.
+        Returns
+        -------
+        MongoLock
+            An instance of MongoLock.
+        """
         with MongoLock(collection=self.jobs, **lock_kwargs) as lock:
             yield lock
 
     @contextlib.contextmanager
-    def lock_flow(self, **lock_kwargs):
+    def lock_flow(self, **lock_kwargs) -> Generator[MongoLock, None, None]:
+        """
+        Lock a Flow document.
+
+        See MongoLock context manager for more details about the locking options.
+
+        Parameters
+        ----------
+        lock_kwargs
+            Kwargs passed to the MongoLock context manager.
+        Returns
+        -------
+        MongoLock
+            An instance of MongoLock.
+        """
         with MongoLock(collection=self.flows, **lock_kwargs) as lock:
             yield lock
 
@@ -2861,7 +3018,30 @@ class JobController:
         max_step_attempts,
         delta_retry,
         **kwargs,
-    ):
+    ) -> Generator[MongoLock, None, None]:
+        """
+        Lock a Job document for state update by the Runner.
+
+        See MongoLock context manager for more details about the locking options.
+
+        Parameters
+        ----------
+        query
+            The query used to select the Job document to lock.
+        max_step_attempts
+            The maximum number of attempts for a single step after which
+            the Job should be set to the REMOTE_ERROR state.
+        delta_retry
+            List of increasing delay between subsequent attempts when the
+            advancement of a remote step fails. Used to set the retry time.
+        kwargs
+            Kwargs passed to the MongoLock context manager.
+
+        Returns
+        -------
+        MongoLock
+            An instance of MongoLock.
+        """
         db_filter = dict(query)
         db_filter["remote.retry_time_limit"] = {"$not": {"$gt": datetime.utcnow()}}
 
@@ -2945,7 +3125,36 @@ class JobController:
         acceptable_states: list[JobState] | None = None,
         job_lock_kwargs: dict | None = None,
         flow_lock_kwargs: dict | None = None,
-    ):
+    ) -> Generator[tuple[MongoLock, MongoLock], None, None]:
+        """
+        Lock one Job document and the Flow document the Job belongs to.
+
+        See MongoLock context manager for more details about the locking options.
+
+        Parameters
+        ----------
+        job_id
+            The uuid of the Job to lock.
+        db_id
+            The db_id of the Job to lock.
+        job_index
+            The index of the Job to lock.
+        wait
+            The amount of seconds to wait for a lock to be released.
+        break_lock
+            True if the context manager is allowed to forcibly break a lock.
+        acceptable_states
+            A list of JobStates. If not among these a ValueError exception is
+            raised.
+        job_lock_kwargs
+            Kwargs passed to MongoLock for the Job lock.
+        flow_lock_kwargs
+            Kwargs passed to MongoLock for the Flow lock.
+        Returns
+        -------
+        MongoLock, MongoLock
+            An instance of MongoLock.
+        """
         lock_filter, sort = self.generate_job_id_query(db_id, job_id, job_index)
         sleep = None
         if wait:
@@ -2993,11 +3202,27 @@ class JobController:
                 yield job_lock, flow_lock
 
     def ping_flow_doc(self, uuid: str):
+        """
+        Ping a Flow document to update its "updated_on" value.
+
+        Parameters
+        ----------
+        uuid
+            The uuid of the Flow to update.
+        """
         self.flows.find_one_and_update(
             {"nodes": uuid}, {"$set": {"updated_on": datetime.utcnow()}}
         )
 
     def _cancel_queue_process(self, job_doc: dict):
+        """
+        Cancel the process in the remote queue.
+
+        Parameters
+        ----------
+        job_doc
+            The dict of the JobDoc with the Job to be cancelled.
+        """
         queue_process_id = job_doc["remote"]["process_id"]
         if not queue_process_id:
             raise ValueError("The process id is not defined in the job document")
@@ -3020,20 +3245,69 @@ class JobController:
                 )
 
     def get_batch_processes(self, worker: str) -> dict[str, str]:
+        """
+        Get the batch processes associated with a given worker.
+
+        Parameters
+        ----------
+        worker
+            The worker name.
+        Returns
+        -------
+        dict
+            A dictionary with the {process_id: process_uuid} of the batch
+            jobs running on the selected worker.
+        """
         result = self.auxiliary.find_one({"batch_processes": {"$exists": True}})
         if result:
             return result["batch_processes"].get(worker, {})
         return {}
 
-    def add_batch_process(self, process_id: str, process_uuid: str, worker: str):
-        self.auxiliary.find_one_and_update(
+    def add_batch_process(
+        self, process_id: str, process_uuid: str, worker: str
+    ) -> dict:
+        """
+        Add a batch process to the list of running processes.
+
+        Two IDs are defined, one to keep track of the actual process number and one
+        to be associated to the Jobs that are being executed. The need for two IDs
+        originates from the fact that the former may not be known at runtime.
+
+        Parameters
+        ----------
+        process_id
+            The ID of the processes obtained from the QueueManager.
+        process_uuid
+            A unique ID to identify the processes.
+        worker
+            The worker where the process is being executed.
+        Returns
+        -------
+        dict
+            The updated document.
+        """
+        return self.auxiliary.find_one_and_update(
             {"batch_processes": {"$exists": True}},
             {"$push": {f"batch_processes.{worker}.{process_id}": process_uuid}},
             upsert=True,
         )
 
-    def remove_batch_process(self, process_id: str, worker: str):
-        self.auxiliary.find_one_and_update(
+    def remove_batch_process(self, process_id: str, worker: str) -> dict:
+        """
+        Remove a process from the list of running batch processes.
+
+        Parameters
+        ----------
+        process_id
+            The ID of the processes obtained from the QueueManager.
+        worker
+            The worker where the process was being executed.
+        Returns
+        -------
+        dict
+            The updated document.
+        """
+        return self.auxiliary.find_one_and_update(
             {"batch_processes": {"$exists": True}},
             {"$unset": {f"batch_processes.{worker}.{process_id}": ""}},
             upsert=True,
@@ -3041,6 +3315,18 @@ class JobController:
 
 
 def get_flow_leafs(job_docs: list[dict]) -> list[dict]:
+    """
+    Get the leaf jobs from a list of serilized representation of JobDoc.
+
+    Parameters
+    ----------
+    job_docs
+        The list of serialized JobDocs in the Flow
+    Returns
+    -------
+    list
+        The list of serialized JobDocs that are leafs of the Flow.
+    """
     # first sort the list, so that only the largest indexes are kept in the dictionary
     job_docs = sorted(job_docs, key=lambda j: j["index"])
     d = {j["uuid"]: j for j in job_docs}
