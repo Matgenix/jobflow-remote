@@ -1,0 +1,36 @@
+name: std
+workers:
+  example_worker:
+    type: remote
+    scheduler_type: slurm
+    work_dir: /path/to/run/folder
+    pre_run: source /path/to/python/environment/activate
+    timeout_execute: 60
+    host: remote.host.net
+    user: bob
+queue:
+  type: MongoStore
+  host: localhost
+  database: db_name
+  username: bob
+  password: secret_password
+  collection_name: jobs
+exec_config: {}
+jobstore:
+  docs_store:
+    type: MongoStore
+    database: db_name
+    host: host.mongodb.com
+    port: 27017
+    username: bob
+    password: secret_password
+    collection_name: outputs
+  additional_stores:
+    data:
+      type: GridFSStore
+      database: db_name
+      host: host.mongodb.com
+      port: 27017
+      username: bob
+      password: secret_password
+      collection_name: outputs_blobs

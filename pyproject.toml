@@ -54,6 +54,8 @@ docs = [
     "sphinx",
     "sphinx_design",
     "pydata-sphinx-theme",
+    "sphinx-copybutton",
+    "autodoc_pydantic>=2.0.0",
 ]
 strict = []
 
