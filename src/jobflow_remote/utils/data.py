@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 from collections.abc import Mapping, MutableMapping
 from copy import deepcopy
+from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID
 
@@ -77,7 +78,9 @@ def check_dict_keywords(obj: Any, keywords: list[str]) -> bool:
     return False
 
 
-def uuid_to_path(uuid: str, index: int = 1, num_subdirs: int = 3, subdir_len: int = 2):
+def uuid_to_path(
+    uuid: str, index: int | None = 1, num_subdirs: int = 3, subdir_len: int = 2
+):
     u = UUID(uuid)
     u_hex = u.hex
 
@@ -88,7 +91,9 @@ def uuid_to_path(uuid: str, index: int = 1, num_subdirs: int = 3, subdir_len: in
     ]
 
     # add the index to the final dir name
-    dir_name = f"{uuid}_{index}"
+    dir_name = f"{uuid}"
+    if index is not None:
+        dir_name += f"_{index}"
 
     # Combine root directory and subdirectories to form the final path
     return os.path.join(*subdirs, dir_name)
@@ -125,3 +130,19 @@ def convert_store(spec_dict: dict, valid_stores) -> Store:
         if isinstance(v, dict) and "type" in v:
             _spec_dict[k] = convert_store(v, valid_stores)
     return valid_stores[store_type](**_spec_dict)
+
+
+def convert_utc_time(datetime_value: datetime) -> datetime:
+    """
+    Convert a time in UTC (used in the DB) to the time zone of the
+    system where the code is being executed.
+
+    Parameters
+    ----------
+    datetime_value
+        a datetime object in UTC
+    Returns
+    -------
+        The datetime in the zone of the current system
+    """
+    return datetime_value.replace(tzinfo=timezone.utc).astimezone(tz=None)

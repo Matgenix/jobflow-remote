@@ -226,3 +226,37 @@ class RemoteHost(BaseHost):
         self._create_connection()
         self.connect()
         return remote_cmd(*args, **kwargs)
+
+    def listdir(self, path: str | Path):
+        self._check_connected()
+
+        try:
+            return self._execute_remote_func(self.connection.sftp().listdir, str(path))
+        except FileNotFoundError:
+            return []
+
+    def remove(self, path: str | Path):
+        self._check_connected()
+
+        self._execute_remote_func(self.connection.sftp().remove, str(path))
+
+    def _check_connected(self) -> bool:
+        """
+        Helper method to determine if fabric consider the connection open and
+        open it otherwise
+
+        Since many operations requiring connections happen in the runner,
+        if the connection drops there are cases where the host may not be
+        reconnected. To avoid this issue always try to reconnect automatically
+        if the connection is not open.
+
+        Returns
+        -------
+        True if the connection is open.
+        """
+
+        if not self.is_connected:
+            # Note: raising here instead of reconnecting demonstrated to be a
+            # problem for how the queue managers are handled in the Runner.
+            self.connect()
+        return True

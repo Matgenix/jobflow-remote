@@ -25,9 +25,8 @@ classifiers = [
 ]
 requires-python = ">=3.9"
 dependencies =[
-    "jobflow[strict]",
-    "pydantic<2",
-    "fireworks",
+    "jobflow",
+    "pydantic>=2.0.1",
     "fabric",
     "tomlkit",
     "qtoolkit",
@@ -35,7 +34,9 @@ dependencies =[
     "rich",
     "psutil",
     "supervisor",
-    "ruamel.yaml"
+    "ruamel.yaml",
+    "schedule",
+    "flufl.lock"
 ]
 
 [project.optional-dependencies]
@@ -53,6 +54,8 @@ docs = [
     "sphinx",
     "sphinx_design",
     "pydata-sphinx-theme",
+    "sphinx-copybutton",
+    "autodoc_pydantic>=2.0.0",
 ]
 strict = []
 

@@ -12,6 +12,7 @@ from jobflow_remote.cli.utils import (
     check_incompatible_opt,
     exit_with_error_msg,
     exit_with_warning_msg,
+    get_config_manager,
     loading_spinner,
     out_console,
     print_success_msg,
@@ -235,7 +236,7 @@ def remove(
     """
     Remove a project from the projects' folder, including the related folders.
     """
-    cm = ConfigManager()
+    cm = get_config_manager()
 
     if name not in cm.projects_data:
         exit_with_warning_msg(f"Project {name} does not exist")
@@ -269,7 +270,7 @@ app_project.add_typer(app_exec_config)
 def list_exec_config(
     verbosity: verbosity_opt = 0,
 ):
-    cm = ConfigManager()
+    cm = get_config_manager()
     project = cm.get_project()
     table = get_exec_config_table(project.exec_config, verbosity)
     out_console.print(table)
@@ -292,7 +293,7 @@ app_project.add_typer(app_worker)
 def list_worker(
     verbosity: verbosity_opt = 0,
 ):
-    cm = ConfigManager()
+    cm = get_config_manager()
     project = cm.get_project()
     table = get_worker_table(project.workers, verbosity)
     out_console.print(table)

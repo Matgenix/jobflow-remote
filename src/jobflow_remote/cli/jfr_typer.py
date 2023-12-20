@@ -20,6 +20,9 @@ class JFRTyper(typer.Typer):
         if "rich_markup_mode" not in kwargs:
             kwargs["rich_markup_mode"] = "rich"
 
+        # if "result_callback" not in kwargs:
+        #     kwargs["result_callback"] = test_cb
+
         super().__init__(*args, **kwargs)
 
     def command(

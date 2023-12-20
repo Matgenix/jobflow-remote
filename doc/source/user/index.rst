@@ -11,8 +11,9 @@ details are found in :ref:`reference`.
    :caption: Getting started
    :maxdepth: 1
 
-   whatisjobflowremote
+   introduction
    install
+   projectconf
    quickstart
 
 .. toctree::

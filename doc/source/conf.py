@@ -59,6 +59,8 @@ extensions = [
     "IPython.sphinxext.ipython_directive",
     "sphinx.ext.mathjax",
     "sphinx_design",
+    "sphinx_copybutton",
+    "sphinxcontrib.autodoc_pydantic",
 ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -214,3 +216,6 @@ todo_include_todos = True
 
 # To print the content of the docstring of the __init__ method as well.
 autoclass_content = "both"
+
+autodoc_pydantic_model_show_json = True
+# autodoc_pydantic_model_erdantic_figure = True

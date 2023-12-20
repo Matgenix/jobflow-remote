@@ -1,17 +1,22 @@
 from __future__ import annotations
 
+import io
 import logging
 import os
 from pathlib import Path
 from typing import Any
 
+import orjson
 from jobflow.core.store import JobStore
 from maggma.stores.mongolike import JSONStore
+from monty.json import jsanitize
 
 from jobflow_remote.utils.data import uuid_to_path
 
 
-def get_job_path(job_id: str, index: int, base_path: str | Path | None = None) -> str:
+def get_job_path(
+    job_id: str, index: int | None, base_path: str | Path | None = None
+) -> str:
     if base_path:
         base_path = Path(base_path)
     else:
@@ -21,14 +26,14 @@ def get_job_path(job_id: str, index: int, base_path: str | Path | None = None) -
     return str(base_path / relative_path)
 
 
-def get_remote_files(fw, launch_id):
-    files = {
-        # TODO handle binary data?
-        "FW.json": fw.to_format(f_format="json"),
-        "FW_offline.json": f'{{"launch_id": {launch_id}}}',
-    }
-
-    return files
+def get_remote_in_file(job, remote_store):
+    d = jsanitize(
+        {"job": job, "store": remote_store},
+        strict=True,
+        allow_bson=True,
+        enum_values=True,
+    )
+    return io.BytesIO(orjson.dumps(d, default=default_orjson_serializer))
 
 
 def default_orjson_serializer(obj: Any) -> Any:
@@ -75,11 +80,16 @@ def get_remote_store_filenames(store: JobStore) -> list[str]:
     return filenames
 
 
-def update_store(store, remote_store, save):
+def update_store(store, remote_store, save, db_id):
     # TODO is it correct?
     data = list(remote_store.query(load=save))
     if len(data) > 1:
         raise RuntimeError("something wrong with the remote store")
+
+    # Set the db_id here and not directly in the Job's metadata to avoid
+    # that it gets passed down to its children/replacements.
+    if "db_id" not in data[0]["metadata"]:
+        data[0]["metadata"]["db_id"] = db_id
 
     store.connect()
     try:

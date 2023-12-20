@@ -4,6 +4,7 @@ from pathlib import Path
 
 from qtoolkit.core.data_objects import CancelResult, QJob, QResources, SubmissionResult
 from qtoolkit.io.base import BaseSchedulerIO
+from qtoolkit.io.shell import ShellIO
 
 from jobflow_remote.remote.host import BaseHost
 
@@ -107,7 +108,7 @@ class QueueManager:
             return "\n".join(pre_run)
         return pre_run
 
-    def get_export(self, exports: dict | None) -> str:
+    def get_export(self, exports: dict | None) -> str | None:
         if not exports:
             return None
         exports_str = []
@@ -115,7 +116,7 @@ class QueueManager:
             exports_str.append(f"export {k}={v}")
         return "\n".join(exports_str)
 
-    def get_modules(self, modules: list[str] | None) -> str:
+    def get_modules(self, modules: list[str] | None) -> str | None:
         if not modules:
             return None
         modules_str = []
@@ -146,9 +147,40 @@ class QueueManager:
         export: dict | None = None,
         modules: list[str] | None = None,
         script_fname="submit.sh",
-        create_submit_dir=False,
+        create_submit_dir: bool = False,
         timeout: int | None = None,
     ) -> SubmissionResult:
+        script_fpath = self.write_submission_script(
+            commands=commands,
+            options=options,
+            work_dir=work_dir,
+            pre_run=pre_run,
+            post_run=post_run,
+            export=export,
+            modules=modules,
+            script_fname=script_fname,
+            create_submit_dir=create_submit_dir,
+        )
+        submit_cmd = self.scheduler_io.get_submit_cmd(script_fpath)
+        stdout, stderr, returncode = self.execute_cmd(
+            submit_cmd, work_dir, timeout=timeout
+        )
+        return self.scheduler_io.parse_submit_output(
+            exit_code=returncode, stdout=stdout, stderr=stderr
+        )
+
+    def write_submission_script(
+        self,
+        commands: str | list[str] | None,
+        options=None,
+        work_dir=None,
+        pre_run: str | list[str] | None = None,
+        post_run: str | list[str] | None = None,
+        export: dict | None = None,
+        modules: list[str] | None = None,
+        script_fname="submit.sh",
+        create_submit_dir: bool = False,
+    ):
         script_str = self.get_submission_script(
             commands=commands,
             options=options,
@@ -158,7 +190,6 @@ class QueueManager:
             export=export,
             modules=modules,
         )
-
         if create_submit_dir and work_dir:
             created = self.host.mkdir(work_dir, recursive=True, exist_ok=True)
             if not created:
@@ -168,13 +199,7 @@ class QueueManager:
         else:
             script_fpath = Path(script_fname)
         self.host.write_text_file(script_fpath, script_str)
-        submit_cmd = self.scheduler_io.get_submit_cmd(script_fpath)
-        stdout, stderr, returncode = self.execute_cmd(
-            submit_cmd, work_dir, timeout=timeout
-        )
-        return self.scheduler_io.parse_submit_output(
-            exit_code=returncode, stdout=stdout, stderr=stderr
-        )
+        return script_fpath
 
     def cancel(self, job: QJob | int | str, timeout: int | None = None) -> CancelResult:
         cancel_cmd = self.scheduler_io.get_cancel_cmd(job)
@@ -200,4 +225,9 @@ class QueueManager:
         stdout, stderr, returncode = self.execute_cmd(job_cmd, timeout=timeout)
         return self.scheduler_io.parse_jobs_list_output(
             exit_code=returncode, stdout=stdout, stderr=stderr
+        )
+
+    def get_shell_manager(self):
+        return QueueManager(
+            scheduler_io=ShellIO(), host=self.host, timeout_exec=self.timeout_exec
         )

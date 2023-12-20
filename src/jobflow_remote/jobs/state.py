@@ -3,123 +3,130 @@ from __future__ import annotations
 from enum import Enum
 
 
-class RemoteState(Enum):
-    CHECKED_OUT = "CHECKED_OUT"
+class JobState(Enum):
+    """
+    States of a Job
+    """
+
+    WAITING = "WAITING"
+    READY = "READY"
+    CHECKED_OUT = "CHECKED_OUT"  # TODO should it be RESERVED?
     UPLOADED = "UPLOADED"
     SUBMITTED = "SUBMITTED"
     RUNNING = "RUNNING"
     TERMINATED = "TERMINATED"
     DOWNLOADED = "DOWNLOADED"
-    COMPLETED = "COMPLETED"
-    FAILED = "FAILED"
-    KILLED = "KILLED"
-    PAUSED = "PAUSED"
-
-    @property
-    def next(self):
-        try:
-            return remote_states_order[remote_states_order.index(self) + 1]
-        except Exception:
-            pass
-        raise RuntimeError(f"No next state for state {self.name}")
-
-    @property
-    def previous(self):
-        try:
-            prev_index = remote_states_order.index(self) - 1
-            if prev_index >= 0:
-                return remote_states_order[prev_index]
-        except ValueError:
-            raise RuntimeError(f"No previous state for state {self.name}")
-
-
-remote_states_order = [
-    RemoteState.CHECKED_OUT,
-    RemoteState.UPLOADED,
-    RemoteState.SUBMITTED,
-    RemoteState.RUNNING,
-    RemoteState.TERMINATED,
-    RemoteState.DOWNLOADED,
-    RemoteState.COMPLETED,
-]
-
-
-class JobState(Enum):
-    WAITING = "WAITING"
-    READY = "READY"
-    ONGOING = "ONGOING"
     REMOTE_ERROR = "REMOTE_ERROR"
     COMPLETED = "COMPLETED"
     FAILED = "FAILED"
-    PAUSED = "PAUSED"  # Not yet used
+    PAUSED = "PAUSED"
     STOPPED = "STOPPED"
-    CANCELLED = "CANCELLED"  # Not yet used
-
-    @classmethod
-    def from_states(
-        cls, fw_state: str, remote_state: RemoteState | None = None
-    ) -> JobState:
-        if fw_state in ("WAITING", "READY", "COMPLETED", "PAUSED"):
-            return JobState(fw_state)
-        elif fw_state in ("RESERVED", "RUNNING"):
-            if remote_state == RemoteState.FAILED:
-                return JobState.REMOTE_ERROR
-            else:
-                return JobState.ONGOING
-        elif fw_state == "FIZZLED":
-            return JobState.FAILED
-        # When stop_jobflow or stop_children is used in Response, the Firework with
-        # the corresponding job is set to a DEFUSED state.
-        elif fw_state == "DEFUSED":
-            return JobState.STOPPED
-
-        raise ValueError(f"Unsupported FW state {fw_state}")
-
-    def to_states(self) -> tuple[list[str], list[RemoteState] | None]:
-        if self in (JobState.WAITING, JobState.READY):
-            return [self.value], None
-        elif self in (JobState.COMPLETED, JobState.PAUSED):
-            return [self.value], [RemoteState(self.value)]
-        elif self == JobState.ONGOING:
-            return ["RESERVED", "RUNNING"], list(remote_states_order)
-        elif self == JobState.REMOTE_ERROR:
-            return ["RESERVED", "RUNNING"], [RemoteState.FAILED]
-        elif self == JobState.FAILED:
-            return ["FIZZLED"], [RemoteState.COMPLETED]
-        elif self == JobState.STOPPED:
-            return ["DEFUSED"], None
-
-        raise ValueError(f"Unhandled state {self}")
+    CANCELLED = "CANCELLED"
+    BATCH_SUBMITTED = "BATCH_SUBMITTED"
+    BATCH_RUNNING = "BATCH_RUNNING"
 
     @property
     def short_value(self) -> str:
-        if self == JobState.REMOTE_ERROR:
-            return "RE"
-        return self.value[0]
+        return short_state_mapping[self]
+
+
+short_state_mapping = {
+    JobState.WAITING: "W",
+    JobState.READY: "R",
+    JobState.CHECKED_OUT: "CE",
+    JobState.UPLOADED: "U",
+    JobState.SUBMITTED: "SU",
+    JobState.RUNNING: "RU",
+    JobState.TERMINATED: "T",
+    JobState.DOWNLOADED: "D",
+    JobState.REMOTE_ERROR: "RERR",
+    JobState.COMPLETED: "C",
+    JobState.FAILED: "F",
+    JobState.PAUSED: "P",
+    JobState.STOPPED: "ST",
+    JobState.CANCELLED: "CA",
+    JobState.BATCH_SUBMITTED: "BS",
+    JobState.BATCH_RUNNING: "BR",
+}
+
+
+PAUSABLE_STATES = [
+    JobState.READY,
+    JobState.WAITING,
+]
+
+PAUSABLE_STATES_V = [s.value for s in PAUSABLE_STATES]
+
+RUNNING_STATES = [
+    JobState.CHECKED_OUT,
+    JobState.UPLOADED,
+    JobState.SUBMITTED,
+    JobState.RUNNING,
+    JobState.TERMINATED,
+    JobState.DOWNLOADED,
+]
+
+RUNNING_STATES_V = [s.value for s in RUNNING_STATES]
+
+RESETTABLE_STATES = RUNNING_STATES
+
+RESETTABLE_STATES_V = RUNNING_STATES_V
 
 
 class FlowState(Enum):
+    """
+    States of a Flow.
+    """
+
     WAITING = "WAITING"
     READY = "READY"
-    ONGOING = "ONGOING"
+    RUNNING = "RUNNING"
     COMPLETED = "COMPLETED"
     FAILED = "FAILED"
     PAUSED = "PAUSED"
     STOPPED = "STOPPED"
+    CANCELLED = "CANCELLED"
 
     @classmethod
-    def from_jobs_states(cls, jobs_states: list[JobState]) -> FlowState:
+    def from_jobs_states(
+        cls, jobs_states: list[JobState], leaf_states: list[JobState]
+    ) -> FlowState:
+        """
+        Generate the state of the Flow based on the states of the Jobs
+        composing it, and in particular the states of the leaf Jobs.
+
+        Parameters
+        ----------
+        jobs_states
+            List of JobStates of all the Jobs in the Flow.
+        leaf_states
+            List of JobStates of the leaf Jobs in the Flow.
+
+        Returns
+        -------
+        FlowState
+            The state of the Flow.
+        """
         if all(js == JobState.WAITING for js in jobs_states):
             return cls.WAITING
         elif all(js in (JobState.WAITING, JobState.READY) for js in jobs_states):
             return cls.READY
-        elif all(js == JobState.COMPLETED for js in jobs_states):
+        # only need to check the leaf states to determine if it is completed,
+        # in case some intermediate Job failed but children allow missing
+        # references.
+        elif all(js == JobState.COMPLETED for js in leaf_states):
             return cls.COMPLETED
-        elif any(js in (JobState.FAILED, JobState.REMOTE_ERROR) for js in jobs_states):
+        # REMOTE_ERROR state does not lead to a failed Flow. Two main reasons:
+        # 1) it might be a temporary problem and not a final failure of the Flow
+        # 2) Changing the state of the flow would require locking the Flow
+        #    when applying the change in the remote state.
+        elif any(js == JobState.FAILED for js in jobs_states):
             return cls.FAILED
-        elif all(js == JobState.PAUSED for js in jobs_states):
-            return cls.PAUSED
         elif any(js == JobState.STOPPED for js in jobs_states):
             return cls.STOPPED
+        elif any(js == JobState.CANCELLED for js in jobs_states):
+            return cls.CANCELLED
+        elif any(js == JobState.PAUSED for js in jobs_states):
+            return cls.PAUSED
         else:
-            return cls.ONGOING
+            return cls.RUNNING

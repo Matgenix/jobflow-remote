@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import asdict
+import datetime
+import time
 
 from monty.json import jsanitize
 from rich.scope import render_scope
@@ -9,55 +10,54 @@ from rich.text import Text
 
 from jobflow_remote.cli.utils import ReprStr, fmt_datetime
 from jobflow_remote.config.base import ExecutionConfig, WorkerBase
-from jobflow_remote.jobs.data import FlowInfo, JobInfo
-from jobflow_remote.jobs.state import JobState, RemoteState
-from jobflow_remote.utils.data import remove_none
+from jobflow_remote.jobs.data import FlowInfo, JobDoc, JobInfo
+from jobflow_remote.jobs.state import JobState
+from jobflow_remote.utils.data import convert_utc_time
 
 
 def get_job_info_table(jobs_info: list[JobInfo], verbosity: int):
+    time_zone_str = f" [{time.tzname[0]}]"
+
     table = Table(title="Jobs info")
     table.add_column("DB id")
     table.add_column("Name")
-    table.add_column("State [Remote]")
+    table.add_column("State")
     table.add_column("Job id  (Index)")
 
     table.add_column("Worker")
-    table.add_column("Last updated")
+    table.add_column("Last updated" + time_zone_str)
 
     if verbosity >= 1:
         table.add_column("Queue id")
         table.add_column("Run time")
-        table.add_column("Retry time")
+        table.add_column("Retry time" + time_zone_str)
         table.add_column("Prev state")
         if verbosity < 2:
             table.add_column("Locked")
 
     if verbosity >= 2:
         table.add_column("Lock id")
-        table.add_column("Lock time")
+        table.add_column("Lock time" + time_zone_str)
 
-    excluded_states = (JobState.COMPLETED, JobState.PAUSED)
     for ji in jobs_info:
         state = ji.state.name
-        if ji.remote_state is not None and ji.state not in excluded_states:
-            if ji.retry_time_limit is not None:
-                state += f" [[bold red]{ji.remote_state.name}[/]]"
-            else:
-                state += f" [{ji.remote_state.name}]"
+
+        if ji.remote.retry_time_limit is not None:
+            state = f"[bold red]{state}[/]"
 
         row = [
             str(ji.db_id),
             ji.name,
             Text.from_markup(state),
-            f"{ji.job_id}  ({ji.job_index})",
+            f"{ji.uuid}  ({ji.index})",
             ji.worker,
-            ji.last_updated.strftime(fmt_datetime),
+            convert_utc_time(ji.updated_on).strftime(fmt_datetime),
         ]
 
         if verbosity >= 1:
-            row.append(ji.queue_job_id)
+            row.append(ji.remote.process_id)
             prefix = ""
-            if ji.remote_state == RemoteState.RUNNING:
+            if ji.state == JobState.RUNNING:
                 run_time = ji.estimated_run_time
                 prefix = "~"
             else:
@@ -69,19 +69,21 @@ def get_job_info_table(jobs_info: list[JobInfo], verbosity: int):
             else:
                 row.append("")
             row.append(
-                ji.retry_time_limit.strftime(fmt_datetime)
-                if ji.retry_time_limit
+                convert_utc_time(ji.remote.retry_time_limit).strftime(fmt_datetime)
+                if ji.remote.retry_time_limit
                 else None
             )
-            row.append(
-                ji.remote_previous_state.name if ji.remote_previous_state else None
-            )
+            row.append(ji.previous_state.name if ji.previous_state else None)
             if verbosity < 2:
                 row.append("*" if ji.lock_id is not None else None)
 
         if verbosity >= 2:
             row.append(str(ji.lock_id))
-            row.append(ji.lock_time.strftime(fmt_datetime) if ji.lock_time else None)
+            row.append(
+                convert_utc_time(ji.lock_time).strftime(fmt_datetime)
+                if ji.lock_time
+                else None
+            )
 
         table.add_row(*row)
 
@@ -89,13 +91,15 @@ def get_job_info_table(jobs_info: list[JobInfo], verbosity: int):
 
 
 def get_flow_info_table(flows_info: list[FlowInfo], verbosity: int):
+    time_zone_str = f" [{time.tzname[0]}]"
+
     table = Table(title="Flows info")
     table.add_column("DB id")
     table.add_column("Name")
     table.add_column("State")
     table.add_column("Flow id")
     table.add_column("Num Jobs")
-    table.add_column("Last updated")
+    table.add_column("Last updated" + time_zone_str)
 
     if verbosity >= 1:
         table.add_column("Workers")
@@ -103,7 +107,7 @@ def get_flow_info_table(flows_info: list[FlowInfo], verbosity: int):
         table.add_column("Job states")
 
     for fi in flows_info:
-        # show the smallest fw_id as db_id
+        # show the smallest Job db_id as db_id
         db_id = min(fi.db_ids)
 
         row = [
@@ -112,7 +116,7 @@ def get_flow_info_table(flows_info: list[FlowInfo], verbosity: int):
             fi.state.name,
             fi.flow_id,
             str(len(fi.job_ids)),
-            fi.last_updated.strftime(fmt_datetime),
+            convert_utc_time(fi.updated_on).strftime(fmt_datetime),
         ]
 
         if verbosity >= 1:
@@ -126,18 +130,32 @@ def get_flow_info_table(flows_info: list[FlowInfo], verbosity: int):
     return table
 
 
-def format_job_info(job_info: JobInfo, show_none: bool = False):
-    d = asdict(job_info)
-    if not show_none:
-        d = remove_none(d)
+def format_job_info(
+    job_info: JobInfo | JobDoc, verbosity: int, show_none: bool = False
+):
+    d = job_info.dict(exclude_none=not show_none)
+    if verbosity == 1:
+        d.pop("job", None)
 
-    d = jsanitize(d, allow_bson=False, enum_values=True)
-    error_remote = d.get("error_remote")
-    if error_remote:
-        d["error_remote"] = ReprStr(error_remote)
-    error_job = d.get("error_job")
-    if error_job:
-        d["error_job"] = ReprStr(error_job)
+    # convert dates at the first level and for the remote error
+    for k, v in d.items():
+        if isinstance(v, datetime.datetime):
+            d[k] = convert_utc_time(v).strftime(fmt_datetime)
+
+    if d["remote"].get("retry_time_limit"):
+        d["remote"]["retry_time_limit"] = convert_utc_time(
+            d["remote"]["retry_time_limit"]
+        ).strftime(fmt_datetime)
+
+    d = jsanitize(d, allow_bson=True, enum_values=True, strict=True)
+    error = d.get("error")
+    if error:
+        d["error"] = ReprStr(error)
+
+    remote_error = d["remote"].get("error")
+    if remote_error:
+        d["remote"]["error"] = ReprStr(remote_error)
+
     return render_scope(d)
 
 
@@ -217,8 +235,7 @@ def get_worker_table(workers: dict[str, WorkerBase], verbosity: int = 0):
         if verbosity == 1:
             row.append(render_scope(worker.cli_info))
         elif verbosity > 1:
-            d = worker.dict()
-            d = remove_none(d)
+            d = worker.dict(exclude_none=True)
             d = jsanitize(d, allow_bson=False, enum_values=True)
             row.append(render_scope(d))
 

@@ -5,6 +5,7 @@ import subprocess
 from enum import Enum
 from pathlib import Path
 from string import Template
+from xmlrpc.client import Fault
 
 import psutil
 from monty.os import makedirs_p
@@ -12,7 +13,7 @@ from supervisor import childutils
 from supervisor.states import RUNNING_STATES, STOPPED_STATES, ProcessStates
 from supervisor.xmlrpc import Faults
 
-from jobflow_remote.config import ConfigManager
+from jobflow_remote.config import ConfigManager, Project
 
 logger = logging.getLogger(__name__)
 
@@ -37,11 +38,67 @@ serverurl=unix://$sock_file
 
 [program:runner_daemon]
 priority=100
-command=jf -p $project runner run
+command=jf -p $project runner run -pid --single -log $loglevel
 autostart=true
 autorestart=false
-numprocs=$num_procs
+numprocs=1
 process_name=run_jobflow%(process_num)s
+stopwaitsecs=86400
+"""
+
+
+supervisord_conf_str_split = """
+[unix_http_server]
+file=$sock_file
+
+[rpcinterface:supervisor]
+supervisor.rpcinterface_factory = supervisor.rpcinterface:make_main_rpcinterface
+
+[supervisord]
+logfile=$log_file
+logfile_maxbytes=10MB
+logfile_backups=5
+loglevel=$loglevel
+pidfile=$pid_file
+nodaemon=$nodaemon
+
+[supervisorctl]
+serverurl=unix://$sock_file
+
+[program:runner_daemon_checkout]
+priority=100
+command=jf -p $project runner run -pid --checkout -log $loglevel
+autostart=true
+autorestart=false
+numprocs=1
+process_name=run_jobflow_checkout
+stopwaitsecs=86400
+
+[program:runner_daemon_transfer]
+priority=100
+command=jf -p $project runner run -pid --transfer -log $loglevel
+autostart=true
+autorestart=false
+numprocs=$num_procs_transfer
+process_name=run_jobflow_transfer%(process_num)s
+stopwaitsecs=86400
+
+[program:runner_daemon_queue]
+priority=100
+command=jf -p $project runner run -pid --queue -log $loglevel
+autostart=true
+autorestart=false
+numprocs=1
+process_name=run_jobflow_queue
+stopwaitsecs=86400
+
+[program:runner_daemon_complete]
+priority=100
+command=jf -p $project runner run -pid --complete -log $loglevel
+autostart=true
+autorestart=false
+numprocs=$num_procs_complete
+process_name=run_jobflow_complete%(process_num)s
 stopwaitsecs=86400
 """
 
@@ -54,26 +111,35 @@ class DaemonStatus(Enum):
     SHUT_DOWN = "SHUT_DOWN"
     STOPPED = "STOPPED"
     STOPPING = "STOPPING"
+    PARTIALLY_RUNNING = "PARTIALLY_RUNNING"
     RUNNING = "RUNNING"
 
 
 class DaemonManager:
-    conf_template = Template(supervisord_conf_str)
+    conf_template_single = Template(supervisord_conf_str)
+    conf_template_split = Template(supervisord_conf_str_split)
 
     def __init__(
         self,
-        daemon_dir: str | Path | None = None,
-        log_dir: str | Path | None = None,
-        project_name: str | None = None,
+        daemon_dir: str | Path,
+        log_dir: str | Path,
+        project: Project,
     ):
-        config_manager = ConfigManager()
-        self.project = config_manager.get_project(project_name)
-        if not daemon_dir:
-            daemon_dir = self.project.daemon_dir
+        self.project = project
         self.daemon_dir = Path(daemon_dir).absolute()
-        if not log_dir:
-            log_dir = self.project.log_dir
         self.log_dir = Path(log_dir).absolute()
+
+    @classmethod
+    def from_project(cls, project: Project):
+        daemon_dir = project.daemon_dir
+        log_dir = project.log_dir
+        return cls(daemon_dir, log_dir, project)
+
+    @classmethod
+    def from_project_name(cls, project_name: str | None = None):
+        config_manager = ConfigManager()
+        project = config_manager.get_project(project_name)
+        return cls.from_project(project)
 
     @property
     def conf_filepath(self) -> Path:
@@ -167,14 +233,28 @@ class DaemonManager:
             )
 
         interface = self.get_interface()
-        proc_info = interface.supervisor.getAllProcessInfo()
+        try:
+            proc_info = interface.supervisor.getAllProcessInfo()
+        except Fault as e:
+            # catch this exception as it may be raised if the status is queried while
+            # the supervisord process is shutting down. The error is quite cryptic, so
+            # replace with one that is clearer. Also see a related issue in supervisord:
+            # https://github.com/Supervisor/supervisor/issues/48
+            if e.faultString == "SHUTDOWN_STATE":
+                raise DaemonError(
+                    "The daemon is likely shutting down and the actual state cannot be determined"
+                )
+            raise
         if not proc_info:
             raise DaemonError(
                 "supervisord process is running but no daemon process is present"
             )
 
-        if any(pi.get("state") in RUNNING_STATES for pi in proc_info):
+        if all(pi.get("state") in RUNNING_STATES for pi in proc_info):
             return DaemonStatus.RUNNING
+
+        if any(pi.get("state") in RUNNING_STATES for pi in proc_info):
+            return DaemonStatus.PARTIALLY_RUNNING
 
         if all(pi.get("state") in STOPPED_STATES for pi in proc_info):
             return DaemonStatus.STOPPED
@@ -187,13 +267,13 @@ class DaemonManager:
 
         raise DaemonError("Could not determine the current status of the daemon")
 
-    def get_pids(self) -> dict[str, int] | None:
+    def get_processes_info(self) -> dict[str, dict] | None:
         process_active = self.check_supervisord_process()
 
         if not process_active:
             return None
 
-        pids = {"supervisord": self.get_supervisord_pid()}
+        pids = {"supervisord": {"pid": self.get_supervisord_pid(), "state": "RUNNING"}}
 
         if not self.sock_filepath.is_socket():
             raise DaemonError(
@@ -208,31 +288,58 @@ class DaemonManager:
             )
 
         for pi in proc_info:
-            pids[pi.get("name")] = pi.get("pid")
+            pids[pi.get("name")] = {"pid": pi.get("pid"), "state": pi.get("statename")}
 
         return pids
 
     def write_config(
-        self, num_procs: int = 1, log_level: str = "info", nodaemon: bool = False
+        self,
+        num_procs_transfer: int = 1,
+        num_procs_complete: int = 1,
+        single: bool = True,
+        log_level: str = "info",
+        nodaemon: bool = False,
     ):
-        conf = self.conf_template.substitute(
-            sock_file=str(self.sock_filepath),
-            pid_file=str(self.pid_filepath),
-            log_file=str(self.log_filepath),
-            num_procs=num_procs,
-            nodaemon="true" if nodaemon else "false",
-            project=self.project.name,
-            loglevel=log_level,
-        )
+        if single:
+            conf = self.conf_template_single.substitute(
+                sock_file=str(self.sock_filepath),
+                pid_file=str(self.pid_filepath),
+                log_file=str(self.log_filepath),
+                nodaemon="true" if nodaemon else "false",
+                project=self.project.name,
+                loglevel=log_level,
+            )
+        else:
+            conf = self.conf_template_split.substitute(
+                sock_file=str(self.sock_filepath),
+                pid_file=str(self.pid_filepath),
+                log_file=str(self.log_filepath),
+                num_procs_transfer=num_procs_transfer,
+                num_procs_complete=num_procs_complete,
+                nodaemon="true" if nodaemon else "false",
+                project=self.project.name,
+                loglevel=log_level,
+            )
         with open(self.conf_filepath, "w") as f:
             f.write(conf)
 
     def start_supervisord(
-        self, num_procs: int = 1, log_level: str = "info", nodaemon: bool = False
+        self,
+        num_procs_transfer: int = 1,
+        num_procs_complete: int = 1,
+        single: bool = True,
+        log_level: str = "info",
+        nodaemon: bool = False,
     ) -> str | None:
         makedirs_p(self.daemon_dir)
         makedirs_p(self.log_dir)
-        self.write_config(num_procs=num_procs, log_level=log_level, nodaemon=nodaemon)
+        self.write_config(
+            num_procs_transfer=num_procs_transfer,
+            num_procs_complete=num_procs_complete,
+            single=single,
+            log_level=log_level,
+            nodaemon=nodaemon,
+        )
         cp = subprocess.run(
             f"supervisord -c {str(self.conf_filepath)}",
             shell=True,
@@ -264,16 +371,31 @@ class DaemonManager:
         return None
 
     def start(
-        self, num_procs: int = 1, log_level: str = "info", raise_on_error: bool = False
+        self,
+        num_procs_transfer: int = 1,
+        num_procs_complete: int = 1,
+        single: bool = True,
+        log_level: str = "info",
+        raise_on_error: bool = False,
     ) -> bool:
         status = self.check_status()
         if status == DaemonStatus.RUNNING:
             error = "Daemon process is already running"
         elif status == DaemonStatus.SHUT_DOWN:
-            error = self.start_supervisord(num_procs=num_procs, log_level=log_level)
+            error = self.start_supervisord(
+                num_procs_transfer=num_procs_transfer,
+                num_procs_complete=num_procs_complete,
+                single=single,
+                log_level=log_level,
+            )
         elif status == DaemonStatus.STOPPED:
             self.shut_down(raise_on_error=raise_on_error)
-            error = self.start_supervisord(num_procs=num_procs, log_level=log_level)
+            error = self.start_supervisord(
+                num_procs_transfer=num_procs_transfer,
+                num_procs_complete=num_procs_complete,
+                single=single,
+                log_level=log_level,
+            )
             # else:
             #     error = self.start_processes()
         elif status == DaemonStatus.STOPPING:

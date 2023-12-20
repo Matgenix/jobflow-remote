@@ -27,8 +27,6 @@ class BaseHost(MSONable):
             path where the command will be executed.
 
         """
-        # TODO: define a common error that is raised or a returned in case the procedure
-        # fails to avoid handling different kind of errors for the different hosts
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -36,15 +34,11 @@ class BaseHost(MSONable):
         self, directory: str | Path, recursive: bool = True, exist_ok: bool = True
     ) -> bool:
         """Create directory on the host."""
-        # TODO: define a common error that is raised or a returned in case the procedure
-        # fails to avoid handling different kind of errors for the different hosts
         raise NotImplementedError
 
     @abc.abstractmethod
     def write_text_file(self, filepath, content):
         """Write content to a file on the host."""
-        # TODO: define a common error that is raised or a returned in case the procedure
-        # fails to avoid handling different kind of errors for the different hosts
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -85,20 +79,13 @@ class BaseHost(MSONable):
 
         return msg
 
-    def _check_connected(self) -> bool:
-        """
-        Helper method to determine if a connection is open or raise otherwise.
+    @abc.abstractmethod
+    def listdir(self, path: str | Path) -> list[str]:
+        raise NotImplementedError
 
-        Returns
-        -------
-        True if the connection is open.
-        """
-
-        if not self.is_connected:
-            raise HostError(
-                "The host should be connected before executing this operation"
-            )
-        return True
+    @abc.abstractmethod
+    def remove(self, path: str | Path):
+        raise NotImplementedError
 
 
 class HostError(Exception):

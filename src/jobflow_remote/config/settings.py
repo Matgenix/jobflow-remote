@@ -1,8 +1,10 @@
-from __future__ import annotations
-
 from pathlib import Path
+from typing import Optional
 
-from pydantic import BaseSettings, Field, root_validator
+from pydantic import Field, model_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from jobflow_remote.config.base import LogLevel
 
 DEFAULT_PROJECTS_FOLDER = Path("~/.jfremote").expanduser().as_posix()
 
@@ -17,7 +19,7 @@ class JobflowRemoteSettings(BaseSettings):
     projects_folder: str = Field(
         DEFAULT_PROJECTS_FOLDER, description="Location of the projects files."
     )
-    project: str = Field(None, description="The name of the project used.")
+    project: Optional[str] = Field(None, description="The name of the project used.")
     cli_full_exc: bool = Field(
         False,
         description="If True prints the full stack trace of the exception when raised in the CLI.",
@@ -25,13 +27,14 @@ class JobflowRemoteSettings(BaseSettings):
     cli_suggestions: bool = Field(
         True, description="If True prints some suggestions in the CLI commands."
     )
+    cli_log_level: LogLevel = Field(
+        LogLevel.WARN, description="The level set for logging in the CLI"
+    )
 
-    class Config:
-        """Pydantic config settings."""
+    model_config = SettingsConfigDict(env_prefix="jfremote_")
 
-        env_prefix = "jfremote_"
-
-    @root_validator(pre=True)
+    @model_validator(mode="before")
+    @classmethod
     def load_default_settings(cls, values):
         """
         Load settings from file or environment variables.

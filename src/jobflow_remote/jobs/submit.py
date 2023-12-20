@@ -5,18 +5,16 @@ from qtoolkit.core.data_objects import QResources
 
 from jobflow_remote.config.base import ConfigError, ExecutionConfig
 from jobflow_remote.config.manager import ConfigManager
-from jobflow_remote.fireworks.convert import flow_to_workflow
 
 
 def submit_flow(
     flow: jobflow.Flow | jobflow.Job | list[jobflow.Job],
     worker: str | None = None,
-    store: str | jobflow.JobStore | None = None,
     project: str | None = None,
     exec_config: str | ExecutionConfig | None = None,
     resources: dict | QResources | None = None,
     allow_external_references: bool = False,
-):
+) -> list[int]:
     """
     Submit a flow for calculation to the selected Worker.
 
@@ -30,11 +28,6 @@ def submit_flow(
     worker
         The name of the Worker where the calculation will be submitted. If None, use the
         first configured worker for this project.
-    store
-        A job store. Alternatively, if set to None, :obj:`JobflowSettings.JOB_STORE`
-        will be used. Note, this could be different on the computer that submits the
-        workflow and the computer which runs the workflow. The value of ``JOB_STORE`` on
-        the computer that runs the workflow will be used.
     project
         the name of the project to which the Flow should be submitted. If None the
         current project will be used.
@@ -47,6 +40,11 @@ def submit_flow(
     allow_external_references
         If False all the references to other outputs should be from other Jobs
         of the Flow.
+
+    Returns
+    -------
+    List of int
+        The list of db_ids of the submitted Jobs.
     """
     config_manager = ConfigManager()
 
@@ -63,14 +61,12 @@ def submit_flow(
             exec_config_name=exec_config, project_name=project
         )
 
-    wf = flow_to_workflow(
-        flow,
+    jc = proj_obj.get_job_controller()
+
+    return jc.add_flow(
+        flow=flow,
         worker=worker,
-        store=store,
         exec_config=exec_config,
         resources=resources,
         allow_external_references=allow_external_references,
     )
-
-    rlpad = proj_obj.get_launchpad()
-    rlpad.add_wf(wf)

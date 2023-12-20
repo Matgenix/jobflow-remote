@@ -75,7 +75,8 @@ class ConfigManager:
         """
         Returns
         -------
-        Dictionary with project name as key and Project as value.
+        dict
+            Dictionary with project name as key and Project as value.
         """
         return {name: pd.project for name, pd in self.projects_data.items()}
 
@@ -85,7 +86,8 @@ class ConfigManager:
 
         Returns
         -------
-        Dictionary with project name as key and ProjectData as value.
+        dict
+            Dictionary with project name as key and ProjectData as value.
         """
 
         projects_data: dict[str, ProjectData] = {}
@@ -122,7 +124,8 @@ class ConfigManager:
             The name of the project or None to use the value from the settings
         Returns
         -------
-        The name of the selected project.
+        str
+            The name of the selected project.
         """
         from jobflow_remote import SETTINGS
 
@@ -145,7 +148,8 @@ class ConfigManager:
             The name of the project or None to use the value from the settings
         Returns
         -------
-        The selected ProjectData
+        ProjectData
+            The selected ProjectData
         """
         project_name = self.select_project_name(project_name)
 
@@ -164,7 +168,8 @@ class ConfigManager:
             The name of the project or None to use the value from the settings
         Returns
         -------
-        The selected Project
+        Project
+            The selected Project
         """
         return self.get_project_data(project_name).project
 
@@ -264,7 +269,8 @@ class ConfigManager:
 
         Returns
         -------
-        List of project names.
+        list
+            List of project names.
         """
         project_names = []
         for ext in self.projects_ext:
@@ -344,6 +350,7 @@ class ConfigManager:
             use the one from the settings.
         Returns
         -------
+        WorkerBase
             The selected Worker.
         """
         project = self.get_project(project_name)
@@ -447,6 +454,7 @@ class ConfigManager:
             or None to use the one from the settings.
         Returns
         -------
+        ExecutionConfig
             The selected ExecutionConfig
         """
         project = self.get_project(project_name)

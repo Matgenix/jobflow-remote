@@ -3,13 +3,13 @@ import logging
 import traceback
 from enum import Enum
 from pathlib import Path
-from typing import Annotated, Literal, Optional, Union
+from typing import Annotated, Any, Literal, Optional, Union
 
 from jobflow import JobStore
-from pydantic import BaseModel, Extra, Field, validator
+from maggma.stores import MongoStore
+from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator
 from qtoolkit.io import BaseSchedulerIO, scheduler_mapping
 
-from jobflow_remote.fireworks.launchpad import RemoteLaunchPad
 from jobflow_remote.remote.host import BaseHost, LocalHost, RemoteHost
 from jobflow_remote.utils.data import store_from_dict
 
@@ -33,6 +33,16 @@ class RunnerOptions(BaseModel):
     delay_advance_status: int = Field(
         30,
         description="Delay between subsequent advancement of the job's remote state (seconds)",
+    )
+    delay_refresh_limited: int = Field(
+        600,
+        description="Delay between subsequent refresh from the DB of the number of submitted "
+        "and running jobs (seconds). Only use if a worker with max_jobs is present",
+    )
+    delay_update_batch: int = Field(
+        60,
+        description="Delay between subsequent refresh from the DB of the number of submitted "
+        "and running jobs (seconds). Only use if a worker with max_jobs is present",
     )
     lock_timeout: Optional[int] = Field(
         86400,
@@ -71,8 +81,7 @@ class RunnerOptions(BaseModel):
         ind = min(step_attempts, len(self.delta_retry)) - 1
         return self.delta_retry[ind]
 
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")
 
 
 class LogLevel(str, Enum):
@@ -101,10 +110,34 @@ class LogLevel(str, Enum):
         }[self]
 
 
+class BatchConfig(BaseModel):
+    jobs_handle_dir: Path = Field(
+        description="Absolute path to a folder that will be used to store information to share with the jobs being executed"
+    )
+    work_dir: Path = Field(
+        description="Absolute path to a folder where the batch jobs will be executed"
+    )
+    max_jobs: Optional[int] = Field(
+        None, description="Maximum number of jobs executed in a single run in the queue"
+    )
+    max_wait: Optional[int] = Field(
+        60,
+        description="Maximum time to wait before stopping if no new jobs are available to run (seconds)",
+    )
+    max_time: Optional[int] = Field(
+        None,
+        description="Maximum time after which a job will not submit more jobs (seconds). To help avoid hitting the walltime",
+    )
+
+
 class WorkerBase(BaseModel):
     """
     Base class defining the common field for the different types of Worker.
     """
+
+    type: str = Field(
+        description="The discriminator field to determine the worker type"
+    )
 
     scheduler_type: str = Field(
         description="Type of the scheduler. Depending on the values supported by QToolKit"
@@ -131,12 +164,19 @@ class WorkerBase(BaseModel):
         description="Timeout for the execution of the commands in the worker "
         "(e.g. submitting a job)",
     )
+    max_jobs: Optional[int] = Field(
+        None,
+        description="The maximum number of jobs that can be submitted to the queue.",
+        ge=0,
+    )
+    batch: Optional[BatchConfig] = Field(
+        None,
+        description="Options for batch execution. If define the worker will be considered a batch worker",
+    )
+    model_config = ConfigDict(extra="forbid")
 
-    class Config:
-        extra = Extra.forbid
-
-    @validator("scheduler_type", always=True)
-    def check_scheduler_type(cls, scheduler_type: str, values: dict) -> str:
+    @field_validator("scheduler_type")
+    def check_scheduler_type(cls, scheduler_type: str) -> str:
         """
         Validator to set the default of scheduler_type
         """
@@ -144,7 +184,7 @@ class WorkerBase(BaseModel):
             raise ValueError(f"Unknown scheduler type {scheduler_type}")
         return scheduler_type
 
-    @validator("work_dir", always=True)
+    @field_validator("work_dir")
     def check_work_dir(cls, v) -> Path:
         if not v.is_absolute():
             raise ValueError("`work_dir` must be an absolute path")
@@ -179,6 +219,10 @@ class WorkerBase(BaseModel):
         -------
         A dictionary with the Worker short information.
         """
+
+    @property
+    def is_local(self) -> bool:
+        return self.type == "local"
 
 
 class LocalWorker(WorkerBase):
@@ -230,8 +274,8 @@ class RemoteWorker(WorkerBase):
         "remote", description="The discriminator field to determine the worker type"
     )
     host: str = Field(description="The host to which to connect")
-    user: str = Field(None, description="Login username")
-    port: int = Field(None, description="Port number")
+    user: Optional[str] = Field(None, description="Login username")
+    port: Optional[int] = Field(None, description="Port number")
     password: Optional[str] = Field(None, description="Login password")
     key_filename: Optional[Union[str, list[str]]] = Field(
         None,
@@ -241,18 +285,20 @@ class RemoteWorker(WorkerBase):
     passphrase: Optional[str] = Field(
         None, description="Passphrase used for decrypting private keys"
     )
-    gateway: str = Field(
+    gateway: Optional[str] = Field(
         None, description="A shell command string to use as a proxy or gateway"
     )
-    forward_agent: bool = Field(
+    forward_agent: Optional[bool] = Field(
         None, description="Whether to enable SSH agent forwarding"
     )
-    connect_timeout: int = Field(None, description="Connection timeout, in seconds")
-    connect_kwargs: dict = Field(
+    connect_timeout: Optional[int] = Field(
+        None, description="Connection timeout, in seconds"
+    )
+    connect_kwargs: Optional[dict] = Field(
         None,
         description="Other keyword arguments passed to paramiko.client.SSHClient.connect",
     )
-    inline_ssh_env: bool = Field(
+    inline_ssh_env: Optional[bool] = Field(
         None,
         description="Whether to send environment variables 'inline' as prefixes in "
         "front of command strings",
@@ -327,7 +373,7 @@ class ExecutionConfig(BaseModel):
     modules: Optional[list[str]] = Field(
         None, description="list of modules to be loaded"
     )
-    export: Optional[dict[str, str]] = Field(
+    export: Optional[dict[str, Any]] = Field(
         None, description="dictionary with variable to be exported"
     )
     pre_run: Optional[str] = Field(
@@ -336,9 +382,7 @@ class ExecutionConfig(BaseModel):
     post_run: Optional[str] = Field(
         None, description="Commands to be executed after the execution of a job"
     )
-
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")
 
 
 class Project(BaseModel):
@@ -351,19 +395,23 @@ class Project(BaseModel):
         None,
         description="The base directory containing the project related files. Default "
         "is a folder with the project name inside the projects folder",
+        validate_default=True,
     )
     tmp_dir: Optional[str] = Field(
         None,
         description="Folder where remote files are copied. Default a 'tmp' folder in base_dir",
+        validate_default=True,
     )
     log_dir: Optional[str] = Field(
         None,
         description="Folder containing all the logs. Default a 'log' folder in base_dir",
+        validate_default=True,
     )
     daemon_dir: Optional[str] = Field(
         None,
         description="Folder containing daemon related files. Default to a 'daemon' "
         "folder in base_dir",
+        validate_default=True,
     )
     log_level: LogLevel = Field(LogLevel.INFO, description="The level set for logging")
     runner: RunnerOptions = Field(
@@ -378,7 +426,9 @@ class Project(BaseModel):
         default_factory=dict,
         description="Dictionary describing a maggma Store used for the queue data. "
         "Can contain the monty serialized dictionary or a dictionary with a 'type' "
-        "specifying the Store subclass",
+        "specifying the Store subclass. Should be subclass of a MongoStore, as it "
+        "requires to perform MongoDB actions.",
+        validate_default=True,
     )
     exec_config: dict[str, ExecutionConfig] = Field(
         default_factory=dict,
@@ -389,6 +439,7 @@ class Project(BaseModel):
         default_factory=lambda: dict(DEFAULT_JOBSTORE),
         description="The JobStore used for the input. Can contain the monty "
         "serialized dictionary or the Store int the Jobflow format",
+        validate_default=True,
     )
     metadata: Optional[dict] = Field(
         None, description="A dictionary with metadata associated to the project"
@@ -419,56 +470,51 @@ class Project(BaseModel):
         """
         return store_from_dict(self.queue)
 
-    def get_launchpad(self) -> RemoteLaunchPad:
-        """
-        Provide an instance of a RemoteLaunchPad based on the queue Store.
+    def get_job_controller(self):
+        from jobflow_remote.jobs.jobcontroller import JobController
 
-        Returns
-        -------
-        A RemoteLaunchPad
-        """
-        return RemoteLaunchPad(self.get_queue_store())
+        return JobController.from_project(self)
 
-    @validator("base_dir", always=True)
-    def check_base_dir(cls, base_dir: str, values: dict) -> str:
+    @field_validator("base_dir")
+    def check_base_dir(cls, base_dir: str, info: ValidationInfo) -> str:
         """
         Validator to set the default of base_dir based on the project name
         """
         if not base_dir:
             from jobflow_remote import SETTINGS
 
-            return str(Path(SETTINGS.projects_folder, values["name"]))
+            return str(Path(SETTINGS.projects_folder, info.data["name"]))
         return base_dir
 
-    @validator("tmp_dir", always=True)
-    def check_tmp_dir(cls, tmp_dir: str, values: dict) -> str:
+    @field_validator("tmp_dir")
+    def check_tmp_dir(cls, tmp_dir: str, info: ValidationInfo) -> str:
         """
         Validator to set the default of tmp_dir based on the base_dir
         """
         if not tmp_dir:
-            return str(Path(values["base_dir"], "tmp"))
+            return str(Path(info.data["base_dir"], "tmp"))
         return tmp_dir
 
-    @validator("log_dir", always=True)
-    def check_log_dir(cls, log_dir: str, values: dict) -> str:
+    @field_validator("log_dir")
+    def check_log_dir(cls, log_dir: str, info: ValidationInfo) -> str:
         """
         Validator to set the default of log_dir based on the base_dir
         """
         if not log_dir:
-            return str(Path(values["base_dir"], "log"))
+            return str(Path(info.data["base_dir"], "log"))
         return log_dir
 
-    @validator("daemon_dir", always=True)
-    def check_daemon_dir(cls, daemon_dir: str, values: dict) -> str:
+    @field_validator("daemon_dir")
+    def check_daemon_dir(cls, daemon_dir: str, info: ValidationInfo) -> str:
         """
         Validator to set the default of daemon_dir based on the base_dir
         """
         if not daemon_dir:
-            return str(Path(values["base_dir"], "daemon"))
+            return str(Path(info.data["base_dir"], "daemon"))
         return daemon_dir
 
-    @validator("jobstore", always=True)
-    def check_jobstore(cls, jobstore: dict, values: dict) -> dict:
+    @field_validator("jobstore")
+    def check_jobstore(cls, jobstore: dict) -> dict:
         """
         Check that the jobstore configuration could be converted to a JobStore.
         """
@@ -484,22 +530,23 @@ class Project(BaseModel):
                 ) from e
         return jobstore
 
-    @validator("queue", always=True)
-    def check_queue(cls, queue: dict, values: dict) -> dict:
+    @field_validator("queue")
+    def check_queue(cls, queue: dict) -> dict:
         """
         Check that the queue configuration could be converted to a Store.
         """
         if queue:
             try:
-                store_from_dict(queue)
+                store = store_from_dict(queue)
             except Exception as e:
                 raise ValueError(
                     f"error while converting queue to a maggma store. Error: {traceback.format_exc()}"
                 ) from e
+            if not isinstance(store, MongoStore):
+                raise ValueError("The queue store should be a subclass of a MongoStore")
         return queue
 
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")
 
 
 class ConfigError(Exception):
