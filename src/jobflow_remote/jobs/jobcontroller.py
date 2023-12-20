@@ -14,6 +14,7 @@ import jobflow
 import pymongo
 from jobflow import JobStore, OnMissing
 from maggma.stores import MongoStore
+from monty.json import MontyDecoder
 from monty.serialization import loadfn
 from qtoolkit.core.data_objects import CancelStatus, QResources
 
@@ -2445,23 +2446,53 @@ class JobController:
 
     def _append_flow(
         self,
-        job_doc: JobDoc,
+        job_doc: dict,
         flow_dict: dict,
-        new_flow: jobflow.Flow | jobflow.Job | list[jobflow.Job],
+        new_flow_dict: dict,
         worker: str,
         response_type: DynamicResponseType,
         exec_config: ExecutionConfig | None = None,
         resources: QResources | None = None,
     ):
-        from jobflow.core.flow import get_flow
+        from jobflow import Flow, Job
 
-        new_flow = get_flow(new_flow, allow_external_references=True)
+        decoder = MontyDecoder()
+
+        def deserialize_partial_flow(in_dict: dict):
+            """
+            Recursively deserialize a Flow dictionary, avoiding the deserialization
+            of all the elements that may require external packages.
+            """
+            if in_dict.get("@class", None) == "Flow":
+                jobs = [deserialize_partial_flow(d) for d in in_dict.get("jobs")]
+                flow_init = {
+                    k: v
+                    for k, v in in_dict.items()
+                    if k not in ("@module", "@class", "@version", "job")
+                }
+                flow_init["jobs"] = jobs
+                return Flow(**flow_init)
+            # if it is not a Flow, should be a Job
+            job_init = {
+                k: v
+                for k, v in in_dict.items()
+                if k not in ("@module", "@class", "@version")
+            }
+            job_init["config"] = decoder.process_decoded(job_init["config"])
+            return Job(**job_init)
+
+        # It is sure that the new_flow_dict is a serialized Flow (and not Job
+        # or list[Job]), because the get_flow has already been applied at run
+        # time, during the remote execution.
+        # Recursive deserialize the Flow without deserializing function and
+        # arguments to take advantage of standard Flow/Job methods.
+        new_flow = deserialize_partial_flow(new_flow_dict)
 
         # get job parents
         if response_type == DynamicResponseType.REPLACE:
-            job_parents = job_doc.parents
+            job_parents = job_doc["parents"]
         else:
-            job_parents = [(job_doc.uuid, job_doc.index)]
+            job_parents = [(job_doc["uuid"], job_doc["index"])]
 
         # add new jobs to flow
         flow_dict = dict(flow_dict)
@@ -2501,7 +2532,8 @@ class JobController:
             # if detour, update the parents of the child jobs
             leaf_uuids = [v for v, d in new_flow.graph.out_degree() if d == 0]
             self.jobs.update_many(
-                {"parents": job_doc.uuid}, {"$push": {"parents": {"$each": leaf_uuids}}}
+                {"parents": job_doc["uuid"]},
+                {"$push": {"parents": {"$each": leaf_uuids}}},
             )
 
         # flow_dict["updated_on"] = datetime.utcnow()
@@ -2594,7 +2626,7 @@ class JobController:
     # TODO if jobstore is not an option anymore, the "store" argument
     # can be removed and just use self.jobstore.
     def complete_job(
-        self, job_doc: JobDoc, local_path: Path | str, store: JobStore
+        self, job_doc: dict, local_path: Path | str, store: JobStore
     ) -> bool:
         # Don't sleep if the flow is locked. Only the Runner should call this,
         # and it will handle the fact of having a locked Flow.
@@ -2602,11 +2634,12 @@ class JobController:
         # avoids parsing (potentially large) files to discover that the flow is
         # already locked.
         with self.lock_flow(
-            filter={"jobs": job_doc.uuid}, get_locked_doc=True
+            filter={"jobs": job_doc["uuid"]}, get_locked_doc=True
         ) as flow_lock:
             if flow_lock.locked_document:
                 local_path = Path(local_path)
                 out_path = local_path / OUT_FILENAME
+                host_flow_id = job_doc["job"]["hosts"][-1]
                 if not out_path.exists():
                     msg = (
                         f"The output file {OUT_FILENAME} was not present in the download "
@@ -2615,13 +2648,16 @@ class JobController:
                     self.checkin_job(
                         job_doc, flow_lock.locked_document, response=None, error=msg
                     )
-                    self.update_flow_state(job_doc.job.hosts[-1])
+                    self.update_flow_state(host_flow_id)
                     return True
 
-                out = loadfn(out_path)
-                doc_update = {"start_time": out["start_time"]}
+                # do not deserialize the response or stored data, saves time and
+                # avoids the need for packages to be installed.
+                out = loadfn(out_path, cls=None)
+                decoder = MontyDecoder()
+                doc_update = {"start_time": decoder.process_decoded(out["start_time"])}
                 # update the time of the JobDoc, will be used in the checkin
-                end_time = out.get("end_time")
+                end_time = decoder.process_decoded(out.get("end_time"))
                 if end_time:
                     doc_update["end_time"] = end_time
 
@@ -2634,7 +2670,7 @@ class JobController:
                         error=error,
                         doc_update=doc_update,
                     )
-                    self.update_flow_state(job_doc.job.hosts[-1])
+                    self.update_flow_state(host_flow_id)
                     return True
 
                 response = out.get("response")
@@ -2651,24 +2687,20 @@ class JobController:
                         error=msg,
                         doc_update=doc_update,
                     )
-                    self.update_flow_state(job_doc.job.hosts[-1])
+                    self.update_flow_state(host_flow_id)
                     return True
 
-                save = {
-                    k: "output" if v is True else v
-                    for k, v in job_doc.job._kwargs.items()
-                }
-
                 remote_store = get_remote_store(store, local_path)
-                remote_store.connect()
-                update_store(store, remote_store, save, job_doc.db_id)
+
+                update_store(store, remote_store, job_doc["db_id"])
+
                 self.checkin_job(
                     job_doc,
                     flow_lock.locked_document,
                     response=response,
                     doc_update=doc_update,
                 )
-                self.update_flow_state(job_doc.job.hosts[-1])
+                self.update_flow_state(host_flow_id)
                 return True
             elif flow_lock.unavailable_document:
                 # raising the error if the lock could not be acquired leaves
@@ -2682,9 +2714,9 @@ class JobController:
 
     def checkin_job(
         self,
-        job_doc: JobDoc,
+        job_doc: dict,
         flow_dict: dict,
-        response: jobflow.Response | None,
+        response: dict | None,
         error: str | None = None,
         doc_update: dict | None = None,
     ):
@@ -2694,51 +2726,47 @@ class JobController:
         # handle response
         else:
             new_state = JobState.COMPLETED.value
-            if response.replace is not None:
+            if response["replace"] is not None:
                 self._append_flow(
                     job_doc,
                     flow_dict,
-                    response.replace,
+                    response["replace"],
                     response_type=DynamicResponseType.REPLACE,
-                    worker=job_doc.worker,
-                    exec_config=job_doc.exec_config,
-                    resources=job_doc.resources,
+                    worker=job_doc["worker"],
+                    exec_config=job_doc["exec_config"],
+                    resources=job_doc["resources"],
                 )
 
-            if response.addition is not None:
+            if response["addition"] is not None:
                 self._append_flow(
                     job_doc,
                     flow_dict,
-                    response.addition,
+                    response["addition"],
                     response_type=DynamicResponseType.ADDITION,
-                    worker=job_doc.worker,
-                    exec_config=job_doc.exec_config,
-                    resources=job_doc.resources,
+                    worker=job_doc["worker"],
+                    exec_config=job_doc["exec_config"],
+                    resources=job_doc["resources"],
                 )
 
-            if response.detour is not None:
+            if response["detour"] is not None:
                 self._append_flow(
                     job_doc,
                     flow_dict,
-                    response.detour,
+                    response["detour"],
                     response_type=DynamicResponseType.DETOUR,
-                    worker=job_doc.worker,
-                    exec_config=job_doc.exec_config,
-                    resources=job_doc.resources,
+                    worker=job_doc["worker"],
+                    exec_config=job_doc["exec_config"],
+                    resources=job_doc["resources"],
                 )
 
-            if response.stored_data is not None:
-                from monty.json import jsanitize
+            if response["stored_data"] is not None:
+                stored_data = response["stored_data"]
 
-                stored_data = jsanitize(
-                    response.stored_data, strict=True, enum_values=True
-                )
+            if response["stop_children"]:
+                self.stop_children(job_doc["uuid"])
 
-            if response.stop_children:
-                self.stop_children(job_doc.uuid)
-
-            if response.stop_jobflow:
-                self.stop_jobflow(job_uuid=job_doc.uuid)
+            if response["stop_jobflow"]:
+                self.stop_jobflow(job_uuid=job_doc["uuid"])
 
         if not doc_update:
             doc_update = {}
@@ -2747,16 +2775,16 @@ class JobController:
         )
 
         result = self.jobs.update_one(
-            {"uuid": job_doc.uuid, "index": job_doc.index}, {"$set": doc_update}
+            {"uuid": job_doc["uuid"], "index": job_doc["index"]}, {"$set": doc_update}
         )
         if result.modified_count == 0:
             raise RuntimeError(
-                f"The job {job_doc.uuid} index {job_doc.index} has not been updated in the database"
+                f"The job {job_doc['uuid']} index {job_doc['index']} has not been updated in the database"
             )
 
         # TODO it should be fine to replace this query by constructing the list of
         # job uuids from the original + those added. Should be verified.
-        job_uuids = self.get_flow_info_by_job_uuid(job_doc.uuid, ["jobs"])["jobs"]
+        job_uuids = self.get_flow_info_by_job_uuid(job_doc["uuid"], ["jobs"])["jobs"]
         return len(self.refresh_children(job_uuids)) + 1
 
     # TODO should this refresh all the kind of states? Or just set to ready?
