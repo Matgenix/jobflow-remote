@@ -1,0 +1,124 @@
+name: Publish and Deploy
+
+on:
+  release:
+    types:
+    - published
+
+env:
+  PUBLISH_UPDATE_BRANCH: develop
+  GIT_USER_NAME: Matgenix
+  GIT_USER_EMAIL: "dev@matgenix.com"
+
+jobs:
+
+  publish:
+    name: Publish package
+    runs-on: ubuntu-latest
+    if: github.repository == 'matgenix/jobflow-remote' && startsWith(github.ref, 'refs/tags/v')
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        submodules: true
+        fetch-depth: 0
+
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install Python dependencies
+      run: |
+        python -m pip install -U pip
+        pip install -U setuptools wheel
+        pip install -e .[all]
+
+    - name: Update changelog
+      uses: CharMixer/auto-changelog-action@v1
+      with:
+        token: ${{ secrets.RELEASE_PAT_BOT }}
+        release_branch: ${{ env.PUBLISH_UPDATE_BRANCH }}
+        exclude_labels: "duplicate,question,invalid,wontfix,dependency_updates,skip_changelog"
+
+    - name: Update '${{ env.PUBLISH_UPDATE_BRANCH }}'
+      uses: CasperWA/push-protected@v2
+      with:
+        token: ${{ secrets.RELEASE_PAT_BOT }}
+        branch: ${{ env.PUBLISH_UPDATE_BRANCH }}
+        unprotect_reviews: true
+        sleep: 15
+        force: true
+        tags: true
+
+    - name: Get tagged versions
+      run: echo "PREVIOUS_VERSION=$(git tag -l --sort -version:refname | sed -n 2p)" >> $GITHUB_ENV
+
+    - name: Create release-specific changelog
+      uses: CharMixer/auto-changelog-action@v1
+      with:
+        token: ${{ secrets.RELEASE_PAT_BOT }}
+        release_branch: ${{ env.PUBLISH_UPDATE_BRANCH }}
+        since_tag: "${{ env.PREVIOUS_VERSION }}"
+        output: "release_changelog.md"
+        exclude_labels: "duplicate,question,invalid,wontfix,dependency_updates,skip_changelog"
+
+    - name: Append changelog to release body
+      run: |
+        gh api /repos/${{ github.repository }}/releases/${{ github.event.release.id }} --jq '.body' > release_body.md
+        cat release_changelog.md >> release_body.md
+        gh api /repos/${{ github.repository }}/releases/${{ github.event.release.id }} -X PATCH -F body='@release_body.md'
+      env:
+        GITHUB_TOKEN: ${{ secrets.RELEASE_PAT_BOT }}
+
+    - name: Build source distribution
+      run: |
+        pip install -U build
+        python -m build
+
+    - name: Publish package to Test PyPI first
+      uses: pypa/gh-action-pypi-publish@release/v1
+      with:
+        user: __token__
+        password: ${{ secrets.TEST_PYPI_PASSWORD }}
+        repository-url: https://test.pypi.org/legacy/
+
+    - name: Install docs dependencies
+      run: |
+        # Required to generate rst files from markdown
+        sudo apt install pandoc
+        pip install .[docs]
+
+    - name: Build Sphinx docs
+      working-directory: doc
+      run: |
+        # cannot use sphinx build directly as the makefile handles generation
+        # of some rst files
+        make html
+
+    - name: Fix permissions # following https://github.com/actions/upload-pages-artifact?tab=readme-ov-file#file-permissions
+      run: |
+        chmod -c -R +rX "./doc/build" | while read line; do
+          echo "::warning title=Invalid file permissions automatically fixed::$line"
+        done
+
+    - name: Upload docs artifact
+      uses: actions/upload-pages-artifact@v2
+      with:
+        path: ./doc/build/html
+
+  deploy_docs:
+    if: github.repository == 'matgenix/jobflow-remote' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write      # to deploy to Pages
+      id-token: write   # to verify the deployment originates from an appropriate source
+    needs: publish
+    environment:
+      name: "Documentation"
+      url: https://matgenix.github.io/Jobflow-Remote
+
+    steps:
+    - name: Deploy docs
+      uses: actions/deploy-pages@v2
