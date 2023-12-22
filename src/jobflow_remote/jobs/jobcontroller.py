@@ -1419,7 +1419,7 @@ class JobController:
             wait=wait,
         )
 
-    def cancel_jobs(
+    def stop_jobs(
         self,
         job_ids: tuple[str, int] | list[tuple[str, int]] | None = None,
         db_ids: str | list[str] | None = None,
@@ -1434,8 +1434,8 @@ class JobController:
         break_lock: bool = False,
     ) -> list[int]:
         """
-        Cancel selected Jobs. Only Jobs in the READY and all the running states
-        can be cancelled.
+        Stop selected Jobs. Only Jobs in the READY and all the running states
+        can be stopped.
         The action is not reversible.
 
         Parameters
@@ -1479,8 +1479,8 @@ class JobController:
             List of db_ids of the updated Jobs.
         """
         return self._many_jobs_action(
-            method=self.cancel_job,
-            action_description="cancelling",
+            method=self.stop_job,
+            action_description="stopping",
             job_ids=job_ids,
             db_ids=db_ids,
             flow_ids=flow_ids,
@@ -1494,7 +1494,7 @@ class JobController:
             break_lock=break_lock,
         )
 
-    def cancel_job(
+    def stop_job(
         self,
         job_id: str | None = None,
         db_id: str | None = None,
@@ -1503,8 +1503,8 @@ class JobController:
         break_lock: bool = False,
     ) -> list[int]:
         """
-        Cancel a single Job. Only Jobs in the READY and all the running states
-        can be cancelled.
+        Stop a single Job. Only Jobs in the READY and all the running states
+        can be stopped.
         Selected by db_id or uuid+index. Only one among db_id
         and job_id should be defined.
         The action is not reversible.
@@ -1556,12 +1556,16 @@ class JobController:
                         f"Failed cancelling the process for Job {job_doc['uuid']} {job_doc['index']}",
                         exc_info=True,
                     )
-            updated_states = {job_id: {job_index: JobState.CANCELLED}}
+            job_id = job_doc["uuid"]
+            job_index = job_doc["index"]
+            updated_states = {job_id: {job_index: JobState.USER_STOPPED}}
             self.update_flow_state(
                 flow_uuid=flow_lock.locked_document["uuid"],
                 updated_states=updated_states,
             )
-            job_lock.update_on_release = {"$set": {"state": JobState.CANCELLED.value}}
+            job_lock.update_on_release = {
+                "$set": {"state": JobState.USER_STOPPED.value}
+            }
             return [job_lock.locked_document["db_id"]]
 
     def pause_job(
@@ -1607,6 +1611,9 @@ class JobController:
             job_lock_kwargs=job_lock_kwargs,
             flow_lock_kwargs=flow_lock_kwargs,
         ) as (job_lock, flow_lock):
+            job_doc = job_lock.locked_document
+            job_id = job_doc["uuid"]
+            job_index = job_doc["index"]
             updated_states = {job_id: {job_index: JobState.PAUSED}}
             self.update_flow_state(
                 flow_uuid=flow_lock.locked_document["uuid"],
@@ -1738,6 +1745,8 @@ class JobController:
             flow_lock_kwargs=flow_lock_kwargs,
         ) as (job_lock, flow_lock):
             job_doc = job_lock.locked_document
+            job_id = job_doc["uuid"]
+            job_index = job_doc["index"]
             on_missing = job_doc["job"]["config"]["on_missing_references"]
             allow_failed = on_missing != OnMissing.ERROR.value
 
@@ -2834,7 +2843,9 @@ class JobController:
                 job.get("job", {}).get("config", {}).get("on_missing_references", None)
             )
             if on_missing_ref == jobflow.OnMissing.NONE.value:
-                allowed_states.extend((JobState.FAILED.value, JobState.CANCELLED.value))
+                allowed_states.extend(
+                    (JobState.FAILED.value, JobState.USER_STOPPED.value)
+                )
             if job["state"] == JobState.WAITING.value and all(
                 [jobs_mapping[p]["state"] in allowed_states for p in job["parents"]]
             ):
