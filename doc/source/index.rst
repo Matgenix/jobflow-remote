@@ -11,6 +11,7 @@ Jobflow Remote documentation
    User Guide <user/index>
    API reference <api/index>
    Development <dev/index>
+   Changelog <changelog>
    release
 
 
