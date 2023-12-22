@@ -23,7 +23,7 @@ sys.path.insert(
 
 project = "Jobflow Remote"
 copyright = "2023, Matgenix SRL"
-author = "Guido Petretto, David Waroquiers"
+author = "Guido Petretto, Matthew Evans, David Waroquiers"
 
 
 import jobflow_remote
