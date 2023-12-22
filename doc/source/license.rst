@@ -1,5 +1,5 @@
 **********************
-Jobflow-Remote license
+Jobflow Remote license
 **********************
 
 .. include:: ../../LICENSE

@@ -3,8 +3,8 @@ requires = ["setuptools >= 42", "versioningit ~= 1.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "jobflow_remote"
-description = "jobflow-remote is a python package to run jobflow workflows on remote resources"
+name = "jobflow-remote"
+description = "Jobflow Remote is a Python package to run jobflow workflows on remote resources"
 readme = "README.md"
 keywords = []
 license = { text = "modified BSD" }
@@ -64,10 +64,10 @@ strict = []
 jf = "jobflow_remote.cli.jf:app"
 
 [project.urls]
-homepage = "https://Matgenix.github.io/jobflow_remote/"
-repository = "https://github.com/Matgenix/jobflow_remote"
-documentation = "https://Matgenix.github.io/jobflow_remote/"
-changelog = "https://github.com/Matgenix/jobflow_remote/CHANGELOG.md"
+homepage = "https://Matgenix.github.io/jobflow-remote/"
+repository = "https://github.com/Matgenix/jobflow-remote"
+documentation = "https://Matgenix.github.io/jobflow-remote/"
+changelog = "https://github.com/Matgenix/jobflow-remote/CHANGELOG.md"
 
 [tool.setuptools.package-data]
 jobflow_remote = ["py.typed"]

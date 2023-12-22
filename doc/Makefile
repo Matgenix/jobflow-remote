@@ -24,7 +24,7 @@ FILES=
 # Internal variables.
 PAPEROPT_a4     = -D latex_paper_size=a4
 PAPEROPT_letter = -D latex_paper_size=letter
-ALLSPHINXOPTS   = -WT --keep-going -d build/doctrees $(PAPEROPT_$(PAPER)) \
+ALLSPHINXOPTS   = -T --keep-going -d build/doctrees $(PAPEROPT_$(PAPER)) \
                   $(SPHINXOPTS) source
 
 .PHONY: help clean html version-check html-build
@@ -62,8 +62,21 @@ build/generate-stamp: $(wildcard source/reference/*.rst)
 	mkdir -p build
 	touch build/generate-stamp
 
+generate-rst-from-md:
+	# generate contributing docs
+	mkdir -p source/dev
+	pandoc --from=markdown --to=rst --output=source/dev/_index.rst ../CONTRIBUTING.md
+	echo ".. _devindex:" > source/dev/index.rst
+	cat source/dev/_index.rst >> source/dev/index.rst
+	rm source/dev/_index.rst
+	# generate changelog
+	pandoc --from=markdown --to=rst --output=source/_changelog.rst ../CHANGELOG.md
+	echo ".. _changelog:" > source/changelog.rst
+	cat source/_changelog.rst >> source/changelog.rst
+	rm source/_changelog.rst
+
 html: api-doc html-build
-html-build: generate
+html-build: generate generate-rst-from-md
 	mkdir -p build/html build/doctrees
 	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) build/html $(FILES)
 	@echo
