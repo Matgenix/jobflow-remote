@@ -1,6 +1,6 @@
 # jobflow-remote
 
-[![tests](https://img.shields.io/github/actions/workflow/status/Matgenix/jobflow-remote/testing.yml?branch=main&label=tests)](https://github.com/Matgenix/jobflow-remote/actions?query=workflow%3Atesting)
+[![tests](https://img.shields.io/github/actions/workflow/status/Matgenix/jobflow-remote/testing.yml?branch=develop&label=tests)](https://github.com/Matgenix/jobflow-remote/actions?query=workflow%3Atesting)
 [![code coverage](https://img.shields.io/codecov/c/gh/Matgenix/jobflow-remote)](https://codecov.io/gh/Matgenix/jobflow-remote)
 [![pypi version](https://img.shields.io/pypi/v/jobflow-remote?color=blue)](https://pypi.org/project/jobflow-remote)
 ![supported python versions](https://img.shields.io/pypi/pyversions/jobflow-remote)
