@@ -21,7 +21,7 @@ sys.path.insert(
 
 # -- Project information -----------------------------------------------------
 
-project = "Jobflow-Remote"
+project = "Jobflow Remote"
 copyright = "2023, Matgenix SRL"
 author = "Guido Petretto, David Waroquiers"
 
@@ -54,8 +54,6 @@ extensions = [
     "sphinx.ext.autosummary",
     "sphinx.ext.graphviz",
     "sphinx.ext.ifconfig",
-    "IPython.sphinxext.ipython_console_highlighting",
-    "IPython.sphinxext.ipython_directive",
     "sphinx.ext.mathjax",
     "sphinx_design",
     "sphinx_copybutton",
@@ -112,7 +110,7 @@ html_theme_options = {
     "collapse_navigation": True,
     "announcement": (
         "<p>"
-        "Jobflow-Remote is still in beta phase. The API may change at any time."
+        "Jobflow Remote is still in beta phase. The API may change at any time."
         "</p>"
     ),
     # "announcement": "<p>This is still in development</p>",
