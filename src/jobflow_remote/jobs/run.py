@@ -10,6 +10,7 @@ import traceback
 from pathlib import Path
 
 from jobflow import JobStore, initialize_logger
+from jobflow.core.flow import get_flow
 from jobflow.core.job import Job
 from monty.os import cd
 from monty.serialization import dumpfn, loadfn
@@ -62,6 +63,17 @@ def run_remote_job(run_dir: str | Path = "."):
 
             # The output of the response has already been stored in the store.
             response.output = None
+
+            # Convert to Flow the dynamic responses before dumping the output.
+            # This is required so that the response does not need to be
+            # deserialized and converted by to Flows by the runner.
+            if response.addition:
+                response.addition = get_flow(response.addition)
+            if response.detour:
+                response.detour = get_flow(response.detour)
+            if response.replace:
+                response.replace = get_flow(response.replace)
+
             output = {
                 "response": response,
                 "error": error,

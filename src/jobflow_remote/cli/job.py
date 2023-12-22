@@ -429,7 +429,7 @@ def play(
 
 
 @app_job.command()
-def cancel(
+def stop(
     job_db_id: job_db_id_arg = None,
     job_index: job_index_arg = None,
     job_id: job_ids_indexes_opt = None,
@@ -448,7 +448,7 @@ def cancel(
     raise_on_error: raise_on_error_opt = False,
 ):
     """
-    Cancel a Job. Only Jobs that did not complete or had an error can be cancelled.
+    Stop a Job. Only Jobs that did not complete or had an error can be stopped.
     The operation is irreversible.
     If possible, the associated job submitted to the remote queue will be cancelled.
     """
@@ -458,8 +458,8 @@ def cancel(
     jc = get_job_controller()
 
     execute_multi_jobs_cmd(
-        single_cmd=jc.cancel_job,
-        multi_cmd=jc.cancel_jobs,
+        single_cmd=jc.stop_job,
+        multi_cmd=jc.stop_jobs,
         job_db_id=job_db_id,
         job_index=job_index,
         job_ids=job_id,
@@ -703,7 +703,7 @@ def resources(
     raise_on_error: raise_on_error_opt = False,
 ):
     """
-    Set the worker for the selected Jobs. Only READY or WAITING Jobs.
+    Set the resources for the selected Jobs. Only READY or WAITING Jobs.
     """
 
     resources_value = str_to_dict(resources_value)

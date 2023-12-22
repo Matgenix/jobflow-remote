@@ -1,15 +1,21 @@
 .. _projectconf:
 
-**********************
-Projects configuration
-**********************
+***********************************
+Projects configuration and Settings
+***********************************
 
-Jobflow-remote allows to handle multiple configurations, defined projects. Since
+Jobflow-remote allows to handle multiple configurations, defined **projects**. Since
 for most of the users a single project is enough let us first consider the configuration
-of a single project. The handling of multiple projects will be described below.
+of a single project. The handling of :ref:`projectconf multi` will be described below.
 
-The configurations allow to control the behaviour of the Job execution, as well as
-the other objects in jobflow-remote. Here a full description of the project's
+Aside from the project options, a set of :ref:`projectconf general` can be also be
+configured through environment variables or an additional configuration file.
+
+Project options
+===============
+
+The project configurations allow to control the behaviour of the Job execution, as well
+as the other objects in jobflow-remote. Here a full description of the project's
 configuration file will be given. If you are looking for a minimal example with its
 description you can find it in the :ref:`minimal project config` section.
 
@@ -32,8 +38,7 @@ section below, while an example for a full configuration file can be generated r
 Note that, while the default file format is YAML, JSON and TOML are also acceptable format.
 You can generate the example in the other formats using the ``--format`` option.
 
-Project options
-===============
+
 
 Name and folders
 ----------------
@@ -52,6 +57,8 @@ For all these folders the paths are set with defaults, but can be customised set
 .. warning::
   The project name does not take into consideration the configuration file name.
   For coherence it would be better to give use the project name as file name.
+
+.. _projectconf worker:
 
 Workers
 -------
@@ -72,18 +79,118 @@ type all the credentials to connect automatically should be provided. The best o
 would be to set up a passwordless connection and define it in the ``~/.ssh/config``
 file.
 
-The other key property of the workers is the ``scheduler_type``.
+The other key property of the workers is the ``scheduler_type``. It can be any of the
+values supported by the `qtoolkit <https://matgenix.github.io/qtoolkit/>`_. Typical
+values are:
+
+* ``shell``: the Job is executed directly in the shell. No queue will be used.
+  If not limited, all the Jobs can be executed simultaneously
+* ``slurm``, ``pbs``, ...: the name of a queueing system. The job will be submitted
+  to the queue with the selected resources.
+
+Another mandatory argument is ``work_dir``, indicating the full path for a folder
+on the worker machine where the Jobs will be actually executed.
+
+It is possible to optionally select default values for keywords like ``pre_run``
+and ``resources``, that can be overridden for individual Jobs. Note that these
+configurations will be applied to *all*  the Jobs executed by the worker. These
+are thus more suitable for generic settings (e.g. the activation of a python
+environment, or loading of some modules), rather than for the specific code
+configurations. Those can better be set with the :ref:`projectconf execconfig`.
 
 .. note::
 
     If a single worker is defined it will be used as default in the submission
     of new Flows.
 
+JobStore
+--------
+
+The ``jobstore`` value contains a dictionary representation of the standard
+``JobStore`` object defined in jobflow. It can either be the serialized
+version as obtained by the ``as_dict`` module or the representation defined
+in `jobflow's documentation <https://materialsproject.github.io/jobflow/stores.html>`_.
+
+This ``JobStore`` will be used to store the outputs of all the Jobs executed
+in this project.
+
+.. note::
+
+    The ``JobStore`` should be defined in jobflow-remote's configuration file.
+    The content of the standard jobflow configuration file will be ignored.
+
+Queue Store
+-----------
+
+The ``queue`` element contains the definition of the database containing the
+state of the Jobs and Flows.  The subelement ``store`` should contain the
+representation of a `maggma <https://materialsproject.github.io/maggma/>`_ ``Store``.
+As for the ``JobStore`` it can be either its serialization or the same kind
+of representation used for the ``docs_store`` in jobflow's configuration file.
+
+The collection defined by the ``Store`` will contain the information about the
+state of the ``Job``, while two more collections will be created. The name
+of these two collections can also be customized.
+
+.. warning::
+
+    The queue ``Store`` should be a subclass of the ``MongoStore`` and currently
+    it should be based on a real MongoDB (e.g. not a ``JSONStore``).
+    Some key operations required by jobflow-remote on the collections are not
+    supported by any file based MongoDB implementation at the moment.
+
+.. _projectconf execconfig:
+
+Execution configurations
+------------------------
+
+It is possible to define a set of ``ExecutionConfig`` objects to quickly set up
+configurations for different kind of Jobs and Flow. The ``exec_config`` key
+contains a dictionary where the keys are the names associated to the configurations
+and for each a set of instruction to be set before and after the execution of the Job.
+
+Runner options
+--------------
+
+The behaviour of the ``Runner`` can also be customized to some extent. In particular
+the ``Runner`` implements an exponential backoff mechanism for retrying when an
+operation of updating of a Job state fails. The amount of tries and the delay between
+them can be set ``max_step_attempts`` and ``delta_retry`` values. In addition some
+reasonable values are set for the delay between each check of the database for
+different kind of actions performed by the ``Runner``. These intervals can be
+changed to better fit your needs. Remind that reducing these intervals too much
+may put unnecessary strain on the database.
+
+Metadata
+--------
+
+While this does currently not play any role in the execution of jobflow-remote,
+this can be used to include some additional information to be used by external
+tools or to quickly distinguish a configuration file among others.
+
+.. _projectconf multi:
 
 Multiple Projects
 =================
 
-asdsd
+While a single project can be enough for most of the users and for beginners,
+it may be convenient to define different databases, configurations and python
+environments to work on different topics. For this reason jobflow-remote will
+consider as potential projects configuration all the YAML, JSON and TOML files
+in the ``~/.jfremote`` folder. There is no additional procedure required to
+add or remove project, aside from creating/deleting a project configuration file.
+
+If more than one project is present and a specific one is not selected, the
+code will always stop asking for a project to be specified. Python functions
+like ``submit_flow`` and ``get_jobstore`` accept a ``project`` argument to
+specify which project should be considered. For the command line interface
+a general ``-p`` allows to select a project for the command that is being
+executed::
+
+    jf -p another_project job list
+
+To define a default project for all the functions and commands executed on the
+system or in a specific cell see the :ref:`projectconf general` section.
 
 .. _project detailed specs:
 
@@ -92,3 +199,31 @@ Project specs
 
 .. raw:: html
    :file: ../_static/project_schema.html
+
+.. _projectconf general:
+
+General Settings
+================
+
+Aside from the project specific configuration, a few options can also be
+defined in general. There are two ways to set these options:
+
+* set the value in the ``~/.jfremote.yaml`` configuration file.
+* export the variable name prepended by the ``jfremote`` prefix::
+
+    export jfremote_project=project_name
+
+.. note::
+
+    The name of the exported variables is case-insensitive (i.e. JFREMOTE_PROJECT
+    is equally valid).
+
+The most useful variable to set is the ``project`` one, allowing to select the
+default project to be used in a multi-project environment.
+
+Other generic options are the location of the projects folder, instead of
+``~/.jfremote`` (``projects_folder``) and the path to the ``~/.jfremote.yaml``
+file itself (``config_file``).
+
+Some customization options are also available for the behaviour of the CLI.
+For more details see the API documentation :py:class:`jobflow_remote.config.settings.JobflowRemoteSettings`.

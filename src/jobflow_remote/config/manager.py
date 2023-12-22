@@ -154,7 +154,10 @@ class ConfigManager:
         project_name = self.select_project_name(project_name)
 
         if project_name not in self.projects_data:
-            raise ConfigError(f"The selected project {project_name} does not exist")
+            raise ConfigError(
+                f"The selected project {project_name} does not exist "
+                "or could not be parsed correctly"
+            )
 
         return self.projects_data[project_name]
 

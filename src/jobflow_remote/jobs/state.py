@@ -21,7 +21,7 @@ class JobState(Enum):
     FAILED = "FAILED"
     PAUSED = "PAUSED"
     STOPPED = "STOPPED"
-    CANCELLED = "CANCELLED"
+    USER_STOPPED = "USER_STOPPED"
     BATCH_SUBMITTED = "BATCH_SUBMITTED"
     BATCH_RUNNING = "BATCH_RUNNING"
 
@@ -44,7 +44,7 @@ short_state_mapping = {
     JobState.FAILED: "F",
     JobState.PAUSED: "P",
     JobState.STOPPED: "ST",
-    JobState.CANCELLED: "CA",
+    JobState.USER_STOPPED: "CA",
     JobState.BATCH_SUBMITTED: "BS",
     JobState.BATCH_RUNNING: "BR",
 }
@@ -85,7 +85,6 @@ class FlowState(Enum):
     FAILED = "FAILED"
     PAUSED = "PAUSED"
     STOPPED = "STOPPED"
-    CANCELLED = "CANCELLED"
 
     @classmethod
     def from_jobs_states(
@@ -122,10 +121,8 @@ class FlowState(Enum):
         #    when applying the change in the remote state.
         elif any(js == JobState.FAILED for js in jobs_states):
             return cls.FAILED
-        elif any(js == JobState.STOPPED for js in jobs_states):
+        elif any(js in (JobState.STOPPED, JobState.USER_STOPPED) for js in jobs_states):
             return cls.STOPPED
-        elif any(js == JobState.CANCELLED for js in jobs_states):
-            return cls.CANCELLED
         elif any(js == JobState.PAUSED for js in jobs_states):
             return cls.PAUSED
         else:

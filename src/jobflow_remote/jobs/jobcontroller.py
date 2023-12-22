@@ -14,6 +14,7 @@ import jobflow
 import pymongo
 from jobflow import JobStore, OnMissing
 from maggma.stores import MongoStore
+from monty.json import MontyDecoder
 from monty.serialization import loadfn
 from qtoolkit.core.data_objects import CancelStatus, QResources
 
@@ -119,9 +120,7 @@ class JobController:
         """
         config_manager: ConfigManager = ConfigManager()
         project: Project = config_manager.get_project(project_name)
-        queue_store = project.get_queue_store()
-        jobstore = project.get_jobstore()
-        return cls(queue_store=queue_store, jobstore=jobstore, project=project)
+        return cls.from_project(project=project)
 
     @classmethod
     def from_project(cls, project: Project) -> JobController:
@@ -139,8 +138,16 @@ class JobController:
             An instance of JobController associated with the project.
         """
         queue_store = project.get_queue_store()
+        flows_collection = project.queue.flows_collection
+        auxiliary_collection = project.queue.auxiliary_collection
         jobstore = project.get_jobstore()
-        return cls(queue_store=queue_store, jobstore=jobstore, project=project)
+        return cls(
+            queue_store=queue_store,
+            jobstore=jobstore,
+            flows_collection=flows_collection,
+            auxiliary_collection=auxiliary_collection,
+            project=project,
+        )
 
     def close(self):
         """
@@ -163,7 +170,7 @@ class JobController:
     def _build_query_job(
         self,
         job_ids: tuple[str, int] | list[tuple[str, int]] | None = None,
-        db_ids: int | list[int] | None = None,
+        db_ids: str | list[str] | None = None,
         flow_ids: str | list[str] | None = None,
         state: JobState | None = None,
         locked: bool = False,
@@ -257,7 +264,7 @@ class JobController:
     def _build_query_flow(
         self,
         job_ids: str | list[str] | None = None,
-        db_ids: int | list[int] | None = None,
+        db_ids: str | list[str] | None = None,
         flow_ids: str | None = None,
         state: FlowState | None = None,
         start_date: datetime | None = None,
@@ -360,7 +367,7 @@ class JobController:
     def get_jobs_info(
         self,
         job_ids: tuple[str, int] | list[tuple[str, int]] | None = None,
-        db_ids: int | list[int] | None = None,
+        db_ids: str | list[str] | None = None,
         flow_ids: str | list[str] | None = None,
         state: JobState | None = None,
         start_date: datetime | None = None,
@@ -449,7 +456,7 @@ class JobController:
     def get_jobs_doc(
         self,
         job_ids: tuple[str, int] | list[tuple[str, int]] | None = None,
-        db_ids: int | list[int] | None = None,
+        db_ids: str | list[str] | None = None,
         flow_ids: str | list[str] | None = None,
         state: JobState | None = None,
         start_date: datetime | None = None,
@@ -514,7 +521,7 @@ class JobController:
 
     @staticmethod
     def generate_job_id_query(
-        db_id: int | None = None,
+        db_id: str | None = None,
         job_id: str | None = None,
         job_index: int | None = None,
     ) -> tuple[dict, list | None]:
@@ -562,7 +569,7 @@ class JobController:
     def get_job_info(
         self,
         job_id: str | None = None,
-        db_id: int | None = None,
+        db_id: str | None = None,
         job_index: int | None = None,
     ) -> JobInfo | None:
         """
@@ -599,7 +606,7 @@ class JobController:
         method: Callable,
         action_description: str,
         job_ids: tuple[str, int] | list[tuple[str, int]] | None = None,
-        db_ids: int | list[int] | None = None,
+        db_ids: str | list[str] | None = None,
         flow_ids: str | list[str] | None = None,
         state: JobState | None = None,
         start_date: datetime | None = None,
@@ -687,7 +694,7 @@ class JobController:
     def rerun_jobs(
         self,
         job_ids: tuple[str, int] | list[tuple[str, int]] | None = None,
-        db_ids: int | list[int] | None = None,
+        db_ids: str | list[str] | None = None,
         flow_ids: str | list[str] | None = None,
         state: JobState | None = None,
         start_date: datetime | None = None,
@@ -765,7 +772,7 @@ class JobController:
     def rerun_job(
         self,
         job_id: str | None = None,
-        db_id: int | None = None,
+        db_id: str | None = None,
         job_index: int | None = None,
         force: bool = False,
         wait: int | None = None,
@@ -1063,7 +1070,7 @@ class JobController:
     def _set_job_properties(
         self,
         values: dict,
-        db_id: int | None = None,
+        db_id: str | None = None,
         job_id: str | None = None,
         job_index: int | None = None,
         wait: int | None = None,
@@ -1135,7 +1142,7 @@ class JobController:
         self,
         state: JobState,
         job_id: str | None = None,
-        db_id: int | None = None,
+        db_id: str | None = None,
         job_index: int | None = None,
         wait: int | None = None,
         break_lock: bool = False,
@@ -1190,7 +1197,7 @@ class JobController:
     def retry_jobs(
         self,
         job_ids: tuple[str, int] | list[tuple[str, int]] | None = None,
-        db_ids: int | list[int] | None = None,
+        db_ids: str | list[str] | None = None,
         flow_ids: str | list[str] | None = None,
         state: JobState | None = None,
         start_date: datetime | None = None,
@@ -1264,7 +1271,7 @@ class JobController:
     def retry_job(
         self,
         job_id: str | None = None,
-        db_id: int | None = None,
+        db_id: str | None = None,
         job_index: int | None = None,
         wait: int | None = None,
         break_lock: bool = False,
@@ -1347,7 +1354,7 @@ class JobController:
     def pause_jobs(
         self,
         job_ids: tuple[str, int] | list[tuple[str, int]] | None = None,
-        db_ids: int | list[int] | None = None,
+        db_ids: str | list[str] | None = None,
         flow_ids: str | list[str] | None = None,
         state: JobState | None = None,
         start_date: datetime | None = None,
@@ -1412,10 +1419,10 @@ class JobController:
             wait=wait,
         )
 
-    def cancel_jobs(
+    def stop_jobs(
         self,
         job_ids: tuple[str, int] | list[tuple[str, int]] | None = None,
-        db_ids: int | list[int] | None = None,
+        db_ids: str | list[str] | None = None,
         flow_ids: str | list[str] | None = None,
         state: JobState | None = None,
         start_date: datetime | None = None,
@@ -1427,8 +1434,8 @@ class JobController:
         break_lock: bool = False,
     ) -> list[int]:
         """
-        Cancel selected Jobs. Only Jobs in the READY and all the running states
-        can be cancelled.
+        Stop selected Jobs. Only Jobs in the READY and all the running states
+        can be stopped.
         The action is not reversible.
 
         Parameters
@@ -1472,8 +1479,8 @@ class JobController:
             List of db_ids of the updated Jobs.
         """
         return self._many_jobs_action(
-            method=self.cancel_job,
-            action_description="cancelling",
+            method=self.stop_job,
+            action_description="stopping",
             job_ids=job_ids,
             db_ids=db_ids,
             flow_ids=flow_ids,
@@ -1487,17 +1494,17 @@ class JobController:
             break_lock=break_lock,
         )
 
-    def cancel_job(
+    def stop_job(
         self,
         job_id: str | None = None,
-        db_id: int | None = None,
+        db_id: str | None = None,
         job_index: int | None = None,
         wait: int | None = None,
         break_lock: bool = False,
     ) -> list[int]:
         """
-        Cancel a single Job. Only Jobs in the READY and all the running states
-        can be cancelled.
+        Stop a single Job. Only Jobs in the READY and all the running states
+        can be stopped.
         Selected by db_id or uuid+index. Only one among db_id
         and job_id should be defined.
         The action is not reversible.
@@ -1549,18 +1556,22 @@ class JobController:
                         f"Failed cancelling the process for Job {job_doc['uuid']} {job_doc['index']}",
                         exc_info=True,
                     )
-            updated_states = {job_id: {job_index: JobState.CANCELLED}}
+            job_id = job_doc["uuid"]
+            job_index = job_doc["index"]
+            updated_states = {job_id: {job_index: JobState.USER_STOPPED}}
             self.update_flow_state(
                 flow_uuid=flow_lock.locked_document["uuid"],
                 updated_states=updated_states,
             )
-            job_lock.update_on_release = {"$set": {"state": JobState.CANCELLED.value}}
+            job_lock.update_on_release = {
+                "$set": {"state": JobState.USER_STOPPED.value}
+            }
             return [job_lock.locked_document["db_id"]]
 
     def pause_job(
         self,
         job_id: str | None = None,
-        db_id: int | None = None,
+        db_id: str | None = None,
         job_index: int | None = None,
         wait: int | None = None,
     ) -> list[int]:
@@ -1600,6 +1611,9 @@ class JobController:
             job_lock_kwargs=job_lock_kwargs,
             flow_lock_kwargs=flow_lock_kwargs,
         ) as (job_lock, flow_lock):
+            job_doc = job_lock.locked_document
+            job_id = job_doc["uuid"]
+            job_index = job_doc["index"]
             updated_states = {job_id: {job_index: JobState.PAUSED}}
             self.update_flow_state(
                 flow_uuid=flow_lock.locked_document["uuid"],
@@ -1611,7 +1625,7 @@ class JobController:
     def play_jobs(
         self,
         job_ids: tuple[str, int] | list[tuple[str, int]] | None = None,
-        db_ids: int | list[int] | None = None,
+        db_ids: str | list[str] | None = None,
         flow_ids: str | list[str] | None = None,
         state: JobState | None = None,
         start_date: datetime | None = None,
@@ -1684,7 +1698,7 @@ class JobController:
     def play_job(
         self,
         job_id: str | None = None,
-        db_id: int | None = None,
+        db_id: str | None = None,
         job_index: int | None = None,
         wait: int | None = None,
         break_lock: bool = False,
@@ -1731,6 +1745,8 @@ class JobController:
             flow_lock_kwargs=flow_lock_kwargs,
         ) as (job_lock, flow_lock):
             job_doc = job_lock.locked_document
+            job_id = job_doc["uuid"]
+            job_index = job_doc["index"]
             on_missing = job_doc["job"]["config"]["on_missing_references"]
             allow_failed = on_missing != OnMissing.ERROR.value
 
@@ -1764,7 +1780,7 @@ class JobController:
         resources: dict | QResources | None = None,
         update: bool = True,
         job_ids: tuple[str, int] | list[tuple[str, int]] | None = None,
-        db_ids: int | list[int] | None = None,
+        db_ids: str | list[str] | None = None,
         flow_ids: str | list[str] | None = None,
         state: JobState | None = None,
         start_date: datetime | None = None,
@@ -1924,7 +1940,7 @@ class JobController:
     def get_flows_info(
         self,
         job_ids: str | list[str] | None = None,
-        db_ids: int | list[int] | None = None,
+        db_ids: str | list[str] | None = None,
         flow_ids: str | None = None,
         state: FlowState | None = None,
         start_date: datetime | None = None,
@@ -2070,7 +2086,7 @@ class JobController:
     def remove_lock_job(
         self,
         job_ids: tuple[str, int] | list[tuple[str, int]] | None = None,
-        db_ids: int | list[int] | None = None,
+        db_ids: str | list[str] | None = None,
         flow_ids: str | list[str] | None = None,
         state: JobState | None = None,
         start_date: datetime | None = None,
@@ -2133,7 +2149,7 @@ class JobController:
     def remove_lock_flow(
         self,
         job_ids: str | list[str] | None = None,
-        db_ids: int | list[int] | None = None,
+        db_ids: str | list[str] | None = None,
         flow_ids: str | None = None,
         state: FlowState | None = None,
         start_date: datetime | None = None,
@@ -2318,7 +2334,7 @@ class JobController:
     def get_job_doc(
         self,
         job_id: str | None = None,
-        db_id: int | None = None,
+        db_id: str | None = None,
         job_index: int | None = None,
     ) -> JobDoc | None:
         query, sort = self.generate_job_id_query(db_id, job_id, job_index)
@@ -2336,7 +2352,7 @@ class JobController:
         self,
         query: dict | None = None,
         job_ids: tuple[str, int] | list[tuple[str, int]] | None = None,
-        db_ids: int | list[int] | None = None,
+        db_ids: str | list[str] | None = None,
         flow_ids: str | list[str] | None = None,
         state: JobState | None = None,
         locked: bool = False,
@@ -2363,7 +2379,7 @@ class JobController:
         self,
         query: dict | None = None,
         job_ids: str | list[str] | None = None,
-        db_ids: int | list[int] | None = None,
+        db_ids: str | list[str] | None = None,
         flow_ids: str | None = None,
         state: FlowState | None = None,
         start_date: datetime | None = None,
@@ -2398,7 +2414,7 @@ class JobController:
         allow_external_references: bool = False,
         exec_config: ExecutionConfig | None = None,
         resources: dict | QResources | None = None,
-    ) -> list[int]:
+    ) -> list[str]:
         from jobflow.core.flow import get_flow
 
         flow = get_flow(flow, allow_external_references=allow_external_references)
@@ -2417,7 +2433,11 @@ class JobController:
             )
         first_id = doc_next_id["next_id"]
         db_ids = []
-        for (job, parents), db_id in zip(jobs_list, range(first_id, first_id + n_jobs)):
+        for (job, parents), db_id_int in zip(
+            jobs_list, range(first_id, first_id + n_jobs)
+        ):
+            prefix = self.project.queue.db_id_prefix or ""
+            db_id = f"{prefix}{db_id_int}"
             db_ids.append(db_id)
             job_dicts.append(
                 get_initial_job_doc_dict(
@@ -2445,23 +2465,53 @@ class JobController:
 
     def _append_flow(
         self,
-        job_doc: JobDoc,
+        job_doc: dict,
         flow_dict: dict,
-        new_flow: jobflow.Flow | jobflow.Job | list[jobflow.Job],
+        new_flow_dict: dict,
         worker: str,
         response_type: DynamicResponseType,
         exec_config: ExecutionConfig | None = None,
         resources: QResources | None = None,
     ):
-        from jobflow.core.flow import get_flow
+        from jobflow import Flow, Job
 
-        new_flow = get_flow(new_flow, allow_external_references=True)
+        decoder = MontyDecoder()
+
+        def deserialize_partial_flow(in_dict: dict):
+            """
+            Recursively deserialize a Flow dictionary, avoiding the deserialization
+            of all the elements that may require external packages.
+            """
+            if in_dict.get("@class", None) == "Flow":
+                jobs = [deserialize_partial_flow(d) for d in in_dict.get("jobs")]
+                flow_init = {
+                    k: v
+                    for k, v in in_dict.items()
+                    if k not in ("@module", "@class", "@version", "job")
+                }
+                flow_init["jobs"] = jobs
+                return Flow(**flow_init)
+            # if it is not a Flow, should be a Job
+            job_init = {
+                k: v
+                for k, v in in_dict.items()
+                if k not in ("@module", "@class", "@version")
+            }
+            job_init["config"] = decoder.process_decoded(job_init["config"])
+            return Job(**job_init)
+
+        # It is sure that the new_flow_dict is a serialized Flow (and not Job
+        # or list[Job]), because the get_flow has already been applied at run
+        # time, during the remote execution.
+        # Recursive deserialize the Flow without deserializing function and
+        # arguments to take advantage of standard Flow/Job methods.
+        new_flow = deserialize_partial_flow(new_flow_dict)
 
         # get job parents
         if response_type == DynamicResponseType.REPLACE:
-            job_parents = job_doc.parents
+            job_parents = job_doc["parents"]
         else:
-            job_parents = [(job_doc.uuid, job_doc.index)]
+            job_parents = [(job_doc["uuid"], job_doc["index"])]
 
         # add new jobs to flow
         flow_dict = dict(flow_dict)
@@ -2478,9 +2528,11 @@ class JobController:
         job_dicts = []
         flow_updates["$set"] = {}
         ids_to_push = []
-        for (job, parents), db_id in zip(
+        for (job, parents), db_id_int in zip(
             jobs_list, range(first_id, first_id + n_new_jobs)
         ):
+            prefix = self.project.queue.db_id_prefix or ""
+            db_id = f"{prefix}{db_id_int}"
             # inherit the parents of the job to which we are appending
             parents = parents if parents else job_parents
             job_dicts.append(
@@ -2501,7 +2553,8 @@ class JobController:
             # if detour, update the parents of the child jobs
             leaf_uuids = [v for v, d in new_flow.graph.out_degree() if d == 0]
             self.jobs.update_many(
-                {"parents": job_doc.uuid}, {"$push": {"parents": {"$each": leaf_uuids}}}
+                {"parents": job_doc["uuid"]},
+                {"$push": {"parents": {"$each": leaf_uuids}}},
             )
 
         # flow_dict["updated_on"] = datetime.utcnow()
@@ -2594,7 +2647,7 @@ class JobController:
     # TODO if jobstore is not an option anymore, the "store" argument
     # can be removed and just use self.jobstore.
     def complete_job(
-        self, job_doc: JobDoc, local_path: Path | str, store: JobStore
+        self, job_doc: dict, local_path: Path | str, store: JobStore
     ) -> bool:
         # Don't sleep if the flow is locked. Only the Runner should call this,
         # and it will handle the fact of having a locked Flow.
@@ -2602,11 +2655,12 @@ class JobController:
         # avoids parsing (potentially large) files to discover that the flow is
         # already locked.
         with self.lock_flow(
-            filter={"jobs": job_doc.uuid}, get_locked_doc=True
+            filter={"jobs": job_doc["uuid"]}, get_locked_doc=True
         ) as flow_lock:
             if flow_lock.locked_document:
                 local_path = Path(local_path)
                 out_path = local_path / OUT_FILENAME
+                host_flow_id = job_doc["job"]["hosts"][-1]
                 if not out_path.exists():
                     msg = (
                         f"The output file {OUT_FILENAME} was not present in the download "
@@ -2615,13 +2669,16 @@ class JobController:
                     self.checkin_job(
                         job_doc, flow_lock.locked_document, response=None, error=msg
                     )
-                    self.update_flow_state(job_doc.job.hosts[-1])
+                    self.update_flow_state(host_flow_id)
                     return True
 
-                out = loadfn(out_path)
-                doc_update = {"start_time": out["start_time"]}
+                # do not deserialize the response or stored data, saves time and
+                # avoids the need for packages to be installed.
+                out = loadfn(out_path, cls=None)
+                decoder = MontyDecoder()
+                doc_update = {"start_time": decoder.process_decoded(out["start_time"])}
                 # update the time of the JobDoc, will be used in the checkin
-                end_time = out.get("end_time")
+                end_time = decoder.process_decoded(out.get("end_time"))
                 if end_time:
                     doc_update["end_time"] = end_time
 
@@ -2634,7 +2691,7 @@ class JobController:
                         error=error,
                         doc_update=doc_update,
                     )
-                    self.update_flow_state(job_doc.job.hosts[-1])
+                    self.update_flow_state(host_flow_id)
                     return True
 
                 response = out.get("response")
@@ -2651,24 +2708,20 @@ class JobController:
                         error=msg,
                         doc_update=doc_update,
                     )
-                    self.update_flow_state(job_doc.job.hosts[-1])
+                    self.update_flow_state(host_flow_id)
                     return True
 
-                save = {
-                    k: "output" if v is True else v
-                    for k, v in job_doc.job._kwargs.items()
-                }
-
                 remote_store = get_remote_store(store, local_path)
-                remote_store.connect()
-                update_store(store, remote_store, save, job_doc.db_id)
+
+                update_store(store, remote_store, job_doc["db_id"])
+
                 self.checkin_job(
                     job_doc,
                     flow_lock.locked_document,
                     response=response,
                     doc_update=doc_update,
                 )
-                self.update_flow_state(job_doc.job.hosts[-1])
+                self.update_flow_state(host_flow_id)
                 return True
             elif flow_lock.unavailable_document:
                 # raising the error if the lock could not be acquired leaves
@@ -2682,9 +2735,9 @@ class JobController:
 
     def checkin_job(
         self,
-        job_doc: JobDoc,
+        job_doc: dict,
         flow_dict: dict,
-        response: jobflow.Response | None,
+        response: dict | None,
         error: str | None = None,
         doc_update: dict | None = None,
     ):
@@ -2694,51 +2747,47 @@ class JobController:
         # handle response
         else:
             new_state = JobState.COMPLETED.value
-            if response.replace is not None:
+            if response["replace"] is not None:
                 self._append_flow(
                     job_doc,
                     flow_dict,
-                    response.replace,
+                    response["replace"],
                     response_type=DynamicResponseType.REPLACE,
-                    worker=job_doc.worker,
-                    exec_config=job_doc.exec_config,
-                    resources=job_doc.resources,
+                    worker=job_doc["worker"],
+                    exec_config=job_doc["exec_config"],
+                    resources=job_doc["resources"],
                 )
 
-            if response.addition is not None:
+            if response["addition"] is not None:
                 self._append_flow(
                     job_doc,
                     flow_dict,
-                    response.addition,
+                    response["addition"],
                     response_type=DynamicResponseType.ADDITION,
-                    worker=job_doc.worker,
-                    exec_config=job_doc.exec_config,
-                    resources=job_doc.resources,
+                    worker=job_doc["worker"],
+                    exec_config=job_doc["exec_config"],
+                    resources=job_doc["resources"],
                 )
 
-            if response.detour is not None:
+            if response["detour"] is not None:
                 self._append_flow(
                     job_doc,
                     flow_dict,
-                    response.detour,
+                    response["detour"],
                     response_type=DynamicResponseType.DETOUR,
-                    worker=job_doc.worker,
-                    exec_config=job_doc.exec_config,
-                    resources=job_doc.resources,
+                    worker=job_doc["worker"],
+                    exec_config=job_doc["exec_config"],
+                    resources=job_doc["resources"],
                 )
 
-            if response.stored_data is not None:
-                from monty.json import jsanitize
+            if response["stored_data"] is not None:
+                stored_data = response["stored_data"]
 
-                stored_data = jsanitize(
-                    response.stored_data, strict=True, enum_values=True
-                )
+            if response["stop_children"]:
+                self.stop_children(job_doc["uuid"])
 
-            if response.stop_children:
-                self.stop_children(job_doc.uuid)
-
-            if response.stop_jobflow:
-                self.stop_jobflow(job_uuid=job_doc.uuid)
+            if response["stop_jobflow"]:
+                self.stop_jobflow(job_uuid=job_doc["uuid"])
 
         if not doc_update:
             doc_update = {}
@@ -2747,16 +2796,16 @@ class JobController:
         )
 
         result = self.jobs.update_one(
-            {"uuid": job_doc.uuid, "index": job_doc.index}, {"$set": doc_update}
+            {"uuid": job_doc["uuid"], "index": job_doc["index"]}, {"$set": doc_update}
         )
         if result.modified_count == 0:
             raise RuntimeError(
-                f"The job {job_doc.uuid} index {job_doc.index} has not been updated in the database"
+                f"The job {job_doc['uuid']} index {job_doc['index']} has not been updated in the database"
             )
 
         # TODO it should be fine to replace this query by constructing the list of
         # job uuids from the original + those added. Should be verified.
-        job_uuids = self.get_flow_info_by_job_uuid(job_doc.uuid, ["jobs"])["jobs"]
+        job_uuids = self.get_flow_info_by_job_uuid(job_doc["uuid"], ["jobs"])["jobs"]
         return len(self.refresh_children(job_uuids)) + 1
 
     # TODO should this refresh all the kind of states? Or just set to ready?
@@ -2794,7 +2843,9 @@ class JobController:
                 job.get("job", {}).get("config", {}).get("on_missing_references", None)
             )
             if on_missing_ref == jobflow.OnMissing.NONE.value:
-                allowed_states.extend((JobState.FAILED.value, JobState.CANCELLED.value))
+                allowed_states.extend(
+                    (JobState.FAILED.value, JobState.USER_STOPPED.value)
+                )
             if job["state"] == JobState.WAITING.value and all(
                 [jobs_mapping[p]["state"] in allowed_states for p in job["parents"]]
             ):
@@ -3118,7 +3169,7 @@ class JobController:
     def lock_job_flow(
         self,
         job_id: str | None = None,
-        db_id: int | None = None,
+        db_id: str | None = None,
         job_index: int | None = None,
         wait: int | None = None,
         break_lock: bool = False,

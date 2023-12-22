@@ -9,12 +9,13 @@ workers:
     host: remote.host.net
     user: bob
 queue:
-  type: MongoStore
-  host: localhost
-  database: db_name
-  username: bob
-  password: secret_password
-  collection_name: jobs
+  store:
+    type: MongoStore
+    host: localhost
+    database: db_name
+    username: bob
+    password: secret_password
+    collection_name: jobs
 exec_config: {}
 jobstore:
   docs_store:
