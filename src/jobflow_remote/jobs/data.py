@@ -19,7 +19,7 @@ OUT_FILENAME = "jfremote_out.json"
 def get_initial_job_doc_dict(
     job: Job,
     parents: Optional[list[str]],
-    db_id: int,
+    db_id: str,
     worker: str,
     exec_config: Optional[ExecutionConfig],
     resources: Optional[Union[dict, QResources]],
@@ -121,7 +121,7 @@ class JobInfo(BaseModel):
 
     uuid: str
     index: int
-    db_id: int
+    db_id: str
     worker: str
     name: str
     state: JobState
@@ -226,7 +226,7 @@ class JobDoc(BaseModel):
     job: Job
     uuid: str
     index: int
-    db_id: int
+    db_id: str
     worker: str
     state: JobState
     remote: RemoteInfo = RemoteInfo()
@@ -296,7 +296,7 @@ class FlowDoc(BaseModel):
     # This dictionary include {job uuid: {job index: [parent's uuids]}}
     parents: dict[str, dict[str, list[str]]] = Field(default_factory=dict)
     # ids correspond to db_id, uuid, index for each JobDoc
-    ids: list[tuple[int, str, int]] = Field(default_factory=list)
+    ids: list[tuple[str, str, int]] = Field(default_factory=list)
 
     def as_db_dict(self) -> dict:
         """
@@ -348,7 +348,7 @@ class FlowDoc(BaseModel):
         return list(descendants)
 
     @cached_property
-    def ids_mapping(self) -> dict[str, dict[int, int]]:
+    def ids_mapping(self) -> dict[str, dict[int, str]]:
         d: dict = defaultdict(dict)
 
         for db_id, job_id, index in self.ids:
@@ -373,7 +373,7 @@ class FlowInfo(BaseModel):
     Mainly for visualization purposes.
     """
 
-    db_ids: list[int]
+    db_ids: list[str]
     job_ids: list[str]
     job_indexes: list[int]
     flow_id: str
@@ -439,7 +439,7 @@ class FlowInfo(BaseModel):
         )
 
     @cached_property
-    def ids_mapping(self) -> dict[str, dict[int, int]]:
+    def ids_mapping(self) -> dict[str, dict[int, str]]:
         d: dict = defaultdict(dict)
 
         for db_id, job_id, index in zip(self.db_ids, self.job_ids, self.job_indexes):

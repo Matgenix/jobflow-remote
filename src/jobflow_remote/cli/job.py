@@ -703,7 +703,7 @@ def resources(
     raise_on_error: raise_on_error_opt = False,
 ):
     """
-    Set the worker for the selected Jobs. Only READY or WAITING Jobs.
+    Set the resources for the selected Jobs. Only READY or WAITING Jobs.
     """
 
     resources_value = str_to_dict(resources_value)

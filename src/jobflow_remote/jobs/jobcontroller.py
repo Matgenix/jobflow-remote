@@ -120,9 +120,7 @@ class JobController:
         """
         config_manager: ConfigManager = ConfigManager()
         project: Project = config_manager.get_project(project_name)
-        queue_store = project.get_queue_store()
-        jobstore = project.get_jobstore()
-        return cls(queue_store=queue_store, jobstore=jobstore, project=project)
+        return cls.from_project(project=project)
 
     @classmethod
     def from_project(cls, project: Project) -> JobController:
@@ -140,8 +138,16 @@ class JobController:
             An instance of JobController associated with the project.
         """
         queue_store = project.get_queue_store()
+        flows_collection = project.queue.flows_collection
+        auxiliary_collection = project.queue.auxiliary_collection
         jobstore = project.get_jobstore()
-        return cls(queue_store=queue_store, jobstore=jobstore, project=project)
+        return cls(
+            queue_store=queue_store,
+            jobstore=jobstore,
+            flows_collection=flows_collection,
+            auxiliary_collection=auxiliary_collection,
+            project=project,
+        )
 
     def close(self):
         """
@@ -164,7 +170,7 @@ class JobController:
     def _build_query_job(
         self,
         job_ids: tuple[str, int] | list[tuple[str, int]] | None = None,
-        db_ids: int | list[int] | None = None,
+        db_ids: str | list[str] | None = None,
         flow_ids: str | list[str] | None = None,
         state: JobState | None = None,
         locked: bool = False,
@@ -258,7 +264,7 @@ class JobController:
     def _build_query_flow(
         self,
         job_ids: str | list[str] | None = None,
-        db_ids: int | list[int] | None = None,
+        db_ids: str | list[str] | None = None,
         flow_ids: str | None = None,
         state: FlowState | None = None,
         start_date: datetime | None = None,
@@ -361,7 +367,7 @@ class JobController:
     def get_jobs_info(
         self,
         job_ids: tuple[str, int] | list[tuple[str, int]] | None = None,
-        db_ids: int | list[int] | None = None,
+        db_ids: str | list[str] | None = None,
         flow_ids: str | list[str] | None = None,
         state: JobState | None = None,
         start_date: datetime | None = None,
@@ -450,7 +456,7 @@ class JobController:
     def get_jobs_doc(
         self,
         job_ids: tuple[str, int] | list[tuple[str, int]] | None = None,
-        db_ids: int | list[int] | None = None,
+        db_ids: str | list[str] | None = None,
         flow_ids: str | list[str] | None = None,
         state: JobState | None = None,
         start_date: datetime | None = None,
@@ -515,7 +521,7 @@ class JobController:
 
     @staticmethod
     def generate_job_id_query(
-        db_id: int | None = None,
+        db_id: str | None = None,
         job_id: str | None = None,
         job_index: int | None = None,
     ) -> tuple[dict, list | None]:
@@ -563,7 +569,7 @@ class JobController:
     def get_job_info(
         self,
         job_id: str | None = None,
-        db_id: int | None = None,
+        db_id: str | None = None,
         job_index: int | None = None,
     ) -> JobInfo | None:
         """
@@ -600,7 +606,7 @@ class JobController:
         method: Callable,
         action_description: str,
         job_ids: tuple[str, int] | list[tuple[str, int]] | None = None,
-        db_ids: int | list[int] | None = None,
+        db_ids: str | list[str] | None = None,
         flow_ids: str | list[str] | None = None,
         state: JobState | None = None,
         start_date: datetime | None = None,
@@ -688,7 +694,7 @@ class JobController:
     def rerun_jobs(
         self,
         job_ids: tuple[str, int] | list[tuple[str, int]] | None = None,
-        db_ids: int | list[int] | None = None,
+        db_ids: str | list[str] | None = None,
         flow_ids: str | list[str] | None = None,
         state: JobState | None = None,
         start_date: datetime | None = None,
@@ -766,7 +772,7 @@ class JobController:
     def rerun_job(
         self,
         job_id: str | None = None,
-        db_id: int | None = None,
+        db_id: str | None = None,
         job_index: int | None = None,
         force: bool = False,
         wait: int | None = None,
@@ -1064,7 +1070,7 @@ class JobController:
     def _set_job_properties(
         self,
         values: dict,
-        db_id: int | None = None,
+        db_id: str | None = None,
         job_id: str | None = None,
         job_index: int | None = None,
         wait: int | None = None,
@@ -1136,7 +1142,7 @@ class JobController:
         self,
         state: JobState,
         job_id: str | None = None,
-        db_id: int | None = None,
+        db_id: str | None = None,
         job_index: int | None = None,
         wait: int | None = None,
         break_lock: bool = False,
@@ -1191,7 +1197,7 @@ class JobController:
     def retry_jobs(
         self,
         job_ids: tuple[str, int] | list[tuple[str, int]] | None = None,
-        db_ids: int | list[int] | None = None,
+        db_ids: str | list[str] | None = None,
         flow_ids: str | list[str] | None = None,
         state: JobState | None = None,
         start_date: datetime | None = None,
@@ -1265,7 +1271,7 @@ class JobController:
     def retry_job(
         self,
         job_id: str | None = None,
-        db_id: int | None = None,
+        db_id: str | None = None,
         job_index: int | None = None,
         wait: int | None = None,
         break_lock: bool = False,
@@ -1348,7 +1354,7 @@ class JobController:
     def pause_jobs(
         self,
         job_ids: tuple[str, int] | list[tuple[str, int]] | None = None,
-        db_ids: int | list[int] | None = None,
+        db_ids: str | list[str] | None = None,
         flow_ids: str | list[str] | None = None,
         state: JobState | None = None,
         start_date: datetime | None = None,
@@ -1416,7 +1422,7 @@ class JobController:
     def cancel_jobs(
         self,
         job_ids: tuple[str, int] | list[tuple[str, int]] | None = None,
-        db_ids: int | list[int] | None = None,
+        db_ids: str | list[str] | None = None,
         flow_ids: str | list[str] | None = None,
         state: JobState | None = None,
         start_date: datetime | None = None,
@@ -1491,7 +1497,7 @@ class JobController:
     def cancel_job(
         self,
         job_id: str | None = None,
-        db_id: int | None = None,
+        db_id: str | None = None,
         job_index: int | None = None,
         wait: int | None = None,
         break_lock: bool = False,
@@ -1561,7 +1567,7 @@ class JobController:
     def pause_job(
         self,
         job_id: str | None = None,
-        db_id: int | None = None,
+        db_id: str | None = None,
         job_index: int | None = None,
         wait: int | None = None,
     ) -> list[int]:
@@ -1612,7 +1618,7 @@ class JobController:
     def play_jobs(
         self,
         job_ids: tuple[str, int] | list[tuple[str, int]] | None = None,
-        db_ids: int | list[int] | None = None,
+        db_ids: str | list[str] | None = None,
         flow_ids: str | list[str] | None = None,
         state: JobState | None = None,
         start_date: datetime | None = None,
@@ -1685,7 +1691,7 @@ class JobController:
     def play_job(
         self,
         job_id: str | None = None,
-        db_id: int | None = None,
+        db_id: str | None = None,
         job_index: int | None = None,
         wait: int | None = None,
         break_lock: bool = False,
@@ -1765,7 +1771,7 @@ class JobController:
         resources: dict | QResources | None = None,
         update: bool = True,
         job_ids: tuple[str, int] | list[tuple[str, int]] | None = None,
-        db_ids: int | list[int] | None = None,
+        db_ids: str | list[str] | None = None,
         flow_ids: str | list[str] | None = None,
         state: JobState | None = None,
         start_date: datetime | None = None,
@@ -1925,7 +1931,7 @@ class JobController:
     def get_flows_info(
         self,
         job_ids: str | list[str] | None = None,
-        db_ids: int | list[int] | None = None,
+        db_ids: str | list[str] | None = None,
         flow_ids: str | None = None,
         state: FlowState | None = None,
         start_date: datetime | None = None,
@@ -2071,7 +2077,7 @@ class JobController:
     def remove_lock_job(
         self,
         job_ids: tuple[str, int] | list[tuple[str, int]] | None = None,
-        db_ids: int | list[int] | None = None,
+        db_ids: str | list[str] | None = None,
         flow_ids: str | list[str] | None = None,
         state: JobState | None = None,
         start_date: datetime | None = None,
@@ -2134,7 +2140,7 @@ class JobController:
     def remove_lock_flow(
         self,
         job_ids: str | list[str] | None = None,
-        db_ids: int | list[int] | None = None,
+        db_ids: str | list[str] | None = None,
         flow_ids: str | None = None,
         state: FlowState | None = None,
         start_date: datetime | None = None,
@@ -2319,7 +2325,7 @@ class JobController:
     def get_job_doc(
         self,
         job_id: str | None = None,
-        db_id: int | None = None,
+        db_id: str | None = None,
         job_index: int | None = None,
     ) -> JobDoc | None:
         query, sort = self.generate_job_id_query(db_id, job_id, job_index)
@@ -2337,7 +2343,7 @@ class JobController:
         self,
         query: dict | None = None,
         job_ids: tuple[str, int] | list[tuple[str, int]] | None = None,
-        db_ids: int | list[int] | None = None,
+        db_ids: str | list[str] | None = None,
         flow_ids: str | list[str] | None = None,
         state: JobState | None = None,
         locked: bool = False,
@@ -2364,7 +2370,7 @@ class JobController:
         self,
         query: dict | None = None,
         job_ids: str | list[str] | None = None,
-        db_ids: int | list[int] | None = None,
+        db_ids: str | list[str] | None = None,
         flow_ids: str | None = None,
         state: FlowState | None = None,
         start_date: datetime | None = None,
@@ -2399,7 +2405,7 @@ class JobController:
         allow_external_references: bool = False,
         exec_config: ExecutionConfig | None = None,
         resources: dict | QResources | None = None,
-    ) -> list[int]:
+    ) -> list[str]:
         from jobflow.core.flow import get_flow
 
         flow = get_flow(flow, allow_external_references=allow_external_references)
@@ -2418,7 +2424,11 @@ class JobController:
             )
         first_id = doc_next_id["next_id"]
         db_ids = []
-        for (job, parents), db_id in zip(jobs_list, range(first_id, first_id + n_jobs)):
+        for (job, parents), db_id_int in zip(
+            jobs_list, range(first_id, first_id + n_jobs)
+        ):
+            prefix = self.project.queue.db_id_prefix or ""
+            db_id = f"{prefix}{db_id_int}"
             db_ids.append(db_id)
             job_dicts.append(
                 get_initial_job_doc_dict(
@@ -2509,9 +2519,11 @@ class JobController:
         job_dicts = []
         flow_updates["$set"] = {}
         ids_to_push = []
-        for (job, parents), db_id in zip(
+        for (job, parents), db_id_int in zip(
             jobs_list, range(first_id, first_id + n_new_jobs)
         ):
+            prefix = self.project.queue.db_id_prefix or ""
+            db_id = f"{prefix}{db_id_int}"
             # inherit the parents of the job to which we are appending
             parents = parents if parents else job_parents
             job_dicts.append(
@@ -3146,7 +3158,7 @@ class JobController:
     def lock_job_flow(
         self,
         job_id: str | None = None,
-        db_id: int | None = None,
+        db_id: str | None = None,
         job_index: int | None = None,
         wait: int | None = None,
         break_lock: bool = False,

@@ -128,6 +128,7 @@ class BatchConfig(BaseModel):
         None,
         description="Maximum time after which a job will not submit more jobs (seconds). To help avoid hitting the walltime",
     )
+    model_config = ConfigDict(extra="forbid")
 
 
 class WorkerBase(BaseModel):
@@ -385,6 +386,54 @@ class ExecutionConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class QueueConfig(BaseModel):
+    store: dict = Field(
+        default_factory=dict,
+        description="Dictionary describing a maggma Store used for the queue data. "
+        "Can contain the monty serialized dictionary or a dictionary with a 'type' "
+        "specifying the Store subclass. Should be subclass of a MongoStore, as it "
+        "requires to perform MongoDB actions. The collection is used to store the "
+        "jobs",
+        validate_default=True,
+    )
+    flows_collection: str = Field(
+        "flows",
+        description="The name of the collection containing information about the flows. "
+        "Taken from the same database as the one defined in the store",
+    )
+    auxiliary_collection: str = Field(
+        "jf_auxiliary",
+        description="The name of the collection containing auxiliary information. "
+        "Taken from the same database as the one defined in the store",
+    )
+    db_id_prefix: Optional[str] = Field(
+        None,
+        description="a string defining the prefix added to the integer ID associated "
+        "to each Job in the database",
+    )
+
+    @field_validator("store")
+    def check_store(cls, store: dict) -> dict:
+        """
+        Check that the queue configuration could be converted to a Store.
+        """
+        if store:
+            try:
+                deserialized_store = store_from_dict(store)
+            except Exception as e:
+                raise ValueError(
+                    f"error while converting queue to a maggma store. Error: {traceback.format_exc()}"
+                ) from e
+            if not isinstance(deserialized_store, MongoStore):
+                raise ValueError(
+                    "The queue store should be a subclass of a "
+                    f"MongoStore: {deserialized_store.__class__} instead"
+                )
+        return store
+
+    model_config = ConfigDict(extra="forbid")
+
+
 class Project(BaseModel):
     """
     The configurations of a Project.
@@ -422,13 +471,9 @@ class Project(BaseModel):
         description="A dictionary with the worker name as keys and the worker "
         "configuration as values",
     )
-    queue: dict = Field(
-        default_factory=dict,
-        description="Dictionary describing a maggma Store used for the queue data. "
-        "Can contain the monty serialized dictionary or a dictionary with a 'type' "
-        "specifying the Store subclass. Should be subclass of a MongoStore, as it "
-        "requires to perform MongoDB actions.",
-        validate_default=True,
+    queue: QueueConfig = Field(
+        description="The configuration of the Store used to store the states of"
+        "the Jobs and the Flows",
     )
     exec_config: dict[str, ExecutionConfig] = Field(
         default_factory=dict,
@@ -468,7 +513,7 @@ class Project(BaseModel):
         -------
         A maggma Store
         """
-        return store_from_dict(self.queue)
+        return store_from_dict(self.queue.store)
 
     def get_job_controller(self):
         from jobflow_remote.jobs.jobcontroller import JobController
@@ -529,22 +574,6 @@ class Project(BaseModel):
                     f"error while converting jobstore to JobStore. Error: {traceback.format_exc()}"
                 ) from e
         return jobstore
-
-    @field_validator("queue")
-    def check_queue(cls, queue: dict) -> dict:
-        """
-        Check that the queue configuration could be converted to a Store.
-        """
-        if queue:
-            try:
-                store = store_from_dict(queue)
-            except Exception as e:
-                raise ValueError(
-                    f"error while converting queue to a maggma store. Error: {traceback.format_exc()}"
-                ) from e
-            if not isinstance(store, MongoStore):
-                raise ValueError("The queue store should be a subclass of a MongoStore")
-        return queue
 
     model_config = ConfigDict(extra="forbid")
 

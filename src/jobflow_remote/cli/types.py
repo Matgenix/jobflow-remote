@@ -34,7 +34,7 @@ job_ids_opt = Annotated[
 
 
 db_ids_opt = Annotated[
-    Optional[List[int]],
+    Optional[List[str]],
     typer.Option(
         "--db-id",
         "-did",
