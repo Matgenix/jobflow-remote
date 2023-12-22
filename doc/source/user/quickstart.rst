@@ -56,8 +56,13 @@ This code will print an integer unique id associated to the submitted ``Job`` s.
     On the worker selection:
      * The worker should match the name of one of the workers defined in the project.
      * In this way all the ``Job`` s will be assigned to the same worker.
-     * If only one worker is defined, the argument can be omitted.
+     * If the argument is omitted the first worker in the project configuration is used.
      * In any case the worker is determined when the ``Job`` is inserted in the database.
+
+.. warning::
+
+    Once the flow has been submitted to the database, any further change to the
+    ``Flow`` object will not be taken into account.
 
 It is now possible to use the ``jf`` command line interface (CLI)::
 
@@ -127,6 +132,11 @@ done before::
     │ 1     │ add  │ COMPLETED │ ae020c67-72f0-4805-858e-fe48644e4bb0  (1) │ local_shell │ 2023-12-19 16:44   │
     └───────┴──────┴───────────┴───────────────────────────────────────────┴─────────────┴────────────────────┘
 
+.. note::
+
+    The ``Runner`` checks the states of the Jobs at regular intervals. A few seconds may
+    be required to have a change in the Job state.
+
 The ``Runner`` will keep checking the database for the submission of new Jobs
 and will update the state of each Job as soon as the previous action is completed.
 If you plan to keep submitting workflows you can keep the daemon running, otherwise
@@ -138,6 +148,16 @@ you can stop the process with::
 
     By default the daemon will spawn several processes, each taking care of some
     of the actions listed above.
+
+.. warning::
+
+    The ``stop`` command will send a ``SIGTERM`` command to the ``Runner`` processes, that
+    will terminate the action currently being performed before actually stopping. This should
+    prevent the presence on inconsistent states in the database.
+    However, if you believe the ``Runner`` is stuck or need to halt the ``Runner`` immediately
+    you can kill the processes with::
+
+        jf runner kill
 
 Results
 =======

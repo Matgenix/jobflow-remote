@@ -182,7 +182,7 @@ Jobstore
 --------
 
 The ``jobstore`` used for ``jobflow``. Its definition is equivalent to the one used in
-``jobflow``'s configuration file. See `Jobflows documentation <https://materialsproject.github.io/jobflow/stores.html>`_
+``jobflow``'s configuration file. See `Jobflow's documentation <https://materialsproject.github.io/jobflow/stores.html>`_
 for more details. It can be the same as in the :ref:`queue simple config` or a different one.
 
 Check
