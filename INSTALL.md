@@ -1,10 +1,13 @@
 # Installation
 
+Simple installation instructions can be found below.
+For more advanced setup including configuring a database and runner, please see the [online documentation](https://matgenix.github.io/jobflow-remote/user/install.html)
+
 Clone this repository and then install with `pip` in the virtual environment of your choice.
 
 ```
-git clone git@{{ repository_provider }}:{{ repository_namespace }}/{{ package_name }}
-cd {{package_name}}
+git clone https://github.com/Matgenix/jobflow-remote
+cd jobflow-remote
 pip install .
 ```
 
