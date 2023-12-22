@@ -1,0 +1,632 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../" data-theme="light">
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Tuning Job execution &#8212; Jobflow Remote v0.0.1.post117+gfc0fbc0.d20231222 Manual</title>
+
+
+
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "light";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "light";
+  </script>
+
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../_static/styles/theme.css?digest=5b4479735964841361fd" rel="stylesheet" />
+<link href="../_static/styles/bootstrap.css?digest=5b4479735964841361fd" rel="stylesheet" />
+<link href="../_static/styles/pydata-sphinx-theme.css?digest=5b4479735964841361fd" rel="stylesheet" />
+
+
+  <link href="../_static/vendor/fontawesome/6.1.2/css/all.min.css?digest=5b4479735964841361fd" rel="stylesheet" />
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.1.2/webfonts/fa-solid-900.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.1.2/webfonts/fa-brands-400.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.1.2/webfonts/fa-regular-400.woff2" />
+
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=fa44fd50" />
+    <link rel="stylesheet" type="text/css" href="../_static/graphviz.css?v=eafc0fe6" />
+    <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../_static/autodoc_pydantic.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/design-style.1e8bd061cd6da7fc9cf755528e8ffc24.min.css?v=0a3b3ea7" />
+    <link rel="stylesheet" type="text/css" href="../_static/jobflow_remote.css?v=7b6df8f0" />
+
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=5b4479735964841361fd" />
+<link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=5b4479735964841361fd" />
+  <script src="../_static/vendor/fontawesome/6.1.2/js/all.min.js?digest=5b4479735964841361fd"></script>
+
+    <script src="../_static/documentation_options.js?v=e135783d"></script>
+    <script src="../_static/doctools.js?v=888ff710"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../_static/copybutton.js?v=f281be69"></script>
+    <script src="../_static/design-tabs.js?v=36754332"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'user/tuning';</script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="States" href="states.html" />
+    <link rel="prev" title="Jobflow Remote quickstart" href="quickstart.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+    <meta name="docbuild:last-update" content="Dec 22, 2023"/>
+  </head>
+
+
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="light">
+
+
+
+  <a class="skip-link" href="#main-content">Skip to main content</a>
+
+  <div id="pst-scroll-pixel-helper"></div>
+
+
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>
+    Back to top
+  </button>
+
+
+  <input type="checkbox"
+          class="sidebar-toggle"
+          name="__primary"
+          id="__primary"/>
+  <label class="overlay overlay-primary" for="__primary"></label>
+
+  <input type="checkbox"
+          class="sidebar-toggle"
+          name="__secondary"
+          id="__secondary"/>
+  <label class="overlay overlay-secondary" for="__secondary"></label>
+
+  <div class="search-button__wrapper">
+    <div class="search-button__overlay"></div>
+    <div class="search-button__search-container">
+<form class="bd-search d-flex align-items-center"
+      action="../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         id="search-input"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form></div>
+  </div>
+
+
+  <div class="bd-header-announcement container-fluid bd-header-announcement">
+    <div class="bd-header-announcement__content"><p>Jobflow Remote is still in beta phase. The API may change at any time.</p></div>
+  </div>
+
+
+    <nav class="bd-header navbar navbar-expand-lg bd-navbar">
+<div class="bd-header__inner bd-page-width">
+  <label class="sidebar-toggle primary-toggle" for="__primary">
+    <span class="fa-solid fa-bars"></span>
+  </label>
+
+
+  <div class="col-lg-3 navbar-header-items__start">
+
+      <div class="navbar-item">
+
+
+
+<a class="navbar-brand logo" href="../index.html">
+
+
+
+
+
+
+    <p class="title logo__title">Jobflow Remote v0.0.1.post117+gfc0fbc0.d20231222 Manual</p>
+
+</a></div>
+
+  </div>
+
+  <div class="col-lg-9 navbar-header-items">
+
+    <div class="me-auto navbar-header-items__center">
+
+        <div class="navbar-item">
+<nav class="navbar-nav">
+  <p class="sidebar-header-items__title"
+     role="heading"
+     aria-level="1"
+     aria-label="Site Navigation">
+    Site Navigation
+  </p>
+  <ul class="bd-navbar-elements navbar-nav">
+
+                    <li class="nav-item current active">
+                      <a class="nav-link nav-internal" href="index.html">
+                        User Guide
+                      </a>
+                    </li>
+
+
+                    <li class="nav-item">
+                      <a class="nav-link nav-internal" href="../api/index.html">
+                        API reference
+                      </a>
+                    </li>
+
+
+                    <li class="nav-item">
+                      <a class="nav-link nav-internal" href="../dev/index.html">
+                        Development
+                      </a>
+                    </li>
+
+  </ul>
+</nav></div>
+
+    </div>
+
+
+    <div class="navbar-header-items__end">
+
+        <div class="navbar-item navbar-persistent--container">
+
+
+ <script>
+ document.write(`
+   <button class="btn navbar-btn search-button-field search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass"></i>
+    <span class="search-button__default-text">Search</span>
+    <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+   </button>
+ `);
+ </script>
+        </div>
+
+
+        <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm navbar-btn theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="theme-switch nav-link" data-mode="light"><i class="fa-solid fa-sun fa-lg"></i></span>
+    <span class="theme-switch nav-link" data-mode="dark"><i class="fa-solid fa-moon fa-lg"></i></span>
+    <span class="theme-switch nav-link" data-mode="auto"><i class="fa-solid fa-circle-half-stroke fa-lg"></i></span>
+  </button>
+`);
+</script></div>
+
+    </div>
+
+  </div>
+
+
+    <div class="navbar-persistent--mobile">
+
+ <script>
+ document.write(`
+   <button class="btn navbar-btn search-button-field search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass"></i>
+    <span class="search-button__default-text">Search</span>
+    <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+   </button>
+ `);
+ </script>
+    </div>
+
+
+
+    <label class="sidebar-toggle secondary-toggle" for="__secondary" tabindex="0">
+      <span class="fa-solid fa-outdent"></span>
+    </label>
+
+</div>
+
+    </nav>
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+
+      <div class="bd-sidebar-primary bd-sidebar">
+
+
+
+  <div class="sidebar-header-items sidebar-primary__section">
+
+
+      <div class="sidebar-header-items__center">
+
+          <div class="navbar-item">
+<nav class="navbar-nav">
+  <p class="sidebar-header-items__title"
+     role="heading"
+     aria-level="1"
+     aria-label="Site Navigation">
+    Site Navigation
+  </p>
+  <ul class="bd-navbar-elements navbar-nav">
+
+                    <li class="nav-item current active">
+                      <a class="nav-link nav-internal" href="index.html">
+                        User Guide
+                      </a>
+                    </li>
+
+
+                    <li class="nav-item">
+                      <a class="nav-link nav-internal" href="../api/index.html">
+                        API reference
+                      </a>
+                    </li>
+
+
+                    <li class="nav-item">
+                      <a class="nav-link nav-internal" href="../dev/index.html">
+                        Development
+                      </a>
+                    </li>
+
+  </ul>
+</nav></div>
+
+      </div>
+
+
+
+      <div class="sidebar-header-items__end">
+
+          <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm navbar-btn theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="theme-switch nav-link" data-mode="light"><i class="fa-solid fa-sun fa-lg"></i></span>
+    <span class="theme-switch nav-link" data-mode="dark"><i class="fa-solid fa-moon fa-lg"></i></span>
+    <span class="theme-switch nav-link" data-mode="auto"><i class="fa-solid fa-circle-half-stroke fa-lg"></i></span>
+  </button>
+`);
+</script></div>
+
+      </div>
+
+  </div>
+
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+<nav class="bd-docs-nav bd-links"
+     aria-label="Section Navigation">
+  <p class="bd-links__title" role="heading" aria-level="1">Section Navigation</p>
+  <div class="bd-toc-item navbar-nav"><p aria-level="2" class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul class="current nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="install.html">Setup and installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="projectconf.html">Projects configuration and Settings</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quickstart.html">Jobflow Remote quickstart</a></li>
+<li class="toctree-l1 current active"><a class="current reference internal" href="#">Tuning Job execution</a></li>
+<li class="toctree-l1"><a class="reference internal" href="states.html">States</a></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Advanced usage and interoperability</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="building.html">Building from source</a></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Extras</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../glossary.html">Glossary</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../license.html">Jobflow Remote license</a></li>
+</ul>
+</div>
+</nav></div>
+    </div>
+
+
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+
+  <div id="rtd-footer-container"></div>
+
+
+      </div>
+
+      <main id="main-content" class="bd-main">
+
+
+          <div class="bd-content">
+            <div class="bd-article-container">
+
+              <div class="bd-header-article">
+<div class="header-article-items header-article__inner">
+
+    <div class="header-article-items__start">
+
+        <div class="header-article-item">
+
+
+
+<nav aria-label="Breadcrumb">
+  <ul class="bd-breadcrumbs">
+
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+
+    <li class="breadcrumb-item"><a href="index.html" class="nav-link">Jobflow Remote user guide</a></li>
+
+    <li class="breadcrumb-item active" aria-current="page">Tuning Job execution</li>
+  </ul>
+</nav>
+</div>
+
+    </div>
+
+
+</div>
+</div>
+
+
+
+
+<div id="searchbox"></div>
+                <article class="bd-article" role="main">
+
+  <section id="tuning-job-execution">
+<span id="tuning"></span><h1>Tuning Job execution<a class="headerlink" href="#tuning-job-execution" title="Link to this heading">#</a></h1>
+<p>Jobs with time consuming calculations require to properly configure
+the environment and the resources used to execute them. This
+section focuses on which options can be tuned and the ways available
+in jobflow-remote to change them.</p>
+<section id="tuning-options">
+<h2>Tuning options<a class="headerlink" href="#tuning-options" title="Link to this heading">#</a></h2>
+<section id="worker">
+<h3>Worker<a class="headerlink" href="#worker" title="Link to this heading">#</a></h3>
+<p>A worker is a computational unit that will actually execute the function
+inside a Job. The list of workers is given in the <a class="reference internal" href="projectconf.html#projectconf-worker"><span class="std std-ref">Workers</span></a>
+project configuration.</p>
+<p>Workers are set by the name used to define them in the project and a worker
+should always be defined for each Job when adding a Flow to the database.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>A single worker should not necessarily be identified with a computation
+resource as a whole. Different workers referring to the same for example
+to the same HPC center, but with different configurations can be created.
+The <code class="docutils literal notranslate"><span class="pre">Runner</span></code> will still open a single connection if the host is the same.</p>
+</div>
+</section>
+<section id="execution-configuration">
+<h3>Execution configuration<a class="headerlink" href="#execution-configuration" title="Link to this heading">#</a></h3>
+<p>An execution configuration, represented as an <code class="docutils literal notranslate"><span class="pre">ExecutionConfig</span></code> object in
+the code, contains information to run additional commands before and after
+the execution of a Job.</p>
+<p>These can be typically used to define the modules to load on an HPC center,
+specific python environment to load or setting the <code class="docutils literal notranslate"><span class="pre">PATH</span></code> for some executable
+needed by the Job.</p>
+<p>They can be usually given as a string referring to the setting defined in the
+project configuration file, or as an instance of <code class="docutils literal notranslate"><span class="pre">ExecutionConfig</span></code>.</p>
+</section>
+<section id="resources">
+<h3>Resources<a class="headerlink" href="#resources" title="Link to this heading">#</a></h3>
+<p>If the worker executing the Job runs under the control of a queueing system
+(e.g. SLURM, PBS), it is also important to specify which resources need to
+be allocated when running a Job.</p>
+<p>Since the all the operations involving the queueing system are handled with
+<a class="reference external" href="https://matgenix.github.io/qtoolkit/">qtoolkit</a>, jobflow-remote
+supports the same functionalities. In particular it is either possible to
+pass a dictionary containing the keywords specific to the selected queuing system
+or to pass an instance of a <code class="docutils literal notranslate"><span class="pre">QResources</span></code>, a generic object defining resources
+for standard use cases. These will be used to fill in a template and generate
+a suitable submission script.</p>
+</section>
+</section>
+<section id="how-to-tune">
+<h2>How to tune<a class="headerlink" href="#how-to-tune" title="Link to this heading">#</a></h2>
+<p>Different ways of setting the worker, execution configuration and resources
+for each Job are available. A combination of them can be used to ease the
+configuration for all the Jobs.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>If not defined otherwise, Jobs generated dynamically will inherit
+the configuration of the Job that generated them.</p>
+</div>
+<section id="submission">
+<h3>Submission<a class="headerlink" href="#submission" title="Link to this heading">#</a></h3>
+<p>The first entry point to customize the execution of the Jobs in a Flow
+is to use the arguments in the <code class="docutils literal notranslate"><span class="pre">submit_flow</span></code> function.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">resource</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;nodes&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;ntasks&quot;</span><span class="p">:</span> <span class="mi">4</span><span class="p">,</span> <span class="s2">&quot;partition&quot;</span><span class="p">:</span> <span class="s2">&quot;batch&quot;</span><span class="p">}</span>
+<span class="n">submit_flow</span><span class="p">(</span>
+    <span class="n">flow</span><span class="p">,</span> <span class="n">worker</span><span class="o">=</span><span class="s2">&quot;local_shell&quot;</span><span class="p">,</span> <span class="n">exec_config</span><span class="o">=</span><span class="s2">&quot;somecode_v.x.y&quot;</span><span class="p">,</span> <span class="n">resources</span><span class="o">=</span><span class="n">resources</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>This will set the passed values for all the Jobs for which have not been
+set in the Job previously.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Once the flow has been submitted to the database, any further change to the
+<code class="docutils literal notranslate"><span class="pre">Flow</span></code> object will not be taken into account.</p>
+</div>
+</section>
+<section id="jobconfig">
+<h3>JobConfig<a class="headerlink" href="#jobconfig" title="Link to this heading">#</a></h3>
+<p>Each jobflow’s Job has a <code class="docutils literal notranslate"><span class="pre">JobConfig</span></code> attribute. This can be used to store
+a <code class="docutils literal notranslate"><span class="pre">manager_config</span></code> dictionary with configuration specific to that Job.</p>
+<p>This can be done with the <code class="docutils literal notranslate"><span class="pre">set_run_config</span></code> function, that targets Jobs
+based on their name or on the callable they are wrapping. Consider the
+following example</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">jobflow_remote.utils.examples</span> <span class="kn">import</span> <span class="n">add</span><span class="p">,</span> <span class="n">value</span>
+<span class="kn">from</span> <span class="nn">jobflow_remote</span> <span class="kn">import</span> <span class="n">submit_flow</span><span class="p">,</span> <span class="n">set_run_config</span>
+<span class="kn">from</span> <span class="nn">jobflow</span> <span class="kn">import</span> <span class="n">Flow</span>
+
+<span class="n">job1</span> <span class="o">=</span> <span class="n">value</span><span class="p">(</span><span class="mi">5</span><span class="p">)</span>
+<span class="n">job2</span> <span class="o">=</span> <span class="n">add</span><span class="p">(</span><span class="n">job1</span><span class="o">.</span><span class="n">output</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
+
+<span class="n">flow</span> <span class="o">=</span> <span class="n">Flow</span><span class="p">([</span><span class="n">job1</span><span class="p">,</span> <span class="n">job2</span><span class="p">])</span>
+
+<span class="n">flow</span> <span class="o">=</span> <span class="n">set_run_config</span><span class="p">(</span>
+    <span class="n">flow</span><span class="p">,</span> <span class="n">name_filter</span><span class="o">=</span><span class="s2">&quot;add&quot;</span><span class="p">,</span> <span class="n">worker</span><span class="o">=</span><span class="s2">&quot;secondw&quot;</span><span class="p">,</span> <span class="n">exec_config</span><span class="o">=</span><span class="s2">&quot;anotherconfig&quot;</span>
+<span class="p">)</span>
+
+<span class="n">resource</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;nodes&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;ntasks&quot;</span><span class="p">:</span> <span class="mi">4</span><span class="p">,</span> <span class="s2">&quot;partition&quot;</span><span class="p">:</span> <span class="s2">&quot;batch&quot;</span><span class="p">}</span>
+<span class="n">submit_flow</span><span class="p">(</span><span class="n">flow</span><span class="p">,</span> <span class="n">worker</span><span class="o">=</span><span class="s2">&quot;firstw&quot;</span><span class="p">,</span> <span class="n">exec_config</span><span class="o">=</span><span class="s2">&quot;somecode_v.x.y&quot;</span><span class="p">,</span> <span class="n">resources</span><span class="o">=</span><span class="n">resources</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>After being submitted to the database the <code class="docutils literal notranslate"><span class="pre">value</span></code> Job will be executed
+on the <code class="docutils literal notranslate"><span class="pre">firstw</span></code> worker, while the <code class="docutils literal notranslate"><span class="pre">add</span></code> Job will be executed on the
+<code class="docutils literal notranslate"><span class="pre">secondw</span></code> worker.</p>
+<p>In addition, since <code class="docutils literal notranslate"><span class="pre">set_run_config</span></code> makes use of jobflow’s <code class="docutils literal notranslate"><span class="pre">update_config</span></code>
+method, these updates will also automatically be applied to any new Job
+automatically generated in the Flow.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">name_filter</span></code> matches any name containing the string passed.
+So using a <code class="docutils literal notranslate"><span class="pre">name_filter=add</span></code> will match both a job named <code class="docutils literal notranslate"><span class="pre">add</span></code>
+and one named <code class="docutils literal notranslate"><span class="pre">add</span> <span class="pre">more</span></code>.</p>
+</div>
+</section>
+<section id="cli">
+<h3>CLI<a class="headerlink" href="#cli" title="Link to this heading">#</a></h3>
+<p>After a Job has been added to the database, it is still possible to change
+its settings. This can be achieved with the <code class="docutils literal notranslate"><span class="pre">jf</span> <span class="pre">job</span> <span class="pre">set</span></code> CLI command.
+For example running:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">jf</span> <span class="n">job</span> <span class="nb">set</span> <span class="n">worker</span> <span class="o">-</span><span class="n">did</span> <span class="mi">8</span> <span class="n">example_worker</span>
+</pre></div>
+</div>
+<p>sets the worker for Job with DB id 8 to <code class="docutils literal notranslate"><span class="pre">example_worker</span></code>. Similarly,
+the <code class="docutils literal notranslate"><span class="pre">jf</span> <span class="pre">job</span> <span class="pre">set</span> <span class="pre">resources</span></code> and <code class="docutils literal notranslate"><span class="pre">jf</span> <span class="pre">job</span> <span class="pre">set</span> <span class="pre">exec-config</span></code> can be used
+to set the values of the resources and execution configurations.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>In order for this to be meaningful only Jobs that have not been started
+can be modified. So this commands can be applied only to Jobs in the
+<code class="docutils literal notranslate"><span class="pre">READY</span></code> or <code class="docutils literal notranslate"><span class="pre">WAITING</span></code> states.</p>
+</div>
+</section>
+</section>
+</section>
+
+
+                </article>
+
+
+
+
+
+                <footer class="prev-next-footer">
+
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="quickstart.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">Jobflow Remote quickstart</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="states.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">States</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+
+            </div>
+
+
+
+                <div class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+  <div class="sidebar-secondary-item">
+
+  <div class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> On this page
+  </div>
+  <nav class="bd-toc-nav page-toc">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#tuning-options">Tuning options</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#worker">Worker</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#execution-configuration">Execution configuration</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#resources">Resources</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#how-to-tune">How to tune</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#submission">Submission</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#jobconfig">JobConfig</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#cli">CLI</a></li>
+</ul>
+</li>
+</ul>
+  </nav></div>
+
+</div></div>
+
+
+          </div>
+          <footer class="bd-footer-content">
+
+          </footer>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="../_static/scripts/bootstrap.js?digest=5b4479735964841361fd"></script>
+<script src="../_static/scripts/pydata-sphinx-theme.js?digest=5b4479735964841361fd"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+
+    <div class="footer-items__start">
+
+        <div class="footer-item">
+
+  <p class="copyright">
+
+      © Copyright 2023, Matgenix SRL.
+      <br/>
+
+  </p>
+</div>
+
+        <div class="footer-item">
+
+  <p class="sphinx-version">
+    Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 7.2.6.
+    <br/>
+  </p>
+</div>
+
+    </div>
+
+
+
+    <div class="footer-items__end">
+
+        <div class="footer-item">
+<p class="theme-version">
+  Built with the <a href="https://pydata-sphinx-theme.readthedocs.io/en/stable/index.html">PyData Sphinx Theme</a> 0.14.4.
+</p></div>
+
+    </div>
+
+</div>
+
+  </footer>
+  </body>
+</html>

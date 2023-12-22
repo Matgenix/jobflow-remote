@@ -1,0 +1,714 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../" data-theme="light">
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>jobflow_remote.jobs.runner module &#8212; Jobflow Remote v0.0.1.post117+gfc0fbc0.d20231222 Manual</title>
+
+
+
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "light";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "light";
+  </script>
+
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../_static/styles/theme.css?digest=5b4479735964841361fd" rel="stylesheet" />
+<link href="../_static/styles/bootstrap.css?digest=5b4479735964841361fd" rel="stylesheet" />
+<link href="../_static/styles/pydata-sphinx-theme.css?digest=5b4479735964841361fd" rel="stylesheet" />
+
+
+  <link href="../_static/vendor/fontawesome/6.1.2/css/all.min.css?digest=5b4479735964841361fd" rel="stylesheet" />
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.1.2/webfonts/fa-solid-900.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.1.2/webfonts/fa-brands-400.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.1.2/webfonts/fa-regular-400.woff2" />
+
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=fa44fd50" />
+    <link rel="stylesheet" type="text/css" href="../_static/graphviz.css?v=eafc0fe6" />
+    <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../_static/autodoc_pydantic.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/design-style.1e8bd061cd6da7fc9cf755528e8ffc24.min.css?v=0a3b3ea7" />
+    <link rel="stylesheet" type="text/css" href="../_static/jobflow_remote.css?v=7b6df8f0" />
+
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=5b4479735964841361fd" />
+<link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=5b4479735964841361fd" />
+  <script src="../_static/vendor/fontawesome/6.1.2/js/all.min.js?digest=5b4479735964841361fd"></script>
+
+    <script src="../_static/documentation_options.js?v=e135783d"></script>
+    <script src="../_static/doctools.js?v=888ff710"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../_static/copybutton.js?v=f281be69"></script>
+    <script src="../_static/design-tabs.js?v=36754332"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'api/jobflow_remote.jobs.runner';</script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="jobflow_remote.jobs.state module" href="jobflow_remote.jobs.state.html" />
+    <link rel="prev" title="jobflow_remote.jobs.run module" href="jobflow_remote.jobs.run.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+    <meta name="docbuild:last-update" content="Dec 22, 2023"/>
+  </head>
+
+
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="light">
+
+
+
+  <a class="skip-link" href="#main-content">Skip to main content</a>
+
+  <div id="pst-scroll-pixel-helper"></div>
+
+
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>
+    Back to top
+  </button>
+
+
+  <input type="checkbox"
+          class="sidebar-toggle"
+          name="__primary"
+          id="__primary"/>
+  <label class="overlay overlay-primary" for="__primary"></label>
+
+  <input type="checkbox"
+          class="sidebar-toggle"
+          name="__secondary"
+          id="__secondary"/>
+  <label class="overlay overlay-secondary" for="__secondary"></label>
+
+  <div class="search-button__wrapper">
+    <div class="search-button__overlay"></div>
+    <div class="search-button__search-container">
+<form class="bd-search d-flex align-items-center"
+      action="../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         id="search-input"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form></div>
+  </div>
+
+
+  <div class="bd-header-announcement container-fluid bd-header-announcement">
+    <div class="bd-header-announcement__content"><p>Jobflow Remote is still in beta phase. The API may change at any time.</p></div>
+  </div>
+
+
+    <nav class="bd-header navbar navbar-expand-lg bd-navbar">
+<div class="bd-header__inner bd-page-width">
+  <label class="sidebar-toggle primary-toggle" for="__primary">
+    <span class="fa-solid fa-bars"></span>
+  </label>
+
+
+  <div class="col-lg-3 navbar-header-items__start">
+
+      <div class="navbar-item">
+
+
+
+<a class="navbar-brand logo" href="../index.html">
+
+
+
+
+
+
+    <p class="title logo__title">Jobflow Remote v0.0.1.post117+gfc0fbc0.d20231222 Manual</p>
+
+</a></div>
+
+  </div>
+
+  <div class="col-lg-9 navbar-header-items">
+
+    <div class="me-auto navbar-header-items__center">
+
+        <div class="navbar-item">
+<nav class="navbar-nav">
+  <p class="sidebar-header-items__title"
+     role="heading"
+     aria-level="1"
+     aria-label="Site Navigation">
+    Site Navigation
+  </p>
+  <ul class="bd-navbar-elements navbar-nav">
+
+                    <li class="nav-item">
+                      <a class="nav-link nav-internal" href="../user/index.html">
+                        User Guide
+                      </a>
+                    </li>
+
+
+                    <li class="nav-item">
+                      <a class="nav-link nav-internal" href="index.html">
+                        API reference
+                      </a>
+                    </li>
+
+
+                    <li class="nav-item">
+                      <a class="nav-link nav-internal" href="../dev/index.html">
+                        Development
+                      </a>
+                    </li>
+
+  </ul>
+</nav></div>
+
+    </div>
+
+
+    <div class="navbar-header-items__end">
+
+        <div class="navbar-item navbar-persistent--container">
+
+
+ <script>
+ document.write(`
+   <button class="btn navbar-btn search-button-field search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass"></i>
+    <span class="search-button__default-text">Search</span>
+    <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+   </button>
+ `);
+ </script>
+        </div>
+
+
+        <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm navbar-btn theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="theme-switch nav-link" data-mode="light"><i class="fa-solid fa-sun fa-lg"></i></span>
+    <span class="theme-switch nav-link" data-mode="dark"><i class="fa-solid fa-moon fa-lg"></i></span>
+    <span class="theme-switch nav-link" data-mode="auto"><i class="fa-solid fa-circle-half-stroke fa-lg"></i></span>
+  </button>
+`);
+</script></div>
+
+    </div>
+
+  </div>
+
+
+    <div class="navbar-persistent--mobile">
+
+ <script>
+ document.write(`
+   <button class="btn navbar-btn search-button-field search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass"></i>
+    <span class="search-button__default-text">Search</span>
+    <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+   </button>
+ `);
+ </script>
+    </div>
+
+
+
+    <label class="sidebar-toggle secondary-toggle" for="__secondary" tabindex="0">
+      <span class="fa-solid fa-outdent"></span>
+    </label>
+
+</div>
+
+    </nav>
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+
+      <div class="bd-sidebar-primary bd-sidebar">
+
+
+
+  <div class="sidebar-header-items sidebar-primary__section">
+
+
+      <div class="sidebar-header-items__center">
+
+          <div class="navbar-item">
+<nav class="navbar-nav">
+  <p class="sidebar-header-items__title"
+     role="heading"
+     aria-level="1"
+     aria-label="Site Navigation">
+    Site Navigation
+  </p>
+  <ul class="bd-navbar-elements navbar-nav">
+
+                    <li class="nav-item">
+                      <a class="nav-link nav-internal" href="../user/index.html">
+                        User Guide
+                      </a>
+                    </li>
+
+
+                    <li class="nav-item">
+                      <a class="nav-link nav-internal" href="index.html">
+                        API reference
+                      </a>
+                    </li>
+
+
+                    <li class="nav-item">
+                      <a class="nav-link nav-internal" href="../dev/index.html">
+                        Development
+                      </a>
+                    </li>
+
+  </ul>
+</nav></div>
+
+      </div>
+
+
+
+      <div class="sidebar-header-items__end">
+
+          <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm navbar-btn theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="theme-switch nav-link" data-mode="light"><i class="fa-solid fa-sun fa-lg"></i></span>
+    <span class="theme-switch nav-link" data-mode="dark"><i class="fa-solid fa-moon fa-lg"></i></span>
+    <span class="theme-switch nav-link" data-mode="auto"><i class="fa-solid fa-circle-half-stroke fa-lg"></i></span>
+  </button>
+`);
+</script></div>
+
+      </div>
+
+  </div>
+
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+<nav class="bd-docs-nav bd-links"
+     aria-label="Section Navigation">
+  <p class="bd-links__title" role="heading" aria-level="1">Section Navigation</p>
+  <div class="bd-toc-item navbar-nav"><ul class="current nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="jobflow_remote.cli.html">jobflow_remote.cli package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="jobflow_remote.config.html">jobflow_remote.config package</a></li>
+<li class="toctree-l1 current active has-children"><a class="reference internal" href="jobflow_remote.jobs.html">jobflow_remote.jobs package</a><input checked="" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-1"><i class="fa-solid fa-chevron-down"></i></label><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="jobflow_remote.jobs.batch.html">jobflow_remote.jobs.batch module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="jobflow_remote.jobs.daemon.html">jobflow_remote.jobs.daemon module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="jobflow_remote.jobs.data.html">jobflow_remote.jobs.data module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="jobflow_remote.jobs.graph.html">jobflow_remote.jobs.graph module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="jobflow_remote.jobs.jobcontroller.html">jobflow_remote.jobs.jobcontroller module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="jobflow_remote.jobs.run.html">jobflow_remote.jobs.run module</a></li>
+<li class="toctree-l2 current active"><a class="current reference internal" href="#">jobflow_remote.jobs.runner module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="jobflow_remote.jobs.state.html">jobflow_remote.jobs.state module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="jobflow_remote.jobs.store.html">jobflow_remote.jobs.store module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="jobflow_remote.jobs.submit.html">jobflow_remote.jobs.submit module</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="jobflow_remote.remote.html">jobflow_remote.remote package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="jobflow_remote.utils.html">jobflow_remote.utils package</a></li>
+</ul>
+</div>
+</nav></div>
+    </div>
+
+
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+
+  <div id="rtd-footer-container"></div>
+
+
+      </div>
+
+      <main id="main-content" class="bd-main">
+
+
+          <div class="bd-content">
+            <div class="bd-article-container">
+
+              <div class="bd-header-article">
+<div class="header-article-items header-article__inner">
+
+    <div class="header-article-items__start">
+
+        <div class="header-article-item">
+
+
+
+<nav aria-label="Breadcrumb">
+  <ul class="bd-breadcrumbs">
+
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+
+    <li class="breadcrumb-item"><a href="index.html" class="nav-link">API Reference</a></li>
+
+
+    <li class="breadcrumb-item"><a href="jobflow_remote.jobs.html" class="nav-link">jobflow_remote.jobs package</a></li>
+
+    <li class="breadcrumb-item active" aria-current="page">jobflow_remo...</li>
+  </ul>
+</nav>
+</div>
+
+    </div>
+
+
+</div>
+</div>
+
+
+
+
+<div id="searchbox"></div>
+                <article class="bd-article" role="main">
+
+  <section id="module-jobflow_remote.jobs.runner">
+<span id="jobflow-remote-jobs-runner-module"></span><h1>jobflow_remote.jobs.runner module<a class="headerlink" href="#module-jobflow_remote.jobs.runner" title="Link to this heading">#</a></h1>
+<p>The Runner orchestrating the Jobs execution</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="jobflow_remote.jobs.runner.Runner">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">jobflow_remote.jobs.runner.</span></span><span class="sig-name descname"><span class="pre">Runner</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">project_name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.12)"><span class="pre">str</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.12)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">log_level</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.LogLevel" title="jobflow_remote.config.base.LogLevel"><span class="pre">LogLevel</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.12)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">runner_id</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.12)"><span class="pre">str</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.12)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/jobflow_remote/jobs/runner.html#Runner"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#jobflow_remote.jobs.runner.Runner" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.12)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
+<p>Object orchestrating the execution of all the Jobs.</p>
+<p>Advances the status of the Jobs, handles the communication with the workers
+and updates the queue and output databases.</p>
+<p>The main entry point is the <cite>run</cite> method. It is supposed to be executed
+by a daemon, but can also be run directly for testing purposes.
+It allows to run all the steps required to advance the Job’s states or even
+a subset of them, to parallelize the different tasks.</p>
+<p>The runner instantiates a pool of workers and hosts given in the project
+definition. A single connection will be opened if multiple workers share
+the same host.</p>
+<p>The Runner schedules the execution of the specific tasks at regular intervals
+and relies on objects like QueueManager, BaseHost and JobController to
+interact with workers and databases.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>project_name</strong> – Name of the project. Used to retrieve all the configurations required
+to execute the runner.</p></li>
+<li><p><strong>log_level</strong> – Logging level of the Runner.</p></li>
+<li><p><strong>runner_id</strong> – A unique identifier for the Runner process. Used to identify the
+runner process in logging and in the DB locks.
+If None a uuid will be generated.</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="jobflow_remote.jobs.runner.Runner.advance_state">
+<span class="sig-name descname"><span class="pre">advance_state</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">states</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.12)"><span class="pre">list</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.12)"><span class="pre">str</span></a><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/jobflow_remote/jobs/runner.html#Runner.advance_state"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#jobflow_remote.jobs.runner.Runner.advance_state" title="Link to this definition">#</a></dt>
+<dd><p>Acquire the lock and advance the state of a single job.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>states</strong> – The state of the Jobs that can be queried.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="jobflow_remote.jobs.runner.Runner.check_run_status">
+<span class="sig-name descname"><span class="pre">check_run_status</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/jobflow_remote/jobs/runner.html#Runner.check_run_status"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#jobflow_remote.jobs.runner.Runner.check_run_status" title="Link to this definition">#</a></dt>
+<dd><p>Check the status of all the jobs submitted to a queue.</p>
+<p>If Jobs started update their state from SUBMITTED to RUNNING.
+If Jobs terminated set their state to TERMINATED if running on a remote
+host. If on a local host set them directly to DOWNLOADED.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="jobflow_remote.jobs.runner.Runner.checkout">
+<span class="sig-name descname"><span class="pre">checkout</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/jobflow_remote/jobs/runner.html#Runner.checkout"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#jobflow_remote.jobs.runner.Runner.checkout" title="Link to this definition">#</a></dt>
+<dd><p>Checkout READY Jobs.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="jobflow_remote.jobs.runner.Runner.cleanup">
+<span class="sig-name descname"><span class="pre">cleanup</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/jobflow_remote/jobs/runner.html#Runner.cleanup"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#jobflow_remote.jobs.runner.Runner.cleanup" title="Link to this definition">#</a></dt>
+<dd><p>Close all the connections after stopping the Runner.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="jobflow_remote.jobs.runner.Runner.complete_job">
+<span class="sig-name descname"><span class="pre">complete_job</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">lock</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/jobflow_remote/jobs/runner.html#Runner.complete_job"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#jobflow_remote.jobs.runner.Runner.complete_job" title="Link to this definition">#</a></dt>
+<dd><p>Complete a locked Job in the DOWNLOADED state.
+If successful set the state to COMPLETED, otherwise to FAILED.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>lock</strong> – The MongoLock with the locked Job document.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="jobflow_remote.jobs.runner.Runner.download">
+<span class="sig-name descname"><span class="pre">download</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">lock</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/jobflow_remote/jobs/runner.html#Runner.download"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#jobflow_remote.jobs.runner.Runner.download" title="Link to this definition">#</a></dt>
+<dd><p>Download the final files for a locked Job in the TERMINATED state.
+If successful set the state to DOWNLOADED.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>lock</strong> – The MongoLock with the locked Job document.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="jobflow_remote.jobs.runner.Runner.get_host">
+<span class="sig-name descname"><span class="pre">get_host</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">worker_name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.12)"><span class="pre">str</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="jobflow_remote.remote.host.base.html#jobflow_remote.remote.host.base.BaseHost" title="jobflow_remote.remote.host.base.BaseHost"><span class="pre">BaseHost</span></a></span></span><a class="reference internal" href="../_modules/jobflow_remote/jobs/runner.html#Runner.get_host"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#jobflow_remote.jobs.runner.Runner.get_host" title="Link to this definition">#</a></dt>
+<dd><p>Get the host associated to a worker from the pool of hosts instantiated
+by the Runner.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>worker_name</strong> – The name of the worker.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>An instance of the Host associated to the worker.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="jobflow_remote.jobs.runner.Runner.get_queue_manager">
+<span class="sig-name descname"><span class="pre">get_queue_manager</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">worker_name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.12)"><span class="pre">str</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="jobflow_remote.remote.queue.html#jobflow_remote.remote.queue.QueueManager" title="jobflow_remote.remote.queue.QueueManager"><span class="pre">QueueManager</span></a></span></span><a class="reference internal" href="../_modules/jobflow_remote/jobs/runner.html#Runner.get_queue_manager"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#jobflow_remote.jobs.runner.Runner.get_queue_manager" title="Link to this definition">#</a></dt>
+<dd><p>Get an instance of the queue manager associated to a worker, based on its host.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>worker_name</strong> – The name of the worker.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>An instance of the QueueManager associated to the worker.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="jobflow_remote.jobs.runner.Runner.get_worker">
+<span class="sig-name descname"><span class="pre">get_worker</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">worker_name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.12)"><span class="pre">str</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.WorkerBase" title="jobflow_remote.config.base.WorkerBase"><span class="pre">WorkerBase</span></a></span></span><a class="reference internal" href="../_modules/jobflow_remote/jobs/runner.html#Runner.get_worker"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#jobflow_remote.jobs.runner.Runner.get_worker" title="Link to this definition">#</a></dt>
+<dd><p>Get the worker from the pool of workers instantiated by the Runner.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>worker_name</strong> – The name of the worker.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>An instance of the corresponding worker.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="jobflow_remote.jobs.runner.Runner.handle_signal">
+<span class="sig-name descname"><span class="pre">handle_signal</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">signum</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">frame</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/jobflow_remote/jobs/runner.html#Runner.handle_signal"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#jobflow_remote.jobs.runner.Runner.handle_signal" title="Link to this definition">#</a></dt>
+<dd><p>Handle the SIGTERM signal in the Runner.
+Sets a variable that will stop the Runner loop.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="jobflow_remote.jobs.runner.Runner.refresh_num_current_jobs">
+<span class="sig-name descname"><span class="pre">refresh_num_current_jobs</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/jobflow_remote/jobs/runner.html#Runner.refresh_num_current_jobs"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#jobflow_remote.jobs.runner.Runner.refresh_num_current_jobs" title="Link to this definition">#</a></dt>
+<dd><p>Update the number of jobs currently running for worker with limited
+number of Jobs.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="jobflow_remote.jobs.runner.Runner.run">
+<span class="sig-name descname"><span class="pre">run</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">transfer</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.12)"><span class="pre">bool</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">complete</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.12)"><span class="pre">bool</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">queue</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.12)"><span class="pre">bool</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">checkout</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.12)"><span class="pre">bool</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/jobflow_remote/jobs/runner.html#Runner.run"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#jobflow_remote.jobs.runner.Runner.run" title="Link to this definition">#</a></dt>
+<dd><p>Start the runner.</p>
+<p>Which actions are being performed can be tuned by the arguments.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>transfer</strong> – If True actions related to file transfer are performed by the runner.</p></li>
+<li><p><strong>complete</strong> – If True Job completion is performed by the runner.</p></li>
+<li><p><strong>queue</strong> – If True interactions with the queue manager are handled by the Runner.</p></li>
+<li><p><strong>checkout</strong> – If True the checkout of Jobs is performed by the Runner.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="jobflow_remote.jobs.runner.Runner.runner_options">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">runner_options</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.RunnerOptions" title="jobflow_remote.config.base.RunnerOptions"><span class="pre">RunnerOptions</span></a></em><a class="headerlink" href="#jobflow_remote.jobs.runner.Runner.runner_options" title="Link to this definition">#</a></dt>
+<dd><p>The Runner options defined in the project.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="jobflow_remote.jobs.runner.Runner.submit">
+<span class="sig-name descname"><span class="pre">submit</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">lock</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="jobflow_remote.utils.db.html#jobflow_remote.utils.db.MongoLock" title="jobflow_remote.utils.db.MongoLock"><span class="pre">MongoLock</span></a></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/jobflow_remote/jobs/runner.html#Runner.submit"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#jobflow_remote.jobs.runner.Runner.submit" title="Link to this definition">#</a></dt>
+<dd><p>Submit to the queue for a locked Job in the UPLOADED state.
+If successful set the state to SUBMITTED.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>lock</strong> – The MongoLock with the locked Job document.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="jobflow_remote.jobs.runner.Runner.update_batch_jobs">
+<span class="sig-name descname"><span class="pre">update_batch_jobs</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/jobflow_remote/jobs/runner.html#Runner.update_batch_jobs"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#jobflow_remote.jobs.runner.Runner.update_batch_jobs" title="Link to this definition">#</a></dt>
+<dd><p>Update the status of batch jobs.</p>
+<p>Includes submitting to the remote queue, checking the status of
+running jobs in the queue and handle the files with the Jobs information
+about their status.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="jobflow_remote.jobs.runner.Runner.upload">
+<span class="sig-name descname"><span class="pre">upload</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">lock</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="jobflow_remote.utils.db.html#jobflow_remote.utils.db.MongoLock" title="jobflow_remote.utils.db.MongoLock"><span class="pre">MongoLock</span></a></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/jobflow_remote/jobs/runner.html#Runner.upload"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#jobflow_remote.jobs.runner.Runner.upload" title="Link to this definition">#</a></dt>
+<dd><p>Upload files for a locked Job in the CHECKED_OUT state.
+If successful set the state to UPLOADED.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>lock</strong> – The MongoLock with the locked Job document.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+
+
+                </article>
+
+
+
+
+
+                <footer class="prev-next-footer">
+
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="jobflow_remote.jobs.run.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">jobflow_remote.jobs.run module</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="jobflow_remote.jobs.state.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">jobflow_remote.jobs.state module</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+
+            </div>
+
+
+
+                <div class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+  <div class="sidebar-secondary-item">
+
+  <div class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> On this page
+  </div>
+  <nav class="bd-toc-nav page-toc">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#jobflow_remote.jobs.runner.Runner"><code class="docutils literal notranslate"><span class="pre">Runner</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#jobflow_remote.jobs.runner.Runner.advance_state"><code class="docutils literal notranslate"><span class="pre">Runner.advance_state()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#jobflow_remote.jobs.runner.Runner.check_run_status"><code class="docutils literal notranslate"><span class="pre">Runner.check_run_status()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#jobflow_remote.jobs.runner.Runner.checkout"><code class="docutils literal notranslate"><span class="pre">Runner.checkout()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#jobflow_remote.jobs.runner.Runner.cleanup"><code class="docutils literal notranslate"><span class="pre">Runner.cleanup()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#jobflow_remote.jobs.runner.Runner.complete_job"><code class="docutils literal notranslate"><span class="pre">Runner.complete_job()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#jobflow_remote.jobs.runner.Runner.download"><code class="docutils literal notranslate"><span class="pre">Runner.download()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#jobflow_remote.jobs.runner.Runner.get_host"><code class="docutils literal notranslate"><span class="pre">Runner.get_host()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#jobflow_remote.jobs.runner.Runner.get_queue_manager"><code class="docutils literal notranslate"><span class="pre">Runner.get_queue_manager()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#jobflow_remote.jobs.runner.Runner.get_worker"><code class="docutils literal notranslate"><span class="pre">Runner.get_worker()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#jobflow_remote.jobs.runner.Runner.handle_signal"><code class="docutils literal notranslate"><span class="pre">Runner.handle_signal()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#jobflow_remote.jobs.runner.Runner.refresh_num_current_jobs"><code class="docutils literal notranslate"><span class="pre">Runner.refresh_num_current_jobs()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#jobflow_remote.jobs.runner.Runner.run"><code class="docutils literal notranslate"><span class="pre">Runner.run()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#jobflow_remote.jobs.runner.Runner.runner_options"><code class="docutils literal notranslate"><span class="pre">Runner.runner_options</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#jobflow_remote.jobs.runner.Runner.submit"><code class="docutils literal notranslate"><span class="pre">Runner.submit()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#jobflow_remote.jobs.runner.Runner.update_batch_jobs"><code class="docutils literal notranslate"><span class="pre">Runner.update_batch_jobs()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#jobflow_remote.jobs.runner.Runner.upload"><code class="docutils literal notranslate"><span class="pre">Runner.upload()</span></code></a></li>
+</ul>
+</li>
+</ul>
+  </nav></div>
+
+</div></div>
+
+
+          </div>
+          <footer class="bd-footer-content">
+
+          </footer>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="../_static/scripts/bootstrap.js?digest=5b4479735964841361fd"></script>
+<script src="../_static/scripts/pydata-sphinx-theme.js?digest=5b4479735964841361fd"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+
+    <div class="footer-items__start">
+
+        <div class="footer-item">
+
+  <p class="copyright">
+
+      © Copyright 2023, Matgenix SRL.
+      <br/>
+
+  </p>
+</div>
+
+        <div class="footer-item">
+
+  <p class="sphinx-version">
+    Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 7.2.6.
+    <br/>
+  </p>
+</div>
+
+    </div>
+
+
+
+    <div class="footer-items__end">
+
+        <div class="footer-item">
+<p class="theme-version">
+  Built with the <a href="https://pydata-sphinx-theme.readthedocs.io/en/stable/index.html">PyData Sphinx Theme</a> 0.14.4.
+</p></div>
+
+    </div>
+
+</div>
+
+  </footer>
+  </body>
+</html>

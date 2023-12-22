@@ -1,0 +1,747 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../" data-theme="light">
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Jobflow Remote quickstart &#8212; Jobflow Remote v0.0.1.post117+gfc0fbc0.d20231222 Manual</title>
+
+
+
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "light";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "light";
+  </script>
+
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../_static/styles/theme.css?digest=5b4479735964841361fd" rel="stylesheet" />
+<link href="../_static/styles/bootstrap.css?digest=5b4479735964841361fd" rel="stylesheet" />
+<link href="../_static/styles/pydata-sphinx-theme.css?digest=5b4479735964841361fd" rel="stylesheet" />
+
+
+  <link href="../_static/vendor/fontawesome/6.1.2/css/all.min.css?digest=5b4479735964841361fd" rel="stylesheet" />
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.1.2/webfonts/fa-solid-900.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.1.2/webfonts/fa-brands-400.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.1.2/webfonts/fa-regular-400.woff2" />
+
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=fa44fd50" />
+    <link rel="stylesheet" type="text/css" href="../_static/graphviz.css?v=eafc0fe6" />
+    <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../_static/autodoc_pydantic.css?v=a0a71c94" />
+    <link rel="stylesheet" type="text/css" href="../_static/design-style.1e8bd061cd6da7fc9cf755528e8ffc24.min.css?v=0a3b3ea7" />
+    <link rel="stylesheet" type="text/css" href="../_static/jobflow_remote.css?v=7b6df8f0" />
+
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=5b4479735964841361fd" />
+<link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=5b4479735964841361fd" />
+  <script src="../_static/vendor/fontawesome/6.1.2/js/all.min.js?digest=5b4479735964841361fd"></script>
+
+    <script src="../_static/documentation_options.js?v=e135783d"></script>
+    <script src="../_static/doctools.js?v=888ff710"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../_static/copybutton.js?v=f281be69"></script>
+    <script src="../_static/design-tabs.js?v=36754332"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'user/quickstart';</script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Tuning Job execution" href="tuning.html" />
+    <link rel="prev" title="Projects configuration and Settings" href="projectconf.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+    <meta name="docbuild:last-update" content="Dec 22, 2023"/>
+  </head>
+
+
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="light">
+
+
+
+  <a class="skip-link" href="#main-content">Skip to main content</a>
+
+  <div id="pst-scroll-pixel-helper"></div>
+
+
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>
+    Back to top
+  </button>
+
+
+  <input type="checkbox"
+          class="sidebar-toggle"
+          name="__primary"
+          id="__primary"/>
+  <label class="overlay overlay-primary" for="__primary"></label>
+
+  <input type="checkbox"
+          class="sidebar-toggle"
+          name="__secondary"
+          id="__secondary"/>
+  <label class="overlay overlay-secondary" for="__secondary"></label>
+
+  <div class="search-button__wrapper">
+    <div class="search-button__overlay"></div>
+    <div class="search-button__search-container">
+<form class="bd-search d-flex align-items-center"
+      action="../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         id="search-input"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form></div>
+  </div>
+
+
+  <div class="bd-header-announcement container-fluid bd-header-announcement">
+    <div class="bd-header-announcement__content"><p>Jobflow Remote is still in beta phase. The API may change at any time.</p></div>
+  </div>
+
+
+    <nav class="bd-header navbar navbar-expand-lg bd-navbar">
+<div class="bd-header__inner bd-page-width">
+  <label class="sidebar-toggle primary-toggle" for="__primary">
+    <span class="fa-solid fa-bars"></span>
+  </label>
+
+
+  <div class="col-lg-3 navbar-header-items__start">
+
+      <div class="navbar-item">
+
+
+
+<a class="navbar-brand logo" href="../index.html">
+
+
+
+
+
+
+    <p class="title logo__title">Jobflow Remote v0.0.1.post117+gfc0fbc0.d20231222 Manual</p>
+
+</a></div>
+
+  </div>
+
+  <div class="col-lg-9 navbar-header-items">
+
+    <div class="me-auto navbar-header-items__center">
+
+        <div class="navbar-item">
+<nav class="navbar-nav">
+  <p class="sidebar-header-items__title"
+     role="heading"
+     aria-level="1"
+     aria-label="Site Navigation">
+    Site Navigation
+  </p>
+  <ul class="bd-navbar-elements navbar-nav">
+
+                    <li class="nav-item current active">
+                      <a class="nav-link nav-internal" href="index.html">
+                        User Guide
+                      </a>
+                    </li>
+
+
+                    <li class="nav-item">
+                      <a class="nav-link nav-internal" href="../api/index.html">
+                        API reference
+                      </a>
+                    </li>
+
+
+                    <li class="nav-item">
+                      <a class="nav-link nav-internal" href="../dev/index.html">
+                        Development
+                      </a>
+                    </li>
+
+  </ul>
+</nav></div>
+
+    </div>
+
+
+    <div class="navbar-header-items__end">
+
+        <div class="navbar-item navbar-persistent--container">
+
+
+ <script>
+ document.write(`
+   <button class="btn navbar-btn search-button-field search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass"></i>
+    <span class="search-button__default-text">Search</span>
+    <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+   </button>
+ `);
+ </script>
+        </div>
+
+
+        <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm navbar-btn theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="theme-switch nav-link" data-mode="light"><i class="fa-solid fa-sun fa-lg"></i></span>
+    <span class="theme-switch nav-link" data-mode="dark"><i class="fa-solid fa-moon fa-lg"></i></span>
+    <span class="theme-switch nav-link" data-mode="auto"><i class="fa-solid fa-circle-half-stroke fa-lg"></i></span>
+  </button>
+`);
+</script></div>
+
+    </div>
+
+  </div>
+
+
+    <div class="navbar-persistent--mobile">
+
+ <script>
+ document.write(`
+   <button class="btn navbar-btn search-button-field search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass"></i>
+    <span class="search-button__default-text">Search</span>
+    <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+   </button>
+ `);
+ </script>
+    </div>
+
+
+
+    <label class="sidebar-toggle secondary-toggle" for="__secondary" tabindex="0">
+      <span class="fa-solid fa-outdent"></span>
+    </label>
+
+</div>
+
+    </nav>
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+
+      <div class="bd-sidebar-primary bd-sidebar">
+
+
+
+  <div class="sidebar-header-items sidebar-primary__section">
+
+
+      <div class="sidebar-header-items__center">
+
+          <div class="navbar-item">
+<nav class="navbar-nav">
+  <p class="sidebar-header-items__title"
+     role="heading"
+     aria-level="1"
+     aria-label="Site Navigation">
+    Site Navigation
+  </p>
+  <ul class="bd-navbar-elements navbar-nav">
+
+                    <li class="nav-item current active">
+                      <a class="nav-link nav-internal" href="index.html">
+                        User Guide
+                      </a>
+                    </li>
+
+
+                    <li class="nav-item">
+                      <a class="nav-link nav-internal" href="../api/index.html">
+                        API reference
+                      </a>
+                    </li>
+
+
+                    <li class="nav-item">
+                      <a class="nav-link nav-internal" href="../dev/index.html">
+                        Development
+                      </a>
+                    </li>
+
+  </ul>
+</nav></div>
+
+      </div>
+
+
+
+      <div class="sidebar-header-items__end">
+
+          <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm navbar-btn theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="theme-switch nav-link" data-mode="light"><i class="fa-solid fa-sun fa-lg"></i></span>
+    <span class="theme-switch nav-link" data-mode="dark"><i class="fa-solid fa-moon fa-lg"></i></span>
+    <span class="theme-switch nav-link" data-mode="auto"><i class="fa-solid fa-circle-half-stroke fa-lg"></i></span>
+  </button>
+`);
+</script></div>
+
+      </div>
+
+  </div>
+
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+<nav class="bd-docs-nav bd-links"
+     aria-label="Section Navigation">
+  <p class="bd-links__title" role="heading" aria-level="1">Section Navigation</p>
+  <div class="bd-toc-item navbar-nav"><p aria-level="2" class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul class="current nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="install.html">Setup and installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="projectconf.html">Projects configuration and Settings</a></li>
+<li class="toctree-l1 current active"><a class="current reference internal" href="#">Jobflow Remote quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tuning.html">Tuning Job execution</a></li>
+<li class="toctree-l1"><a class="reference internal" href="states.html">States</a></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Advanced usage and interoperability</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="building.html">Building from source</a></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Extras</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../glossary.html">Glossary</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../license.html">Jobflow Remote license</a></li>
+</ul>
+</div>
+</nav></div>
+    </div>
+
+
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+
+  <div id="rtd-footer-container"></div>
+
+
+      </div>
+
+      <main id="main-content" class="bd-main">
+
+
+          <div class="bd-content">
+            <div class="bd-article-container">
+
+              <div class="bd-header-article">
+<div class="header-article-items header-article__inner">
+
+    <div class="header-article-items__start">
+
+        <div class="header-article-item">
+
+
+
+<nav aria-label="Breadcrumb">
+  <ul class="bd-breadcrumbs">
+
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+
+    <li class="breadcrumb-item"><a href="index.html" class="nav-link">Jobflow Remote user guide</a></li>
+
+    <li class="breadcrumb-item active" aria-current="page">Jobflow...</li>
+  </ul>
+</nav>
+</div>
+
+    </div>
+
+
+</div>
+</div>
+
+
+
+
+<div id="searchbox"></div>
+                <article class="bd-article" role="main">
+
+  <section id="jobflow-remote-quickstart">
+<span id="quickstart"></span><h1>Jobflow Remote quickstart<a class="headerlink" href="#jobflow-remote-quickstart" title="Link to this heading">#</a></h1>
+<p>After completing the <a class="reference internal" href="install.html#install"><span class="std std-ref">Setup and installation</span></a>, it is possible to start submitting
+<code class="docutils literal notranslate"><span class="pre">Flow</span></code> for execution. If you are not familiar with the concept of <code class="docutils literal notranslate"><span class="pre">Job</span></code>
+and <code class="docutils literal notranslate"><span class="pre">Flow</span></code> in jobflow you can start checking its
+<a class="reference external" href="https://materialsproject.github.io/jobflow/tutorials.html">tutorials</a>.</p>
+<p>Any jobflow’s <code class="docutils literal notranslate"><span class="pre">Flow</span></code> can be executed with jobflow-remote,
+but, at variance with jobflow simple examples, the Job functions should
+be serializable and accessible by the runner. Simple custom examples based
+on functions defined on the fly cannot thus be used.
+For this reason a few simple <code class="docutils literal notranslate"><span class="pre">Job</span></code> s have been prepared for
+test purposes in the <code class="docutils literal notranslate"><span class="pre">jobflow_remote.utils.examples</span></code> module.</p>
+<p>For the execution of the following tutorial it may be convenient to define
+a simple worker with <code class="docutils literal notranslate"><span class="pre">type:</span> <span class="pre">local</span></code> and <code class="docutils literal notranslate"><span class="pre">scheduler_type:</span> <span class="pre">shell</span></code> to speed up
+the execution, but any worker is acceptable.</p>
+<section id="submit-a-flow">
+<h2>Submit a <code class="docutils literal notranslate"><span class="pre">Flow</span></code><a class="headerlink" href="#submit-a-flow" title="Link to this heading">#</a></h2>
+<p>To run a workflow with jobflow-remote the first step is to insert it into the
+database. A <code class="docutils literal notranslate"><span class="pre">Flow</span></code> can be created following the standard jobflow procedure.
+Then it should be passed to the <code class="docutils literal notranslate"><span class="pre">submit_flow</span></code> function:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">jobflow_remote.utils.examples</span> <span class="kn">import</span> <span class="n">add</span>
+<span class="kn">from</span> <span class="nn">jobflow_remote</span> <span class="kn">import</span> <span class="n">submit_flow</span>
+<span class="kn">from</span> <span class="nn">jobflow</span> <span class="kn">import</span> <span class="n">Flow</span>
+
+<span class="n">job1</span> <span class="o">=</span> <span class="n">add</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
+<span class="n">job2</span> <span class="o">=</span> <span class="n">add</span><span class="p">(</span><span class="n">job1</span><span class="o">.</span><span class="n">output</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
+
+<span class="n">flow</span> <span class="o">=</span> <span class="n">Flow</span><span class="p">([</span><span class="n">job1</span><span class="p">,</span> <span class="n">job2</span><span class="p">])</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="n">submit_flow</span><span class="p">(</span><span class="n">flow</span><span class="p">,</span> <span class="n">worker</span><span class="o">=</span><span class="s2">&quot;local_shell&quot;</span><span class="p">))</span>
+</pre></div>
+</div>
+<p>This code will print an integer unique id associated to the submitted <code class="docutils literal notranslate"><span class="pre">Job</span></code> s.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>In addition to the uuid, the standard jobflow’s identifier for Jobs,
+jobflow-remote also defines an incremental <code class="docutils literal notranslate"><span class="pre">db_id</span></code>, to help quickly
+identify different Jobs. A <code class="docutils literal notranslate"><span class="pre">db_id</span></code> uniquely identifies each Job entry
+in jobflow-remote’s queue database. The same entry is also uniquely
+identified by the <code class="docutils literal notranslate"><span class="pre">uuid</span></code>, <code class="docutils literal notranslate"><span class="pre">index</span></code> pair.</p>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<dl class="simple">
+<dt>On the worker selection:</dt><dd><ul class="simple">
+<li><p>The worker should match the name of one of the workers defined in the project.</p></li>
+<li><p>In this way all the <code class="docutils literal notranslate"><span class="pre">Job</span></code> s will be assigned to the same worker.</p></li>
+<li><p>If the argument is omitted the first worker in the project configuration is used.</p></li>
+<li><p>In any case the worker is determined when the <code class="docutils literal notranslate"><span class="pre">Job</span></code> is inserted in the database.</p></li>
+</ul>
+</dd>
+</dl>
+</div>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Once the flow has been submitted to the database, any further change to the
+<code class="docutils literal notranslate"><span class="pre">Flow</span></code> object will not be taken into account.</p>
+</div>
+<p>It is now possible to use the <code class="docutils literal notranslate"><span class="pre">jf</span></code> command line interface (CLI):</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">jf</span> <span class="n">job</span> <span class="nb">list</span>
+</pre></div>
+</div>
+<p>to display the list of <code class="docutils literal notranslate"><span class="pre">Job</span></code> s in the database:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>                                               Jobs info
+┏━━━━━━━┳━━━━━━┳━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━┓
+┃ DB id ┃ Name ┃ State   ┃ Job id  (Index)                           ┃ Worker      ┃ Last updated [CET] ┃
+┡━━━━━━━╇━━━━━━╇━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━┩
+│ 2     │ add  │ WAITING │ 8b7a7841-37c7-4446-853b-ad3c00eb5227  (1) │ local_shell │ 2023-12-19 16:33   │
+│ 1     │ add  │ READY   │ ae020c67-72f0-4805-858e-fe48644e4bb0  (1) │ local_shell │ 2023-12-19 16:33   │
+└───────┴──────┴─────────┴───────────────────────────────────────────┴─────────────┴────────────────────┘
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>It is possible to use the <code class="docutils literal notranslate"><span class="pre">-v</span></code> flag to increase the <strong>verbosity</strong> of the output.
+Use <code class="docutils literal notranslate"><span class="pre">-vv</span></code> or <code class="docutils literal notranslate"><span class="pre">-vvv</span></code> to further increase the the verbosity.</p>
+<p>It is also possible to <strong>filter</strong> and <em>sort*</em> the results. run <code class="docutils literal notranslate"><span class="pre">jf</span> <span class="pre">job</span> <span class="pre">list</span> <span class="pre">-h</span></code>
+to see the available options.</p>
+</div>
+<p>One of the Jobs is in the <code class="docutils literal notranslate"><span class="pre">READY</span></code> state, signaling that it is ready to be executed.
+The second Job is instead in the <code class="docutils literal notranslate"><span class="pre">WAITING</span></code> state since it will not start until the
+first reaches the <code class="docutils literal notranslate"><span class="pre">COMPLETED</span></code> state. At this point nothing will happen, since the
+process to handle the Jobs has not been started yet.</p>
+</section>
+<section id="the-runner">
+<h2>The Runner<a class="headerlink" href="#the-runner" title="Link to this heading">#</a></h2>
+<p>Jobflow-remote’s <code class="docutils literal notranslate"><span class="pre">Runner</span></code> is an object that takes care of handling the
+submitted <code class="docutils literal notranslate"><span class="pre">Job</span></code> s. It performs several actions to advance the state of the
+workflows. For each <code class="docutils literal notranslate"><span class="pre">Job</span></code> it:</p>
+<ul class="simple">
+<li><p>Copies files to and from the <strong>WORKER</strong> (i.e. <code class="docutils literal notranslate"><span class="pre">Job</span></code> ‘s inputs and outputs)</p></li>
+<li><p>Interacts with the <strong>WORKER</strong>’s queue manager (e.g. SLURM, PBS, …),
+submitting jobs and checking their state</p></li>
+<li><p>Updates the content of the database</p></li>
+</ul>
+<p>Only the actual execution of the Jobs in the Workers are disconnected
+from the <code class="docutils literal notranslate"><span class="pre">Runner</span></code>. In all the other cases, the state of the <code class="docutils literal notranslate"><span class="pre">Job</span></code> s
+can change only if the <code class="docutils literal notranslate"><span class="pre">Runner</span></code> is running.</p>
+<p>The standard way to execute the <code class="docutils literal notranslate"><span class="pre">Runner</span></code> is through a daemon process
+that can be started with the <code class="docutils literal notranslate"><span class="pre">jf</span></code> CLI:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">jf</span> <span class="n">runner</span> <span class="n">start</span>
+</pre></div>
+</div>
+<p>Since the process starts in the background, you can check that it properly
+started with the command:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">jf</span> <span class="n">runner</span> <span class="n">status</span>
+</pre></div>
+</div>
+<p>If the <code class="docutils literal notranslate"><span class="pre">Runner</span></code> started correctly you should get:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">Daemon</span> <span class="n">status</span><span class="p">:</span> <span class="n">running</span>
+</pre></div>
+</div>
+<p>During the execution of the Job it is possible to check their status as
+done before:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>                                                 Jobs info
+┏━━━━━━━┳━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━┓
+┃ DB id ┃ Name ┃ State     ┃ Job id  (Index)                           ┃ Worker      ┃ Last updated [CET] ┃
+┡━━━━━━━╇━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━┩
+│ 2     │ add  │ RUNNING   │ 8b7a7841-37c7-4446-853b-ad3c00eb5227  (1) │ local_shell │ 2023-12-19 16:44   │
+│ 1     │ add  │ COMPLETED │ ae020c67-72f0-4805-858e-fe48644e4bb0  (1) │ local_shell │ 2023-12-19 16:44   │
+└───────┴──────┴───────────┴───────────────────────────────────────────┴─────────────┴────────────────────┘
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">Runner</span></code> checks the states of the Jobs at regular intervals. A few seconds may
+be required to have a change in the Job state.</p>
+</div>
+<p>The <code class="docutils literal notranslate"><span class="pre">Runner</span></code> will keep checking the database for the submission of new Jobs
+and will update the state of each Job as soon as the previous action is completed.
+If you plan to keep submitting workflows you can keep the daemon running, otherwise
+you can stop the process with:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">jf</span> <span class="n">runner</span> <span class="n">stop</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>By default the daemon will spawn several processes, each taking care of some
+of the actions listed above.</p>
+</div>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">stop</span></code> command will send a <code class="docutils literal notranslate"><span class="pre">SIGTERM</span></code> command to the <code class="docutils literal notranslate"><span class="pre">Runner</span></code> processes, that
+will terminate the action currently being performed before actually stopping. This should
+prevent the presence on inconsistent states in the database.
+However, if you believe the <code class="docutils literal notranslate"><span class="pre">Runner</span></code> is stuck or need to halt the <code class="docutils literal notranslate"><span class="pre">Runner</span></code> immediately
+you can kill the processes with:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">jf</span> <span class="n">runner</span> <span class="n">kill</span>
+</pre></div>
+</div>
+</div>
+</section>
+<section id="results">
+<h2>Results<a class="headerlink" href="#results" title="Link to this heading">#</a></h2>
+<p>As in standard jobflow execution, when a <code class="docutils literal notranslate"><span class="pre">Job</span></code> is <code class="docutils literal notranslate"><span class="pre">COMPLETED</span></code> its output is
+stored in the defined <code class="docutils literal notranslate"><span class="pre">JobStore</span></code>. For simple cases like the one used in this
+example the outputs can be fetched directly using the CLI:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">jf</span> <span class="n">job</span> <span class="n">output</span> <span class="mi">2</span>
+</pre></div>
+</div>
+<p>That should print the expected result:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="mi">5</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The CLI commands that accept a single Job id, both the <code class="docutils literal notranslate"><span class="pre">uuid</span></code> or the <code class="docutils literal notranslate"><span class="pre">db_id</span></code>
+can be passed. The code will automatically determine the</p>
+</div>
+<p>For more advanced workflows, the best way to obtain the results is using the
+<code class="docutils literal notranslate"><span class="pre">JobStore</span></code>, as done with <a class="reference external" href="https://materialsproject.github.io/jobflow/tutorials/2-introduction.html#Examine-Flow-outputs">usual jobflow’s outputs</a>.
+For jobflow-remote, a convenient way to access the <code class="docutils literal notranslate"><span class="pre">JobStore</span></code> in python is
+to use the <code class="docutils literal notranslate"><span class="pre">get_jobstore</span></code> helper function.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">jobflow_remote</span> <span class="kn">import</span> <span class="n">get_jobstore</span>
+
+<span class="n">js</span> <span class="o">=</span> <span class="n">get_jobstore</span><span class="p">()</span>
+<span class="n">js</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="n">js</span><span class="o">.</span><span class="n">get_output</span><span class="p">(</span><span class="s2">&quot;8b7a7841-37c7-4446-853b-ad3c00eb5227&quot;</span><span class="p">))</span>
+</pre></div>
+</div>
+</section>
+<section id="cli">
+<h2>CLI<a class="headerlink" href="#cli" title="Link to this heading">#</a></h2>
+<p>On top of the CLI commands shown above a full list of the commands, sub-commands options
+available is accessible through the <code class="docutils literal notranslate"><span class="pre">-h</span></code> flag. Here we present a few more of them
+that can be useful to get started.</p>
+<section id="job-info">
+<h3>Job info<a class="headerlink" href="#job-info" title="Link to this heading">#</a></h3>
+<p>Detailed information from a Job can be obtained running the command:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">jf</span> <span class="n">job</span> <span class="n">info</span> <span class="mi">2</span>
+</pre></div>
+</div>
+<p>that prints a summary of the content of the Job document in the DB:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>╭─────────────────────────────────────────────────────────────────────────────────────────────╮
+│ created_on = &#39;2023-12-19 16:33&#39;                                                             │
+│      db_id = 2                                                                              │
+│   end_time = &#39;2023-12-19 16:44&#39;                                                             │
+│      index = 1                                                                              │
+│   metadata = {}                                                                             │
+│       name = &#39;add&#39;                                                                          │
+│    parents = [&#39;ae020c67-72f0-4805-858e-fe48644e4bb0&#39;]                                       │
+│   priority = 0                                                                              │
+│     remote = {&#39;step_attempts&#39;: 0, &#39;process_id&#39;: &#39;89838&#39;}                                    │
+│    run_dir = &#39;/path/to/run/folder/8b/7a/78/8b7a7841-37c7-4446-853b-ad3c00eb5227_1&#39;          │
+│ start_time = &#39;2023-12-19 16:44&#39;                                                             │
+│      state = &#39;COMPLETED&#39;                                                                    │
+│ updated_on = &#39;2023-12-19 16:44&#39;                                                             │
+│       uuid = &#39;8b7a7841-37c7-4446-853b-ad3c00eb5227&#39;                                         │
+│     worker = &#39;local_shell&#39;                                                                  │
+╰─────────────────────────────────────────────────────────────────────────────────────────────╯
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This will also contain the tracked error in case of failure of the Job.
+Dealing with failed Jobs will be dealt with in the troubleshooting section.</p>
+</div>
+</section>
+<section id="flow-list">
+<h3>Flow list<a class="headerlink" href="#flow-list" title="Link to this heading">#</a></h3>
+<p>Similarly to the list of Jobs a list of Flows and their states can be obtained with:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">jf</span> <span class="n">flow</span> <span class="nb">list</span>
+</pre></div>
+</div>
+<p>that returns:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>                                            Flows info
+┏━━━━━━━┳━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━┓
+┃ DB id ┃ Name ┃ State     ┃ Flow id                              ┃ Num Jobs ┃ Last updated [CET] ┃
+┡━━━━━━━╇━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━┩
+│ 1     │ Flow │ COMPLETED │ 959ffe14-7061-4b74-a3ad-10c3c12715ad │ 2        │ 2023-12-19 16:43   │
+└───────┴──────┴───────────┴──────────────────────────────────────┴──────────┴────────────────────┘
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>A Flow has its own uuid, while the DB id corresponds to the lowest DB id among the
+Jobs belonging to the Flow</p>
+</div>
+</section>
+<section id="delete-flows">
+<h3>Delete Flows<a class="headerlink" href="#delete-flows" title="Link to this heading">#</a></h3>
+<p>In case you need to delete some Flows, without resetting the whole database,
+you can use the command:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">jf</span> <span class="n">flow</span> <span class="n">delete</span> <span class="o">-</span><span class="n">did</span> <span class="mi">1</span>
+</pre></div>
+</div>
+<p>where filters similar to the ones of the <code class="docutils literal notranslate"><span class="pre">list</span></code> command can be used.</p>
+</section>
+</section>
+</section>
+
+
+                </article>
+
+
+
+
+
+                <footer class="prev-next-footer">
+
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="projectconf.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">Projects configuration and Settings</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="tuning.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">Tuning Job execution</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+
+            </div>
+
+
+
+                <div class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+  <div class="sidebar-secondary-item">
+
+  <div class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> On this page
+  </div>
+  <nav class="bd-toc-nav page-toc">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#submit-a-flow">Submit a <code class="docutils literal notranslate"><span class="pre">Flow</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#the-runner">The Runner</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#results">Results</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#cli">CLI</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#job-info">Job info</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#flow-list">Flow list</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#delete-flows">Delete Flows</a></li>
+</ul>
+</li>
+</ul>
+  </nav></div>
+
+</div></div>
+
+
+          </div>
+          <footer class="bd-footer-content">
+
+          </footer>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="../_static/scripts/bootstrap.js?digest=5b4479735964841361fd"></script>
+<script src="../_static/scripts/pydata-sphinx-theme.js?digest=5b4479735964841361fd"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+
+    <div class="footer-items__start">
+
+        <div class="footer-item">
+
+  <p class="copyright">
+
+      © Copyright 2023, Matgenix SRL.
+      <br/>
+
+  </p>
+</div>
+
+        <div class="footer-item">
+
+  <p class="sphinx-version">
+    Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 7.2.6.
+    <br/>
+  </p>
+</div>
+
+    </div>
+
+
+
+    <div class="footer-items__end">
+
+        <div class="footer-item">
+<p class="theme-version">
+  Built with the <a href="https://pydata-sphinx-theme.readthedocs.io/en/stable/index.html">PyData Sphinx Theme</a> 0.14.4.
+</p></div>
+
+    </div>
+
+</div>
+
+  </footer>
+  </body>
+</html>

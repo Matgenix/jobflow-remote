@@ -1,0 +1,1098 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../../../" data-theme="light">
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>jobflow_remote.config.base &#8212; Jobflow Remote v0.0.1.post117+gfc0fbc0.d20231222 Manual</title>
+
+
+
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "light";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "light";
+  </script>
+
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../../_static/styles/theme.css?digest=5b4479735964841361fd" rel="stylesheet" />
+<link href="../../../_static/styles/bootstrap.css?digest=5b4479735964841361fd" rel="stylesheet" />
+<link href="../../../_static/styles/pydata-sphinx-theme.css?digest=5b4479735964841361fd" rel="stylesheet" />
+
+
+  <link href="../../../_static/vendor/fontawesome/6.1.2/css/all.min.css?digest=5b4479735964841361fd" rel="stylesheet" />
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="../../../_static/vendor/fontawesome/6.1.2/webfonts/fa-solid-900.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../_static/vendor/fontawesome/6.1.2/webfonts/fa-brands-400.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../_static/vendor/fontawesome/6.1.2/webfonts/fa-regular-400.woff2" />
+
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=fa44fd50" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css?v=eafc0fe6" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/autodoc_pydantic.css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/design-style.1e8bd061cd6da7fc9cf755528e8ffc24.min.css?v=0a3b3ea7" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/jobflow_remote.css?v=7b6df8f0" />
+
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../../_static/scripts/bootstrap.js?digest=5b4479735964841361fd" />
+<link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=5b4479735964841361fd" />
+  <script src="../../../_static/vendor/fontawesome/6.1.2/js/all.min.js?digest=5b4479735964841361fd"></script>
+
+    <script src="../../../_static/documentation_options.js?v=e135783d"></script>
+    <script src="../../../_static/doctools.js?v=888ff710"></script>
+    <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../../_static/design-tabs.js?v=36754332"></script>
+    <script src="https://unpkg.com/mermaid@10.2.0/dist/mermaid.min.js"></script>
+    <script>mermaid.initialize({startOnLoad:true});</script>
+    <script>DOCUMENTATION_OPTIONS.pagename = '_modules/jobflow_remote/config/base';</script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+    <meta name="docbuild:last-update" content="Dec 22, 2023"/>
+  </head>
+
+
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="light">
+
+
+
+  <a class="skip-link" href="#main-content">Skip to main content</a>
+
+  <div id="pst-scroll-pixel-helper"></div>
+
+
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>
+    Back to top
+  </button>
+
+
+  <input type="checkbox"
+          class="sidebar-toggle"
+          name="__primary"
+          id="__primary"/>
+  <label class="overlay overlay-primary" for="__primary"></label>
+
+  <input type="checkbox"
+          class="sidebar-toggle"
+          name="__secondary"
+          id="__secondary"/>
+  <label class="overlay overlay-secondary" for="__secondary"></label>
+
+  <div class="search-button__wrapper">
+    <div class="search-button__overlay"></div>
+    <div class="search-button__search-container">
+<form class="bd-search d-flex align-items-center"
+      action="../../../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         id="search-input"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form></div>
+  </div>
+
+
+  <div class="bd-header-announcement container-fluid bd-header-announcement">
+    <div class="bd-header-announcement__content"><p>Jobflow Remote is still in beta phase. The API may change at any time.</p></div>
+  </div>
+
+
+    <nav class="bd-header navbar navbar-expand-lg bd-navbar">
+<div class="bd-header__inner bd-page-width">
+  <label class="sidebar-toggle primary-toggle" for="__primary">
+    <span class="fa-solid fa-bars"></span>
+  </label>
+
+
+  <div class="col-lg-3 navbar-header-items__start">
+
+      <div class="navbar-item">
+
+
+
+<a class="navbar-brand logo" href="../../../index.html">
+
+
+
+
+
+
+    <p class="title logo__title">Jobflow Remote v0.0.1.post117+gfc0fbc0.d20231222 Manual</p>
+
+</a></div>
+
+  </div>
+
+  <div class="col-lg-9 navbar-header-items">
+
+    <div class="me-auto navbar-header-items__center">
+
+        <div class="navbar-item">
+<nav class="navbar-nav">
+  <p class="sidebar-header-items__title"
+     role="heading"
+     aria-level="1"
+     aria-label="Site Navigation">
+    Site Navigation
+  </p>
+  <ul class="bd-navbar-elements navbar-nav">
+
+                    <li class="nav-item">
+                      <a class="nav-link nav-internal" href="../../../user/index.html">
+                        User Guide
+                      </a>
+                    </li>
+
+
+                    <li class="nav-item">
+                      <a class="nav-link nav-internal" href="../../../api/index.html">
+                        API reference
+                      </a>
+                    </li>
+
+
+                    <li class="nav-item">
+                      <a class="nav-link nav-internal" href="../../../dev/index.html">
+                        Development
+                      </a>
+                    </li>
+
+  </ul>
+</nav></div>
+
+    </div>
+
+
+    <div class="navbar-header-items__end">
+
+        <div class="navbar-item navbar-persistent--container">
+
+
+ <script>
+ document.write(`
+   <button class="btn navbar-btn search-button-field search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass"></i>
+    <span class="search-button__default-text">Search</span>
+    <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+   </button>
+ `);
+ </script>
+        </div>
+
+
+        <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm navbar-btn theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="theme-switch nav-link" data-mode="light"><i class="fa-solid fa-sun fa-lg"></i></span>
+    <span class="theme-switch nav-link" data-mode="dark"><i class="fa-solid fa-moon fa-lg"></i></span>
+    <span class="theme-switch nav-link" data-mode="auto"><i class="fa-solid fa-circle-half-stroke fa-lg"></i></span>
+  </button>
+`);
+</script></div>
+
+    </div>
+
+  </div>
+
+
+    <div class="navbar-persistent--mobile">
+
+ <script>
+ document.write(`
+   <button class="btn navbar-btn search-button-field search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass"></i>
+    <span class="search-button__default-text">Search</span>
+    <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+   </button>
+ `);
+ </script>
+    </div>
+
+
+
+</div>
+
+    </nav>
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+
+      <div class="bd-sidebar-primary bd-sidebar hide-on-wide">
+
+
+
+  <div class="sidebar-header-items sidebar-primary__section">
+
+
+      <div class="sidebar-header-items__center">
+
+          <div class="navbar-item">
+<nav class="navbar-nav">
+  <p class="sidebar-header-items__title"
+     role="heading"
+     aria-level="1"
+     aria-label="Site Navigation">
+    Site Navigation
+  </p>
+  <ul class="bd-navbar-elements navbar-nav">
+
+                    <li class="nav-item">
+                      <a class="nav-link nav-internal" href="../../../user/index.html">
+                        User Guide
+                      </a>
+                    </li>
+
+
+                    <li class="nav-item">
+                      <a class="nav-link nav-internal" href="../../../api/index.html">
+                        API reference
+                      </a>
+                    </li>
+
+
+                    <li class="nav-item">
+                      <a class="nav-link nav-internal" href="../../../dev/index.html">
+                        Development
+                      </a>
+                    </li>
+
+  </ul>
+</nav></div>
+
+      </div>
+
+
+
+      <div class="sidebar-header-items__end">
+
+          <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm navbar-btn theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="theme-switch nav-link" data-mode="light"><i class="fa-solid fa-sun fa-lg"></i></span>
+    <span class="theme-switch nav-link" data-mode="dark"><i class="fa-solid fa-moon fa-lg"></i></span>
+    <span class="theme-switch nav-link" data-mode="auto"><i class="fa-solid fa-circle-half-stroke fa-lg"></i></span>
+  </button>
+`);
+</script></div>
+
+      </div>
+
+  </div>
+
+
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+
+  <div id="rtd-footer-container"></div>
+
+
+      </div>
+
+      <main id="main-content" class="bd-main">
+
+
+          <div class="bd-content">
+            <div class="bd-article-container">
+
+              <div class="bd-header-article">
+<div class="header-article-items header-article__inner">
+
+    <div class="header-article-items__start">
+
+        <div class="header-article-item">
+
+
+
+<nav aria-label="Breadcrumb">
+  <ul class="bd-breadcrumbs">
+
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../../../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+
+    <li class="breadcrumb-item"><a href="../../index.html" class="nav-link">Module code</a></li>
+
+    <li class="breadcrumb-item active" aria-current="page">jobflow_remo...</li>
+  </ul>
+</nav>
+</div>
+
+    </div>
+
+
+</div>
+</div>
+
+
+
+
+<div id="searchbox"></div>
+                <article class="bd-article" role="main">
+
+  <h1>Source code for jobflow_remote.config.base</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span> <span class="nn">abc</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">import</span> <span class="nn">traceback</span>
+<span class="kn">from</span> <span class="nn">enum</span> <span class="kn">import</span> <span class="n">Enum</span>
+<span class="kn">from</span> <span class="nn">pathlib</span> <span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Annotated</span><span class="p">,</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Literal</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Union</span>
+
+<span class="kn">from</span> <span class="nn">jobflow</span> <span class="kn">import</span> <span class="n">JobStore</span>
+<span class="kn">from</span> <span class="nn">maggma.stores</span> <span class="kn">import</span> <span class="n">MongoStore</span>
+<span class="kn">from</span> <span class="nn">pydantic</span> <span class="kn">import</span> <span class="n">BaseModel</span><span class="p">,</span> <span class="n">ConfigDict</span><span class="p">,</span> <span class="n">Field</span><span class="p">,</span> <span class="n">ValidationInfo</span><span class="p">,</span> <span class="n">field_validator</span>
+<span class="kn">from</span> <span class="nn">qtoolkit.io</span> <span class="kn">import</span> <span class="n">BaseSchedulerIO</span><span class="p">,</span> <span class="n">scheduler_mapping</span>
+
+<span class="kn">from</span> <span class="nn">jobflow_remote.remote.host</span> <span class="kn">import</span> <span class="n">BaseHost</span><span class="p">,</span> <span class="n">LocalHost</span><span class="p">,</span> <span class="n">RemoteHost</span>
+<span class="kn">from</span> <span class="nn">jobflow_remote.utils.data</span> <span class="kn">import</span> <span class="n">store_from_dict</span>
+
+<span class="n">DEFAULT_JOBSTORE</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;docs_store&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;MemoryStore&quot;</span><span class="p">}}</span>
+
+
+<div class="viewcode-block" id="RunnerOptions">
+<a class="viewcode-back" href="../../../api/jobflow_remote.config.base.html#jobflow_remote.config.base.RunnerOptions">[docs]</a>
+<span class="k">class</span> <span class="nc">RunnerOptions</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Options to tune the execution of the Runner</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">delay_checkout</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span>
+        <span class="mi">30</span><span class="p">,</span>
+        <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Delay between subsequent execution of the checkout from database (seconds)&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">delay_check_run_status</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span>
+        <span class="mi">30</span><span class="p">,</span>
+        <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Delay between subsequent execution of the checking the status of &quot;</span>
+        <span class="s2">&quot;jobs that are submitted to the scheduler (seconds)&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">delay_advance_status</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span>
+        <span class="mi">30</span><span class="p">,</span>
+        <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Delay between subsequent advancement of the job&#39;s remote state (seconds)&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">delay_refresh_limited</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span>
+        <span class="mi">600</span><span class="p">,</span>
+        <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Delay between subsequent refresh from the DB of the number of submitted &quot;</span>
+        <span class="s2">&quot;and running jobs (seconds). Only use if a worker with max_jobs is present&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">delay_update_batch</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span>
+        <span class="mi">60</span><span class="p">,</span>
+        <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Delay between subsequent refresh from the DB of the number of submitted &quot;</span>
+        <span class="s2">&quot;and running jobs (seconds). Only use if a worker with max_jobs is present&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">lock_timeout</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span>
+        <span class="mi">86400</span><span class="p">,</span>
+        <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Time to consider the lock on a document expired and can be overridden (seconds)&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">delete_tmp_folder</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span>
+        <span class="kc">True</span><span class="p">,</span>
+        <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Whether to delete the local temporary folder after a job has completed&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">max_step_attempts</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span>
+        <span class="mi">3</span><span class="p">,</span>
+        <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Maximum number of attempt performed before failing an &quot;</span>
+        <span class="s2">&quot;advancement of a remote state&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">delta_retry</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span>
+        <span class="p">(</span><span class="mi">30</span><span class="p">,</span> <span class="mi">300</span><span class="p">,</span> <span class="mi">1200</span><span class="p">),</span>
+        <span class="n">description</span><span class="o">=</span><span class="s2">&quot;List of increasing delay between subsequent attempts when the &quot;</span>
+        <span class="s2">&quot;advancement of a remote step fails&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+
+<div class="viewcode-block" id="RunnerOptions.get_delta_retry">
+<a class="viewcode-back" href="../../../api/jobflow_remote.config.base.html#jobflow_remote.config.base.RunnerOptions.get_delta_retry">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_delta_retry</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">step_attempts</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        The time to wait before retrying a failed advancement of the remote state,</span>
+<span class="sd">        based on the number of attempts.</span>
+
+<span class="sd">        If exceeding the size of the list delta_retry, the last value is returned.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        step_attempts</span>
+<span class="sd">            The number of attempts advancing a remote state.</span>
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">            The delay in seconds.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">ind</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">step_attempts</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">delta_retry</span><span class="p">))</span> <span class="o">-</span> <span class="mi">1</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">delta_retry</span><span class="p">[</span><span class="n">ind</span><span class="p">]</span></div>
+
+
+    <span class="n">model_config</span> <span class="o">=</span> <span class="n">ConfigDict</span><span class="p">(</span><span class="n">extra</span><span class="o">=</span><span class="s2">&quot;forbid&quot;</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="LogLevel">
+<a class="viewcode-back" href="../../../api/jobflow_remote.config.base.html#jobflow_remote.config.base.LogLevel">[docs]</a>
+<span class="k">class</span> <span class="nc">LogLevel</span><span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="n">Enum</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Enumeration of logging level.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">ERROR</span> <span class="o">=</span> <span class="s2">&quot;error&quot;</span>
+    <span class="n">WARN</span> <span class="o">=</span> <span class="s2">&quot;warn&quot;</span>
+    <span class="n">INFO</span> <span class="o">=</span> <span class="s2">&quot;info&quot;</span>
+    <span class="n">DEBUG</span> <span class="o">=</span> <span class="s2">&quot;debug&quot;</span>
+
+<div class="viewcode-block" id="LogLevel.to_logging">
+<a class="viewcode-back" href="../../../api/jobflow_remote.config.base.html#jobflow_remote.config.base.LogLevel.to_logging">[docs]</a>
+    <span class="k">def</span> <span class="nf">to_logging</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Helper converter to python logging values.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        The int corresponding to python logging value</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="p">{</span>
+            <span class="n">LogLevel</span><span class="o">.</span><span class="n">ERROR</span><span class="p">:</span> <span class="n">logging</span><span class="o">.</span><span class="n">ERROR</span><span class="p">,</span>
+            <span class="n">LogLevel</span><span class="o">.</span><span class="n">WARN</span><span class="p">:</span> <span class="n">logging</span><span class="o">.</span><span class="n">WARN</span><span class="p">,</span>
+            <span class="n">LogLevel</span><span class="o">.</span><span class="n">INFO</span><span class="p">:</span> <span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">,</span>
+            <span class="n">LogLevel</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">:</span> <span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">,</span>
+        <span class="p">}[</span><span class="bp">self</span><span class="p">]</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="BatchConfig">
+<a class="viewcode-back" href="../../../api/jobflow_remote.config.base.html#jobflow_remote.config.base.BatchConfig">[docs]</a>
+<span class="k">class</span> <span class="nc">BatchConfig</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+    <span class="n">jobs_handle_dir</span><span class="p">:</span> <span class="n">Path</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span>
+        <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Absolute path to a folder that will be used to store information to share with the jobs being executed&quot;</span>
+    <span class="p">)</span>
+    <span class="n">work_dir</span><span class="p">:</span> <span class="n">Path</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span>
+        <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Absolute path to a folder where the batch jobs will be executed&quot;</span>
+    <span class="p">)</span>
+    <span class="n">max_jobs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span>
+        <span class="kc">None</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Maximum number of jobs executed in a single run in the queue&quot;</span>
+    <span class="p">)</span>
+    <span class="n">max_wait</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span>
+        <span class="mi">60</span><span class="p">,</span>
+        <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Maximum time to wait before stopping if no new jobs are available to run (seconds)&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">max_time</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span>
+        <span class="kc">None</span><span class="p">,</span>
+        <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Maximum time after which a job will not submit more jobs (seconds). To help avoid hitting the walltime&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">model_config</span> <span class="o">=</span> <span class="n">ConfigDict</span><span class="p">(</span><span class="n">extra</span><span class="o">=</span><span class="s2">&quot;forbid&quot;</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="WorkerBase">
+<a class="viewcode-back" href="../../../api/jobflow_remote.config.base.html#jobflow_remote.config.base.WorkerBase">[docs]</a>
+<span class="k">class</span> <span class="nc">WorkerBase</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Base class defining the common field for the different types of Worker.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="nb">type</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span>
+        <span class="n">description</span><span class="o">=</span><span class="s2">&quot;The discriminator field to determine the worker type&quot;</span>
+    <span class="p">)</span>
+
+    <span class="n">scheduler_type</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span>
+        <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Type of the scheduler. Depending on the values supported by QToolKit&quot;</span>
+    <span class="p">)</span>
+    <span class="n">work_dir</span><span class="p">:</span> <span class="n">Path</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span>
+        <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Absolute path of the directory of the worker where subfolders for &quot;</span>
+        <span class="s2">&quot;executing the calculation will be created&quot;</span>
+    <span class="p">)</span>
+    <span class="n">resources</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">]</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span>
+        <span class="kc">None</span><span class="p">,</span>
+        <span class="n">description</span><span class="o">=</span><span class="s2">&quot;A dictionary defining the default resources requested to the &quot;</span>
+        <span class="s2">&quot;scheduler. Used to fill in the QToolKit template&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">pre_run</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span>
+        <span class="kc">None</span><span class="p">,</span>
+        <span class="n">description</span><span class="o">=</span><span class="s2">&quot;String with commands that will be executed before the execution of the Job&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">post_run</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span>
+        <span class="kc">None</span><span class="p">,</span>
+        <span class="n">description</span><span class="o">=</span><span class="s2">&quot;String with commands that will be executed after the execution of the Job&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">timeout_execute</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span>
+        <span class="mi">60</span><span class="p">,</span>
+        <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Timeout for the execution of the commands in the worker &quot;</span>
+        <span class="s2">&quot;(e.g. submitting a job)&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">max_jobs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span>
+        <span class="kc">None</span><span class="p">,</span>
+        <span class="n">description</span><span class="o">=</span><span class="s2">&quot;The maximum number of jobs that can be submitted to the queue.&quot;</span><span class="p">,</span>
+        <span class="n">ge</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">batch</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">BatchConfig</span><span class="p">]</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span>
+        <span class="kc">None</span><span class="p">,</span>
+        <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Options for batch execution. If define the worker will be considered a batch worker&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">model_config</span> <span class="o">=</span> <span class="n">ConfigDict</span><span class="p">(</span><span class="n">extra</span><span class="o">=</span><span class="s2">&quot;forbid&quot;</span><span class="p">)</span>
+
+<div class="viewcode-block" id="WorkerBase.check_scheduler_type">
+<a class="viewcode-back" href="../../../api/jobflow_remote.config.base.html#jobflow_remote.config.base.WorkerBase.check_scheduler_type">[docs]</a>
+    <span class="nd">@field_validator</span><span class="p">(</span><span class="s2">&quot;scheduler_type&quot;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">check_scheduler_type</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">scheduler_type</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Validator to set the default of scheduler_type</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">scheduler_type</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">scheduler_mapping</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unknown scheduler type </span><span class="si">{</span><span class="n">scheduler_type</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">scheduler_type</span></div>
+
+
+<div class="viewcode-block" id="WorkerBase.check_work_dir">
+<a class="viewcode-back" href="../../../api/jobflow_remote.config.base.html#jobflow_remote.config.base.WorkerBase.check_work_dir">[docs]</a>
+    <span class="nd">@field_validator</span><span class="p">(</span><span class="s2">&quot;work_dir&quot;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">check_work_dir</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">v</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Path</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">v</span><span class="o">.</span><span class="n">is_absolute</span><span class="p">():</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;`work_dir` must be an absolute path&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">v</span></div>
+
+
+<div class="viewcode-block" id="WorkerBase.get_scheduler_io">
+<a class="viewcode-back" href="../../../api/jobflow_remote.config.base.html#jobflow_remote.config.base.WorkerBase.get_scheduler_io">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_scheduler_io</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">BaseSchedulerIO</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Get the BaseSchedulerIO from QToolKit depending on scheduler_type.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        The instance of the scheduler_type.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">scheduler_type</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">scheduler_mapping</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">ConfigError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unknown scheduler type </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">scheduler_type</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">scheduler_mapping</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">scheduler_type</span><span class="p">]()</span></div>
+
+
+<div class="viewcode-block" id="WorkerBase.get_host">
+<a class="viewcode-back" href="../../../api/jobflow_remote.config.base.html#jobflow_remote.config.base.WorkerBase.get_host">[docs]</a>
+    <span class="nd">@abc</span><span class="o">.</span><span class="n">abstractmethod</span>
+    <span class="k">def</span> <span class="nf">get_host</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">BaseHost</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return the Host object used in the Worker.</span>
+<span class="sd">        &quot;&quot;&quot;</span></div>
+
+
+    <span class="nd">@property</span>
+    <span class="nd">@abc</span><span class="o">.</span><span class="n">abstractmethod</span>
+    <span class="k">def</span> <span class="nf">cli_info</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Short information about the worker to be displayed in the command line</span>
+<span class="sd">        interface.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        A dictionary with the Worker short information.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">is_local</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="s2">&quot;local&quot;</span></div>
+
+
+
+<div class="viewcode-block" id="LocalWorker">
+<a class="viewcode-back" href="../../../api/jobflow_remote.config.base.html#jobflow_remote.config.base.LocalWorker">[docs]</a>
+<span class="k">class</span> <span class="nc">LocalWorker</span><span class="p">(</span><span class="n">WorkerBase</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Worker representing the local host.</span>
+
+<span class="sd">    Executes command directly.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="nb">type</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;local&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span>
+        <span class="s2">&quot;local&quot;</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="s2">&quot;The discriminator field to determine the worker type&quot;</span>
+    <span class="p">)</span>
+
+<div class="viewcode-block" id="LocalWorker.get_host">
+<a class="viewcode-back" href="../../../api/jobflow_remote.config.base.html#jobflow_remote.config.base.LocalWorker.get_host">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_host</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">BaseHost</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return the LocalHost.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        The LocalHost.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">LocalHost</span><span class="p">(</span><span class="n">timeout_execute</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">timeout_execute</span><span class="p">)</span></div>
+
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">cli_info</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Short information about the worker to be displayed in the command line</span>
+<span class="sd">        interface.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        A dictionary with the Worker short information.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">dict</span><span class="p">(</span>
+            <span class="n">scheduler_type</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">scheduler_type</span><span class="p">,</span>
+            <span class="n">work_dir</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">work_dir</span><span class="p">,</span>
+        <span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="RemoteWorker">
+<a class="viewcode-back" href="../../../api/jobflow_remote.config.base.html#jobflow_remote.config.base.RemoteWorker">[docs]</a>
+<span class="k">class</span> <span class="nc">RemoteWorker</span><span class="p">(</span><span class="n">WorkerBase</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Worker representing a remote host reached through an SSH connection.</span>
+
+<span class="sd">    Uses a Fabric Connection. Check Fabric documentation for more datails on the</span>
+<span class="sd">    options defininf a Connection.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="nb">type</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;remote&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span>
+        <span class="s2">&quot;remote&quot;</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="s2">&quot;The discriminator field to determine the worker type&quot;</span>
+    <span class="p">)</span>
+    <span class="n">host</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">description</span><span class="o">=</span><span class="s2">&quot;The host to which to connect&quot;</span><span class="p">)</span>
+    <span class="n">user</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Login username&quot;</span><span class="p">)</span>
+    <span class="n">port</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Port number&quot;</span><span class="p">)</span>
+    <span class="n">password</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Login password&quot;</span><span class="p">)</span>
+    <span class="n">key_filename</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]]]</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span>
+        <span class="kc">None</span><span class="p">,</span>
+        <span class="n">description</span><span class="o">=</span><span class="s2">&quot;The filename, or list of filenames, of optional private key(s) &quot;</span>
+        <span class="s2">&quot;and/or certs to try for authentication&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">passphrase</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span>
+        <span class="kc">None</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Passphrase used for decrypting private keys&quot;</span>
+    <span class="p">)</span>
+    <span class="n">gateway</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span>
+        <span class="kc">None</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="s2">&quot;A shell command string to use as a proxy or gateway&quot;</span>
+    <span class="p">)</span>
+    <span class="n">forward_agent</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">bool</span><span class="p">]</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span>
+        <span class="kc">None</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Whether to enable SSH agent forwarding&quot;</span>
+    <span class="p">)</span>
+    <span class="n">connect_timeout</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span>
+        <span class="kc">None</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Connection timeout, in seconds&quot;</span>
+    <span class="p">)</span>
+    <span class="n">connect_kwargs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">]</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span>
+        <span class="kc">None</span><span class="p">,</span>
+        <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Other keyword arguments passed to paramiko.client.SSHClient.connect&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">inline_ssh_env</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">bool</span><span class="p">]</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span>
+        <span class="kc">None</span><span class="p">,</span>
+        <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Whether to send environment variables &#39;inline&#39; as prefixes in &quot;</span>
+        <span class="s2">&quot;front of command strings&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">keepalive</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span>
+        <span class="mi">60</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Keepalive value in seconds passed to paramiko&#39;s transport&quot;</span>
+    <span class="p">)</span>
+    <span class="n">shell_cmd</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span>
+        <span class="s2">&quot;bash&quot;</span><span class="p">,</span>
+        <span class="n">description</span><span class="o">=</span><span class="s2">&quot;The shell command used to execute the command remotely. If None &quot;</span>
+        <span class="s2">&quot;the command is executed directly&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">login_shell</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span>
+        <span class="kc">True</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Whether to use a login shell when executing the command&quot;</span>
+    <span class="p">)</span>
+
+<div class="viewcode-block" id="RemoteWorker.get_host">
+<a class="viewcode-back" href="../../../api/jobflow_remote.config.base.html#jobflow_remote.config.base.RemoteWorker.get_host">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_host</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">BaseHost</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return the RemoteHost.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        The RemoteHost.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">connect_kwargs</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">connect_kwargs</span><span class="p">)</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">connect_kwargs</span> <span class="k">else</span> <span class="p">{}</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">password</span><span class="p">:</span>
+            <span class="n">connect_kwargs</span><span class="p">[</span><span class="s2">&quot;password&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">password</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">key_filename</span><span class="p">:</span>
+            <span class="n">connect_kwargs</span><span class="p">[</span><span class="s2">&quot;key_filename&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">key_filename</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">passphrase</span><span class="p">:</span>
+            <span class="n">connect_kwargs</span><span class="p">[</span><span class="s2">&quot;passphrase&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">passphrase</span>
+        <span class="k">return</span> <span class="n">RemoteHost</span><span class="p">(</span>
+            <span class="n">host</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">host</span><span class="p">,</span>
+            <span class="n">user</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">user</span><span class="p">,</span>
+            <span class="n">port</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">port</span><span class="p">,</span>
+            <span class="n">gateway</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">gateway</span><span class="p">,</span>
+            <span class="n">forward_agent</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">forward_agent</span><span class="p">,</span>
+            <span class="n">connect_timeout</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">connect_timeout</span><span class="p">,</span>
+            <span class="n">connect_kwargs</span><span class="o">=</span><span class="n">connect_kwargs</span><span class="p">,</span>
+            <span class="n">inline_ssh_env</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">inline_ssh_env</span><span class="p">,</span>
+            <span class="n">timeout_execute</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">timeout_execute</span><span class="p">,</span>
+            <span class="n">keepalive</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">keepalive</span><span class="p">,</span>
+            <span class="n">shell_cmd</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">shell_cmd</span><span class="p">,</span>
+            <span class="n">login_shell</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">login_shell</span><span class="p">,</span>
+        <span class="p">)</span></div>
+
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">cli_info</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Short information about the worker to be displayed in the command line</span>
+<span class="sd">        interface.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        A dictionary with the Worker short information.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">dict</span><span class="p">(</span>
+            <span class="n">host</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">host</span><span class="p">,</span>
+            <span class="n">scheduler_type</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">scheduler_type</span><span class="p">,</span>
+            <span class="n">work_dir</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">work_dir</span><span class="p">,</span>
+        <span class="p">)</span></div>
+
+
+
+<span class="n">WorkerConfig</span> <span class="o">=</span> <span class="n">Annotated</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="n">LocalWorker</span><span class="p">,</span> <span class="n">RemoteWorker</span><span class="p">],</span> <span class="n">Field</span><span class="p">(</span><span class="n">discriminator</span><span class="o">=</span><span class="s2">&quot;type&quot;</span><span class="p">)]</span>
+
+
+<div class="viewcode-block" id="ExecutionConfig">
+<a class="viewcode-back" href="../../../api/jobflow_remote.config.base.html#jobflow_remote.config.base.ExecutionConfig">[docs]</a>
+<span class="k">class</span> <span class="nc">ExecutionConfig</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Configuration to be set before and after the execution of a Job.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">modules</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span>
+        <span class="kc">None</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="s2">&quot;list of modules to be loaded&quot;</span>
+    <span class="p">)</span>
+    <span class="n">export</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span>
+        <span class="kc">None</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="s2">&quot;dictionary with variable to be exported&quot;</span>
+    <span class="p">)</span>
+    <span class="n">pre_run</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span>
+        <span class="kc">None</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Other commands to be executed before the execution of a job&quot;</span>
+    <span class="p">)</span>
+    <span class="n">post_run</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span>
+        <span class="kc">None</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Commands to be executed after the execution of a job&quot;</span>
+    <span class="p">)</span>
+    <span class="n">model_config</span> <span class="o">=</span> <span class="n">ConfigDict</span><span class="p">(</span><span class="n">extra</span><span class="o">=</span><span class="s2">&quot;forbid&quot;</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="QueueConfig">
+<a class="viewcode-back" href="../../../api/jobflow_remote.config.base.html#jobflow_remote.config.base.QueueConfig">[docs]</a>
+<span class="k">class</span> <span class="nc">QueueConfig</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+    <span class="n">store</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span>
+        <span class="n">default_factory</span><span class="o">=</span><span class="nb">dict</span><span class="p">,</span>
+        <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Dictionary describing a maggma Store used for the queue data. &quot;</span>
+        <span class="s2">&quot;Can contain the monty serialized dictionary or a dictionary with a &#39;type&#39; &quot;</span>
+        <span class="s2">&quot;specifying the Store subclass. Should be subclass of a MongoStore, as it &quot;</span>
+        <span class="s2">&quot;requires to perform MongoDB actions. The collection is used to store the &quot;</span>
+        <span class="s2">&quot;jobs&quot;</span><span class="p">,</span>
+        <span class="n">validate_default</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">flows_collection</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span>
+        <span class="s2">&quot;flows&quot;</span><span class="p">,</span>
+        <span class="n">description</span><span class="o">=</span><span class="s2">&quot;The name of the collection containing information about the flows. &quot;</span>
+        <span class="s2">&quot;Taken from the same database as the one defined in the store&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">auxiliary_collection</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span>
+        <span class="s2">&quot;jf_auxiliary&quot;</span><span class="p">,</span>
+        <span class="n">description</span><span class="o">=</span><span class="s2">&quot;The name of the collection containing auxiliary information. &quot;</span>
+        <span class="s2">&quot;Taken from the same database as the one defined in the store&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">db_id_prefix</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span>
+        <span class="kc">None</span><span class="p">,</span>
+        <span class="n">description</span><span class="o">=</span><span class="s2">&quot;a string defining the prefix added to the integer ID associated &quot;</span>
+        <span class="s2">&quot;to each Job in the database&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+
+<div class="viewcode-block" id="QueueConfig.check_store">
+<a class="viewcode-back" href="../../../api/jobflow_remote.config.base.html#jobflow_remote.config.base.QueueConfig.check_store">[docs]</a>
+    <span class="nd">@field_validator</span><span class="p">(</span><span class="s2">&quot;store&quot;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">check_store</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">store</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Check that the queue configuration could be converted to a Store.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">store</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">deserialized_store</span> <span class="o">=</span> <span class="n">store_from_dict</span><span class="p">(</span><span class="n">store</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;error while converting queue to a maggma store. Error: </span><span class="si">{</span><span class="n">traceback</span><span class="o">.</span><span class="n">format_exc</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span>
+                <span class="p">)</span> <span class="kn">from</span> <span class="nn">e</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">deserialized_store</span><span class="p">,</span> <span class="n">MongoStore</span><span class="p">):</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="s2">&quot;The queue store should be a subclass of a &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;MongoStore: </span><span class="si">{</span><span class="n">deserialized_store</span><span class="o">.</span><span class="vm">__class__</span><span class="si">}</span><span class="s2"> instead&quot;</span>
+                <span class="p">)</span>
+        <span class="k">return</span> <span class="n">store</span></div>
+
+
+    <span class="n">model_config</span> <span class="o">=</span> <span class="n">ConfigDict</span><span class="p">(</span><span class="n">extra</span><span class="o">=</span><span class="s2">&quot;forbid&quot;</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="Project">
+<a class="viewcode-back" href="../../../api/jobflow_remote.config.base.html#jobflow_remote.config.base.Project">[docs]</a>
+<span class="k">class</span> <span class="nc">Project</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    The configurations of a Project.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">description</span><span class="o">=</span><span class="s2">&quot;The name of the project&quot;</span><span class="p">)</span>
+    <span class="n">base_dir</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span>
+        <span class="kc">None</span><span class="p">,</span>
+        <span class="n">description</span><span class="o">=</span><span class="s2">&quot;The base directory containing the project related files. Default &quot;</span>
+        <span class="s2">&quot;is a folder with the project name inside the projects folder&quot;</span><span class="p">,</span>
+        <span class="n">validate_default</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">tmp_dir</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span>
+        <span class="kc">None</span><span class="p">,</span>
+        <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Folder where remote files are copied. Default a &#39;tmp&#39; folder in base_dir&quot;</span><span class="p">,</span>
+        <span class="n">validate_default</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">log_dir</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span>
+        <span class="kc">None</span><span class="p">,</span>
+        <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Folder containing all the logs. Default a &#39;log&#39; folder in base_dir&quot;</span><span class="p">,</span>
+        <span class="n">validate_default</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">daemon_dir</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span>
+        <span class="kc">None</span><span class="p">,</span>
+        <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Folder containing daemon related files. Default to a &#39;daemon&#39; &quot;</span>
+        <span class="s2">&quot;folder in base_dir&quot;</span><span class="p">,</span>
+        <span class="n">validate_default</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">log_level</span><span class="p">:</span> <span class="n">LogLevel</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">LogLevel</span><span class="o">.</span><span class="n">INFO</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="s2">&quot;The level set for logging&quot;</span><span class="p">)</span>
+    <span class="n">runner</span><span class="p">:</span> <span class="n">RunnerOptions</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span>
+        <span class="n">default_factory</span><span class="o">=</span><span class="n">RunnerOptions</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="s2">&quot;The options for the Runner&quot;</span>
+    <span class="p">)</span>
+    <span class="n">workers</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">WorkerConfig</span><span class="p">]</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span>
+        <span class="n">default_factory</span><span class="o">=</span><span class="nb">dict</span><span class="p">,</span>
+        <span class="n">description</span><span class="o">=</span><span class="s2">&quot;A dictionary with the worker name as keys and the worker &quot;</span>
+        <span class="s2">&quot;configuration as values&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">queue</span><span class="p">:</span> <span class="n">QueueConfig</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span>
+        <span class="n">description</span><span class="o">=</span><span class="s2">&quot;The configuration of the Store used to store the states of&quot;</span>
+        <span class="s2">&quot;the Jobs and the Flows&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">exec_config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">ExecutionConfig</span><span class="p">]</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span>
+        <span class="n">default_factory</span><span class="o">=</span><span class="nb">dict</span><span class="p">,</span>
+        <span class="n">description</span><span class="o">=</span><span class="s2">&quot;A dictionary with the ExecutionConfig name as keys and the &quot;</span>
+        <span class="s2">&quot;ExecutionConfig configuration as values&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">jobstore</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span>
+        <span class="n">default_factory</span><span class="o">=</span><span class="k">lambda</span><span class="p">:</span> <span class="nb">dict</span><span class="p">(</span><span class="n">DEFAULT_JOBSTORE</span><span class="p">),</span>
+        <span class="n">description</span><span class="o">=</span><span class="s2">&quot;The JobStore used for the input. Can contain the monty &quot;</span>
+        <span class="s2">&quot;serialized dictionary or the Store int the Jobflow format&quot;</span><span class="p">,</span>
+        <span class="n">validate_default</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">metadata</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">]</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span>
+        <span class="kc">None</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="s2">&quot;A dictionary with metadata associated to the project&quot;</span>
+    <span class="p">)</span>
+
+<div class="viewcode-block" id="Project.get_jobstore">
+<a class="viewcode-back" href="../../../api/jobflow_remote.config.base.html#jobflow_remote.config.base.Project.get_jobstore">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_jobstore</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">JobStore</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Generate an instance of the JobStore based on the configuration</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        A JobStore</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">jobstore</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span>
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">jobstore</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;@class&quot;</span><span class="p">)</span> <span class="o">==</span> <span class="s2">&quot;JobStore&quot;</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">JobStore</span><span class="o">.</span><span class="n">from_dict</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">jobstore</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">JobStore</span><span class="o">.</span><span class="n">from_dict_spec</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">jobstore</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Project.get_queue_store">
+<a class="viewcode-back" href="../../../api/jobflow_remote.config.base.html#jobflow_remote.config.base.Project.get_queue_store">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_queue_store</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Generate an instance of a maggma Store based on the queue configuration.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        A maggma Store</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">store_from_dict</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">queue</span><span class="o">.</span><span class="n">store</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Project.get_job_controller">
+<a class="viewcode-back" href="../../../api/jobflow_remote.config.base.html#jobflow_remote.config.base.Project.get_job_controller">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_job_controller</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="kn">from</span> <span class="nn">jobflow_remote.jobs.jobcontroller</span> <span class="kn">import</span> <span class="n">JobController</span>
+
+        <span class="k">return</span> <span class="n">JobController</span><span class="o">.</span><span class="n">from_project</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Project.check_base_dir">
+<a class="viewcode-back" href="../../../api/jobflow_remote.config.base.html#jobflow_remote.config.base.Project.check_base_dir">[docs]</a>
+    <span class="nd">@field_validator</span><span class="p">(</span><span class="s2">&quot;base_dir&quot;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">check_base_dir</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">base_dir</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">info</span><span class="p">:</span> <span class="n">ValidationInfo</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Validator to set the default of base_dir based on the project name</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">base_dir</span><span class="p">:</span>
+            <span class="kn">from</span> <span class="nn">jobflow_remote</span> <span class="kn">import</span> <span class="n">SETTINGS</span>
+
+            <span class="k">return</span> <span class="nb">str</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="n">SETTINGS</span><span class="o">.</span><span class="n">projects_folder</span><span class="p">,</span> <span class="n">info</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">]))</span>
+        <span class="k">return</span> <span class="n">base_dir</span></div>
+
+
+<div class="viewcode-block" id="Project.check_tmp_dir">
+<a class="viewcode-back" href="../../../api/jobflow_remote.config.base.html#jobflow_remote.config.base.Project.check_tmp_dir">[docs]</a>
+    <span class="nd">@field_validator</span><span class="p">(</span><span class="s2">&quot;tmp_dir&quot;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">check_tmp_dir</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">tmp_dir</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">info</span><span class="p">:</span> <span class="n">ValidationInfo</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Validator to set the default of tmp_dir based on the base_dir</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">tmp_dir</span><span class="p">:</span>
+            <span class="k">return</span> <span class="nb">str</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="n">info</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;base_dir&quot;</span><span class="p">],</span> <span class="s2">&quot;tmp&quot;</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">tmp_dir</span></div>
+
+
+<div class="viewcode-block" id="Project.check_log_dir">
+<a class="viewcode-back" href="../../../api/jobflow_remote.config.base.html#jobflow_remote.config.base.Project.check_log_dir">[docs]</a>
+    <span class="nd">@field_validator</span><span class="p">(</span><span class="s2">&quot;log_dir&quot;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">check_log_dir</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">log_dir</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">info</span><span class="p">:</span> <span class="n">ValidationInfo</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Validator to set the default of log_dir based on the base_dir</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">log_dir</span><span class="p">:</span>
+            <span class="k">return</span> <span class="nb">str</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="n">info</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;base_dir&quot;</span><span class="p">],</span> <span class="s2">&quot;log&quot;</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">log_dir</span></div>
+
+
+<div class="viewcode-block" id="Project.check_daemon_dir">
+<a class="viewcode-back" href="../../../api/jobflow_remote.config.base.html#jobflow_remote.config.base.Project.check_daemon_dir">[docs]</a>
+    <span class="nd">@field_validator</span><span class="p">(</span><span class="s2">&quot;daemon_dir&quot;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">check_daemon_dir</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">daemon_dir</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">info</span><span class="p">:</span> <span class="n">ValidationInfo</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Validator to set the default of daemon_dir based on the base_dir</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">daemon_dir</span><span class="p">:</span>
+            <span class="k">return</span> <span class="nb">str</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="n">info</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;base_dir&quot;</span><span class="p">],</span> <span class="s2">&quot;daemon&quot;</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">daemon_dir</span></div>
+
+
+<div class="viewcode-block" id="Project.check_jobstore">
+<a class="viewcode-back" href="../../../api/jobflow_remote.config.base.html#jobflow_remote.config.base.Project.check_jobstore">[docs]</a>
+    <span class="nd">@field_validator</span><span class="p">(</span><span class="s2">&quot;jobstore&quot;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">check_jobstore</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">jobstore</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Check that the jobstore configuration could be converted to a JobStore.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">jobstore</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">jobstore</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;@class&quot;</span><span class="p">)</span> <span class="o">==</span> <span class="s2">&quot;JobStore&quot;</span><span class="p">:</span>
+                    <span class="n">JobStore</span><span class="o">.</span><span class="n">from_dict</span><span class="p">(</span><span class="n">jobstore</span><span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">JobStore</span><span class="o">.</span><span class="n">from_dict_spec</span><span class="p">(</span><span class="n">jobstore</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;error while converting jobstore to JobStore. Error: </span><span class="si">{</span><span class="n">traceback</span><span class="o">.</span><span class="n">format_exc</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span>
+                <span class="p">)</span> <span class="kn">from</span> <span class="nn">e</span>
+        <span class="k">return</span> <span class="n">jobstore</span></div>
+
+
+    <span class="n">model_config</span> <span class="o">=</span> <span class="n">ConfigDict</span><span class="p">(</span><span class="n">extra</span><span class="o">=</span><span class="s2">&quot;forbid&quot;</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="ConfigError">
+<a class="viewcode-back" href="../../../api/jobflow_remote.config.base.html#jobflow_remote.config.base.ConfigError">[docs]</a>
+<span class="k">class</span> <span class="nc">ConfigError</span><span class="p">(</span><span class="ne">Exception</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    A generic Exception related to the configuration</span>
+<span class="sd">    &quot;&quot;&quot;</span></div>
+
+
+
+<div class="viewcode-block" id="ProjectUndefined">
+<a class="viewcode-back" href="../../../api/jobflow_remote.config.base.html#jobflow_remote.config.base.ProjectUndefined">[docs]</a>
+<span class="k">class</span> <span class="nc">ProjectUndefined</span><span class="p">(</span><span class="n">ConfigError</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Exception raised if the Project has not been defined or could not be determined.</span>
+<span class="sd">    &quot;&quot;&quot;</span></div>
+
+</pre></div>
+
+                </article>
+
+
+
+
+
+                <footer class="prev-next-footer">
+
+<div class="prev-next-area">
+</div>
+                </footer>
+
+            </div>
+
+
+
+
+          </div>
+          <footer class="bd-footer-content">
+
+          </footer>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="../../../_static/scripts/bootstrap.js?digest=5b4479735964841361fd"></script>
+<script src="../../../_static/scripts/pydata-sphinx-theme.js?digest=5b4479735964841361fd"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+
+    <div class="footer-items__start">
+
+        <div class="footer-item">
+
+  <p class="copyright">
+
+      © Copyright 2023, Matgenix SRL.
+      <br/>
+
+  </p>
+</div>
+
+        <div class="footer-item">
+
+  <p class="sphinx-version">
+    Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 7.2.6.
+    <br/>
+  </p>
+</div>
+
+    </div>
+
+
+
+    <div class="footer-items__end">
+
+        <div class="footer-item">
+<p class="theme-version">
+  Built with the <a href="https://pydata-sphinx-theme.readthedocs.io/en/stable/index.html">PyData Sphinx Theme</a> 0.14.4.
+</p></div>
+
+    </div>
+
+</div>
+
+  </footer>
+  </body>
+</html>

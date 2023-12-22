@@ -1,0 +1,946 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../../../" data-theme="light">
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>jobflow_remote.config.manager &#8212; Jobflow Remote v0.0.1.post117+gfc0fbc0.d20231222 Manual</title>
+
+
+
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "light";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "light";
+  </script>
+
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../../_static/styles/theme.css?digest=5b4479735964841361fd" rel="stylesheet" />
+<link href="../../../_static/styles/bootstrap.css?digest=5b4479735964841361fd" rel="stylesheet" />
+<link href="../../../_static/styles/pydata-sphinx-theme.css?digest=5b4479735964841361fd" rel="stylesheet" />
+
+
+  <link href="../../../_static/vendor/fontawesome/6.1.2/css/all.min.css?digest=5b4479735964841361fd" rel="stylesheet" />
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="../../../_static/vendor/fontawesome/6.1.2/webfonts/fa-solid-900.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../_static/vendor/fontawesome/6.1.2/webfonts/fa-brands-400.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../_static/vendor/fontawesome/6.1.2/webfonts/fa-regular-400.woff2" />
+
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=fa44fd50" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css?v=eafc0fe6" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/autodoc_pydantic.css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/design-style.1e8bd061cd6da7fc9cf755528e8ffc24.min.css?v=0a3b3ea7" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/jobflow_remote.css?v=7b6df8f0" />
+
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../../_static/scripts/bootstrap.js?digest=5b4479735964841361fd" />
+<link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=5b4479735964841361fd" />
+  <script src="../../../_static/vendor/fontawesome/6.1.2/js/all.min.js?digest=5b4479735964841361fd"></script>
+
+    <script src="../../../_static/documentation_options.js?v=e135783d"></script>
+    <script src="../../../_static/doctools.js?v=888ff710"></script>
+    <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../../_static/design-tabs.js?v=36754332"></script>
+    <script src="https://unpkg.com/mermaid@10.2.0/dist/mermaid.min.js"></script>
+    <script>mermaid.initialize({startOnLoad:true});</script>
+    <script>DOCUMENTATION_OPTIONS.pagename = '_modules/jobflow_remote/config/manager';</script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+    <meta name="docbuild:last-update" content="Dec 22, 2023"/>
+  </head>
+
+
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="light">
+
+
+
+  <a class="skip-link" href="#main-content">Skip to main content</a>
+
+  <div id="pst-scroll-pixel-helper"></div>
+
+
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>
+    Back to top
+  </button>
+
+
+  <input type="checkbox"
+          class="sidebar-toggle"
+          name="__primary"
+          id="__primary"/>
+  <label class="overlay overlay-primary" for="__primary"></label>
+
+  <input type="checkbox"
+          class="sidebar-toggle"
+          name="__secondary"
+          id="__secondary"/>
+  <label class="overlay overlay-secondary" for="__secondary"></label>
+
+  <div class="search-button__wrapper">
+    <div class="search-button__overlay"></div>
+    <div class="search-button__search-container">
+<form class="bd-search d-flex align-items-center"
+      action="../../../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         id="search-input"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form></div>
+  </div>
+
+
+  <div class="bd-header-announcement container-fluid bd-header-announcement">
+    <div class="bd-header-announcement__content"><p>Jobflow Remote is still in beta phase. The API may change at any time.</p></div>
+  </div>
+
+
+    <nav class="bd-header navbar navbar-expand-lg bd-navbar">
+<div class="bd-header__inner bd-page-width">
+  <label class="sidebar-toggle primary-toggle" for="__primary">
+    <span class="fa-solid fa-bars"></span>
+  </label>
+
+
+  <div class="col-lg-3 navbar-header-items__start">
+
+      <div class="navbar-item">
+
+
+
+<a class="navbar-brand logo" href="../../../index.html">
+
+
+
+
+
+
+    <p class="title logo__title">Jobflow Remote v0.0.1.post117+gfc0fbc0.d20231222 Manual</p>
+
+</a></div>
+
+  </div>
+
+  <div class="col-lg-9 navbar-header-items">
+
+    <div class="me-auto navbar-header-items__center">
+
+        <div class="navbar-item">
+<nav class="navbar-nav">
+  <p class="sidebar-header-items__title"
+     role="heading"
+     aria-level="1"
+     aria-label="Site Navigation">
+    Site Navigation
+  </p>
+  <ul class="bd-navbar-elements navbar-nav">
+
+                    <li class="nav-item">
+                      <a class="nav-link nav-internal" href="../../../user/index.html">
+                        User Guide
+                      </a>
+                    </li>
+
+
+                    <li class="nav-item">
+                      <a class="nav-link nav-internal" href="../../../api/index.html">
+                        API reference
+                      </a>
+                    </li>
+
+
+                    <li class="nav-item">
+                      <a class="nav-link nav-internal" href="../../../dev/index.html">
+                        Development
+                      </a>
+                    </li>
+
+  </ul>
+</nav></div>
+
+    </div>
+
+
+    <div class="navbar-header-items__end">
+
+        <div class="navbar-item navbar-persistent--container">
+
+
+ <script>
+ document.write(`
+   <button class="btn navbar-btn search-button-field search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass"></i>
+    <span class="search-button__default-text">Search</span>
+    <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+   </button>
+ `);
+ </script>
+        </div>
+
+
+        <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm navbar-btn theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="theme-switch nav-link" data-mode="light"><i class="fa-solid fa-sun fa-lg"></i></span>
+    <span class="theme-switch nav-link" data-mode="dark"><i class="fa-solid fa-moon fa-lg"></i></span>
+    <span class="theme-switch nav-link" data-mode="auto"><i class="fa-solid fa-circle-half-stroke fa-lg"></i></span>
+  </button>
+`);
+</script></div>
+
+    </div>
+
+  </div>
+
+
+    <div class="navbar-persistent--mobile">
+
+ <script>
+ document.write(`
+   <button class="btn navbar-btn search-button-field search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass"></i>
+    <span class="search-button__default-text">Search</span>
+    <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+   </button>
+ `);
+ </script>
+    </div>
+
+
+
+</div>
+
+    </nav>
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+
+      <div class="bd-sidebar-primary bd-sidebar hide-on-wide">
+
+
+
+  <div class="sidebar-header-items sidebar-primary__section">
+
+
+      <div class="sidebar-header-items__center">
+
+          <div class="navbar-item">
+<nav class="navbar-nav">
+  <p class="sidebar-header-items__title"
+     role="heading"
+     aria-level="1"
+     aria-label="Site Navigation">
+    Site Navigation
+  </p>
+  <ul class="bd-navbar-elements navbar-nav">
+
+                    <li class="nav-item">
+                      <a class="nav-link nav-internal" href="../../../user/index.html">
+                        User Guide
+                      </a>
+                    </li>
+
+
+                    <li class="nav-item">
+                      <a class="nav-link nav-internal" href="../../../api/index.html">
+                        API reference
+                      </a>
+                    </li>
+
+
+                    <li class="nav-item">
+                      <a class="nav-link nav-internal" href="../../../dev/index.html">
+                        Development
+                      </a>
+                    </li>
+
+  </ul>
+</nav></div>
+
+      </div>
+
+
+
+      <div class="sidebar-header-items__end">
+
+          <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm navbar-btn theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="theme-switch nav-link" data-mode="light"><i class="fa-solid fa-sun fa-lg"></i></span>
+    <span class="theme-switch nav-link" data-mode="dark"><i class="fa-solid fa-moon fa-lg"></i></span>
+    <span class="theme-switch nav-link" data-mode="auto"><i class="fa-solid fa-circle-half-stroke fa-lg"></i></span>
+  </button>
+`);
+</script></div>
+
+      </div>
+
+  </div>
+
+
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+
+  <div id="rtd-footer-container"></div>
+
+
+      </div>
+
+      <main id="main-content" class="bd-main">
+
+
+          <div class="bd-content">
+            <div class="bd-article-container">
+
+              <div class="bd-header-article">
+<div class="header-article-items header-article__inner">
+
+    <div class="header-article-items__start">
+
+        <div class="header-article-item">
+
+
+
+<nav aria-label="Breadcrumb">
+  <ul class="bd-breadcrumbs">
+
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../../../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+
+    <li class="breadcrumb-item"><a href="../../index.html" class="nav-link">Module code</a></li>
+
+    <li class="breadcrumb-item active" aria-current="page">jobflow_remo...</li>
+  </ul>
+</nav>
+</div>
+
+    </div>
+
+
+</div>
+</div>
+
+
+
+
+<div id="searchbox"></div>
+                <article class="bd-article" role="main">
+
+  <h1>Source code for jobflow_remote.config.manager</h1><div class="highlight"><pre>
+<span></span><span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">import</span> <span class="nn">glob</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">shutil</span>
+<span class="kn">import</span> <span class="nn">traceback</span>
+<span class="kn">from</span> <span class="nn">collections</span> <span class="kn">import</span> <span class="n">namedtuple</span>
+<span class="kn">from</span> <span class="nn">pathlib</span> <span class="kn">import</span> <span class="n">Path</span>
+
+<span class="kn">import</span> <span class="nn">tomlkit</span>
+<span class="kn">from</span> <span class="nn">jobflow</span> <span class="kn">import</span> <span class="n">JobStore</span>
+<span class="kn">from</span> <span class="nn">maggma.stores</span> <span class="kn">import</span> <span class="n">MongoStore</span>
+<span class="kn">from</span> <span class="nn">monty.json</span> <span class="kn">import</span> <span class="n">jsanitize</span>
+<span class="kn">from</span> <span class="nn">monty.os</span> <span class="kn">import</span> <span class="n">makedirs_p</span>
+<span class="kn">from</span> <span class="nn">monty.serialization</span> <span class="kn">import</span> <span class="n">dumpfn</span><span class="p">,</span> <span class="n">loadfn</span>
+
+<span class="kn">from</span> <span class="nn">jobflow_remote.config.base</span> <span class="kn">import</span> <span class="p">(</span>
+    <span class="n">ConfigError</span><span class="p">,</span>
+    <span class="n">ExecutionConfig</span><span class="p">,</span>
+    <span class="n">Project</span><span class="p">,</span>
+    <span class="n">ProjectUndefined</span><span class="p">,</span>
+    <span class="n">WorkerBase</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span> <span class="nn">jobflow_remote.utils.data</span> <span class="kn">import</span> <span class="n">deep_merge_dict</span>
+
+<span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+<span class="n">ProjectData</span> <span class="o">=</span> <span class="n">namedtuple</span><span class="p">(</span><span class="s2">&quot;ProjectData&quot;</span><span class="p">,</span> <span class="p">[</span><span class="s2">&quot;filepath&quot;</span><span class="p">,</span> <span class="s2">&quot;project&quot;</span><span class="p">,</span> <span class="s2">&quot;ext&quot;</span><span class="p">])</span>
+
+<span class="n">WorkerData</span> <span class="o">=</span> <span class="n">namedtuple</span><span class="p">(</span><span class="s2">&quot;WorkerData&quot;</span><span class="p">,</span> <span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">,</span> <span class="s2">&quot;worker&quot;</span><span class="p">])</span>
+
+
+<div class="viewcode-block" id="ConfigManager">
+<a class="viewcode-back" href="../../../api/jobflow_remote.config.manager.html#jobflow_remote.config.manager.ConfigManager">[docs]</a>
+<span class="k">class</span> <span class="nc">ConfigManager</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    A manager for the projects configuration files.</span>
+
+<span class="sd">    Provides tool to parse project information from the selected projects folder as</span>
+<span class="sd">    well as methods to update the properties of each project.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">projects_ext</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;json&quot;</span><span class="p">,</span> <span class="s2">&quot;yaml&quot;</span><span class="p">,</span> <span class="s2">&quot;toml&quot;</span><span class="p">]</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">exclude_unset</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="n">exclude_none</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="n">warn</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        exclude_unset</span>
+<span class="sd">            when dumping projects determine whether fields which were not explicitly</span>
+<span class="sd">            set when creating the model should be excluded from the dictionary</span>
+<span class="sd">        exclude_none</span>
+<span class="sd">            when dumping projects determine whether fields which are equal to None</span>
+<span class="sd">            should be excluded from the dictionary</span>
+<span class="sd">        warn</span>
+<span class="sd">            if True print warnings related to the parsing of the files in the</span>
+<span class="sd">            projects folder</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="kn">from</span> <span class="nn">jobflow_remote</span> <span class="kn">import</span> <span class="n">SETTINGS</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">exclude_unset</span> <span class="o">=</span> <span class="n">exclude_unset</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">exclude_none</span> <span class="o">=</span> <span class="n">exclude_none</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">warn</span> <span class="o">=</span> <span class="n">warn</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">projects_folder</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">SETTINGS</span><span class="o">.</span><span class="n">projects_folder</span><span class="p">)</span>
+        <span class="n">makedirs_p</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">projects_folder</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">projects_data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">load_projects_data</span><span class="p">()</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">projects</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Project</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        dict</span>
+<span class="sd">            Dictionary with project name as key and Project as value.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="p">{</span><span class="n">name</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">project</span> <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">pd</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">projects_data</span><span class="o">.</span><span class="n">items</span><span class="p">()}</span>
+
+<div class="viewcode-block" id="ConfigManager.load_projects_data">
+<a class="viewcode-back" href="../../../api/jobflow_remote.config.manager.html#jobflow_remote.config.manager.ConfigManager.load_projects_data">[docs]</a>
+    <span class="k">def</span> <span class="nf">load_projects_data</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">ProjectData</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Load projects from the selected projects folder.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        dict</span>
+<span class="sd">            Dictionary with project name as key and ProjectData as value.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="n">projects_data</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">ProjectData</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">ext</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">projects_ext</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">filepath</span> <span class="ow">in</span> <span class="n">glob</span><span class="o">.</span><span class="n">glob</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">projects_folder</span> <span class="o">/</span> <span class="sa">f</span><span class="s2">&quot;*.</span><span class="si">{</span><span class="n">ext</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)):</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="n">ext</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;json&quot;</span><span class="p">,</span> <span class="s2">&quot;yaml&quot;</span><span class="p">]:</span>
+                        <span class="n">d</span> <span class="o">=</span> <span class="n">loadfn</span><span class="p">(</span><span class="n">filepath</span><span class="p">)</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">filepath</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+                            <span class="n">d</span> <span class="o">=</span> <span class="n">tomlkit</span><span class="o">.</span><span class="n">parse</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">read</span><span class="p">())</span>
+                    <span class="n">project</span> <span class="o">=</span> <span class="n">Project</span><span class="o">.</span><span class="n">parse_obj</span><span class="p">(</span><span class="n">d</span><span class="p">)</span>
+                <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">warn</span><span class="p">:</span>
+                        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                            <span class="sa">f</span><span class="s2">&quot;File </span><span class="si">{</span><span class="n">filepath</span><span class="si">}</span><span class="s2"> could not be parsed as a Project. Error: </span><span class="si">{</span><span class="n">traceback</span><span class="o">.</span><span class="n">format_exc</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span>
+                        <span class="p">)</span>
+                    <span class="k">continue</span>
+                <span class="k">if</span> <span class="n">project</span><span class="o">.</span><span class="n">name</span> <span class="ow">in</span> <span class="n">projects_data</span><span class="p">:</span>
+                    <span class="n">msg</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;Two projects with the same name &#39;</span><span class="si">{</span><span class="n">project</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">&#39; have been defined: </span><span class="si">{</span><span class="n">filepath</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="n">projects_data</span><span class="p">[</span><span class="n">project</span><span class="o">.</span><span class="n">name</span><span class="p">]</span><span class="o">.</span><span class="n">filepath</span><span class="si">}</span><span class="s2">&quot;</span>
+                    <span class="k">raise</span> <span class="n">ConfigError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+                <span class="n">projects_data</span><span class="p">[</span><span class="n">project</span><span class="o">.</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">ProjectData</span><span class="p">(</span><span class="n">filepath</span><span class="p">,</span> <span class="n">project</span><span class="p">,</span> <span class="n">ext</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">projects_data</span></div>
+
+
+<div class="viewcode-block" id="ConfigManager.select_project_name">
+<a class="viewcode-back" href="../../../api/jobflow_remote.config.manager.html#jobflow_remote.config.manager.ConfigManager.select_project_name">[docs]</a>
+    <span class="k">def</span> <span class="nf">select_project_name</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">project_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Determine the project name to be used based on the passed value</span>
+<span class="sd">        and on the general settings.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        project_name</span>
+<span class="sd">            The name of the project or None to use the value from the settings</span>
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        str</span>
+<span class="sd">            The name of the selected project.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="kn">from</span> <span class="nn">jobflow_remote</span> <span class="kn">import</span> <span class="n">SETTINGS</span>
+
+        <span class="n">project_name</span> <span class="o">=</span> <span class="n">project_name</span> <span class="ow">or</span> <span class="n">SETTINGS</span><span class="o">.</span><span class="n">project</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">project_name</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">projects_data</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+                <span class="n">project_name</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span><span class="nb">iter</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">projects_data</span><span class="o">.</span><span class="n">keys</span><span class="p">()))</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">ProjectUndefined</span><span class="p">(</span><span class="s2">&quot;A project name should be defined&quot;</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">project_name</span></div>
+
+
+<div class="viewcode-block" id="ConfigManager.get_project_data">
+<a class="viewcode-back" href="../../../api/jobflow_remote.config.manager.html#jobflow_remote.config.manager.ConfigManager.get_project_data">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_project_data</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">project_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ProjectData</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Get the ProjectData object based from the project name.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        project_name</span>
+<span class="sd">            The name of the project or None to use the value from the settings</span>
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        ProjectData</span>
+<span class="sd">            The selected ProjectData</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">project_name</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">select_project_name</span><span class="p">(</span><span class="n">project_name</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">project_name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">projects_data</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">ConfigError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;The selected project </span><span class="si">{</span><span class="n">project_name</span><span class="si">}</span><span class="s2"> does not exist &quot;</span>
+                <span class="s2">&quot;or could not be parsed correctly&quot;</span>
+            <span class="p">)</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">projects_data</span><span class="p">[</span><span class="n">project_name</span><span class="p">]</span></div>
+
+
+<div class="viewcode-block" id="ConfigManager.get_project">
+<a class="viewcode-back" href="../../../api/jobflow_remote.config.manager.html#jobflow_remote.config.manager.ConfigManager.get_project">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_project</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">project_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Project</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Get the Project object based from the project name.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        project_name</span>
+<span class="sd">            The name of the project or None to use the value from the settings</span>
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        Project</span>
+<span class="sd">            The selected Project</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_project_data</span><span class="p">(</span><span class="n">project_name</span><span class="p">)</span><span class="o">.</span><span class="n">project</span></div>
+
+
+<div class="viewcode-block" id="ConfigManager.dump_project">
+<a class="viewcode-back" href="../../../api/jobflow_remote.config.manager.html#jobflow_remote.config.manager.ConfigManager.dump_project">[docs]</a>
+    <span class="k">def</span> <span class="nf">dump_project</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">project_data</span><span class="p">:</span> <span class="n">ProjectData</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Dump the project to filepath specified in the ProjectData.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        project_data</span>
+<span class="sd">            The project data to be dumped</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">exclude_none</span> <span class="o">=</span> <span class="kc">True</span> <span class="k">if</span> <span class="n">project_data</span><span class="o">.</span><span class="n">ext</span> <span class="o">==</span> <span class="s2">&quot;toml&quot;</span> <span class="k">else</span> <span class="bp">self</span><span class="o">.</span><span class="n">exclude_none</span>
+        <span class="n">d</span> <span class="o">=</span> <span class="n">jsanitize</span><span class="p">(</span>
+            <span class="n">project_data</span><span class="o">.</span><span class="n">project</span><span class="o">.</span><span class="n">dict</span><span class="p">(</span>
+                <span class="n">exclude_none</span><span class="o">=</span><span class="n">exclude_none</span><span class="p">,</span> <span class="n">exclude_unset</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">exclude_unset</span>
+            <span class="p">),</span>
+            <span class="n">enum_values</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="k">if</span> <span class="n">project_data</span><span class="o">.</span><span class="n">ext</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;json&quot;</span><span class="p">,</span> <span class="s2">&quot;yaml&quot;</span><span class="p">]:</span>
+            <span class="n">dumpfn</span><span class="p">(</span><span class="n">d</span><span class="p">,</span> <span class="n">project_data</span><span class="o">.</span><span class="n">filepath</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">project_data</span><span class="o">.</span><span class="n">ext</span> <span class="o">==</span> <span class="s2">&quot;toml&quot;</span><span class="p">:</span>
+            <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">project_data</span><span class="o">.</span><span class="n">filepath</span><span class="p">,</span> <span class="s2">&quot;w&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+                <span class="n">tomlkit</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">d</span><span class="p">,</span> <span class="n">f</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="ConfigManager.create_project">
+<a class="viewcode-back" href="../../../api/jobflow_remote.config.manager.html#jobflow_remote.config.manager.ConfigManager.create_project">[docs]</a>
+    <span class="k">def</span> <span class="nf">create_project</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">project</span><span class="p">:</span> <span class="n">Project</span><span class="p">,</span> <span class="n">ext</span><span class="o">=</span><span class="s2">&quot;yaml&quot;</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Create a new Project in the project folder by dumping the project to file.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        project</span>
+<span class="sd">            The data of the project to be created.</span>
+<span class="sd">        ext</span>
+<span class="sd">            The extension of the file to which the project will be dumped (yaml, json</span>
+<span class="sd">             or toml)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">project</span><span class="o">.</span><span class="n">name</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">projects_data</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">ConfigError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Project with name </span><span class="si">{</span><span class="n">project</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2"> already exists&quot;</span><span class="p">)</span>
+
+        <span class="n">makedirs_p</span><span class="p">(</span><span class="n">project</span><span class="o">.</span><span class="n">base_dir</span><span class="p">)</span>
+        <span class="n">makedirs_p</span><span class="p">(</span><span class="n">project</span><span class="o">.</span><span class="n">tmp_dir</span><span class="p">)</span>
+        <span class="n">makedirs_p</span><span class="p">(</span><span class="n">project</span><span class="o">.</span><span class="n">log_dir</span><span class="p">)</span>
+        <span class="n">filepath</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">projects_folder</span> <span class="o">/</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">project</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">.</span><span class="si">{</span><span class="n">ext</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="k">if</span> <span class="n">filepath</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+            <span class="k">raise</span> <span class="n">ConfigError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Project with name </span><span class="si">{</span><span class="n">project</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2"> does not exist, but file </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">filepath</span><span class="p">)</span><span class="si">}</span><span class="s2"> does&quot;</span>
+            <span class="p">)</span>
+        <span class="n">project_data</span> <span class="o">=</span> <span class="n">ProjectData</span><span class="p">(</span><span class="n">filepath</span><span class="p">,</span> <span class="n">project</span><span class="p">,</span> <span class="n">ext</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dump_project</span><span class="p">(</span><span class="n">project_data</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">projects_data</span><span class="p">[</span><span class="n">project</span><span class="o">.</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">project_data</span></div>
+
+
+<div class="viewcode-block" id="ConfigManager.remove_project">
+<a class="viewcode-back" href="../../../api/jobflow_remote.config.manager.html#jobflow_remote.config.manager.ConfigManager.remove_project">[docs]</a>
+    <span class="k">def</span> <span class="nf">remove_project</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">project_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">remove_folders</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Remove a project from the projects folder.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        project_name</span>
+<span class="sd">            Name of the project to be removed.</span>
+<span class="sd">        remove_folders</span>
+<span class="sd">            Optionally remove the folders related to the project (e.g. tmp, log).</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">project_name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">projects_data</span><span class="p">:</span>
+            <span class="k">return</span>
+        <span class="n">project_data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">projects_data</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">project_name</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">remove_folders</span><span class="p">:</span>
+            <span class="n">shutil</span><span class="o">.</span><span class="n">rmtree</span><span class="p">(</span><span class="n">project_data</span><span class="o">.</span><span class="n">project</span><span class="o">.</span><span class="n">base_dir</span><span class="p">,</span> <span class="n">ignore_errors</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">project_data</span><span class="o">.</span><span class="n">filepath</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="ConfigManager.update_project">
+<a class="viewcode-back" href="../../../api/jobflow_remote.config.manager.html#jobflow_remote.config.manager.ConfigManager.update_project">[docs]</a>
+    <span class="k">def</span> <span class="nf">update_project</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="n">project_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Update the project values.</span>
+<span class="sd">        The passed dict with values will be recursively merged in the current project.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        config</span>
+<span class="sd">            Dictionary with the project values to be updated.</span>
+<span class="sd">        project_name</span>
+<span class="sd">            Name of the project to be updated</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">project_data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">projects_data</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">project_name</span><span class="p">)</span>
+        <span class="n">proj_dict</span> <span class="o">=</span> <span class="n">project_data</span><span class="o">.</span><span class="n">project</span><span class="o">.</span><span class="n">dict</span><span class="p">()</span>
+        <span class="n">new_project</span> <span class="o">=</span> <span class="n">Project</span><span class="o">.</span><span class="n">parse_obj</span><span class="p">(</span><span class="n">deep_merge_dict</span><span class="p">(</span><span class="n">proj_dict</span><span class="p">,</span> <span class="n">config</span><span class="p">))</span>
+        <span class="n">project_data</span> <span class="o">=</span> <span class="n">ProjectData</span><span class="p">(</span><span class="n">project_data</span><span class="o">.</span><span class="n">filepath</span><span class="p">,</span> <span class="n">new_project</span><span class="p">,</span> <span class="n">project_data</span><span class="o">.</span><span class="n">ext</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dump_project</span><span class="p">(</span><span class="n">project_data</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">projects_data</span><span class="p">[</span><span class="n">project_data</span><span class="o">.</span><span class="n">project</span><span class="o">.</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">project_data</span></div>
+
+
+<div class="viewcode-block" id="ConfigManager.project_names_from_files">
+<a class="viewcode-back" href="../../../api/jobflow_remote.config.manager.html#jobflow_remote.config.manager.ConfigManager.project_names_from_files">[docs]</a>
+    <span class="k">def</span> <span class="nf">project_names_from_files</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Parses all the prasable files and only checks for the &quot;name&quot; attribute to</span>
+<span class="sd">        return a list of potential project file names.</span>
+
+<span class="sd">        Useful in case some projects cannot be properly parsed, but the full list</span>
+<span class="sd">        needs to be returned.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        list</span>
+<span class="sd">            List of project names.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">project_names</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">ext</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">projects_ext</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">filepath</span> <span class="ow">in</span> <span class="n">glob</span><span class="o">.</span><span class="n">glob</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">projects_folder</span> <span class="o">/</span> <span class="sa">f</span><span class="s2">&quot;*.</span><span class="si">{</span><span class="n">ext</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)):</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="n">ext</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;json&quot;</span><span class="p">,</span> <span class="s2">&quot;yaml&quot;</span><span class="p">]:</span>
+                        <span class="n">d</span> <span class="o">=</span> <span class="n">loadfn</span><span class="p">(</span><span class="n">filepath</span><span class="p">)</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">filepath</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+                            <span class="n">d</span> <span class="o">=</span> <span class="n">tomlkit</span><span class="o">.</span><span class="n">parse</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">read</span><span class="p">())</span>
+                    <span class="k">if</span> <span class="s2">&quot;name&quot;</span> <span class="ow">in</span> <span class="n">d</span><span class="p">:</span>
+                        <span class="n">project_names</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">d</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">])</span>
+                <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                    <span class="k">continue</span>
+
+        <span class="k">return</span> <span class="n">project_names</span></div>
+
+
+<div class="viewcode-block" id="ConfigManager.set_worker">
+<a class="viewcode-back" href="../../../api/jobflow_remote.config.manager.html#jobflow_remote.config.manager.ConfigManager.set_worker">[docs]</a>
+    <span class="k">def</span> <span class="nf">set_worker</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">worker</span><span class="p">:</span> <span class="n">WorkerBase</span><span class="p">,</span>
+        <span class="n">project_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">replace</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Set a worker in the selected project.</span>
+<span class="sd">        Can add a new worker or replace an existing one.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        name</span>
+<span class="sd">            Name of the worker to be added or replaced.</span>
+<span class="sd">        worker</span>
+<span class="sd">            Worker to be set.</span>
+<span class="sd">        project_name</span>
+<span class="sd">            Name of the project where the Worker is set, or None to use the one</span>
+<span class="sd">            from the settings.</span>
+<span class="sd">        replace</span>
+<span class="sd">            Raise an exception if False and a Worker with the chosen name already</span>
+<span class="sd">            exists.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">project_data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_project_data</span><span class="p">(</span><span class="n">project_name</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">replace</span> <span class="ow">and</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">project_data</span><span class="o">.</span><span class="n">project</span><span class="o">.</span><span class="n">workers</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">ConfigError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Worker with name </span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2"> is already defined&quot;</span><span class="p">)</span>
+
+        <span class="n">project_data</span><span class="o">.</span><span class="n">project</span><span class="o">.</span><span class="n">workers</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">worker</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dump_project</span><span class="p">(</span><span class="n">project_data</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="ConfigManager.remove_worker">
+<a class="viewcode-back" href="../../../api/jobflow_remote.config.manager.html#jobflow_remote.config.manager.ConfigManager.remove_worker">[docs]</a>
+    <span class="k">def</span> <span class="nf">remove_worker</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">worker_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">project_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Remove a worker from the selected project.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        worker_name</span>
+<span class="sd">            Name of the worker to be removed</span>
+<span class="sd">        project_name</span>
+<span class="sd">            Name of the project from which the Worker should be removed, or None to</span>
+<span class="sd">            use the one from the settings.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">project_data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_project_data</span><span class="p">(</span><span class="n">project_name</span><span class="p">)</span>
+        <span class="n">project_data</span><span class="o">.</span><span class="n">project</span><span class="o">.</span><span class="n">workers</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">worker_name</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dump_project</span><span class="p">(</span><span class="n">project_data</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="ConfigManager.get_worker">
+<a class="viewcode-back" href="../../../api/jobflow_remote.config.manager.html#jobflow_remote.config.manager.ConfigManager.get_worker">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_worker</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">worker_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">project_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">WorkerBase</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return the worker object based on the name.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        worker_name</span>
+<span class="sd">            Name of the worker to retrieve.</span>
+<span class="sd">        project_name</span>
+<span class="sd">            Name of the project from which the Worker should be retrieved, or None to</span>
+<span class="sd">            use the one from the settings.</span>
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        WorkerBase</span>
+<span class="sd">            The selected Worker.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">project</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_project</span><span class="p">(</span><span class="n">project_name</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">worker_name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">project</span><span class="o">.</span><span class="n">workers</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">ConfigError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Worker with name </span><span class="si">{</span><span class="n">worker_name</span><span class="si">}</span><span class="s2"> is not defined&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">project</span><span class="o">.</span><span class="n">workers</span><span class="p">[</span><span class="n">worker_name</span><span class="p">]</span></div>
+
+
+<div class="viewcode-block" id="ConfigManager.set_queue_db">
+<a class="viewcode-back" href="../../../api/jobflow_remote.config.manager.html#jobflow_remote.config.manager.ConfigManager.set_queue_db">[docs]</a>
+    <span class="k">def</span> <span class="nf">set_queue_db</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">store</span><span class="p">:</span> <span class="n">MongoStore</span><span class="p">,</span> <span class="n">project_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Set the project specific store used for managing the queue.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        store</span>
+<span class="sd">            A maggma Store</span>
+<span class="sd">        project_name</span>
+<span class="sd">            Name of the project where the Store is set, or None to use the one</span>
+<span class="sd">            from the settings.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">project_data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_project_data</span><span class="p">(</span><span class="n">project_name</span><span class="p">)</span>
+        <span class="n">project_data</span><span class="o">.</span><span class="n">project</span><span class="o">.</span><span class="n">queue</span> <span class="o">=</span> <span class="n">store</span><span class="o">.</span><span class="n">as_dict</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">dump_project</span><span class="p">(</span><span class="n">project_data</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="ConfigManager.set_jobstore">
+<a class="viewcode-back" href="../../../api/jobflow_remote.config.manager.html#jobflow_remote.config.manager.ConfigManager.set_jobstore">[docs]</a>
+    <span class="k">def</span> <span class="nf">set_jobstore</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">jobstore</span><span class="p">:</span> <span class="n">JobStore</span><span class="p">,</span> <span class="n">project_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Set the project specific store used for jobflow.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        jobstore</span>
+<span class="sd">            A maggma Store</span>
+<span class="sd">        project_name</span>
+<span class="sd">            Name of the project where the Store is set, or None to use the one</span>
+<span class="sd">            from the settings.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">project_data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_project_data</span><span class="p">(</span><span class="n">project_name</span><span class="p">)</span>
+        <span class="n">project_data</span><span class="o">.</span><span class="n">project</span><span class="o">.</span><span class="n">jobstore</span> <span class="o">=</span> <span class="n">jobstore</span><span class="o">.</span><span class="n">as_dict</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dump_project</span><span class="p">(</span><span class="n">project_data</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="ConfigManager.set_exec_config">
+<a class="viewcode-back" href="../../../api/jobflow_remote.config.manager.html#jobflow_remote.config.manager.ConfigManager.set_exec_config">[docs]</a>
+    <span class="k">def</span> <span class="nf">set_exec_config</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">exec_config_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">exec_config</span><span class="p">:</span> <span class="n">ExecutionConfig</span><span class="p">,</span>
+        <span class="n">project_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">replace</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Set an ExecutionConfig in the selected project.</span>
+<span class="sd">        Can add a new ExecutionConfig or replace an existing one.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        exec_config_name</span>
+<span class="sd">            Name of the ExecutionConfig to be added or replaced.</span>
+<span class="sd">        exec_config</span>
+<span class="sd">            The ExecutionConfig.</span>
+<span class="sd">        project_name</span>
+<span class="sd">            Name of the project where the ExecutionConfig is set, or None to use</span>
+<span class="sd">             the one from the settings.</span>
+<span class="sd">        replace</span>
+<span class="sd">            Raise an exception if False and an ExecutionConfig with the chosen</span>
+<span class="sd">            name already exists.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">project_data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_project_data</span><span class="p">(</span><span class="n">project_name</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">replace</span> <span class="ow">and</span> <span class="n">exec_config_name</span> <span class="ow">in</span> <span class="n">project_data</span><span class="o">.</span><span class="n">project</span><span class="o">.</span><span class="n">exec_config</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">ConfigError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Host with name </span><span class="si">{</span><span class="n">exec_config_name</span><span class="si">}</span><span class="s2"> is already defined&quot;</span><span class="p">)</span>
+        <span class="n">project_data</span><span class="o">.</span><span class="n">project</span><span class="o">.</span><span class="n">exec_config</span><span class="p">[</span><span class="n">exec_config_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">exec_config</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dump_project</span><span class="p">(</span><span class="n">project_data</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="ConfigManager.remove_exec_config">
+<a class="viewcode-back" href="../../../api/jobflow_remote.config.manager.html#jobflow_remote.config.manager.ConfigManager.remove_exec_config">[docs]</a>
+    <span class="k">def</span> <span class="nf">remove_exec_config</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">exec_config_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">project_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Remove an ExecutionConfig from the selected project.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        exec_config_name</span>
+<span class="sd">            Name of the ExecutionConfig to be removed</span>
+<span class="sd">        project_name</span>
+<span class="sd">            Name of the project from which the ExecutionConfig should be removed, or</span>
+<span class="sd">            None to use the one from the settings.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">project_data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_project_data</span><span class="p">(</span><span class="n">project_name</span><span class="p">)</span>
+        <span class="n">project_data</span><span class="o">.</span><span class="n">project</span><span class="o">.</span><span class="n">exec_config</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">exec_config_name</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dump_project</span><span class="p">(</span><span class="n">project_data</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="ConfigManager.get_exec_config">
+<a class="viewcode-back" href="../../../api/jobflow_remote.config.manager.html#jobflow_remote.config.manager.ConfigManager.get_exec_config">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_exec_config</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">exec_config_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">project_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ExecutionConfig</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return the ExecutionConfig object based on the name.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        exec_config_name</span>
+<span class="sd">            Name of the ExecutionConfig.</span>
+<span class="sd">        project_name</span>
+<span class="sd">            Name of the project from which the ExecutionConfig should be retrieved,</span>
+<span class="sd">            or None to use the one from the settings.</span>
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        ExecutionConfig</span>
+<span class="sd">            The selected ExecutionConfig</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">project</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_project</span><span class="p">(</span><span class="n">project_name</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">exec_config_name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">project</span><span class="o">.</span><span class="n">exec_config</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">ConfigError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;ExecutionConfig with id </span><span class="si">{</span><span class="n">exec_config_name</span><span class="si">}</span><span class="s2"> is not defined&quot;</span>
+            <span class="p">)</span>
+        <span class="k">return</span> <span class="n">project</span><span class="o">.</span><span class="n">exec_config</span><span class="p">[</span><span class="n">exec_config_name</span><span class="p">]</span></div>
+</div>
+
+</pre></div>
+
+                </article>
+
+
+
+
+
+                <footer class="prev-next-footer">
+
+<div class="prev-next-area">
+</div>
+                </footer>
+
+            </div>
+
+
+
+
+          </div>
+          <footer class="bd-footer-content">
+
+          </footer>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="../../../_static/scripts/bootstrap.js?digest=5b4479735964841361fd"></script>
+<script src="../../../_static/scripts/pydata-sphinx-theme.js?digest=5b4479735964841361fd"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+
+    <div class="footer-items__start">
+
+        <div class="footer-item">
+
+  <p class="copyright">
+
+      © Copyright 2023, Matgenix SRL.
+      <br/>
+
+  </p>
+</div>
+
+        <div class="footer-item">
+
+  <p class="sphinx-version">
+    Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 7.2.6.
+    <br/>
+  </p>
+</div>
+
+    </div>
+
+
+
+    <div class="footer-items__end">
+
+        <div class="footer-item">
+<p class="theme-version">
+  Built with the <a href="https://pydata-sphinx-theme.readthedocs.io/en/stable/index.html">PyData Sphinx Theme</a> 0.14.4.
+</p></div>
+
+    </div>
+
+</div>
+
+  </footer>
+  </body>
+</html>

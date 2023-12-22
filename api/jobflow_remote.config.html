@@ -1,0 +1,679 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../" data-theme="light">
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>jobflow_remote.config package &#8212; Jobflow Remote v0.0.1.post117+gfc0fbc0.d20231222 Manual</title>
+
+
+
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "light";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "light";
+  </script>
+
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../_static/styles/theme.css?digest=5b4479735964841361fd" rel="stylesheet" />
+<link href="../_static/styles/bootstrap.css?digest=5b4479735964841361fd" rel="stylesheet" />
+<link href="../_static/styles/pydata-sphinx-theme.css?digest=5b4479735964841361fd" rel="stylesheet" />
+
+
+  <link href="../_static/vendor/fontawesome/6.1.2/css/all.min.css?digest=5b4479735964841361fd" rel="stylesheet" />
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.1.2/webfonts/fa-solid-900.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.1.2/webfonts/fa-brands-400.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.1.2/webfonts/fa-regular-400.woff2" />
+
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=fa44fd50" />
+    <link rel="stylesheet" type="text/css" href="../_static/graphviz.css?v=eafc0fe6" />
+    <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../_static/autodoc_pydantic.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/design-style.1e8bd061cd6da7fc9cf755528e8ffc24.min.css?v=0a3b3ea7" />
+    <link rel="stylesheet" type="text/css" href="../_static/jobflow_remote.css?v=7b6df8f0" />
+
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=5b4479735964841361fd" />
+<link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=5b4479735964841361fd" />
+  <script src="../_static/vendor/fontawesome/6.1.2/js/all.min.js?digest=5b4479735964841361fd"></script>
+
+    <script src="../_static/documentation_options.js?v=e135783d"></script>
+    <script src="../_static/doctools.js?v=888ff710"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../_static/copybutton.js?v=f281be69"></script>
+    <script src="../_static/design-tabs.js?v=36754332"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'api/jobflow_remote.config';</script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="jobflow_remote.config.base module" href="jobflow_remote.config.base.html" />
+    <link rel="prev" title="jobflow_remote.cli.utils module" href="jobflow_remote.cli.utils.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+    <meta name="docbuild:last-update" content="Dec 22, 2023"/>
+  </head>
+
+
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="light">
+
+
+
+  <a class="skip-link" href="#main-content">Skip to main content</a>
+
+  <div id="pst-scroll-pixel-helper"></div>
+
+
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>
+    Back to top
+  </button>
+
+
+  <input type="checkbox"
+          class="sidebar-toggle"
+          name="__primary"
+          id="__primary"/>
+  <label class="overlay overlay-primary" for="__primary"></label>
+
+  <input type="checkbox"
+          class="sidebar-toggle"
+          name="__secondary"
+          id="__secondary"/>
+  <label class="overlay overlay-secondary" for="__secondary"></label>
+
+  <div class="search-button__wrapper">
+    <div class="search-button__overlay"></div>
+    <div class="search-button__search-container">
+<form class="bd-search d-flex align-items-center"
+      action="../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         id="search-input"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form></div>
+  </div>
+
+
+  <div class="bd-header-announcement container-fluid bd-header-announcement">
+    <div class="bd-header-announcement__content"><p>Jobflow Remote is still in beta phase. The API may change at any time.</p></div>
+  </div>
+
+
+    <nav class="bd-header navbar navbar-expand-lg bd-navbar">
+<div class="bd-header__inner bd-page-width">
+  <label class="sidebar-toggle primary-toggle" for="__primary">
+    <span class="fa-solid fa-bars"></span>
+  </label>
+
+
+  <div class="col-lg-3 navbar-header-items__start">
+
+      <div class="navbar-item">
+
+
+
+<a class="navbar-brand logo" href="../index.html">
+
+
+
+
+
+
+    <p class="title logo__title">Jobflow Remote v0.0.1.post117+gfc0fbc0.d20231222 Manual</p>
+
+</a></div>
+
+  </div>
+
+  <div class="col-lg-9 navbar-header-items">
+
+    <div class="me-auto navbar-header-items__center">
+
+        <div class="navbar-item">
+<nav class="navbar-nav">
+  <p class="sidebar-header-items__title"
+     role="heading"
+     aria-level="1"
+     aria-label="Site Navigation">
+    Site Navigation
+  </p>
+  <ul class="bd-navbar-elements navbar-nav">
+
+                    <li class="nav-item">
+                      <a class="nav-link nav-internal" href="../user/index.html">
+                        User Guide
+                      </a>
+                    </li>
+
+
+                    <li class="nav-item">
+                      <a class="nav-link nav-internal" href="index.html">
+                        API reference
+                      </a>
+                    </li>
+
+
+                    <li class="nav-item">
+                      <a class="nav-link nav-internal" href="../dev/index.html">
+                        Development
+                      </a>
+                    </li>
+
+  </ul>
+</nav></div>
+
+    </div>
+
+
+    <div class="navbar-header-items__end">
+
+        <div class="navbar-item navbar-persistent--container">
+
+
+ <script>
+ document.write(`
+   <button class="btn navbar-btn search-button-field search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass"></i>
+    <span class="search-button__default-text">Search</span>
+    <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+   </button>
+ `);
+ </script>
+        </div>
+
+
+        <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm navbar-btn theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="theme-switch nav-link" data-mode="light"><i class="fa-solid fa-sun fa-lg"></i></span>
+    <span class="theme-switch nav-link" data-mode="dark"><i class="fa-solid fa-moon fa-lg"></i></span>
+    <span class="theme-switch nav-link" data-mode="auto"><i class="fa-solid fa-circle-half-stroke fa-lg"></i></span>
+  </button>
+`);
+</script></div>
+
+    </div>
+
+  </div>
+
+
+    <div class="navbar-persistent--mobile">
+
+ <script>
+ document.write(`
+   <button class="btn navbar-btn search-button-field search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass"></i>
+    <span class="search-button__default-text">Search</span>
+    <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+   </button>
+ `);
+ </script>
+    </div>
+
+
+
+    <label class="sidebar-toggle secondary-toggle" for="__secondary" tabindex="0">
+      <span class="fa-solid fa-outdent"></span>
+    </label>
+
+</div>
+
+    </nav>
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+
+      <div class="bd-sidebar-primary bd-sidebar">
+
+
+
+  <div class="sidebar-header-items sidebar-primary__section">
+
+
+      <div class="sidebar-header-items__center">
+
+          <div class="navbar-item">
+<nav class="navbar-nav">
+  <p class="sidebar-header-items__title"
+     role="heading"
+     aria-level="1"
+     aria-label="Site Navigation">
+    Site Navigation
+  </p>
+  <ul class="bd-navbar-elements navbar-nav">
+
+                    <li class="nav-item">
+                      <a class="nav-link nav-internal" href="../user/index.html">
+                        User Guide
+                      </a>
+                    </li>
+
+
+                    <li class="nav-item">
+                      <a class="nav-link nav-internal" href="index.html">
+                        API reference
+                      </a>
+                    </li>
+
+
+                    <li class="nav-item">
+                      <a class="nav-link nav-internal" href="../dev/index.html">
+                        Development
+                      </a>
+                    </li>
+
+  </ul>
+</nav></div>
+
+      </div>
+
+
+
+      <div class="sidebar-header-items__end">
+
+          <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm navbar-btn theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="theme-switch nav-link" data-mode="light"><i class="fa-solid fa-sun fa-lg"></i></span>
+    <span class="theme-switch nav-link" data-mode="dark"><i class="fa-solid fa-moon fa-lg"></i></span>
+    <span class="theme-switch nav-link" data-mode="auto"><i class="fa-solid fa-circle-half-stroke fa-lg"></i></span>
+  </button>
+`);
+</script></div>
+
+      </div>
+
+  </div>
+
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+<nav class="bd-docs-nav bd-links"
+     aria-label="Section Navigation">
+  <p class="bd-links__title" role="heading" aria-level="1">Section Navigation</p>
+  <div class="bd-toc-item navbar-nav"><ul class="current nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="jobflow_remote.cli.html">jobflow_remote.cli package</a></li>
+<li class="toctree-l1 current active has-children"><a class="current reference internal" href="#">jobflow_remote.config package</a><input checked="" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-1"><i class="fa-solid fa-chevron-down"></i></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="jobflow_remote.config.base.html">jobflow_remote.config.base module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="jobflow_remote.config.helper.html">jobflow_remote.config.helper module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="jobflow_remote.config.jobconfig.html">jobflow_remote.config.jobconfig module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="jobflow_remote.config.manager.html">jobflow_remote.config.manager module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="jobflow_remote.config.settings.html">jobflow_remote.config.settings module</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="jobflow_remote.jobs.html">jobflow_remote.jobs package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="jobflow_remote.remote.html">jobflow_remote.remote package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="jobflow_remote.utils.html">jobflow_remote.utils package</a></li>
+</ul>
+</div>
+</nav></div>
+    </div>
+
+
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+
+  <div id="rtd-footer-container"></div>
+
+
+      </div>
+
+      <main id="main-content" class="bd-main">
+
+
+          <div class="bd-content">
+            <div class="bd-article-container">
+
+              <div class="bd-header-article">
+<div class="header-article-items header-article__inner">
+
+    <div class="header-article-items__start">
+
+        <div class="header-article-item">
+
+
+
+<nav aria-label="Breadcrumb">
+  <ul class="bd-breadcrumbs">
+
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+
+    <li class="breadcrumb-item"><a href="index.html" class="nav-link">API Reference</a></li>
+
+    <li class="breadcrumb-item active" aria-current="page">jobflow_remo...</li>
+  </ul>
+</nav>
+</div>
+
+    </div>
+
+
+</div>
+</div>
+
+
+
+
+<div id="searchbox"></div>
+                <article class="bd-article" role="main">
+
+  <section id="jobflow-remote-config-package">
+<h1>jobflow_remote.config package<a class="headerlink" href="#jobflow-remote-config-package" title="Link to this heading">#</a></h1>
+<section id="submodules">
+<h2>Submodules<a class="headerlink" href="#submodules" title="Link to this heading">#</a></h2>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="jobflow_remote.config.base.html">jobflow_remote.config.base module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.BatchConfig"><code class="docutils literal notranslate"><span class="pre">BatchConfig</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.BatchConfig.jobs_handle_dir"><code class="docutils literal notranslate"><span class="pre">BatchConfig.jobs_handle_dir</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.BatchConfig.max_jobs"><code class="docutils literal notranslate"><span class="pre">BatchConfig.max_jobs</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.BatchConfig.max_time"><code class="docutils literal notranslate"><span class="pre">BatchConfig.max_time</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.BatchConfig.max_wait"><code class="docutils literal notranslate"><span class="pre">BatchConfig.max_wait</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.BatchConfig.work_dir"><code class="docutils literal notranslate"><span class="pre">BatchConfig.work_dir</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.ConfigError"><code class="docutils literal notranslate"><span class="pre">ConfigError</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.ExecutionConfig"><code class="docutils literal notranslate"><span class="pre">ExecutionConfig</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.ExecutionConfig.export"><code class="docutils literal notranslate"><span class="pre">ExecutionConfig.export</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.ExecutionConfig.modules"><code class="docutils literal notranslate"><span class="pre">ExecutionConfig.modules</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.ExecutionConfig.post_run"><code class="docutils literal notranslate"><span class="pre">ExecutionConfig.post_run</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.ExecutionConfig.pre_run"><code class="docutils literal notranslate"><span class="pre">ExecutionConfig.pre_run</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.LocalWorker"><code class="docutils literal notranslate"><span class="pre">LocalWorker</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.LocalWorker.type"><code class="docutils literal notranslate"><span class="pre">LocalWorker.type</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.LocalWorker.get_host"><code class="docutils literal notranslate"><span class="pre">LocalWorker.get_host()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.LocalWorker.cli_info"><code class="docutils literal notranslate"><span class="pre">LocalWorker.cli_info</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.LogLevel"><code class="docutils literal notranslate"><span class="pre">LogLevel</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.LogLevel.DEBUG"><code class="docutils literal notranslate"><span class="pre">LogLevel.DEBUG</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.LogLevel.ERROR"><code class="docutils literal notranslate"><span class="pre">LogLevel.ERROR</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.LogLevel.INFO"><code class="docutils literal notranslate"><span class="pre">LogLevel.INFO</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.LogLevel.WARN"><code class="docutils literal notranslate"><span class="pre">LogLevel.WARN</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.LogLevel.to_logging"><code class="docutils literal notranslate"><span class="pre">LogLevel.to_logging()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.Project"><code class="docutils literal notranslate"><span class="pre">Project</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.Project.base_dir"><code class="docutils literal notranslate"><span class="pre">Project.base_dir</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.Project.daemon_dir"><code class="docutils literal notranslate"><span class="pre">Project.daemon_dir</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.Project.exec_config"><code class="docutils literal notranslate"><span class="pre">Project.exec_config</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.Project.jobstore"><code class="docutils literal notranslate"><span class="pre">Project.jobstore</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.Project.log_dir"><code class="docutils literal notranslate"><span class="pre">Project.log_dir</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.Project.log_level"><code class="docutils literal notranslate"><span class="pre">Project.log_level</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.Project.metadata"><code class="docutils literal notranslate"><span class="pre">Project.metadata</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.Project.name"><code class="docutils literal notranslate"><span class="pre">Project.name</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.Project.queue"><code class="docutils literal notranslate"><span class="pre">Project.queue</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.Project.runner"><code class="docutils literal notranslate"><span class="pre">Project.runner</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.Project.tmp_dir"><code class="docutils literal notranslate"><span class="pre">Project.tmp_dir</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.Project.workers"><code class="docutils literal notranslate"><span class="pre">Project.workers</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.Project.check_base_dir"><code class="docutils literal notranslate"><span class="pre">Project.check_base_dir</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.Project.check_daemon_dir"><code class="docutils literal notranslate"><span class="pre">Project.check_daemon_dir</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.Project.check_jobstore"><code class="docutils literal notranslate"><span class="pre">Project.check_jobstore</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.Project.check_log_dir"><code class="docutils literal notranslate"><span class="pre">Project.check_log_dir</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.Project.check_tmp_dir"><code class="docutils literal notranslate"><span class="pre">Project.check_tmp_dir</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.Project.get_job_controller"><code class="docutils literal notranslate"><span class="pre">Project.get_job_controller()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.Project.get_jobstore"><code class="docutils literal notranslate"><span class="pre">Project.get_jobstore()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.Project.get_queue_store"><code class="docutils literal notranslate"><span class="pre">Project.get_queue_store()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.ProjectUndefined"><code class="docutils literal notranslate"><span class="pre">ProjectUndefined</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.QueueConfig"><code class="docutils literal notranslate"><span class="pre">QueueConfig</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.QueueConfig.auxiliary_collection"><code class="docutils literal notranslate"><span class="pre">QueueConfig.auxiliary_collection</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.QueueConfig.db_id_prefix"><code class="docutils literal notranslate"><span class="pre">QueueConfig.db_id_prefix</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.QueueConfig.flows_collection"><code class="docutils literal notranslate"><span class="pre">QueueConfig.flows_collection</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.QueueConfig.store"><code class="docutils literal notranslate"><span class="pre">QueueConfig.store</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.QueueConfig.check_store"><code class="docutils literal notranslate"><span class="pre">QueueConfig.check_store</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.RemoteWorker"><code class="docutils literal notranslate"><span class="pre">RemoteWorker</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.RemoteWorker.connect_kwargs"><code class="docutils literal notranslate"><span class="pre">RemoteWorker.connect_kwargs</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.RemoteWorker.connect_timeout"><code class="docutils literal notranslate"><span class="pre">RemoteWorker.connect_timeout</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.RemoteWorker.forward_agent"><code class="docutils literal notranslate"><span class="pre">RemoteWorker.forward_agent</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.RemoteWorker.gateway"><code class="docutils literal notranslate"><span class="pre">RemoteWorker.gateway</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.RemoteWorker.host"><code class="docutils literal notranslate"><span class="pre">RemoteWorker.host</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.RemoteWorker.inline_ssh_env"><code class="docutils literal notranslate"><span class="pre">RemoteWorker.inline_ssh_env</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.RemoteWorker.keepalive"><code class="docutils literal notranslate"><span class="pre">RemoteWorker.keepalive</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.RemoteWorker.key_filename"><code class="docutils literal notranslate"><span class="pre">RemoteWorker.key_filename</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.RemoteWorker.login_shell"><code class="docutils literal notranslate"><span class="pre">RemoteWorker.login_shell</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.RemoteWorker.passphrase"><code class="docutils literal notranslate"><span class="pre">RemoteWorker.passphrase</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.RemoteWorker.password"><code class="docutils literal notranslate"><span class="pre">RemoteWorker.password</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.RemoteWorker.port"><code class="docutils literal notranslate"><span class="pre">RemoteWorker.port</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.RemoteWorker.shell_cmd"><code class="docutils literal notranslate"><span class="pre">RemoteWorker.shell_cmd</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.RemoteWorker.type"><code class="docutils literal notranslate"><span class="pre">RemoteWorker.type</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.RemoteWorker.user"><code class="docutils literal notranslate"><span class="pre">RemoteWorker.user</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.RemoteWorker.get_host"><code class="docutils literal notranslate"><span class="pre">RemoteWorker.get_host()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.RemoteWorker.cli_info"><code class="docutils literal notranslate"><span class="pre">RemoteWorker.cli_info</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.RunnerOptions"><code class="docutils literal notranslate"><span class="pre">RunnerOptions</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.RunnerOptions.delay_advance_status"><code class="docutils literal notranslate"><span class="pre">RunnerOptions.delay_advance_status</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.RunnerOptions.delay_check_run_status"><code class="docutils literal notranslate"><span class="pre">RunnerOptions.delay_check_run_status</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.RunnerOptions.delay_checkout"><code class="docutils literal notranslate"><span class="pre">RunnerOptions.delay_checkout</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.RunnerOptions.delay_refresh_limited"><code class="docutils literal notranslate"><span class="pre">RunnerOptions.delay_refresh_limited</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.RunnerOptions.delay_update_batch"><code class="docutils literal notranslate"><span class="pre">RunnerOptions.delay_update_batch</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.RunnerOptions.delete_tmp_folder"><code class="docutils literal notranslate"><span class="pre">RunnerOptions.delete_tmp_folder</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.RunnerOptions.delta_retry"><code class="docutils literal notranslate"><span class="pre">RunnerOptions.delta_retry</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.RunnerOptions.lock_timeout"><code class="docutils literal notranslate"><span class="pre">RunnerOptions.lock_timeout</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.RunnerOptions.max_step_attempts"><code class="docutils literal notranslate"><span class="pre">RunnerOptions.max_step_attempts</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.RunnerOptions.get_delta_retry"><code class="docutils literal notranslate"><span class="pre">RunnerOptions.get_delta_retry()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.WorkerBase"><code class="docutils literal notranslate"><span class="pre">WorkerBase</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.WorkerBase.batch"><code class="docutils literal notranslate"><span class="pre">WorkerBase.batch</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.WorkerBase.max_jobs"><code class="docutils literal notranslate"><span class="pre">WorkerBase.max_jobs</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.WorkerBase.post_run"><code class="docutils literal notranslate"><span class="pre">WorkerBase.post_run</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.WorkerBase.pre_run"><code class="docutils literal notranslate"><span class="pre">WorkerBase.pre_run</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.WorkerBase.resources"><code class="docutils literal notranslate"><span class="pre">WorkerBase.resources</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.WorkerBase.scheduler_type"><code class="docutils literal notranslate"><span class="pre">WorkerBase.scheduler_type</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.WorkerBase.timeout_execute"><code class="docutils literal notranslate"><span class="pre">WorkerBase.timeout_execute</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.WorkerBase.type"><code class="docutils literal notranslate"><span class="pre">WorkerBase.type</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.WorkerBase.work_dir"><code class="docutils literal notranslate"><span class="pre">WorkerBase.work_dir</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.WorkerBase.check_scheduler_type"><code class="docutils literal notranslate"><span class="pre">WorkerBase.check_scheduler_type</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.WorkerBase.check_work_dir"><code class="docutils literal notranslate"><span class="pre">WorkerBase.check_work_dir</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.WorkerBase.get_host"><code class="docutils literal notranslate"><span class="pre">WorkerBase.get_host()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.WorkerBase.get_scheduler_io"><code class="docutils literal notranslate"><span class="pre">WorkerBase.get_scheduler_io()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.WorkerBase.cli_info"><code class="docutils literal notranslate"><span class="pre">WorkerBase.cli_info</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.base.html#jobflow_remote.config.base.WorkerBase.is_local"><code class="docutils literal notranslate"><span class="pre">WorkerBase.is_local</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="jobflow_remote.config.helper.html">jobflow_remote.config.helper module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="jobflow_remote.config.helper.html#jobflow_remote.config.helper.check_jobstore"><code class="docutils literal notranslate"><span class="pre">check_jobstore()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="jobflow_remote.config.helper.html#jobflow_remote.config.helper.check_queue_store"><code class="docutils literal notranslate"><span class="pre">check_queue_store()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="jobflow_remote.config.helper.html#jobflow_remote.config.helper.check_worker"><code class="docutils literal notranslate"><span class="pre">check_worker()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="jobflow_remote.config.helper.html#jobflow_remote.config.helper.generate_dummy_exec_config"><code class="docutils literal notranslate"><span class="pre">generate_dummy_exec_config()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="jobflow_remote.config.helper.html#jobflow_remote.config.helper.generate_dummy_jobstore"><code class="docutils literal notranslate"><span class="pre">generate_dummy_jobstore()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="jobflow_remote.config.helper.html#jobflow_remote.config.helper.generate_dummy_project"><code class="docutils literal notranslate"><span class="pre">generate_dummy_project()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="jobflow_remote.config.helper.html#jobflow_remote.config.helper.generate_dummy_queue"><code class="docutils literal notranslate"><span class="pre">generate_dummy_queue()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="jobflow_remote.config.helper.html#jobflow_remote.config.helper.generate_dummy_worker"><code class="docutils literal notranslate"><span class="pre">generate_dummy_worker()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="jobflow_remote.config.jobconfig.html">jobflow_remote.config.jobconfig module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="jobflow_remote.config.jobconfig.html#jobflow_remote.config.jobconfig.load_job_store"><code class="docutils literal notranslate"><span class="pre">load_job_store()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="jobflow_remote.config.jobconfig.html#jobflow_remote.config.jobconfig.set_run_config"><code class="docutils literal notranslate"><span class="pre">set_run_config()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="jobflow_remote.config.manager.html">jobflow_remote.config.manager module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="jobflow_remote.config.manager.html#jobflow_remote.config.manager.ConfigManager"><code class="docutils literal notranslate"><span class="pre">ConfigManager</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.manager.html#jobflow_remote.config.manager.ConfigManager.create_project"><code class="docutils literal notranslate"><span class="pre">ConfigManager.create_project()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.manager.html#jobflow_remote.config.manager.ConfigManager.dump_project"><code class="docutils literal notranslate"><span class="pre">ConfigManager.dump_project()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.manager.html#jobflow_remote.config.manager.ConfigManager.get_exec_config"><code class="docutils literal notranslate"><span class="pre">ConfigManager.get_exec_config()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.manager.html#jobflow_remote.config.manager.ConfigManager.get_project"><code class="docutils literal notranslate"><span class="pre">ConfigManager.get_project()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.manager.html#jobflow_remote.config.manager.ConfigManager.get_project_data"><code class="docutils literal notranslate"><span class="pre">ConfigManager.get_project_data()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.manager.html#jobflow_remote.config.manager.ConfigManager.get_worker"><code class="docutils literal notranslate"><span class="pre">ConfigManager.get_worker()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.manager.html#jobflow_remote.config.manager.ConfigManager.load_projects_data"><code class="docutils literal notranslate"><span class="pre">ConfigManager.load_projects_data()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.manager.html#jobflow_remote.config.manager.ConfigManager.project_names_from_files"><code class="docutils literal notranslate"><span class="pre">ConfigManager.project_names_from_files()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.manager.html#jobflow_remote.config.manager.ConfigManager.projects"><code class="docutils literal notranslate"><span class="pre">ConfigManager.projects</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.manager.html#jobflow_remote.config.manager.ConfigManager.projects_ext"><code class="docutils literal notranslate"><span class="pre">ConfigManager.projects_ext</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.manager.html#jobflow_remote.config.manager.ConfigManager.remove_exec_config"><code class="docutils literal notranslate"><span class="pre">ConfigManager.remove_exec_config()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.manager.html#jobflow_remote.config.manager.ConfigManager.remove_project"><code class="docutils literal notranslate"><span class="pre">ConfigManager.remove_project()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.manager.html#jobflow_remote.config.manager.ConfigManager.remove_worker"><code class="docutils literal notranslate"><span class="pre">ConfigManager.remove_worker()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.manager.html#jobflow_remote.config.manager.ConfigManager.select_project_name"><code class="docutils literal notranslate"><span class="pre">ConfigManager.select_project_name()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.manager.html#jobflow_remote.config.manager.ConfigManager.set_exec_config"><code class="docutils literal notranslate"><span class="pre">ConfigManager.set_exec_config()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.manager.html#jobflow_remote.config.manager.ConfigManager.set_jobstore"><code class="docutils literal notranslate"><span class="pre">ConfigManager.set_jobstore()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.manager.html#jobflow_remote.config.manager.ConfigManager.set_queue_db"><code class="docutils literal notranslate"><span class="pre">ConfigManager.set_queue_db()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.manager.html#jobflow_remote.config.manager.ConfigManager.set_worker"><code class="docutils literal notranslate"><span class="pre">ConfigManager.set_worker()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.manager.html#jobflow_remote.config.manager.ConfigManager.update_project"><code class="docutils literal notranslate"><span class="pre">ConfigManager.update_project()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="jobflow_remote.config.manager.html#jobflow_remote.config.manager.ProjectData"><code class="docutils literal notranslate"><span class="pre">ProjectData</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.manager.html#jobflow_remote.config.manager.ProjectData.ext"><code class="docutils literal notranslate"><span class="pre">ProjectData.ext</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.manager.html#jobflow_remote.config.manager.ProjectData.filepath"><code class="docutils literal notranslate"><span class="pre">ProjectData.filepath</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.manager.html#jobflow_remote.config.manager.ProjectData.project"><code class="docutils literal notranslate"><span class="pre">ProjectData.project</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="jobflow_remote.config.manager.html#jobflow_remote.config.manager.WorkerData"><code class="docutils literal notranslate"><span class="pre">WorkerData</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.manager.html#jobflow_remote.config.manager.WorkerData.name"><code class="docutils literal notranslate"><span class="pre">WorkerData.name</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.manager.html#jobflow_remote.config.manager.WorkerData.worker"><code class="docutils literal notranslate"><span class="pre">WorkerData.worker</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="jobflow_remote.config.settings.html">jobflow_remote.config.settings module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="jobflow_remote.config.settings.html#jobflow_remote.config.settings.JobflowRemoteSettings"><code class="docutils literal notranslate"><span class="pre">JobflowRemoteSettings</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.settings.html#jobflow_remote.config.settings.JobflowRemoteSettings.cli_full_exc"><code class="docutils literal notranslate"><span class="pre">JobflowRemoteSettings.cli_full_exc</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.settings.html#jobflow_remote.config.settings.JobflowRemoteSettings.cli_log_level"><code class="docutils literal notranslate"><span class="pre">JobflowRemoteSettings.cli_log_level</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.settings.html#jobflow_remote.config.settings.JobflowRemoteSettings.cli_suggestions"><code class="docutils literal notranslate"><span class="pre">JobflowRemoteSettings.cli_suggestions</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.settings.html#jobflow_remote.config.settings.JobflowRemoteSettings.config_file"><code class="docutils literal notranslate"><span class="pre">JobflowRemoteSettings.config_file</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.settings.html#jobflow_remote.config.settings.JobflowRemoteSettings.project"><code class="docutils literal notranslate"><span class="pre">JobflowRemoteSettings.project</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.settings.html#jobflow_remote.config.settings.JobflowRemoteSettings.projects_folder"><code class="docutils literal notranslate"><span class="pre">JobflowRemoteSettings.projects_folder</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="jobflow_remote.config.settings.html#jobflow_remote.config.settings.JobflowRemoteSettings.load_default_settings"><code class="docutils literal notranslate"><span class="pre">JobflowRemoteSettings.load_default_settings</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</div>
+</section>
+<section id="module-jobflow_remote.config">
+<span id="module-contents"></span><h2>Module contents<a class="headerlink" href="#module-jobflow_remote.config" title="Link to this heading">#</a></h2>
+</section>
+</section>
+
+
+                </article>
+
+
+
+
+
+                <footer class="prev-next-footer">
+
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="jobflow_remote.cli.utils.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">jobflow_remote.cli.utils module</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="jobflow_remote.config.base.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">jobflow_remote.config.base module</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+
+            </div>
+
+
+
+                <div class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+  <div class="sidebar-secondary-item">
+
+  <div class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> On this page
+  </div>
+  <nav class="bd-toc-nav page-toc">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#submodules">Submodules</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#module-jobflow_remote.config">Module contents</a></li>
+</ul>
+  </nav></div>
+
+</div></div>
+
+
+          </div>
+          <footer class="bd-footer-content">
+
+          </footer>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="../_static/scripts/bootstrap.js?digest=5b4479735964841361fd"></script>
+<script src="../_static/scripts/pydata-sphinx-theme.js?digest=5b4479735964841361fd"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+
+    <div class="footer-items__start">
+
+        <div class="footer-item">
+
+  <p class="copyright">
+
+      © Copyright 2023, Matgenix SRL.
+      <br/>
+
+  </p>
+</div>
+
+        <div class="footer-item">
+
+  <p class="sphinx-version">
+    Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 7.2.6.
+    <br/>
+  </p>
+</div>
+
+    </div>
+
+
+
+    <div class="footer-items__end">
+
+        <div class="footer-item">
+<p class="theme-version">
+  Built with the <a href="https://pydata-sphinx-theme.readthedocs.io/en/stable/index.html">PyData Sphinx Theme</a> 0.14.4.
+</p></div>
+
+    </div>
+
+</div>
+
+  </footer>
+  </body>
+</html>

@@ -1,0 +1,968 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../../../" data-theme="light">
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>jobflow_remote.jobs.data &#8212; Jobflow Remote v0.0.1.post117+gfc0fbc0.d20231222 Manual</title>
+
+
+
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "light";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "light";
+  </script>
+
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../../_static/styles/theme.css?digest=5b4479735964841361fd" rel="stylesheet" />
+<link href="../../../_static/styles/bootstrap.css?digest=5b4479735964841361fd" rel="stylesheet" />
+<link href="../../../_static/styles/pydata-sphinx-theme.css?digest=5b4479735964841361fd" rel="stylesheet" />
+
+
+  <link href="../../../_static/vendor/fontawesome/6.1.2/css/all.min.css?digest=5b4479735964841361fd" rel="stylesheet" />
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="../../../_static/vendor/fontawesome/6.1.2/webfonts/fa-solid-900.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../_static/vendor/fontawesome/6.1.2/webfonts/fa-brands-400.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../_static/vendor/fontawesome/6.1.2/webfonts/fa-regular-400.woff2" />
+
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=fa44fd50" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css?v=eafc0fe6" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/autodoc_pydantic.css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/design-style.1e8bd061cd6da7fc9cf755528e8ffc24.min.css?v=0a3b3ea7" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/jobflow_remote.css?v=7b6df8f0" />
+
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../../_static/scripts/bootstrap.js?digest=5b4479735964841361fd" />
+<link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=5b4479735964841361fd" />
+  <script src="../../../_static/vendor/fontawesome/6.1.2/js/all.min.js?digest=5b4479735964841361fd"></script>
+
+    <script src="../../../_static/documentation_options.js?v=e135783d"></script>
+    <script src="../../../_static/doctools.js?v=888ff710"></script>
+    <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../../_static/design-tabs.js?v=36754332"></script>
+    <script src="https://unpkg.com/mermaid@10.2.0/dist/mermaid.min.js"></script>
+    <script>mermaid.initialize({startOnLoad:true});</script>
+    <script>DOCUMENTATION_OPTIONS.pagename = '_modules/jobflow_remote/jobs/data';</script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+    <meta name="docbuild:last-update" content="Dec 22, 2023"/>
+  </head>
+
+
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="light">
+
+
+
+  <a class="skip-link" href="#main-content">Skip to main content</a>
+
+  <div id="pst-scroll-pixel-helper"></div>
+
+
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>
+    Back to top
+  </button>
+
+
+  <input type="checkbox"
+          class="sidebar-toggle"
+          name="__primary"
+          id="__primary"/>
+  <label class="overlay overlay-primary" for="__primary"></label>
+
+  <input type="checkbox"
+          class="sidebar-toggle"
+          name="__secondary"
+          id="__secondary"/>
+  <label class="overlay overlay-secondary" for="__secondary"></label>
+
+  <div class="search-button__wrapper">
+    <div class="search-button__overlay"></div>
+    <div class="search-button__search-container">
+<form class="bd-search d-flex align-items-center"
+      action="../../../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         id="search-input"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form></div>
+  </div>
+
+
+  <div class="bd-header-announcement container-fluid bd-header-announcement">
+    <div class="bd-header-announcement__content"><p>Jobflow Remote is still in beta phase. The API may change at any time.</p></div>
+  </div>
+
+
+    <nav class="bd-header navbar navbar-expand-lg bd-navbar">
+<div class="bd-header__inner bd-page-width">
+  <label class="sidebar-toggle primary-toggle" for="__primary">
+    <span class="fa-solid fa-bars"></span>
+  </label>
+
+
+  <div class="col-lg-3 navbar-header-items__start">
+
+      <div class="navbar-item">
+
+
+
+<a class="navbar-brand logo" href="../../../index.html">
+
+
+
+
+
+
+    <p class="title logo__title">Jobflow Remote v0.0.1.post117+gfc0fbc0.d20231222 Manual</p>
+
+</a></div>
+
+  </div>
+
+  <div class="col-lg-9 navbar-header-items">
+
+    <div class="me-auto navbar-header-items__center">
+
+        <div class="navbar-item">
+<nav class="navbar-nav">
+  <p class="sidebar-header-items__title"
+     role="heading"
+     aria-level="1"
+     aria-label="Site Navigation">
+    Site Navigation
+  </p>
+  <ul class="bd-navbar-elements navbar-nav">
+
+                    <li class="nav-item">
+                      <a class="nav-link nav-internal" href="../../../user/index.html">
+                        User Guide
+                      </a>
+                    </li>
+
+
+                    <li class="nav-item">
+                      <a class="nav-link nav-internal" href="../../../api/index.html">
+                        API reference
+                      </a>
+                    </li>
+
+
+                    <li class="nav-item">
+                      <a class="nav-link nav-internal" href="../../../dev/index.html">
+                        Development
+                      </a>
+                    </li>
+
+  </ul>
+</nav></div>
+
+    </div>
+
+
+    <div class="navbar-header-items__end">
+
+        <div class="navbar-item navbar-persistent--container">
+
+
+ <script>
+ document.write(`
+   <button class="btn navbar-btn search-button-field search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass"></i>
+    <span class="search-button__default-text">Search</span>
+    <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+   </button>
+ `);
+ </script>
+        </div>
+
+
+        <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm navbar-btn theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="theme-switch nav-link" data-mode="light"><i class="fa-solid fa-sun fa-lg"></i></span>
+    <span class="theme-switch nav-link" data-mode="dark"><i class="fa-solid fa-moon fa-lg"></i></span>
+    <span class="theme-switch nav-link" data-mode="auto"><i class="fa-solid fa-circle-half-stroke fa-lg"></i></span>
+  </button>
+`);
+</script></div>
+
+    </div>
+
+  </div>
+
+
+    <div class="navbar-persistent--mobile">
+
+ <script>
+ document.write(`
+   <button class="btn navbar-btn search-button-field search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass"></i>
+    <span class="search-button__default-text">Search</span>
+    <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+   </button>
+ `);
+ </script>
+    </div>
+
+
+
+</div>
+
+    </nav>
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+
+      <div class="bd-sidebar-primary bd-sidebar hide-on-wide">
+
+
+
+  <div class="sidebar-header-items sidebar-primary__section">
+
+
+      <div class="sidebar-header-items__center">
+
+          <div class="navbar-item">
+<nav class="navbar-nav">
+  <p class="sidebar-header-items__title"
+     role="heading"
+     aria-level="1"
+     aria-label="Site Navigation">
+    Site Navigation
+  </p>
+  <ul class="bd-navbar-elements navbar-nav">
+
+                    <li class="nav-item">
+                      <a class="nav-link nav-internal" href="../../../user/index.html">
+                        User Guide
+                      </a>
+                    </li>
+
+
+                    <li class="nav-item">
+                      <a class="nav-link nav-internal" href="../../../api/index.html">
+                        API reference
+                      </a>
+                    </li>
+
+
+                    <li class="nav-item">
+                      <a class="nav-link nav-internal" href="../../../dev/index.html">
+                        Development
+                      </a>
+                    </li>
+
+  </ul>
+</nav></div>
+
+      </div>
+
+
+
+      <div class="sidebar-header-items__end">
+
+          <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm navbar-btn theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="theme-switch nav-link" data-mode="light"><i class="fa-solid fa-sun fa-lg"></i></span>
+    <span class="theme-switch nav-link" data-mode="dark"><i class="fa-solid fa-moon fa-lg"></i></span>
+    <span class="theme-switch nav-link" data-mode="auto"><i class="fa-solid fa-circle-half-stroke fa-lg"></i></span>
+  </button>
+`);
+</script></div>
+
+      </div>
+
+  </div>
+
+
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+
+  <div id="rtd-footer-container"></div>
+
+
+      </div>
+
+      <main id="main-content" class="bd-main">
+
+
+          <div class="bd-content">
+            <div class="bd-article-container">
+
+              <div class="bd-header-article">
+<div class="header-article-items header-article__inner">
+
+    <div class="header-article-items__start">
+
+        <div class="header-article-item">
+
+
+
+<nav aria-label="Breadcrumb">
+  <ul class="bd-breadcrumbs">
+
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../../../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+
+    <li class="breadcrumb-item"><a href="../../index.html" class="nav-link">Module code</a></li>
+
+    <li class="breadcrumb-item active" aria-current="page">jobflow_remo...</li>
+  </ul>
+</nav>
+</div>
+
+    </div>
+
+
+</div>
+</div>
+
+
+
+
+<div id="searchbox"></div>
+                <article class="bd-article" role="main">
+
+  <h1>Source code for jobflow_remote.jobs.data</h1><div class="highlight"><pre>
+<span></span><span class="kn">from</span> <span class="nn">collections</span> <span class="kn">import</span> <span class="n">defaultdict</span>
+<span class="kn">from</span> <span class="nn">datetime</span> <span class="kn">import</span> <span class="n">datetime</span>
+<span class="kn">from</span> <span class="nn">enum</span> <span class="kn">import</span> <span class="n">Enum</span>
+<span class="kn">from</span> <span class="nn">functools</span> <span class="kn">import</span> <span class="n">cached_property</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Union</span>
+
+<span class="kn">from</span> <span class="nn">jobflow</span> <span class="kn">import</span> <span class="n">Flow</span><span class="p">,</span> <span class="n">Job</span>
+<span class="kn">from</span> <span class="nn">monty.json</span> <span class="kn">import</span> <span class="n">jsanitize</span>
+<span class="kn">from</span> <span class="nn">pydantic</span> <span class="kn">import</span> <span class="n">BaseModel</span><span class="p">,</span> <span class="n">Field</span>
+<span class="kn">from</span> <span class="nn">qtoolkit.core.data_objects</span> <span class="kn">import</span> <span class="n">QResources</span><span class="p">,</span> <span class="n">QState</span>
+
+<span class="kn">from</span> <span class="nn">jobflow_remote.config.base</span> <span class="kn">import</span> <span class="n">ExecutionConfig</span>
+<span class="kn">from</span> <span class="nn">jobflow_remote.jobs.state</span> <span class="kn">import</span> <span class="n">FlowState</span><span class="p">,</span> <span class="n">JobState</span>
+
+<span class="n">IN_FILENAME</span> <span class="o">=</span> <span class="s2">&quot;jfremote_in.json&quot;</span>
+<span class="n">OUT_FILENAME</span> <span class="o">=</span> <span class="s2">&quot;jfremote_out.json&quot;</span>
+
+
+<div class="viewcode-block" id="get_initial_job_doc_dict">
+<a class="viewcode-back" href="../../../api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.get_initial_job_doc_dict">[docs]</a>
+<span class="k">def</span> <span class="nf">get_initial_job_doc_dict</span><span class="p">(</span>
+    <span class="n">job</span><span class="p">:</span> <span class="n">Job</span><span class="p">,</span>
+    <span class="n">parents</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]],</span>
+    <span class="n">db_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">worker</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">exec_config</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">ExecutionConfig</span><span class="p">],</span>
+    <span class="n">resources</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="nb">dict</span><span class="p">,</span> <span class="n">QResources</span><span class="p">]],</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Generate an instance of JobDoc for initial insertion in the DB.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    job:</span>
+<span class="sd">        The Job of the JobDoc.</span>
+<span class="sd">    parents</span>
+<span class="sd">        The parents of the Job.</span>
+<span class="sd">    db_id</span>
+<span class="sd">        The db_id.</span>
+<span class="sd">    worker</span>
+<span class="sd">        The worker where the Job should be executed.</span>
+<span class="sd">    exec_config</span>
+<span class="sd">        The ExecutionConfig used for execution.</span>
+<span class="sd">    resources</span>
+<span class="sd">        The resources used to run the Job.</span>
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    JobDoc</span>
+<span class="sd">        A new JobDoc.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="kn">from</span> <span class="nn">monty.json</span> <span class="kn">import</span> <span class="n">jsanitize</span>
+
+    <span class="c1"># take the resources either from the job, if they are defined</span>
+    <span class="c1"># (they can be defined dynamically by the update_config) or the</span>
+    <span class="c1"># defined value</span>
+    <span class="n">job_resources</span> <span class="o">=</span> <span class="n">job</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">manager_config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;resources&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="n">resources</span>
+    <span class="n">job_exec_config</span> <span class="o">=</span> <span class="n">job</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">manager_config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;exec_config&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="n">exec_config</span>
+    <span class="n">worker</span> <span class="o">=</span> <span class="n">job</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">manager_config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;worker&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="n">worker</span>
+
+    <span class="n">job_doc</span> <span class="o">=</span> <span class="n">JobDoc</span><span class="p">(</span>
+        <span class="n">job</span><span class="o">=</span><span class="n">jsanitize</span><span class="p">(</span><span class="n">job</span><span class="p">,</span> <span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">enum_values</span><span class="o">=</span><span class="kc">True</span><span class="p">),</span>
+        <span class="n">uuid</span><span class="o">=</span><span class="n">job</span><span class="o">.</span><span class="n">uuid</span><span class="p">,</span>
+        <span class="n">index</span><span class="o">=</span><span class="n">job</span><span class="o">.</span><span class="n">index</span><span class="p">,</span>
+        <span class="n">db_id</span><span class="o">=</span><span class="n">db_id</span><span class="p">,</span>
+        <span class="n">state</span><span class="o">=</span><span class="n">JobState</span><span class="o">.</span><span class="n">WAITING</span> <span class="k">if</span> <span class="n">parents</span> <span class="k">else</span> <span class="n">JobState</span><span class="o">.</span><span class="n">READY</span><span class="p">,</span>
+        <span class="n">parents</span><span class="o">=</span><span class="n">parents</span><span class="p">,</span>
+        <span class="n">worker</span><span class="o">=</span><span class="n">worker</span><span class="p">,</span>
+        <span class="n">exec_config</span><span class="o">=</span><span class="n">job_exec_config</span><span class="p">,</span>
+        <span class="n">resources</span><span class="o">=</span><span class="n">job_resources</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">job_doc</span><span class="o">.</span><span class="n">as_db_dict</span><span class="p">()</span></div>
+
+
+
+<div class="viewcode-block" id="get_initial_flow_doc_dict">
+<a class="viewcode-back" href="../../../api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.get_initial_flow_doc_dict">[docs]</a>
+<span class="k">def</span> <span class="nf">get_initial_flow_doc_dict</span><span class="p">(</span><span class="n">flow</span><span class="p">:</span> <span class="n">Flow</span><span class="p">,</span> <span class="n">job_dicts</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Generate a serialized FlowDoc for initial insertion in the DB.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    flow</span>
+<span class="sd">        The Flow used to generate the FlowDoc.</span>
+<span class="sd">    job_dicts</span>
+<span class="sd">        The dictionaries of the Jobs composing the Flow.</span>
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    dict</span>
+<span class="sd">        A serialized version of a new FlowDoc.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">jobs</span> <span class="o">=</span> <span class="p">[</span><span class="n">j</span><span class="p">[</span><span class="s2">&quot;uuid&quot;</span><span class="p">]</span> <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="n">job_dicts</span><span class="p">]</span>
+    <span class="n">ids</span> <span class="o">=</span> <span class="p">[(</span><span class="n">j</span><span class="p">[</span><span class="s2">&quot;db_id&quot;</span><span class="p">],</span> <span class="n">j</span><span class="p">[</span><span class="s2">&quot;uuid&quot;</span><span class="p">],</span> <span class="n">j</span><span class="p">[</span><span class="s2">&quot;index&quot;</span><span class="p">])</span> <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="n">job_dicts</span><span class="p">]</span>
+    <span class="n">parents</span> <span class="o">=</span> <span class="p">{</span><span class="n">j</span><span class="p">[</span><span class="s2">&quot;uuid&quot;</span><span class="p">]:</span> <span class="p">{</span><span class="s2">&quot;1&quot;</span><span class="p">:</span> <span class="n">j</span><span class="p">[</span><span class="s2">&quot;parents&quot;</span><span class="p">]}</span> <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="n">job_dicts</span><span class="p">}</span>
+
+    <span class="n">flow_doc</span> <span class="o">=</span> <span class="n">FlowDoc</span><span class="p">(</span>
+        <span class="n">uuid</span><span class="o">=</span><span class="n">flow</span><span class="o">.</span><span class="n">uuid</span><span class="p">,</span>
+        <span class="n">jobs</span><span class="o">=</span><span class="n">jobs</span><span class="p">,</span>
+        <span class="n">state</span><span class="o">=</span><span class="n">FlowState</span><span class="o">.</span><span class="n">READY</span><span class="p">,</span>
+        <span class="n">name</span><span class="o">=</span><span class="n">flow</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+        <span class="n">ids</span><span class="o">=</span><span class="n">ids</span><span class="p">,</span>
+        <span class="n">parents</span><span class="o">=</span><span class="n">parents</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">flow_doc</span><span class="o">.</span><span class="n">as_db_dict</span><span class="p">()</span></div>
+
+
+
+<div class="viewcode-block" id="RemoteInfo">
+<a class="viewcode-back" href="../../../api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.RemoteInfo">[docs]</a>
+<span class="k">class</span> <span class="nc">RemoteInfo</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Model with data describing the remote state of a Job.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">step_attempts</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">queue_state</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">QState</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">process_id</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">retry_time_limit</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">datetime</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">error</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span></div>
+
+
+
+<div class="viewcode-block" id="JobInfo">
+<a class="viewcode-back" href="../../../api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.JobInfo">[docs]</a>
+<span class="k">class</span> <span class="nc">JobInfo</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Model with information extracted from a JobDoc.</span>
+<span class="sd">    Mainly for visualization purposes.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">uuid</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">index</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">db_id</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">worker</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">name</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">state</span><span class="p">:</span> <span class="n">JobState</span>
+    <span class="n">created_on</span><span class="p">:</span> <span class="n">datetime</span>
+    <span class="n">updated_on</span><span class="p">:</span> <span class="n">datetime</span>
+    <span class="n">remote</span><span class="p">:</span> <span class="n">RemoteInfo</span> <span class="o">=</span> <span class="n">RemoteInfo</span><span class="p">()</span>
+    <span class="n">parents</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">previous_state</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">JobState</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">error</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">lock_id</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">lock_time</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">datetime</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">run_dir</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">start_time</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">datetime</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">end_time</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">datetime</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">priority</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">metadata</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">is_locked</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">lock_id</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">run_time</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Calculate the run time based on start and end time.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        float</span>
+<span class="sd">            The run time in seconds</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">start_time</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">end_time</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">end_time</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">start_time</span><span class="p">)</span><span class="o">.</span><span class="n">total_seconds</span><span class="p">()</span>
+
+        <span class="k">return</span> <span class="kc">None</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">estimated_run_time</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Estimate the current run time based on the start time and the current time.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        float</span>
+<span class="sd">            The estimated run time in seconds.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">start_time</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">(</span>
+                <span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">(</span><span class="n">tz</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">start_time</span><span class="o">.</span><span class="n">tzinfo</span><span class="p">)</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">start_time</span>
+            <span class="p">)</span><span class="o">.</span><span class="n">total_seconds</span><span class="p">()</span>
+
+        <span class="k">return</span> <span class="kc">None</span>
+
+<div class="viewcode-block" id="JobInfo.from_query_output">
+<a class="viewcode-back" href="../../../api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.JobInfo.from_query_output">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">from_query_output</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">d</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;JobInfo&quot;</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Generate an instance from the output of a query to the JobDoc collection.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        d</span>
+<span class="sd">            The dictionary with the queried data.</span>
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        JobInfo</span>
+<span class="sd">            The instance of JobInfo based on the data</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">job</span> <span class="o">=</span> <span class="n">d</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;job&quot;</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">,</span> <span class="s2">&quot;metadata&quot;</span><span class="p">]:</span>
+            <span class="n">d</span><span class="p">[</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="n">job</span><span class="p">[</span><span class="n">k</span><span class="p">]</span>
+        <span class="k">return</span> <span class="bp">cls</span><span class="o">.</span><span class="n">model_validate</span><span class="p">(</span><span class="n">d</span><span class="p">)</span></div>
+</div>
+
+
+
+<span class="k">def</span> <span class="nf">_projection_db_info</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Generate a list of fields used for projection, depending on the JobInfo model.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    list</span>
+<span class="sd">        The list of fields to use in a query.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">projection</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">JobInfo</span><span class="o">.</span><span class="n">model_fields</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span>
+    <span class="n">projection</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="s2">&quot;name&quot;</span><span class="p">)</span>
+    <span class="n">projection</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;job.name&quot;</span><span class="p">)</span>
+    <span class="n">projection</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;job.metadata&quot;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">projection</span>
+
+
+<span class="c1"># generate the list only once.</span>
+<span class="n">projection_job_info</span> <span class="o">=</span> <span class="n">_projection_db_info</span><span class="p">()</span>
+
+
+<div class="viewcode-block" id="JobDoc">
+<a class="viewcode-back" href="../../../api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.JobDoc">[docs]</a>
+<span class="k">class</span> <span class="nc">JobDoc</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Model for the standard representation of a Job in the queue database.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="c1"># TODO consider defining this as a dict and provide a get_job() method to</span>
+    <span class="c1"># get the real Job. This would avoid (de)serializing jobs if this document</span>
+    <span class="c1"># is used often to interact with the DB.</span>
+    <span class="n">job</span><span class="p">:</span> <span class="n">Job</span>
+    <span class="n">uuid</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">index</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">db_id</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">worker</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">state</span><span class="p">:</span> <span class="n">JobState</span>
+    <span class="n">remote</span><span class="p">:</span> <span class="n">RemoteInfo</span> <span class="o">=</span> <span class="n">RemoteInfo</span><span class="p">()</span>
+    <span class="c1"># only the uuid as list of parents for a JobDoc (i.e. uuid+index) is</span>
+    <span class="c1"># enough to determine the parents, since once a job with a uuid is</span>
+    <span class="c1"># among the parents, all the index will still be parents.</span>
+    <span class="c1"># Note that for just the uuid this condition is not true: JobDocs with</span>
+    <span class="c1"># the same uuid but different indexes may have different parents</span>
+    <span class="n">parents</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">previous_state</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">JobState</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">error</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># TODO is there a better way to serialize it?</span>
+    <span class="n">lock_id</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">lock_time</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">datetime</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">run_dir</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">start_time</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">datetime</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">end_time</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">datetime</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">created_on</span><span class="p">:</span> <span class="n">datetime</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="n">datetime</span><span class="o">.</span><span class="n">utcnow</span><span class="p">)</span>
+    <span class="n">updated_on</span><span class="p">:</span> <span class="n">datetime</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="n">datetime</span><span class="o">.</span><span class="n">utcnow</span><span class="p">)</span>
+    <span class="n">priority</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="c1"># store: Optional[JobStore] = None</span>
+    <span class="n">exec_config</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="n">ExecutionConfig</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">resources</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="n">QResources</span><span class="p">,</span> <span class="nb">dict</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="n">stored_data</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="c1"># history: Optional[list[str]] = None</span>
+
+<div class="viewcode-block" id="JobDoc.as_db_dict">
+<a class="viewcode-back" href="../../../api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.JobDoc.as_db_dict">[docs]</a>
+    <span class="k">def</span> <span class="nf">as_db_dict</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Generate a dict representation suitable to be inserted in the database.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        dict</span>
+<span class="sd">            The dict representing the JobDoc.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">d</span> <span class="o">=</span> <span class="n">jsanitize</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">model_dump</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="s2">&quot;python&quot;</span><span class="p">),</span>
+            <span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+            <span class="n">allow_bson</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+            <span class="n">enum_values</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="c1"># required since the resources are not serialized otherwise</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">resources</span><span class="p">,</span> <span class="n">QResources</span><span class="p">):</span>
+            <span class="n">d</span><span class="p">[</span><span class="s2">&quot;resources&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">resources</span><span class="o">.</span><span class="n">as_dict</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">d</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="FlowDoc">
+<a class="viewcode-back" href="../../../api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.FlowDoc">[docs]</a>
+<span class="k">class</span> <span class="nc">FlowDoc</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Model for the standard representation of a Flow in the queue database.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">uuid</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">jobs</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span>
+    <span class="n">state</span><span class="p">:</span> <span class="n">FlowState</span>
+    <span class="n">name</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">lock_id</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">lock_time</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">datetime</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">created_on</span><span class="p">:</span> <span class="n">datetime</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="n">datetime</span><span class="o">.</span><span class="n">utcnow</span><span class="p">)</span>
+    <span class="n">updated_on</span><span class="p">:</span> <span class="n">datetime</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="n">datetime</span><span class="o">.</span><span class="n">utcnow</span><span class="p">)</span>
+    <span class="n">metadata</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">dict</span><span class="p">)</span>
+    <span class="c1"># parents need to include both the uuid and the index.</span>
+    <span class="c1"># When dynamically replacing a Job with a Flow some new Jobs will</span>
+    <span class="c1"># be parents of the job with index=i+1, but will not be parents of</span>
+    <span class="c1"># the job with index i.</span>
+    <span class="c1"># index is stored as string, since mongodb needs string keys</span>
+    <span class="c1"># This dictionary include {job uuid: {job index: [parent&#39;s uuids]}}</span>
+    <span class="n">parents</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]]]</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">dict</span><span class="p">)</span>
+    <span class="c1"># ids correspond to db_id, uuid, index for each JobDoc</span>
+    <span class="n">ids</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span>
+
+<div class="viewcode-block" id="FlowDoc.as_db_dict">
+<a class="viewcode-back" href="../../../api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.FlowDoc.as_db_dict">[docs]</a>
+    <span class="k">def</span> <span class="nf">as_db_dict</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Generate a dict representation suitable to be inserted in the database.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        dict</span>
+<span class="sd">            The dict representing the FlowDoc.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">d</span> <span class="o">=</span> <span class="n">jsanitize</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">model_dump</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="s2">&quot;python&quot;</span><span class="p">),</span>
+            <span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+            <span class="n">allow_bson</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+            <span class="n">enum_values</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">d</span></div>
+
+
+    <span class="nd">@cached_property</span>
+    <span class="k">def</span> <span class="nf">int_index_parents</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">d</span> <span class="o">=</span> <span class="n">defaultdict</span><span class="p">(</span><span class="nb">dict</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">child_id</span><span class="p">,</span> <span class="n">index_parents</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">parents</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="k">for</span> <span class="n">index</span><span class="p">,</span> <span class="n">parents</span> <span class="ow">in</span> <span class="n">index_parents</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                <span class="n">d</span><span class="p">[</span><span class="n">child_id</span><span class="p">][</span><span class="nb">int</span><span class="p">(</span><span class="n">index</span><span class="p">)]</span> <span class="o">=</span> <span class="n">parents</span>
+        <span class="k">return</span> <span class="nb">dict</span><span class="p">(</span><span class="n">d</span><span class="p">)</span>
+
+    <span class="nd">@cached_property</span>
+    <span class="k">def</span> <span class="nf">children</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]]:</span>
+        <span class="n">d</span> <span class="o">=</span> <span class="n">defaultdict</span><span class="p">(</span><span class="nb">list</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">job_id</span><span class="p">,</span> <span class="n">index_parents</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">parents</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="k">for</span> <span class="n">index</span><span class="p">,</span> <span class="n">parents</span> <span class="ow">in</span> <span class="n">index_parents</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                <span class="k">for</span> <span class="n">parent_id</span> <span class="ow">in</span> <span class="n">parents</span><span class="p">:</span>
+                    <span class="n">d</span><span class="p">[</span><span class="n">parent_id</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">job_id</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">index</span><span class="p">)))</span>
+
+        <span class="k">return</span> <span class="nb">dict</span><span class="p">(</span><span class="n">d</span><span class="p">)</span>
+
+<div class="viewcode-block" id="FlowDoc.descendants">
+<a class="viewcode-back" href="../../../api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.FlowDoc.descendants">[docs]</a>
+    <span class="k">def</span> <span class="nf">descendants</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">job_uuid</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]:</span>
+        <span class="n">descendants</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+
+        <span class="k">def</span> <span class="nf">add_descendants</span><span class="p">(</span><span class="n">uuid</span><span class="p">):</span>
+            <span class="n">children</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">children</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">uuid</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">children</span><span class="p">:</span>
+                <span class="n">descendants</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">children</span><span class="p">)</span>
+                <span class="k">for</span> <span class="n">child</span> <span class="ow">in</span> <span class="n">children</span><span class="p">:</span>
+                    <span class="n">add_descendants</span><span class="p">(</span><span class="n">child</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+
+        <span class="n">add_descendants</span><span class="p">(</span><span class="n">job_uuid</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="n">descendants</span><span class="p">)</span></div>
+
+
+    <span class="nd">@cached_property</span>
+    <span class="k">def</span> <span class="nf">ids_mapping</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]:</span>
+        <span class="n">d</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">=</span> <span class="n">defaultdict</span><span class="p">(</span><span class="nb">dict</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">db_id</span><span class="p">,</span> <span class="n">job_id</span><span class="p">,</span> <span class="n">index</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">ids</span><span class="p">:</span>
+            <span class="n">d</span><span class="p">[</span><span class="n">job_id</span><span class="p">][</span><span class="nb">int</span><span class="p">(</span><span class="n">index</span><span class="p">)]</span> <span class="o">=</span> <span class="n">db_id</span>
+
+        <span class="k">return</span> <span class="nb">dict</span><span class="p">(</span><span class="n">d</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="RemoteError">
+<a class="viewcode-back" href="../../../api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.RemoteError">[docs]</a>
+<span class="k">class</span> <span class="nc">RemoteError</span><span class="p">(</span><span class="ne">RuntimeError</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    An exception signaling errors during the update of the remote states.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="n">no_retry</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">msg</span> <span class="o">=</span> <span class="n">msg</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">no_retry</span> <span class="o">=</span> <span class="n">no_retry</span></div>
+
+
+
+<div class="viewcode-block" id="FlowInfo">
+<a class="viewcode-back" href="../../../api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.FlowInfo">[docs]</a>
+<span class="k">class</span> <span class="nc">FlowInfo</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Model with information extracted from a FlowDoc.</span>
+<span class="sd">    Mainly for visualization purposes.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">db_ids</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span>
+    <span class="n">job_ids</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span>
+    <span class="n">job_indexes</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span>
+    <span class="n">flow_id</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">state</span><span class="p">:</span> <span class="n">FlowState</span>
+    <span class="n">name</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">created_on</span><span class="p">:</span> <span class="n">datetime</span>
+    <span class="n">updated_on</span><span class="p">:</span> <span class="n">datetime</span>
+    <span class="n">workers</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span>
+    <span class="n">job_states</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">JobState</span><span class="p">]</span>
+    <span class="n">job_names</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span>
+    <span class="n">parents</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span>
+    <span class="n">hosts</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span>
+
+<div class="viewcode-block" id="FlowInfo.from_query_dict">
+<a class="viewcode-back" href="../../../api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.FlowInfo.from_query_dict">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">from_query_dict</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">d</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;FlowInfo&quot;</span><span class="p">:</span>
+        <span class="n">created_on</span> <span class="o">=</span> <span class="n">d</span><span class="p">[</span><span class="s2">&quot;created_on&quot;</span><span class="p">]</span>
+        <span class="n">updated_on</span> <span class="o">=</span> <span class="n">d</span><span class="p">[</span><span class="s2">&quot;updated_on&quot;</span><span class="p">]</span>
+        <span class="n">flow_id</span> <span class="o">=</span> <span class="n">d</span><span class="p">[</span><span class="s2">&quot;uuid&quot;</span><span class="p">]</span>
+        <span class="n">jobs_data</span> <span class="o">=</span> <span class="n">d</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;jobs_list&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="p">[]</span>
+
+        <span class="n">workers</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">job_states</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">job_names</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">parents</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">job_hosts</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="k">if</span> <span class="n">jobs_data</span><span class="p">:</span>
+            <span class="n">db_ids</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="n">job_ids</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="n">job_indexes</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">for</span> <span class="n">job_doc</span> <span class="ow">in</span> <span class="n">jobs_data</span><span class="p">:</span>
+                <span class="n">db_ids</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">job_doc</span><span class="p">[</span><span class="s2">&quot;db_id&quot;</span><span class="p">])</span>
+                <span class="n">job_ids</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">job_doc</span><span class="p">[</span><span class="s2">&quot;uuid&quot;</span><span class="p">])</span>
+                <span class="n">job_indexes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">job_doc</span><span class="p">[</span><span class="s2">&quot;index&quot;</span><span class="p">])</span>
+                <span class="n">job_names</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">job_doc</span><span class="p">[</span><span class="s2">&quot;job&quot;</span><span class="p">][</span><span class="s2">&quot;name&quot;</span><span class="p">])</span>
+                <span class="n">state</span> <span class="o">=</span> <span class="n">job_doc</span><span class="p">[</span><span class="s2">&quot;state&quot;</span><span class="p">]</span>
+                <span class="n">job_states</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">JobState</span><span class="p">(</span><span class="n">state</span><span class="p">))</span>
+                <span class="n">workers</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">job_doc</span><span class="p">[</span><span class="s2">&quot;worker&quot;</span><span class="p">])</span>
+                <span class="n">parents</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">job_doc</span><span class="p">[</span><span class="s2">&quot;parents&quot;</span><span class="p">]</span> <span class="ow">or</span> <span class="p">[])</span>
+                <span class="n">job_hosts</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">job_doc</span><span class="p">[</span><span class="s2">&quot;job&quot;</span><span class="p">][</span><span class="s2">&quot;hosts&quot;</span><span class="p">]</span> <span class="ow">or</span> <span class="p">[])</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">db_ids</span><span class="p">,</span> <span class="n">job_ids</span><span class="p">,</span> <span class="n">job_indexes</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="o">*</span><span class="n">d</span><span class="p">[</span><span class="s2">&quot;ids&quot;</span><span class="p">]))</span>
+            <span class="c1"># parents could be determined in this case as well from the Flow document.</span>
+            <span class="c1"># However, to match the correct order it would require lopping over them.</span>
+            <span class="c1"># To keep the generation faster add this only if a use case shows up.</span>
+
+        <span class="n">state</span> <span class="o">=</span> <span class="n">FlowState</span><span class="p">(</span><span class="n">d</span><span class="p">[</span><span class="s2">&quot;state&quot;</span><span class="p">])</span>
+
+        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span>
+            <span class="n">db_ids</span><span class="o">=</span><span class="n">db_ids</span><span class="p">,</span>
+            <span class="n">job_ids</span><span class="o">=</span><span class="n">job_ids</span><span class="p">,</span>
+            <span class="n">job_indexes</span><span class="o">=</span><span class="n">job_indexes</span><span class="p">,</span>
+            <span class="n">flow_id</span><span class="o">=</span><span class="n">flow_id</span><span class="p">,</span>
+            <span class="n">state</span><span class="o">=</span><span class="n">state</span><span class="p">,</span>
+            <span class="n">name</span><span class="o">=</span><span class="n">d</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">],</span>
+            <span class="n">created_on</span><span class="o">=</span><span class="n">created_on</span><span class="p">,</span>
+            <span class="n">updated_on</span><span class="o">=</span><span class="n">updated_on</span><span class="p">,</span>
+            <span class="n">workers</span><span class="o">=</span><span class="n">workers</span><span class="p">,</span>
+            <span class="n">job_states</span><span class="o">=</span><span class="n">job_states</span><span class="p">,</span>
+            <span class="n">job_names</span><span class="o">=</span><span class="n">job_names</span><span class="p">,</span>
+            <span class="n">parents</span><span class="o">=</span><span class="n">parents</span><span class="p">,</span>
+            <span class="n">hosts</span><span class="o">=</span><span class="n">job_hosts</span><span class="p">,</span>
+        <span class="p">)</span></div>
+
+
+    <span class="nd">@cached_property</span>
+    <span class="k">def</span> <span class="nf">ids_mapping</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]:</span>
+        <span class="n">d</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">=</span> <span class="n">defaultdict</span><span class="p">(</span><span class="nb">dict</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">db_id</span><span class="p">,</span> <span class="n">job_id</span><span class="p">,</span> <span class="n">index</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">db_ids</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">job_ids</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">job_indexes</span><span class="p">):</span>
+            <span class="n">d</span><span class="p">[</span><span class="n">job_id</span><span class="p">][</span><span class="nb">int</span><span class="p">(</span><span class="n">index</span><span class="p">)]</span> <span class="o">=</span> <span class="n">db_id</span>
+
+        <span class="k">return</span> <span class="nb">dict</span><span class="p">(</span><span class="n">d</span><span class="p">)</span>
+
+<div class="viewcode-block" id="FlowInfo.iter_job_prop">
+<a class="viewcode-back" href="../../../api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.FlowInfo.iter_job_prop">[docs]</a>
+    <span class="k">def</span> <span class="nf">iter_job_prop</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">n_jobs</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">job_ids</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_jobs</span><span class="p">):</span>
+            <span class="n">d</span> <span class="o">=</span> <span class="p">{</span>
+                <span class="s2">&quot;db_id&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">db_ids</span><span class="p">[</span><span class="n">i</span><span class="p">],</span>
+                <span class="s2">&quot;uuid&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">job_ids</span><span class="p">[</span><span class="n">i</span><span class="p">],</span>
+                <span class="s2">&quot;index&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">job_indexes</span><span class="p">[</span><span class="n">i</span><span class="p">],</span>
+            <span class="p">}</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">job_names</span><span class="p">:</span>
+                <span class="n">d</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">job_names</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+                <span class="n">d</span><span class="p">[</span><span class="s2">&quot;state&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">job_states</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+                <span class="n">d</span><span class="p">[</span><span class="s2">&quot;parents&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">parents</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+                <span class="n">d</span><span class="p">[</span><span class="s2">&quot;hosts&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">hosts</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+            <span class="k">yield</span> <span class="n">d</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="DynamicResponseType">
+<a class="viewcode-back" href="../../../api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.DynamicResponseType">[docs]</a>
+<span class="k">class</span> <span class="nc">DynamicResponseType</span><span class="p">(</span><span class="n">Enum</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Types of dynamic responses in jobflow.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">REPLACE</span> <span class="o">=</span> <span class="s2">&quot;replace&quot;</span>
+    <span class="n">DETOUR</span> <span class="o">=</span> <span class="s2">&quot;detour&quot;</span>
+    <span class="n">ADDITION</span> <span class="o">=</span> <span class="s2">&quot;addition&quot;</span></div>
+
+
+
+<div class="viewcode-block" id="get_reset_job_base_dict">
+<a class="viewcode-back" href="../../../api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.get_reset_job_base_dict">[docs]</a>
+<span class="k">def</span> <span class="nf">get_reset_job_base_dict</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Generate a dictionary with the basic properties to update in case of reset.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    dict</span>
+<span class="sd">        Data to be reset.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">d</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">&quot;remote.step_attempts&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+        <span class="s2">&quot;remote.retry_time_limit&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="s2">&quot;previous_state&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="s2">&quot;remote.queue_state&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="s2">&quot;remote.error&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="s2">&quot;error&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="s2">&quot;updated_on&quot;</span><span class="p">:</span> <span class="n">datetime</span><span class="o">.</span><span class="n">utcnow</span><span class="p">(),</span>
+        <span class="s2">&quot;start_time&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="s2">&quot;end_time&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">}</span>
+    <span class="k">return</span> <span class="n">d</span></div>
+
+</pre></div>
+
+                </article>
+
+
+
+
+
+                <footer class="prev-next-footer">
+
+<div class="prev-next-area">
+</div>
+                </footer>
+
+            </div>
+
+
+
+
+          </div>
+          <footer class="bd-footer-content">
+
+          </footer>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="../../../_static/scripts/bootstrap.js?digest=5b4479735964841361fd"></script>
+<script src="../../../_static/scripts/pydata-sphinx-theme.js?digest=5b4479735964841361fd"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+
+    <div class="footer-items__start">
+
+        <div class="footer-item">
+
+  <p class="copyright">
+
+      © Copyright 2023, Matgenix SRL.
+      <br/>
+
+  </p>
+</div>
+
+        <div class="footer-item">
+
+  <p class="sphinx-version">
+    Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 7.2.6.
+    <br/>
+  </p>
+</div>
+
+    </div>
+
+
+
+    <div class="footer-items__end">
+
+        <div class="footer-item">
+<p class="theme-version">
+  Built with the <a href="https://pydata-sphinx-theme.readthedocs.io/en/stable/index.html">PyData Sphinx Theme</a> 0.14.4.
+</p></div>
+
+    </div>
+
+</div>
+
+  </footer>
+  </body>
+</html>

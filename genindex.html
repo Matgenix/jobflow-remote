@@ -1,0 +1,2244 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="./" data-theme="light">
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Index &#8212; Jobflow Remote v0.0.1.post117+gfc0fbc0.d20231222 Manual</title>
+
+
+
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "light";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "light";
+  </script>
+
+  <!-- Loaded before other Sphinx assets -->
+  <link href="_static/styles/theme.css?digest=5b4479735964841361fd" rel="stylesheet" />
+<link href="_static/styles/bootstrap.css?digest=5b4479735964841361fd" rel="stylesheet" />
+<link href="_static/styles/pydata-sphinx-theme.css?digest=5b4479735964841361fd" rel="stylesheet" />
+
+
+  <link href="_static/vendor/fontawesome/6.1.2/css/all.min.css?digest=5b4479735964841361fd" rel="stylesheet" />
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="_static/vendor/fontawesome/6.1.2/webfonts/fa-solid-900.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="_static/vendor/fontawesome/6.1.2/webfonts/fa-brands-400.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="_static/vendor/fontawesome/6.1.2/webfonts/fa-regular-400.woff2" />
+
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=fa44fd50" />
+    <link rel="stylesheet" type="text/css" href="_static/graphviz.css?v=eafc0fe6" />
+    <link rel="stylesheet" type="text/css" href="_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="_static/autodoc_pydantic.css?v=a0a71c94" />
+    <link rel="stylesheet" type="text/css" href="_static/design-style.1e8bd061cd6da7fc9cf755528e8ffc24.min.css?v=0a3b3ea7" />
+    <link rel="stylesheet" type="text/css" href="_static/jobflow_remote.css?v=7b6df8f0" />
+
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="_static/scripts/bootstrap.js?digest=5b4479735964841361fd" />
+<link rel="preload" as="script" href="_static/scripts/pydata-sphinx-theme.js?digest=5b4479735964841361fd" />
+  <script src="_static/vendor/fontawesome/6.1.2/js/all.min.js?digest=5b4479735964841361fd"></script>
+
+    <script src="_static/documentation_options.js?v=e135783d"></script>
+    <script src="_static/doctools.js?v=888ff710"></script>
+    <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="_static/copybutton.js?v=f281be69"></script>
+    <script src="_static/design-tabs.js?v=36754332"></script>
+    <script src="https://unpkg.com/mermaid@10.2.0/dist/mermaid.min.js"></script>
+    <script>mermaid.initialize({startOnLoad:true});</script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'genindex';</script>
+    <link rel="index" title="Index" href="#" />
+    <link rel="search" title="Search" href="search.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+    <meta name="docbuild:last-update" content="Dec 22, 2023"/>
+  </head>
+
+
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="light">
+
+
+
+  <a class="skip-link" href="#main-content">Skip to main content</a>
+
+  <div id="pst-scroll-pixel-helper"></div>
+
+
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>
+    Back to top
+  </button>
+
+
+  <input type="checkbox"
+          class="sidebar-toggle"
+          name="__primary"
+          id="__primary"/>
+  <label class="overlay overlay-primary" for="__primary"></label>
+
+  <input type="checkbox"
+          class="sidebar-toggle"
+          name="__secondary"
+          id="__secondary"/>
+  <label class="overlay overlay-secondary" for="__secondary"></label>
+
+  <div class="search-button__wrapper">
+    <div class="search-button__overlay"></div>
+    <div class="search-button__search-container">
+<form class="bd-search d-flex align-items-center"
+      action="search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         id="search-input"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form></div>
+  </div>
+
+
+  <div class="bd-header-announcement container-fluid bd-header-announcement">
+    <div class="bd-header-announcement__content"><p>Jobflow Remote is still in beta phase. The API may change at any time.</p></div>
+  </div>
+
+
+    <nav class="bd-header navbar navbar-expand-lg bd-navbar">
+<div class="bd-header__inner bd-page-width">
+  <label class="sidebar-toggle primary-toggle" for="__primary">
+    <span class="fa-solid fa-bars"></span>
+  </label>
+
+
+  <div class="col-lg-3 navbar-header-items__start">
+
+      <div class="navbar-item">
+
+
+
+<a class="navbar-brand logo" href="index.html">
+
+
+
+
+
+
+    <p class="title logo__title">Jobflow Remote v0.0.1.post117+gfc0fbc0.d20231222 Manual</p>
+
+</a></div>
+
+  </div>
+
+  <div class="col-lg-9 navbar-header-items">
+
+    <div class="me-auto navbar-header-items__center">
+
+        <div class="navbar-item">
+<nav class="navbar-nav">
+  <p class="sidebar-header-items__title"
+     role="heading"
+     aria-level="1"
+     aria-label="Site Navigation">
+    Site Navigation
+  </p>
+  <ul class="bd-navbar-elements navbar-nav">
+
+                    <li class="nav-item">
+                      <a class="nav-link nav-internal" href="user/index.html">
+                        User Guide
+                      </a>
+                    </li>
+
+
+                    <li class="nav-item">
+                      <a class="nav-link nav-internal" href="api/index.html">
+                        API reference
+                      </a>
+                    </li>
+
+
+                    <li class="nav-item">
+                      <a class="nav-link nav-internal" href="dev/index.html">
+                        Development
+                      </a>
+                    </li>
+
+
+                    <li class="nav-item">
+                      <a class="nav-link nav-internal" href="changelog.html">
+                        Changelog
+                      </a>
+                    </li>
+
+  </ul>
+</nav></div>
+
+    </div>
+
+
+    <div class="navbar-header-items__end">
+
+        <div class="navbar-item navbar-persistent--container">
+
+
+ <script>
+ document.write(`
+   <button class="btn navbar-btn search-button-field search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass"></i>
+    <span class="search-button__default-text">Search</span>
+    <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+   </button>
+ `);
+ </script>
+        </div>
+
+
+        <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm navbar-btn theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="theme-switch nav-link" data-mode="light"><i class="fa-solid fa-sun fa-lg"></i></span>
+    <span class="theme-switch nav-link" data-mode="dark"><i class="fa-solid fa-moon fa-lg"></i></span>
+    <span class="theme-switch nav-link" data-mode="auto"><i class="fa-solid fa-circle-half-stroke fa-lg"></i></span>
+  </button>
+`);
+</script></div>
+
+    </div>
+
+  </div>
+
+
+    <div class="navbar-persistent--mobile">
+
+ <script>
+ document.write(`
+   <button class="btn navbar-btn search-button-field search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass"></i>
+    <span class="search-button__default-text">Search</span>
+    <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+   </button>
+ `);
+ </script>
+    </div>
+
+
+
+</div>
+
+    </nav>
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+
+      <div class="bd-sidebar-primary bd-sidebar hide-on-wide">
+
+
+
+  <div class="sidebar-header-items sidebar-primary__section">
+
+
+      <div class="sidebar-header-items__center">
+
+          <div class="navbar-item">
+<nav class="navbar-nav">
+  <p class="sidebar-header-items__title"
+     role="heading"
+     aria-level="1"
+     aria-label="Site Navigation">
+    Site Navigation
+  </p>
+  <ul class="bd-navbar-elements navbar-nav">
+
+                    <li class="nav-item">
+                      <a class="nav-link nav-internal" href="user/index.html">
+                        User Guide
+                      </a>
+                    </li>
+
+
+                    <li class="nav-item">
+                      <a class="nav-link nav-internal" href="api/index.html">
+                        API reference
+                      </a>
+                    </li>
+
+
+                    <li class="nav-item">
+                      <a class="nav-link nav-internal" href="dev/index.html">
+                        Development
+                      </a>
+                    </li>
+
+
+                    <li class="nav-item">
+                      <a class="nav-link nav-internal" href="changelog.html">
+                        Changelog
+                      </a>
+                    </li>
+
+  </ul>
+</nav></div>
+
+      </div>
+
+
+
+      <div class="sidebar-header-items__end">
+
+          <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm navbar-btn theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="theme-switch nav-link" data-mode="light"><i class="fa-solid fa-sun fa-lg"></i></span>
+    <span class="theme-switch nav-link" data-mode="dark"><i class="fa-solid fa-moon fa-lg"></i></span>
+    <span class="theme-switch nav-link" data-mode="auto"><i class="fa-solid fa-circle-half-stroke fa-lg"></i></span>
+  </button>
+`);
+</script></div>
+
+      </div>
+
+  </div>
+
+
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+
+  <div id="rtd-footer-container"></div>
+
+
+      </div>
+
+      <main id="main-content" class="bd-main">
+
+
+          <div class="bd-content">
+            <div class="bd-article-container">
+
+              <div class="bd-header-article"></div>
+
+
+
+
+<div id="searchbox"></div>
+                <article class="bd-article" role="main">
+
+
+<h1 id="index">Index</h1>
+
+<div class="genindex-jumpbox">
+ <a href="#A"><strong>A</strong></a>
+ | <a href="#B"><strong>B</strong></a>
+ | <a href="#C"><strong>C</strong></a>
+ | <a href="#D"><strong>D</strong></a>
+ | <a href="#E"><strong>E</strong></a>
+ | <a href="#F"><strong>F</strong></a>
+ | <a href="#G"><strong>G</strong></a>
+ | <a href="#H"><strong>H</strong></a>
+ | <a href="#I"><strong>I</strong></a>
+ | <a href="#J"><strong>J</strong></a>
+ | <a href="#K"><strong>K</strong></a>
+ | <a href="#L"><strong>L</strong></a>
+ | <a href="#M"><strong>M</strong></a>
+ | <a href="#N"><strong>N</strong></a>
+ | <a href="#O"><strong>O</strong></a>
+ | <a href="#P"><strong>P</strong></a>
+ | <a href="#Q"><strong>Q</strong></a>
+ | <a href="#R"><strong>R</strong></a>
+ | <a href="#S"><strong>S</strong></a>
+ | <a href="#T"><strong>T</strong></a>
+ | <a href="#U"><strong>U</strong></a>
+ | <a href="#V"><strong>V</strong></a>
+ | <a href="#W"><strong>W</strong></a>
+ | <a href="#Y"><strong>Y</strong></a>
+
+</div>
+<h2 id="A">A</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api/jobflow_remote.utils.db.html#jobflow_remote.utils.db.MongoLock.acquire">acquire() (jobflow_remote.utils.db.MongoLock method)</a>
+</li>
+      <li><a href="api/jobflow_remote.utils.examples.html#jobflow_remote.utils.examples.add">add() (in module jobflow_remote.utils.examples)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.jobcontroller.html#jobflow_remote.jobs.jobcontroller.JobController.add_batch_process">add_batch_process() (jobflow_remote.jobs.jobcontroller.JobController method)</a>
+</li>
+      <li><a href="api/jobflow_remote.utils.examples.html#jobflow_remote.utils.examples.add_distributed">add_distributed() (in module jobflow_remote.utils.examples)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.jobcontroller.html#jobflow_remote.jobs.jobcontroller.JobController.add_flow">add_flow() (jobflow_remote.jobs.jobcontroller.JobController method)</a>
+</li>
+      <li><a href="api/jobflow_remote.utils.examples.html#jobflow_remote.utils.examples.add_many">add_many() (in module jobflow_remote.utils.examples)</a>
+</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api/jobflow_remote.utils.examples.html#jobflow_remote.utils.examples.add_raise">add_raise() (in module jobflow_remote.utils.examples)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.DynamicResponseType.ADDITION">ADDITION (jobflow_remote.jobs.data.DynamicResponseType attribute)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.runner.html#jobflow_remote.jobs.runner.Runner.advance_state">advance_state() (jobflow_remote.jobs.runner.Runner method)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.FlowDoc.as_db_dict">as_db_dict() (jobflow_remote.jobs.data.FlowDoc method)</a>
+
+      <ul>
+        <li><a href="api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.JobDoc.as_db_dict">(jobflow_remote.jobs.data.JobDoc method)</a>
+</li>
+      </ul></li>
+      <li><a href="api/jobflow_remote.config.base.html#jobflow_remote.config.base.QueueConfig.auxiliary_collection">auxiliary_collection (jobflow_remote.config.base.QueueConfig attribute)</a>
+</li>
+  </ul></td>
+</tr></table>
+
+<h2 id="B">B</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api/jobflow_remote.config.base.html#jobflow_remote.config.base.Project.base_dir">base_dir (jobflow_remote.config.base.Project attribute)</a>
+</li>
+      <li><a href="api/jobflow_remote.remote.host.base.html#jobflow_remote.remote.host.base.BaseHost">BaseHost (class in jobflow_remote.remote.host.base)</a>
+</li>
+      <li><a href="api/jobflow_remote.config.base.html#jobflow_remote.config.base.WorkerBase.batch">batch (jobflow_remote.config.base.WorkerBase attribute)</a>
+</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api/jobflow_remote.jobs.state.html#jobflow_remote.jobs.state.JobState.BATCH_RUNNING">BATCH_RUNNING (jobflow_remote.jobs.state.JobState attribute)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.state.html#jobflow_remote.jobs.state.JobState.BATCH_SUBMITTED">BATCH_SUBMITTED (jobflow_remote.jobs.state.JobState attribute)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.jobcontroller.html#jobflow_remote.jobs.jobcontroller.JobController.build_indexes">build_indexes() (jobflow_remote.jobs.jobcontroller.JobController method)</a>
+</li>
+  </ul></td>
+</tr></table>
+
+<h2 id="C">C</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api/jobflow_remote.cli.jfr_typer.html#jobflow_remote.cli.jfr_typer.JFRTyper.callback">callback() (jobflow_remote.cli.jfr_typer.JFRTyper method)</a>
+</li>
+      <li><a href="api/jobflow_remote.remote.queue.html#jobflow_remote.remote.queue.QueueManager.cancel">cancel() (jobflow_remote.remote.queue.QueueManager method)</a>
+</li>
+      <li><a href="api/jobflow_remote.cli.project.html#jobflow_remote.cli.project.check">check() (in module jobflow_remote.cli.project)</a>
+</li>
+      <li><a href="api/jobflow_remote.cli.utils.html#jobflow_remote.cli.utils.check_at_least_one_opt">check_at_least_one_opt() (in module jobflow_remote.cli.utils)</a>
+</li>
+      <li><a href="api/jobflow_remote.config.base.html#jobflow_remote.config.base.Project.check_base_dir">check_base_dir() (jobflow_remote.config.base.Project class method)</a>
+</li>
+      <li><a href="api/jobflow_remote.config.base.html#jobflow_remote.config.base.Project.check_daemon_dir">check_daemon_dir() (jobflow_remote.config.base.Project class method)</a>
+</li>
+      <li><a href="api/jobflow_remote.utils.data.html#jobflow_remote.utils.data.check_dict_keywords">check_dict_keywords() (in module jobflow_remote.utils.data)</a>
+</li>
+      <li><a href="api/jobflow_remote.cli.utils.html#jobflow_remote.cli.utils.check_incompatible_opt">check_incompatible_opt() (in module jobflow_remote.cli.utils)</a>
+</li>
+      <li><a href="api/jobflow_remote.config.helper.html#jobflow_remote.config.helper.check_jobstore">check_jobstore() (in module jobflow_remote.config.helper)</a>
+
+      <ul>
+        <li><a href="api/jobflow_remote.config.base.html#jobflow_remote.config.base.Project.check_jobstore">(jobflow_remote.config.base.Project class method)</a>
+</li>
+      </ul></li>
+      <li><a href="api/jobflow_remote.config.base.html#jobflow_remote.config.base.Project.check_log_dir">check_log_dir() (jobflow_remote.config.base.Project class method)</a>
+</li>
+      <li><a href="api/jobflow_remote.cli.utils.html#jobflow_remote.cli.utils.check_only_one_opt">check_only_one_opt() (in module jobflow_remote.cli.utils)</a>
+</li>
+      <li><a href="api/jobflow_remote.config.helper.html#jobflow_remote.config.helper.check_queue_store">check_queue_store() (in module jobflow_remote.config.helper)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.runner.html#jobflow_remote.jobs.runner.Runner.check_run_status">check_run_status() (jobflow_remote.jobs.runner.Runner method)</a>
+</li>
+      <li><a href="api/jobflow_remote.config.base.html#jobflow_remote.config.base.WorkerBase.check_scheduler_type">check_scheduler_type() (jobflow_remote.config.base.WorkerBase class method)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.daemon.html#jobflow_remote.jobs.daemon.DaemonManager.check_status">check_status() (jobflow_remote.jobs.daemon.DaemonManager method)</a>
+</li>
+      <li><a href="api/jobflow_remote.cli.utils.html#jobflow_remote.cli.utils.check_stopped_runner">check_stopped_runner() (in module jobflow_remote.cli.utils)</a>
+</li>
+      <li><a href="api/jobflow_remote.config.base.html#jobflow_remote.config.base.QueueConfig.check_store">check_store() (jobflow_remote.config.base.QueueConfig class method)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.daemon.html#jobflow_remote.jobs.daemon.DaemonManager.check_supervisord_process">check_supervisord_process() (jobflow_remote.jobs.daemon.DaemonManager method)</a>
+</li>
+      <li><a href="api/jobflow_remote.config.base.html#jobflow_remote.config.base.Project.check_tmp_dir">check_tmp_dir() (jobflow_remote.config.base.Project class method)</a>
+</li>
+      <li><a href="api/jobflow_remote.cli.utils.html#jobflow_remote.cli.utils.check_valid_uuid">check_valid_uuid() (in module jobflow_remote.cli.utils)</a>
+</li>
+      <li><a href="api/jobflow_remote.config.base.html#jobflow_remote.config.base.WorkerBase.check_work_dir">check_work_dir() (jobflow_remote.config.base.WorkerBase class method)</a>
+</li>
+      <li><a href="api/jobflow_remote.config.helper.html#jobflow_remote.config.helper.check_worker">check_worker() (in module jobflow_remote.config.helper)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.state.html#jobflow_remote.jobs.state.JobState.CHECKED_OUT">CHECKED_OUT (jobflow_remote.jobs.state.JobState attribute)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.jobcontroller.html#jobflow_remote.jobs.jobcontroller.JobController.checkin_job">checkin_job() (jobflow_remote.jobs.jobcontroller.JobController method)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.runner.html#jobflow_remote.jobs.runner.Runner.checkout">checkout() (jobflow_remote.jobs.runner.Runner method)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.jobcontroller.html#jobflow_remote.jobs.jobcontroller.JobController.checkout_job">checkout_job() (jobflow_remote.jobs.jobcontroller.JobController method)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.FlowDoc.children">children (jobflow_remote.jobs.data.FlowDoc property)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.daemon.html#jobflow_remote.jobs.daemon.DaemonManager.clean_files">clean_files() (jobflow_remote.jobs.daemon.DaemonManager method)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.runner.html#jobflow_remote.jobs.runner.Runner.cleanup">cleanup() (jobflow_remote.jobs.runner.Runner method)</a>
+</li>
+      <li><a href="api/jobflow_remote.cli.utils.html#jobflow_remote.cli.utils.cleanup_job_controller">cleanup_job_controller() (in module jobflow_remote.cli.utils)</a>
+</li>
+      <li><a href="api/jobflow_remote.cli.utils.html#jobflow_remote.cli.utils.cli_error_handler">cli_error_handler() (in module jobflow_remote.cli.utils)</a>
+</li>
+      <li><a href="api/jobflow_remote.config.settings.html#jobflow_remote.config.settings.JobflowRemoteSettings.cli_full_exc">cli_full_exc (jobflow_remote.config.settings.JobflowRemoteSettings attribute)</a>
+</li>
+      <li><a href="api/jobflow_remote.config.base.html#jobflow_remote.config.base.LocalWorker.cli_info">cli_info (jobflow_remote.config.base.LocalWorker property)</a>
+
+      <ul>
+        <li><a href="api/jobflow_remote.config.base.html#jobflow_remote.config.base.RemoteWorker.cli_info">(jobflow_remote.config.base.RemoteWorker property)</a>
+</li>
+        <li><a href="api/jobflow_remote.config.base.html#jobflow_remote.config.base.WorkerBase.cli_info">(jobflow_remote.config.base.WorkerBase property)</a>
+</li>
+      </ul></li>
+      <li><a href="api/jobflow_remote.config.settings.html#jobflow_remote.config.settings.JobflowRemoteSettings.cli_log_level">cli_log_level (jobflow_remote.config.settings.JobflowRemoteSettings attribute)</a>
+</li>
+      <li><a href="api/jobflow_remote.config.settings.html#jobflow_remote.config.settings.JobflowRemoteSettings.cli_suggestions">cli_suggestions (jobflow_remote.config.settings.JobflowRemoteSettings attribute)</a>
+</li>
+      <li><a href="api/jobflow_remote.utils.log.html#jobflow_remote.utils.log.CLIFormatter">CLIFormatter (class in jobflow_remote.utils.log)</a>
+</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api/jobflow_remote.jobs.jobcontroller.html#jobflow_remote.jobs.jobcontroller.JobController.close">close() (jobflow_remote.jobs.jobcontroller.JobController method)</a>
+
+      <ul>
+        <li><a href="api/jobflow_remote.remote.host.base.html#jobflow_remote.remote.host.base.BaseHost.close">(jobflow_remote.remote.host.base.BaseHost method)</a>
+</li>
+        <li><a href="api/jobflow_remote.remote.host.local.html#jobflow_remote.remote.host.local.LocalHost.close">(jobflow_remote.remote.host.local.LocalHost method)</a>
+</li>
+        <li><a href="api/jobflow_remote.remote.host.remote.html#jobflow_remote.remote.host.remote.RemoteHost.close">(jobflow_remote.remote.host.remote.RemoteHost method)</a>
+</li>
+      </ul></li>
+      <li><a href="api/jobflow_remote.cli.jfr_typer.html#jobflow_remote.cli.jfr_typer.JFRTyper.command">command() (jobflow_remote.cli.jfr_typer.JFRTyper method)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.jobcontroller.html#jobflow_remote.jobs.jobcontroller.JobController.compact">compact() (jobflow_remote.jobs.jobcontroller.JobController method)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.jobcontroller.html#jobflow_remote.jobs.jobcontroller.JobController.complete_job">complete_job() (jobflow_remote.jobs.jobcontroller.JobController method)</a>
+
+      <ul>
+        <li><a href="api/jobflow_remote.jobs.runner.html#jobflow_remote.jobs.runner.Runner.complete_job">(jobflow_remote.jobs.runner.Runner method)</a>
+</li>
+      </ul></li>
+      <li><a href="api/jobflow_remote.cli.utils.html#jobflow_remote.cli.utils.complete_profiling">complete_profiling() (in module jobflow_remote.cli.utils)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.state.html#jobflow_remote.jobs.state.FlowState.COMPLETED">COMPLETED (jobflow_remote.jobs.state.FlowState attribute)</a>
+
+      <ul>
+        <li><a href="api/jobflow_remote.jobs.state.html#jobflow_remote.jobs.state.JobState.COMPLETED">(jobflow_remote.jobs.state.JobState attribute)</a>
+</li>
+      </ul></li>
+      <li><a href="api/jobflow_remote.utils.examples.html#jobflow_remote.utils.examples.conditional_sum_replace">conditional_sum_replace() (in module jobflow_remote.utils.examples)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.daemon.html#jobflow_remote.jobs.daemon.DaemonManager.conf_filepath">conf_filepath (jobflow_remote.jobs.daemon.DaemonManager property)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.daemon.html#jobflow_remote.jobs.daemon.DaemonManager.conf_template_single">conf_template_single (jobflow_remote.jobs.daemon.DaemonManager attribute)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.daemon.html#jobflow_remote.jobs.daemon.DaemonManager.conf_template_split">conf_template_split (jobflow_remote.jobs.daemon.DaemonManager attribute)</a>
+</li>
+      <li><a href="api/jobflow_remote.config.settings.html#jobflow_remote.config.settings.JobflowRemoteSettings.config_file">config_file (jobflow_remote.config.settings.JobflowRemoteSettings attribute)</a>
+</li>
+      <li><a href="api/jobflow_remote.config.base.html#jobflow_remote.config.base.ConfigError">ConfigError</a>
+</li>
+      <li><a href="api/jobflow_remote.config.manager.html#jobflow_remote.config.manager.ConfigManager">ConfigManager (class in jobflow_remote.config.manager)</a>
+</li>
+      <li><a href="api/jobflow_remote.remote.host.base.html#jobflow_remote.remote.host.base.BaseHost.connect">connect() (jobflow_remote.remote.host.base.BaseHost method)</a>
+
+      <ul>
+        <li><a href="api/jobflow_remote.remote.host.local.html#jobflow_remote.remote.host.local.LocalHost.connect">(jobflow_remote.remote.host.local.LocalHost method)</a>
+</li>
+        <li><a href="api/jobflow_remote.remote.host.remote.html#jobflow_remote.remote.host.remote.RemoteHost.connect">(jobflow_remote.remote.host.remote.RemoteHost method)</a>
+</li>
+      </ul></li>
+      <li><a href="api/jobflow_remote.config.base.html#jobflow_remote.config.base.RemoteWorker.connect_kwargs">connect_kwargs (jobflow_remote.config.base.RemoteWorker attribute)</a>
+</li>
+      <li><a href="api/jobflow_remote.config.base.html#jobflow_remote.config.base.RemoteWorker.connect_timeout">connect_timeout (jobflow_remote.config.base.RemoteWorker attribute)</a>
+</li>
+      <li><a href="api/jobflow_remote.remote.host.remote.html#jobflow_remote.remote.host.remote.RemoteHost.connection">connection (jobflow_remote.remote.host.remote.RemoteHost property)</a>
+</li>
+      <li><a href="api/jobflow_remote.cli.types.html#jobflow_remote.cli.types.DictTypeParser.convert">convert() (jobflow_remote.cli.types.DictTypeParser method)</a>
+</li>
+      <li><a href="api/jobflow_remote.utils.data.html#jobflow_remote.utils.data.convert_store">convert_store() (in module jobflow_remote.utils.data)</a>
+</li>
+      <li><a href="api/jobflow_remote.utils.data.html#jobflow_remote.utils.data.convert_utc_time">convert_utc_time() (in module jobflow_remote.utils.data)</a>
+</li>
+      <li><a href="api/jobflow_remote.remote.host.base.html#jobflow_remote.remote.host.base.BaseHost.copy">copy() (jobflow_remote.remote.host.base.BaseHost method)</a>
+
+      <ul>
+        <li><a href="api/jobflow_remote.remote.host.local.html#jobflow_remote.remote.host.local.LocalHost.copy">(jobflow_remote.remote.host.local.LocalHost method)</a>
+</li>
+        <li><a href="api/jobflow_remote.remote.host.remote.html#jobflow_remote.remote.host.remote.RemoteHost.copy">(jobflow_remote.remote.host.remote.RemoteHost method)</a>
+</li>
+      </ul></li>
+      <li><a href="api/jobflow_remote.jobs.jobcontroller.html#jobflow_remote.jobs.jobcontroller.JobController.count_flows">count_flows() (jobflow_remote.jobs.jobcontroller.JobController method)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.jobcontroller.html#jobflow_remote.jobs.jobcontroller.JobController.count_jobs">count_jobs() (jobflow_remote.jobs.jobcontroller.JobController method)</a>
+</li>
+      <li><a href="api/jobflow_remote.config.manager.html#jobflow_remote.config.manager.ConfigManager.create_project">create_project() (jobflow_remote.config.manager.ConfigManager method)</a>
+</li>
+      <li><a href="api/jobflow_remote.cli.utils.html#jobflow_remote.cli.utils.SortOption.CREATED_ON">CREATED_ON (jobflow_remote.cli.utils.SortOption attribute)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.FlowDoc.created_on">created_on (jobflow_remote.jobs.data.FlowDoc attribute)</a>
+
+      <ul>
+        <li><a href="api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.FlowInfo.created_on">(jobflow_remote.jobs.data.FlowInfo attribute)</a>
+</li>
+        <li><a href="api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.JobDoc.created_on">(jobflow_remote.jobs.data.JobDoc attribute)</a>
+</li>
+        <li><a href="api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.JobInfo.created_on">(jobflow_remote.jobs.data.JobInfo attribute)</a>
+</li>
+      </ul></li>
+      <li><a href="api/jobflow_remote.cli.project.html#jobflow_remote.cli.project.current_project">current_project() (in module jobflow_remote.cli.project)</a>
+</li>
+  </ul></td>
+</tr></table>
+
+<h2 id="D">D</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api/jobflow_remote.config.base.html#jobflow_remote.config.base.Project.daemon_dir">daemon_dir (jobflow_remote.config.base.Project attribute)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.daemon.html#jobflow_remote.jobs.daemon.DaemonError">DaemonError</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.daemon.html#jobflow_remote.jobs.daemon.DaemonManager">DaemonManager (class in jobflow_remote.jobs.daemon)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.daemon.html#jobflow_remote.jobs.daemon.DaemonStatus">DaemonStatus (class in jobflow_remote.jobs.daemon)</a>
+</li>
+      <li><a href="api/jobflow_remote.cli.utils.html#jobflow_remote.cli.utils.SortOption.DB_ID">DB_ID (jobflow_remote.cli.utils.SortOption attribute)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.JobDoc.db_id">db_id (jobflow_remote.jobs.data.JobDoc attribute)</a>
+
+      <ul>
+        <li><a href="api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.JobInfo.db_id">(jobflow_remote.jobs.data.JobInfo attribute)</a>
+</li>
+      </ul></li>
+      <li><a href="api/jobflow_remote.config.base.html#jobflow_remote.config.base.QueueConfig.db_id_prefix">db_id_prefix (jobflow_remote.config.base.QueueConfig attribute)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.FlowInfo.db_ids">db_ids (jobflow_remote.jobs.data.FlowInfo attribute)</a>
+</li>
+      <li><a href="api/jobflow_remote.config.base.html#jobflow_remote.config.base.LogLevel.DEBUG">DEBUG (jobflow_remote.config.base.LogLevel attribute)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.run.html#jobflow_remote.jobs.run.decompress_files">decompress_files() (in module jobflow_remote.jobs.run)</a>
+</li>
+      <li><a href="api/jobflow_remote.utils.data.html#jobflow_remote.utils.data.deep_merge_dict">deep_merge_dict() (in module jobflow_remote.utils.data)</a>
+</li>
+      <li><a href="api/jobflow_remote.remote.data.html#jobflow_remote.remote.data.default_orjson_serializer">default_orjson_serializer() (in module jobflow_remote.remote.data)</a>
+</li>
+      <li><a href="api/jobflow_remote.config.base.html#jobflow_remote.config.base.RunnerOptions.delay_advance_status">delay_advance_status (jobflow_remote.config.base.RunnerOptions attribute)</a>
+</li>
+      <li><a href="api/jobflow_remote.config.base.html#jobflow_remote.config.base.RunnerOptions.delay_check_run_status">delay_check_run_status (jobflow_remote.config.base.RunnerOptions attribute)</a>
+</li>
+      <li><a href="api/jobflow_remote.config.base.html#jobflow_remote.config.base.RunnerOptions.delay_checkout">delay_checkout (jobflow_remote.config.base.RunnerOptions attribute)</a>
+</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api/jobflow_remote.config.base.html#jobflow_remote.config.base.RunnerOptions.delay_refresh_limited">delay_refresh_limited (jobflow_remote.config.base.RunnerOptions attribute)</a>
+</li>
+      <li><a href="api/jobflow_remote.config.base.html#jobflow_remote.config.base.RunnerOptions.delay_update_batch">delay_update_batch (jobflow_remote.config.base.RunnerOptions attribute)</a>
+</li>
+      <li><a href="api/jobflow_remote.cli.flow.html#jobflow_remote.cli.flow.delete">delete() (in module jobflow_remote.cli.flow)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.jobcontroller.html#jobflow_remote.jobs.jobcontroller.JobController.delete_flow">delete_flow() (jobflow_remote.jobs.jobcontroller.JobController method)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.jobcontroller.html#jobflow_remote.jobs.jobcontroller.JobController.delete_flows">delete_flows() (jobflow_remote.jobs.jobcontroller.JobController method)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.batch.html#jobflow_remote.jobs.batch.RemoteBatchManager.delete_terminated">delete_terminated() (jobflow_remote.jobs.batch.RemoteBatchManager method)</a>
+</li>
+      <li><a href="api/jobflow_remote.config.base.html#jobflow_remote.config.base.RunnerOptions.delete_tmp_folder">delete_tmp_folder (jobflow_remote.config.base.RunnerOptions attribute)</a>
+</li>
+      <li><a href="api/jobflow_remote.config.base.html#jobflow_remote.config.base.RunnerOptions.delta_retry">delta_retry (jobflow_remote.config.base.RunnerOptions attribute)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.FlowDoc.descendants">descendants() (jobflow_remote.jobs.data.FlowDoc method)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.DynamicResponseType.DETOUR">DETOUR (jobflow_remote.jobs.data.DynamicResponseType attribute)</a>
+</li>
+      <li><a href="api/jobflow_remote.cli.types.html#jobflow_remote.cli.types.DictType">DictType (class in jobflow_remote.cli.types)</a>
+</li>
+      <li><a href="api/jobflow_remote.cli.types.html#jobflow_remote.cli.types.DictTypeParser">DictTypeParser (class in jobflow_remote.cli.types)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.runner.html#jobflow_remote.jobs.runner.Runner.download">download() (jobflow_remote.jobs.runner.Runner method)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.state.html#jobflow_remote.jobs.state.JobState.DOWNLOADED">DOWNLOADED (jobflow_remote.jobs.state.JobState attribute)</a>
+</li>
+      <li><a href="api/jobflow_remote.config.manager.html#jobflow_remote.config.manager.ConfigManager.dump_project">dump_project() (jobflow_remote.config.manager.ConfigManager method)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.DynamicResponseType">DynamicResponseType (class in jobflow_remote.jobs.data)</a>
+</li>
+  </ul></td>
+</tr></table>
+
+<h2 id="E">E</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.JobDoc.end_time">end_time (jobflow_remote.jobs.data.JobDoc attribute)</a>
+
+      <ul>
+        <li><a href="api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.JobInfo.end_time">(jobflow_remote.jobs.data.JobInfo attribute)</a>
+</li>
+      </ul></li>
+      <li><a href="api/jobflow_remote.config.base.html#jobflow_remote.config.base.LogLevel.ERROR">ERROR (jobflow_remote.config.base.LogLevel attribute)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.JobDoc.error">error (jobflow_remote.jobs.data.JobDoc attribute)</a>
+
+      <ul>
+        <li><a href="api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.JobInfo.error">(jobflow_remote.jobs.data.JobInfo attribute)</a>
+</li>
+        <li><a href="api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.RemoteInfo.error">(jobflow_remote.jobs.data.RemoteInfo attribute)</a>
+</li>
+      </ul></li>
+      <li><a href="api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.JobInfo.estimated_run_time">estimated_run_time (jobflow_remote.jobs.data.JobInfo property)</a>
+</li>
+      <li><a href="api/jobflow_remote.config.base.html#jobflow_remote.config.base.Project.exec_config">exec_config (jobflow_remote.config.base.Project attribute)</a>
+
+      <ul>
+        <li><a href="api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.JobDoc.exec_config">(jobflow_remote.jobs.data.JobDoc attribute)</a>
+</li>
+      </ul></li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api/jobflow_remote.cli.job.html#jobflow_remote.cli.job.exec_config">exec_config() (in module jobflow_remote.cli.job)</a>
+</li>
+      <li><a href="api/jobflow_remote.remote.host.base.html#jobflow_remote.remote.host.base.BaseHost.execute">execute() (jobflow_remote.remote.host.base.BaseHost method)</a>
+
+      <ul>
+        <li><a href="api/jobflow_remote.remote.host.local.html#jobflow_remote.remote.host.local.LocalHost.execute">(jobflow_remote.remote.host.local.LocalHost method)</a>
+</li>
+        <li><a href="api/jobflow_remote.remote.host.remote.html#jobflow_remote.remote.host.remote.RemoteHost.execute">(jobflow_remote.remote.host.remote.RemoteHost method)</a>
+</li>
+      </ul></li>
+      <li><a href="api/jobflow_remote.remote.queue.html#jobflow_remote.remote.queue.QueueManager.execute_cmd">execute_cmd() (jobflow_remote.remote.queue.QueueManager method)</a>
+</li>
+      <li><a href="api/jobflow_remote.cli.utils.html#jobflow_remote.cli.utils.execute_multi_jobs_cmd">execute_multi_jobs_cmd() (in module jobflow_remote.cli.utils)</a>
+</li>
+      <li><a href="api/jobflow_remote.cli.utils.html#jobflow_remote.cli.utils.exit_with_error_msg">exit_with_error_msg() (in module jobflow_remote.cli.utils)</a>
+</li>
+      <li><a href="api/jobflow_remote.cli.utils.html#jobflow_remote.cli.utils.exit_with_warning_msg">exit_with_warning_msg() (in module jobflow_remote.cli.utils)</a>
+</li>
+      <li><a href="api/jobflow_remote.config.base.html#jobflow_remote.config.base.ExecutionConfig.export">export (jobflow_remote.config.base.ExecutionConfig attribute)</a>
+</li>
+      <li><a href="api/jobflow_remote.config.manager.html#jobflow_remote.config.manager.ProjectData.ext">ext (jobflow_remote.config.manager.ProjectData attribute)</a>
+</li>
+  </ul></td>
+</tr></table>
+
+<h2 id="F">F</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api/jobflow_remote.jobs.state.html#jobflow_remote.jobs.state.FlowState.FAILED">FAILED (jobflow_remote.jobs.state.FlowState attribute)</a>
+
+      <ul>
+        <li><a href="api/jobflow_remote.jobs.state.html#jobflow_remote.jobs.state.JobState.FAILED">(jobflow_remote.jobs.state.JobState attribute)</a>
+</li>
+      </ul></li>
+      <li><a href="api/jobflow_remote.config.manager.html#jobflow_remote.config.manager.ProjectData.filepath">filepath (jobflow_remote.config.manager.ProjectData attribute)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.FlowInfo.flow_id">flow_id (jobflow_remote.jobs.data.FlowInfo attribute)</a>
+</li>
+      <li><a href="api/jobflow_remote.cli.flow.html#jobflow_remote.cli.flow.flow_info">flow_info() (in module jobflow_remote.cli.flow)</a>
+</li>
+      <li><a href="api/jobflow_remote.utils.db.html#jobflow_remote.utils.db.FlowLockedError">FlowLockedError</a>
+</li>
+      <li><a href="api/jobflow_remote.config.base.html#jobflow_remote.config.base.QueueConfig.flows_collection">flows_collection (jobflow_remote.config.base.QueueConfig attribute)</a>
+</li>
+      <li><a href="api/jobflow_remote.cli.flow.html#jobflow_remote.cli.flow.flows_list">flows_list() (in module jobflow_remote.cli.flow)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.state.html#jobflow_remote.jobs.state.FlowState">FlowState (class in jobflow_remote.jobs.state)</a>
+</li>
+      <li><a href="api/jobflow_remote.cli.formatting.html#jobflow_remote.cli.formatting.format_flow_info">format_flow_info() (in module jobflow_remote.cli.formatting)</a>
+</li>
+      <li><a href="api/jobflow_remote.cli.formatting.html#jobflow_remote.cli.formatting.format_job_info">format_job_info() (in module jobflow_remote.cli.formatting)</a>
+</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api/jobflow_remote.utils.log.html#jobflow_remote.utils.log.CLIFormatter.formatException">formatException() (jobflow_remote.utils.log.CLIFormatter method)</a>
+</li>
+      <li><a href="api/jobflow_remote.config.base.html#jobflow_remote.config.base.RemoteWorker.forward_agent">forward_agent (jobflow_remote.config.base.RemoteWorker attribute)</a>
+</li>
+      <li><a href="api/jobflow_remote.utils.db.html#jobflow_remote.utils.db.FlowLockedError.from_flow_doc">from_flow_doc() (jobflow_remote.utils.db.FlowLockedError class method)</a>
+</li>
+      <li><a href="api/jobflow_remote.utils.db.html#jobflow_remote.utils.db.JobLockedError.from_job_doc">from_job_doc() (jobflow_remote.utils.db.JobLockedError class method)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.state.html#jobflow_remote.jobs.state.FlowState.from_jobs_states">from_jobs_states() (jobflow_remote.jobs.state.FlowState class method)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.daemon.html#jobflow_remote.jobs.daemon.DaemonManager.from_project">from_project() (jobflow_remote.jobs.daemon.DaemonManager class method)</a>
+
+      <ul>
+        <li><a href="api/jobflow_remote.jobs.jobcontroller.html#jobflow_remote.jobs.jobcontroller.JobController.from_project">(jobflow_remote.jobs.jobcontroller.JobController class method)</a>
+</li>
+      </ul></li>
+      <li><a href="api/jobflow_remote.jobs.daemon.html#jobflow_remote.jobs.daemon.DaemonManager.from_project_name">from_project_name() (jobflow_remote.jobs.daemon.DaemonManager class method)</a>
+
+      <ul>
+        <li><a href="api/jobflow_remote.jobs.jobcontroller.html#jobflow_remote.jobs.jobcontroller.JobController.from_project_name">(jobflow_remote.jobs.jobcontroller.JobController class method)</a>
+</li>
+      </ul></li>
+      <li><a href="api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.FlowInfo.from_query_dict">from_query_dict() (jobflow_remote.jobs.data.FlowInfo class method)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.JobInfo.from_query_output">from_query_output() (jobflow_remote.jobs.data.JobInfo class method)</a>
+</li>
+  </ul></td>
+</tr></table>
+
+<h2 id="G">G</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api/jobflow_remote.config.base.html#jobflow_remote.config.base.RemoteWorker.gateway">gateway (jobflow_remote.config.base.RemoteWorker attribute)</a>
+</li>
+      <li><a href="api/jobflow_remote.cli.project.html#jobflow_remote.cli.project.generate">generate() (in module jobflow_remote.cli.project)</a>
+</li>
+      <li><a href="api/jobflow_remote.config.helper.html#jobflow_remote.config.helper.generate_dummy_exec_config">generate_dummy_exec_config() (in module jobflow_remote.config.helper)</a>
+</li>
+      <li><a href="api/jobflow_remote.config.helper.html#jobflow_remote.config.helper.generate_dummy_jobstore">generate_dummy_jobstore() (in module jobflow_remote.config.helper)</a>
+</li>
+      <li><a href="api/jobflow_remote.config.helper.html#jobflow_remote.config.helper.generate_dummy_project">generate_dummy_project() (in module jobflow_remote.config.helper)</a>
+</li>
+      <li><a href="api/jobflow_remote.config.helper.html#jobflow_remote.config.helper.generate_dummy_queue">generate_dummy_queue() (in module jobflow_remote.config.helper)</a>
+</li>
+      <li><a href="api/jobflow_remote.config.helper.html#jobflow_remote.config.helper.generate_dummy_worker">generate_dummy_worker() (in module jobflow_remote.config.helper)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.jobcontroller.html#jobflow_remote.jobs.jobcontroller.JobController.generate_job_id_query">generate_job_id_query() (jobflow_remote.jobs.jobcontroller.JobController static method)</a>
+</li>
+      <li><a href="api/jobflow_remote.remote.host.base.html#jobflow_remote.remote.host.base.BaseHost.get">get() (jobflow_remote.remote.host.base.BaseHost method)</a>
+
+      <ul>
+        <li><a href="api/jobflow_remote.remote.host.local.html#jobflow_remote.remote.host.local.LocalHost.get">(jobflow_remote.remote.host.local.LocalHost method)</a>
+</li>
+        <li><a href="api/jobflow_remote.remote.host.remote.html#jobflow_remote.remote.host.remote.RemoteHost.get">(jobflow_remote.remote.host.remote.RemoteHost method)</a>
+</li>
+      </ul></li>
+      <li><a href="api/jobflow_remote.jobs.jobcontroller.html#jobflow_remote.jobs.jobcontroller.JobController.get_batch_processes">get_batch_processes() (jobflow_remote.jobs.jobcontroller.JobController method)</a>
+</li>
+      <li><a href="api/jobflow_remote.remote.queue.html#jobflow_remote.remote.queue.QueueManager.get_change_dir">get_change_dir() (jobflow_remote.remote.queue.QueueManager method)</a>
+</li>
+      <li><a href="api/jobflow_remote.cli.utils.html#jobflow_remote.cli.utils.get_config_manager">get_config_manager() (in module jobflow_remote.cli.utils)</a>
+</li>
+      <li><a href="api/jobflow_remote.config.base.html#jobflow_remote.config.base.RunnerOptions.get_delta_retry">get_delta_retry() (jobflow_remote.config.base.RunnerOptions method)</a>
+</li>
+      <li><a href="api/jobflow_remote.config.manager.html#jobflow_remote.config.manager.ConfigManager.get_exec_config">get_exec_config() (jobflow_remote.config.manager.ConfigManager method)</a>
+</li>
+      <li><a href="api/jobflow_remote.cli.formatting.html#jobflow_remote.cli.formatting.get_exec_config_table">get_exec_config_table() (in module jobflow_remote.cli.formatting)</a>
+</li>
+      <li><a href="api/jobflow_remote.remote.queue.html#jobflow_remote.remote.queue.QueueManager.get_export">get_export() (jobflow_remote.remote.queue.QueueManager method)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.jobcontroller.html#jobflow_remote.jobs.jobcontroller.JobController.get_flow_info_by_flow_uuid">get_flow_info_by_flow_uuid() (jobflow_remote.jobs.jobcontroller.JobController method)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.jobcontroller.html#jobflow_remote.jobs.jobcontroller.JobController.get_flow_info_by_job_uuid">get_flow_info_by_job_uuid() (jobflow_remote.jobs.jobcontroller.JobController method)</a>
+</li>
+      <li><a href="api/jobflow_remote.cli.formatting.html#jobflow_remote.cli.formatting.get_flow_info_table">get_flow_info_table() (in module jobflow_remote.cli.formatting)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.jobcontroller.html#jobflow_remote.jobs.jobcontroller.JobController.get_flow_job_aggreg">get_flow_job_aggreg() (jobflow_remote.jobs.jobcontroller.JobController method)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.jobcontroller.html#jobflow_remote.jobs.jobcontroller.JobController.get_flow_jobs_data">get_flow_jobs_data() (jobflow_remote.jobs.jobcontroller.JobController method)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.jobcontroller.html#jobflow_remote.jobs.jobcontroller.get_flow_leafs">get_flow_leafs() (in module jobflow_remote.jobs.jobcontroller)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.jobcontroller.html#jobflow_remote.jobs.jobcontroller.JobController.get_flows_info">get_flows_info() (jobflow_remote.jobs.jobcontroller.JobController method)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.graph.html#jobflow_remote.jobs.graph.get_graph">get_graph() (in module jobflow_remote.jobs.graph)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.graph.html#jobflow_remote.jobs.graph.get_graph_elements">get_graph_elements() (in module jobflow_remote.jobs.graph)</a>
+</li>
+      <li><a href="api/jobflow_remote.config.base.html#jobflow_remote.config.base.LocalWorker.get_host">get_host() (jobflow_remote.config.base.LocalWorker method)</a>
+
+      <ul>
+        <li><a href="api/jobflow_remote.config.base.html#jobflow_remote.config.base.RemoteWorker.get_host">(jobflow_remote.config.base.RemoteWorker method)</a>
+</li>
+        <li><a href="api/jobflow_remote.config.base.html#jobflow_remote.config.base.WorkerBase.get_host">(jobflow_remote.config.base.WorkerBase method)</a>
+</li>
+        <li><a href="api/jobflow_remote.jobs.runner.html#jobflow_remote.jobs.runner.Runner.get_host">(jobflow_remote.jobs.runner.Runner method)</a>
+</li>
+      </ul></li>
+      <li><a href="api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.get_initial_flow_doc_dict">get_initial_flow_doc_dict() (in module jobflow_remote.jobs.data)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.get_initial_job_doc_dict">get_initial_job_doc_dict() (in module jobflow_remote.jobs.data)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.daemon.html#jobflow_remote.jobs.daemon.DaemonManager.get_interface">get_interface() (jobflow_remote.jobs.daemon.DaemonManager method)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.batch.html#jobflow_remote.jobs.batch.LocalBatchManager.get_job">get_job() (jobflow_remote.jobs.batch.LocalBatchManager method)</a>
+
+      <ul>
+        <li><a href="api/jobflow_remote.remote.queue.html#jobflow_remote.remote.queue.QueueManager.get_job">(jobflow_remote.remote.queue.QueueManager method)</a>
+</li>
+      </ul></li>
+      <li><a href="api/jobflow_remote.cli.utils.html#jobflow_remote.cli.utils.get_job_controller">get_job_controller() (in module jobflow_remote.cli.utils)</a>
+
+      <ul>
+        <li><a href="api/jobflow_remote.config.base.html#jobflow_remote.config.base.Project.get_job_controller">(jobflow_remote.config.base.Project method)</a>
+</li>
+      </ul></li>
+      <li><a href="api/jobflow_remote.cli.utils.html#jobflow_remote.cli.utils.get_job_db_ids">get_job_db_ids() (in module jobflow_remote.cli.utils)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.jobcontroller.html#jobflow_remote.jobs.jobcontroller.JobController.get_job_doc">get_job_doc() (jobflow_remote.jobs.jobcontroller.JobController method)</a>
+</li>
+      <li><a href="api/jobflow_remote.cli.utils.html#jobflow_remote.cli.utils.get_job_ids_indexes">get_job_ids_indexes() (in module jobflow_remote.cli.utils)</a>
+</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api/jobflow_remote.jobs.jobcontroller.html#jobflow_remote.jobs.jobcontroller.JobController.get_job_info">get_job_info() (jobflow_remote.jobs.jobcontroller.JobController method)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.jobcontroller.html#jobflow_remote.jobs.jobcontroller.JobController.get_job_info_by_job_uuid">get_job_info_by_job_uuid() (jobflow_remote.jobs.jobcontroller.JobController method)</a>
+</li>
+      <li><a href="api/jobflow_remote.cli.formatting.html#jobflow_remote.cli.formatting.get_job_info_table">get_job_info_table() (in module jobflow_remote.cli.formatting)</a>
+</li>
+      <li><a href="api/jobflow_remote.remote.data.html#jobflow_remote.remote.data.get_job_path">get_job_path() (in module jobflow_remote.remote.data)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.jobcontroller.html#jobflow_remote.jobs.jobcontroller.JobController.get_job_uuids">get_job_uuids() (jobflow_remote.jobs.jobcontroller.JobController method)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.jobcontroller.html#jobflow_remote.jobs.jobcontroller.JobController.get_jobs">get_jobs() (jobflow_remote.jobs.jobcontroller.JobController method)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.jobcontroller.html#jobflow_remote.jobs.jobcontroller.JobController.get_jobs_doc">get_jobs_doc() (jobflow_remote.jobs.jobcontroller.JobController method)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.jobcontroller.html#jobflow_remote.jobs.jobcontroller.JobController.get_jobs_doc_query">get_jobs_doc_query() (jobflow_remote.jobs.jobcontroller.JobController method)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.jobcontroller.html#jobflow_remote.jobs.jobcontroller.JobController.get_jobs_info">get_jobs_info() (jobflow_remote.jobs.jobcontroller.JobController method)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.jobcontroller.html#jobflow_remote.jobs.jobcontroller.JobController.get_jobs_info_by_flow_uuid">get_jobs_info_by_flow_uuid() (jobflow_remote.jobs.jobcontroller.JobController method)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.jobcontroller.html#jobflow_remote.jobs.jobcontroller.JobController.get_jobs_info_query">get_jobs_info_query() (jobflow_remote.jobs.jobcontroller.JobController method)</a>
+</li>
+      <li><a href="api/jobflow_remote.remote.queue.html#jobflow_remote.remote.queue.QueueManager.get_jobs_list">get_jobs_list() (jobflow_remote.remote.queue.QueueManager method)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.store.html#jobflow_remote.jobs.store.get_jobstore">get_jobstore() (in module jobflow_remote.jobs.store)</a>
+
+      <ul>
+        <li><a href="api/jobflow_remote.config.base.html#jobflow_remote.config.base.Project.get_jobstore">(jobflow_remote.config.base.Project method)</a>
+</li>
+      </ul></li>
+      <li><a href="api/jobflow_remote.utils.db.html#jobflow_remote.utils.db.MongoLock.get_lock_id">get_lock_id() (jobflow_remote.utils.db.MongoLock class method)</a>
+</li>
+      <li><a href="api/jobflow_remote.utils.db.html#jobflow_remote.utils.db.MongoLock.get_lock_time">get_lock_time() (jobflow_remote.utils.db.MongoLock class method)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.graph.html#jobflow_remote.jobs.graph.get_mermaid">get_mermaid() (in module jobflow_remote.jobs.graph)</a>
+</li>
+      <li><a href="api/jobflow_remote.remote.queue.html#jobflow_remote.remote.queue.QueueManager.get_modules">get_modules() (jobflow_remote.remote.queue.QueueManager method)</a>
+</li>
+      <li><a href="api/jobflow_remote.remote.queue.html#jobflow_remote.remote.queue.QueueManager.get_post_run">get_post_run() (jobflow_remote.remote.queue.QueueManager method)</a>
+</li>
+      <li><a href="api/jobflow_remote.remote.queue.html#jobflow_remote.remote.queue.QueueManager.get_pre_run">get_pre_run() (jobflow_remote.remote.queue.QueueManager method)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.daemon.html#jobflow_remote.jobs.daemon.DaemonManager.get_processes_info">get_processes_info() (jobflow_remote.jobs.daemon.DaemonManager method)</a>
+</li>
+      <li><a href="api/jobflow_remote.config.manager.html#jobflow_remote.config.manager.ConfigManager.get_project">get_project() (jobflow_remote.config.manager.ConfigManager method)</a>
+</li>
+      <li><a href="api/jobflow_remote.config.manager.html#jobflow_remote.config.manager.ConfigManager.get_project_data">get_project_data() (jobflow_remote.config.manager.ConfigManager method)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.runner.html#jobflow_remote.jobs.runner.Runner.get_queue_manager">get_queue_manager() (jobflow_remote.jobs.runner.Runner method)</a>
+</li>
+      <li><a href="api/jobflow_remote.config.base.html#jobflow_remote.config.base.Project.get_queue_store">get_queue_store() (jobflow_remote.config.base.Project method)</a>
+</li>
+      <li><a href="api/jobflow_remote.remote.data.html#jobflow_remote.remote.data.get_remote_in_file">get_remote_in_file() (in module jobflow_remote.remote.data)</a>
+</li>
+      <li><a href="api/jobflow_remote.remote.data.html#jobflow_remote.remote.data.get_remote_store">get_remote_store() (in module jobflow_remote.remote.data)</a>
+</li>
+      <li><a href="api/jobflow_remote.remote.data.html#jobflow_remote.remote.data.get_remote_store_filenames">get_remote_store_filenames() (in module jobflow_remote.remote.data)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.get_reset_job_base_dict">get_reset_job_base_dict() (in module jobflow_remote.jobs.data)</a>
+</li>
+      <li><a href="api/jobflow_remote.remote.queue.html#jobflow_remote.remote.queue.QueueManager.get_run_commands">get_run_commands() (jobflow_remote.remote.queue.QueueManager method)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.batch.html#jobflow_remote.jobs.batch.RemoteBatchManager.get_running">get_running() (jobflow_remote.jobs.batch.RemoteBatchManager method)</a>
+</li>
+      <li><a href="api/jobflow_remote.config.base.html#jobflow_remote.config.base.WorkerBase.get_scheduler_io">get_scheduler_io() (jobflow_remote.config.base.WorkerBase method)</a>
+</li>
+      <li><a href="api/jobflow_remote.remote.queue.html#jobflow_remote.remote.queue.QueueManager.get_shell_manager">get_shell_manager() (jobflow_remote.remote.queue.QueueManager method)</a>
+</li>
+      <li><a href="api/jobflow_remote.cli.utils.html#jobflow_remote.cli.utils.get_start_date">get_start_date() (in module jobflow_remote.cli.utils)</a>
+</li>
+      <li><a href="api/jobflow_remote.remote.queue.html#jobflow_remote.remote.queue.QueueManager.get_submission_script">get_submission_script() (jobflow_remote.remote.queue.QueueManager method)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.batch.html#jobflow_remote.jobs.batch.RemoteBatchManager.get_submitted">get_submitted() (jobflow_remote.jobs.batch.RemoteBatchManager method)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.daemon.html#jobflow_remote.jobs.daemon.DaemonManager.get_supervisord_pid">get_supervisord_pid() (jobflow_remote.jobs.daemon.DaemonManager method)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.batch.html#jobflow_remote.jobs.batch.RemoteBatchManager.get_terminated">get_terminated() (jobflow_remote.jobs.batch.RemoteBatchManager method)</a>
+</li>
+      <li><a href="api/jobflow_remote.config.manager.html#jobflow_remote.config.manager.ConfigManager.get_worker">get_worker() (jobflow_remote.config.manager.ConfigManager method)</a>
+
+      <ul>
+        <li><a href="api/jobflow_remote.jobs.runner.html#jobflow_remote.jobs.runner.Runner.get_worker">(jobflow_remote.jobs.runner.Runner method)</a>
+</li>
+      </ul></li>
+      <li><a href="api/jobflow_remote.cli.formatting.html#jobflow_remote.cli.formatting.get_worker_table">get_worker_table() (in module jobflow_remote.cli.formatting)</a>
+</li>
+      <li><a href="api/jobflow_remote.cli.flow.html#jobflow_remote.cli.flow.graph">graph() (in module jobflow_remote.cli.flow)</a>
+</li>
+  </ul></td>
+</tr></table>
+
+<h2 id="H">H</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api/jobflow_remote.jobs.runner.html#jobflow_remote.jobs.runner.Runner.handle_signal">handle_signal() (jobflow_remote.jobs.runner.Runner method)</a>
+</li>
+      <li><a href="api/jobflow_remote.config.base.html#jobflow_remote.config.base.RemoteWorker.host">host (jobflow_remote.config.base.RemoteWorker attribute)</a>
+
+      <ul>
+        <li><a href="api/jobflow_remote.remote.queue.html#jobflow_remote.remote.queue.QueueManager.host">(jobflow_remote.remote.queue.QueueManager attribute)</a>
+</li>
+      </ul></li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api/jobflow_remote.remote.host.base.html#jobflow_remote.remote.host.base.HostError">HostError</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.FlowInfo.hosts">hosts (jobflow_remote.jobs.data.FlowInfo attribute)</a>
+</li>
+  </ul></td>
+</tr></table>
+
+<h2 id="I">I</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.FlowDoc.ids">ids (jobflow_remote.jobs.data.FlowDoc attribute)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.FlowDoc.ids_mapping">ids_mapping (jobflow_remote.jobs.data.FlowDoc property)</a>
+
+      <ul>
+        <li><a href="api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.FlowInfo.ids_mapping">(jobflow_remote.jobs.data.FlowInfo property)</a>
+</li>
+      </ul></li>
+      <li><a href="api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.JobDoc.index">index (jobflow_remote.jobs.data.JobDoc attribute)</a>
+
+      <ul>
+        <li><a href="api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.JobInfo.index">(jobflow_remote.jobs.data.JobInfo attribute)</a>
+</li>
+      </ul></li>
+      <li><a href="api/jobflow_remote.config.base.html#jobflow_remote.config.base.LogLevel.INFO">INFO (jobflow_remote.config.base.LogLevel attribute)</a>
+</li>
+      <li><a href="api/jobflow_remote.cli.runner.html#jobflow_remote.cli.runner.info">info() (in module jobflow_remote.cli.runner)</a>
+</li>
+      <li><a href="api/jobflow_remote.utils.log.html#jobflow_remote.utils.log.initialize_cli_logger">initialize_cli_logger() (in module jobflow_remote.utils.log)</a>
+</li>
+      <li><a href="api/jobflow_remote.cli.utils.html#jobflow_remote.cli.utils.initialize_config_manager">initialize_config_manager() (in module jobflow_remote.cli.utils)</a>
+</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api/jobflow_remote.utils.log.html#jobflow_remote.utils.log.initialize_remote_run_log">initialize_remote_run_log() (in module jobflow_remote.utils.log)</a>
+</li>
+      <li><a href="api/jobflow_remote.utils.log.html#jobflow_remote.utils.log.initialize_runner_logger">initialize_runner_logger() (in module jobflow_remote.utils.log)</a>
+</li>
+      <li><a href="api/jobflow_remote.config.base.html#jobflow_remote.config.base.RemoteWorker.inline_ssh_env">inline_ssh_env (jobflow_remote.config.base.RemoteWorker attribute)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.FlowDoc.int_index_parents">int_index_parents (jobflow_remote.jobs.data.FlowDoc property)</a>
+</li>
+      <li><a href="api/jobflow_remote.remote.host.base.html#jobflow_remote.remote.host.base.BaseHost.is_connected">is_connected (jobflow_remote.remote.host.base.BaseHost property)</a>
+
+      <ul>
+        <li><a href="api/jobflow_remote.remote.host.local.html#jobflow_remote.remote.host.local.LocalHost.is_connected">(jobflow_remote.remote.host.local.LocalHost property)</a>
+</li>
+        <li><a href="api/jobflow_remote.remote.host.remote.html#jobflow_remote.remote.host.remote.RemoteHost.is_connected">(jobflow_remote.remote.host.remote.RemoteHost property)</a>
+</li>
+      </ul></li>
+      <li><a href="api/jobflow_remote.config.base.html#jobflow_remote.config.base.WorkerBase.is_local">is_local (jobflow_remote.config.base.WorkerBase property)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.JobInfo.is_locked">is_locked (jobflow_remote.jobs.data.JobInfo property)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.FlowInfo.iter_job_prop">iter_job_prop() (jobflow_remote.jobs.data.FlowInfo method)</a>
+</li>
+  </ul></td>
+</tr></table>
+
+<h2 id="J">J</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api/jobflow_remote.cli.jfr_typer.html#jobflow_remote.cli.jfr_typer.JFRTyper">JFRTyper (class in jobflow_remote.cli.jfr_typer)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.JobDoc.job">job (jobflow_remote.jobs.data.JobDoc attribute)</a>
+</li>
+      <li><a href="api/jobflow_remote.cli.job.html#jobflow_remote.cli.job.job_dump">job_dump() (in module jobflow_remote.cli.job)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.FlowInfo.job_ids">job_ids (jobflow_remote.jobs.data.FlowInfo attribute)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.FlowInfo.job_indexes">job_indexes (jobflow_remote.jobs.data.FlowInfo attribute)</a>
+</li>
+      <li><a href="api/jobflow_remote.cli.job.html#jobflow_remote.cli.job.job_info">job_info() (in module jobflow_remote.cli.job)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.FlowInfo.job_names">job_names (jobflow_remote.jobs.data.FlowInfo attribute)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.FlowInfo.job_states">job_states (jobflow_remote.jobs.data.FlowInfo attribute)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.jobcontroller.html#jobflow_remote.jobs.jobcontroller.JobController">JobController (class in jobflow_remote.jobs.jobcontroller)</a>
+</li>
+      <li>
+    jobflow_remote
+
+      <ul>
+        <li><a href="api/index.html#module-jobflow_remote">module</a>, <a href="api/jobflow_remote.html#module-jobflow_remote">[1]</a>
+</li>
+      </ul></li>
+      <li>
+    jobflow_remote.cli
+
+      <ul>
+        <li><a href="api/jobflow_remote.cli.html#module-jobflow_remote.cli">module</a>
+</li>
+      </ul></li>
+      <li>
+    jobflow_remote.cli.admin
+
+      <ul>
+        <li><a href="api/jobflow_remote.cli.admin.html#module-jobflow_remote.cli.admin">module</a>
+</li>
+      </ul></li>
+      <li>
+    jobflow_remote.cli.execution
+
+      <ul>
+        <li><a href="api/jobflow_remote.cli.execution.html#module-jobflow_remote.cli.execution">module</a>
+</li>
+      </ul></li>
+      <li>
+    jobflow_remote.cli.flow
+
+      <ul>
+        <li><a href="api/jobflow_remote.cli.flow.html#module-jobflow_remote.cli.flow">module</a>
+</li>
+      </ul></li>
+      <li>
+    jobflow_remote.cli.formatting
+
+      <ul>
+        <li><a href="api/jobflow_remote.cli.formatting.html#module-jobflow_remote.cli.formatting">module</a>
+</li>
+      </ul></li>
+      <li>
+    jobflow_remote.cli.jf
+
+      <ul>
+        <li><a href="api/jobflow_remote.cli.jf.html#module-jobflow_remote.cli.jf">module</a>
+</li>
+      </ul></li>
+      <li>
+    jobflow_remote.cli.jfr_typer
+
+      <ul>
+        <li><a href="api/jobflow_remote.cli.jfr_typer.html#module-jobflow_remote.cli.jfr_typer">module</a>
+</li>
+      </ul></li>
+      <li>
+    jobflow_remote.cli.job
+
+      <ul>
+        <li><a href="api/jobflow_remote.cli.job.html#module-jobflow_remote.cli.job">module</a>
+</li>
+      </ul></li>
+      <li>
+    jobflow_remote.cli.project
+
+      <ul>
+        <li><a href="api/jobflow_remote.cli.project.html#module-jobflow_remote.cli.project">module</a>
+</li>
+      </ul></li>
+      <li>
+    jobflow_remote.cli.runner
+
+      <ul>
+        <li><a href="api/jobflow_remote.cli.runner.html#module-jobflow_remote.cli.runner">module</a>
+</li>
+      </ul></li>
+      <li>
+    jobflow_remote.cli.types
+
+      <ul>
+        <li><a href="api/jobflow_remote.cli.types.html#module-jobflow_remote.cli.types">module</a>
+</li>
+      </ul></li>
+      <li>
+    jobflow_remote.cli.utils
+
+      <ul>
+        <li><a href="api/jobflow_remote.cli.utils.html#module-jobflow_remote.cli.utils">module</a>
+</li>
+      </ul></li>
+      <li>
+    jobflow_remote.config
+
+      <ul>
+        <li><a href="api/jobflow_remote.config.html#module-jobflow_remote.config">module</a>
+</li>
+      </ul></li>
+      <li>
+    jobflow_remote.config.base
+
+      <ul>
+        <li><a href="api/jobflow_remote.config.base.html#module-jobflow_remote.config.base">module</a>
+</li>
+      </ul></li>
+      <li>
+    jobflow_remote.config.helper
+
+      <ul>
+        <li><a href="api/jobflow_remote.config.helper.html#module-jobflow_remote.config.helper">module</a>
+</li>
+      </ul></li>
+      <li>
+    jobflow_remote.config.jobconfig
+
+      <ul>
+        <li><a href="api/jobflow_remote.config.jobconfig.html#module-jobflow_remote.config.jobconfig">module</a>
+</li>
+      </ul></li>
+      <li>
+    jobflow_remote.config.manager
+
+      <ul>
+        <li><a href="api/jobflow_remote.config.manager.html#module-jobflow_remote.config.manager">module</a>
+</li>
+      </ul></li>
+      <li>
+    jobflow_remote.config.settings
+
+      <ul>
+        <li><a href="api/jobflow_remote.config.settings.html#module-jobflow_remote.config.settings">module</a>
+</li>
+      </ul></li>
+      <li>
+    jobflow_remote.jobs
+
+      <ul>
+        <li><a href="api/jobflow_remote.jobs.html#module-jobflow_remote.jobs">module</a>
+</li>
+      </ul></li>
+      <li>
+    jobflow_remote.jobs.batch
+
+      <ul>
+        <li><a href="api/jobflow_remote.jobs.batch.html#module-jobflow_remote.jobs.batch">module</a>
+</li>
+      </ul></li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li>
+    jobflow_remote.jobs.daemon
+
+      <ul>
+        <li><a href="api/jobflow_remote.jobs.daemon.html#module-jobflow_remote.jobs.daemon">module</a>
+</li>
+      </ul></li>
+      <li>
+    jobflow_remote.jobs.data
+
+      <ul>
+        <li><a href="api/jobflow_remote.jobs.data.html#module-jobflow_remote.jobs.data">module</a>
+</li>
+      </ul></li>
+      <li>
+    jobflow_remote.jobs.graph
+
+      <ul>
+        <li><a href="api/jobflow_remote.jobs.graph.html#module-jobflow_remote.jobs.graph">module</a>
+</li>
+      </ul></li>
+      <li>
+    jobflow_remote.jobs.jobcontroller
+
+      <ul>
+        <li><a href="api/jobflow_remote.jobs.jobcontroller.html#module-jobflow_remote.jobs.jobcontroller">module</a>
+</li>
+      </ul></li>
+      <li>
+    jobflow_remote.jobs.run
+
+      <ul>
+        <li><a href="api/jobflow_remote.jobs.run.html#module-jobflow_remote.jobs.run">module</a>
+</li>
+      </ul></li>
+      <li>
+    jobflow_remote.jobs.runner
+
+      <ul>
+        <li><a href="api/jobflow_remote.jobs.runner.html#module-jobflow_remote.jobs.runner">module</a>
+</li>
+      </ul></li>
+      <li>
+    jobflow_remote.jobs.state
+
+      <ul>
+        <li><a href="api/jobflow_remote.jobs.state.html#module-jobflow_remote.jobs.state">module</a>
+</li>
+      </ul></li>
+      <li>
+    jobflow_remote.jobs.store
+
+      <ul>
+        <li><a href="api/jobflow_remote.jobs.store.html#module-jobflow_remote.jobs.store">module</a>
+</li>
+      </ul></li>
+      <li>
+    jobflow_remote.jobs.submit
+
+      <ul>
+        <li><a href="api/jobflow_remote.jobs.submit.html#module-jobflow_remote.jobs.submit">module</a>
+</li>
+      </ul></li>
+      <li>
+    jobflow_remote.remote
+
+      <ul>
+        <li><a href="api/jobflow_remote.remote.html#module-jobflow_remote.remote">module</a>
+</li>
+      </ul></li>
+      <li>
+    jobflow_remote.remote.data
+
+      <ul>
+        <li><a href="api/jobflow_remote.remote.data.html#module-jobflow_remote.remote.data">module</a>
+</li>
+      </ul></li>
+      <li>
+    jobflow_remote.remote.host
+
+      <ul>
+        <li><a href="api/jobflow_remote.remote.host.html#module-jobflow_remote.remote.host">module</a>
+</li>
+      </ul></li>
+      <li>
+    jobflow_remote.remote.host.base
+
+      <ul>
+        <li><a href="api/jobflow_remote.remote.host.base.html#module-jobflow_remote.remote.host.base">module</a>
+</li>
+      </ul></li>
+      <li>
+    jobflow_remote.remote.host.local
+
+      <ul>
+        <li><a href="api/jobflow_remote.remote.host.local.html#module-jobflow_remote.remote.host.local">module</a>
+</li>
+      </ul></li>
+      <li>
+    jobflow_remote.remote.host.remote
+
+      <ul>
+        <li><a href="api/jobflow_remote.remote.host.remote.html#module-jobflow_remote.remote.host.remote">module</a>
+</li>
+      </ul></li>
+      <li>
+    jobflow_remote.remote.queue
+
+      <ul>
+        <li><a href="api/jobflow_remote.remote.queue.html#module-jobflow_remote.remote.queue">module</a>
+</li>
+      </ul></li>
+      <li>
+    jobflow_remote.utils
+
+      <ul>
+        <li><a href="api/jobflow_remote.utils.html#module-jobflow_remote.utils">module</a>
+</li>
+      </ul></li>
+      <li>
+    jobflow_remote.utils.data
+
+      <ul>
+        <li><a href="api/jobflow_remote.utils.data.html#module-jobflow_remote.utils.data">module</a>
+</li>
+      </ul></li>
+      <li>
+    jobflow_remote.utils.db
+
+      <ul>
+        <li><a href="api/jobflow_remote.utils.db.html#module-jobflow_remote.utils.db">module</a>
+</li>
+      </ul></li>
+      <li>
+    jobflow_remote.utils.examples
+
+      <ul>
+        <li><a href="api/jobflow_remote.utils.examples.html#module-jobflow_remote.utils.examples">module</a>
+</li>
+      </ul></li>
+      <li>
+    jobflow_remote.utils.log
+
+      <ul>
+        <li><a href="api/jobflow_remote.utils.log.html#module-jobflow_remote.utils.log">module</a>
+</li>
+      </ul></li>
+      <li>
+    jobflow_remote.utils.schedule
+
+      <ul>
+        <li><a href="api/jobflow_remote.utils.schedule.html#module-jobflow_remote.utils.schedule">module</a>
+</li>
+      </ul></li>
+      <li><a href="api/jobflow_remote.utils.db.html#jobflow_remote.utils.db.JobLockedError">JobLockedError</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.FlowDoc.jobs">jobs (jobflow_remote.jobs.data.FlowDoc attribute)</a>
+</li>
+      <li><a href="api/jobflow_remote.config.base.html#jobflow_remote.config.base.BatchConfig.jobs_handle_dir">jobs_handle_dir (jobflow_remote.config.base.BatchConfig attribute)</a>
+</li>
+      <li><a href="api/jobflow_remote.cli.job.html#jobflow_remote.cli.job.jobs_list">jobs_list() (in module jobflow_remote.cli.job)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.state.html#jobflow_remote.jobs.state.JobState">JobState (class in jobflow_remote.jobs.state)</a>
+</li>
+      <li><a href="api/jobflow_remote.config.base.html#jobflow_remote.config.base.Project.jobstore">jobstore (jobflow_remote.config.base.Project attribute)</a>
+</li>
+      <li><a href="api/jobflow_remote.cli.utils.html#jobflow_remote.cli.utils.SerializeFileFormat.JSON">JSON (jobflow_remote.cli.utils.SerializeFileFormat attribute)</a>
+</li>
+  </ul></td>
+</tr></table>
+
+<h2 id="K">K</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api/jobflow_remote.config.base.html#jobflow_remote.config.base.RemoteWorker.keepalive">keepalive (jobflow_remote.config.base.RemoteWorker attribute)</a>
+</li>
+      <li><a href="api/jobflow_remote.config.base.html#jobflow_remote.config.base.RemoteWorker.key_filename">key_filename (jobflow_remote.config.base.RemoteWorker attribute)</a>
+</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api/jobflow_remote.cli.runner.html#jobflow_remote.cli.runner.kill">kill() (in module jobflow_remote.cli.runner)</a>
+
+      <ul>
+        <li><a href="api/jobflow_remote.jobs.daemon.html#jobflow_remote.jobs.daemon.DaemonManager.kill">(jobflow_remote.jobs.daemon.DaemonManager method)</a>
+</li>
+      </ul></li>
+  </ul></td>
+</tr></table>
+
+<h2 id="L">L</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api/jobflow_remote.cli.project.html#jobflow_remote.cli.project.list_exec_config">list_exec_config() (in module jobflow_remote.cli.project)</a>
+</li>
+      <li><a href="api/jobflow_remote.cli.project.html#jobflow_remote.cli.project.list_projects">list_projects() (in module jobflow_remote.cli.project)</a>
+</li>
+      <li><a href="api/jobflow_remote.cli.project.html#jobflow_remote.cli.project.list_worker">list_worker() (in module jobflow_remote.cli.project)</a>
+</li>
+      <li><a href="api/jobflow_remote.remote.host.base.html#jobflow_remote.remote.host.base.BaseHost.listdir">listdir() (jobflow_remote.remote.host.base.BaseHost method)</a>
+
+      <ul>
+        <li><a href="api/jobflow_remote.remote.host.local.html#jobflow_remote.remote.host.local.LocalHost.listdir">(jobflow_remote.remote.host.local.LocalHost method)</a>
+</li>
+        <li><a href="api/jobflow_remote.remote.host.remote.html#jobflow_remote.remote.host.remote.RemoteHost.listdir">(jobflow_remote.remote.host.remote.RemoteHost method)</a>
+</li>
+      </ul></li>
+      <li><a href="api/jobflow_remote.config.settings.html#jobflow_remote.config.settings.JobflowRemoteSettings.load_default_settings">load_default_settings() (jobflow_remote.config.settings.JobflowRemoteSettings class method)</a>
+</li>
+      <li><a href="api/jobflow_remote.config.jobconfig.html#jobflow_remote.config.jobconfig.load_job_store">load_job_store() (in module jobflow_remote.config.jobconfig)</a>
+</li>
+      <li><a href="api/jobflow_remote.config.manager.html#jobflow_remote.config.manager.ConfigManager.load_projects_data">load_projects_data() (jobflow_remote.config.manager.ConfigManager method)</a>
+</li>
+      <li><a href="api/jobflow_remote.cli.utils.html#jobflow_remote.cli.utils.loading_spinner">loading_spinner() (in module jobflow_remote.cli.utils)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.batch.html#jobflow_remote.jobs.batch.LocalBatchManager">LocalBatchManager (class in jobflow_remote.jobs.batch)</a>
+</li>
+      <li><a href="api/jobflow_remote.remote.host.local.html#jobflow_remote.remote.host.local.LocalHost">LocalHost (class in jobflow_remote.remote.host.local)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.jobcontroller.html#jobflow_remote.jobs.jobcontroller.JobController.lock_flow">lock_flow() (jobflow_remote.jobs.jobcontroller.JobController method)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.FlowDoc.lock_id">lock_id (jobflow_remote.jobs.data.FlowDoc attribute)</a>
+
+      <ul>
+        <li><a href="api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.JobDoc.lock_id">(jobflow_remote.jobs.data.JobDoc attribute)</a>
+</li>
+        <li><a href="api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.JobInfo.lock_id">(jobflow_remote.jobs.data.JobInfo attribute)</a>
+</li>
+      </ul></li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api/jobflow_remote.jobs.jobcontroller.html#jobflow_remote.jobs.jobcontroller.JobController.lock_job">lock_job() (jobflow_remote.jobs.jobcontroller.JobController method)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.jobcontroller.html#jobflow_remote.jobs.jobcontroller.JobController.lock_job_flow">lock_job_flow() (jobflow_remote.jobs.jobcontroller.JobController method)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.jobcontroller.html#jobflow_remote.jobs.jobcontroller.JobController.lock_job_for_update">lock_job_for_update() (jobflow_remote.jobs.jobcontroller.JobController method)</a>
+</li>
+      <li><a href="api/jobflow_remote.utils.db.html#jobflow_remote.utils.db.MongoLock.LOCK_KEY">LOCK_KEY (jobflow_remote.utils.db.MongoLock attribute)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.FlowDoc.lock_time">lock_time (jobflow_remote.jobs.data.FlowDoc attribute)</a>
+
+      <ul>
+        <li><a href="api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.JobDoc.lock_time">(jobflow_remote.jobs.data.JobDoc attribute)</a>
+</li>
+        <li><a href="api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.JobInfo.lock_time">(jobflow_remote.jobs.data.JobInfo attribute)</a>
+</li>
+      </ul></li>
+      <li><a href="api/jobflow_remote.utils.db.html#jobflow_remote.utils.db.MongoLock.LOCK_TIME_KEY">LOCK_TIME_KEY (jobflow_remote.utils.db.MongoLock attribute)</a>
+</li>
+      <li><a href="api/jobflow_remote.config.base.html#jobflow_remote.config.base.RunnerOptions.lock_timeout">lock_timeout (jobflow_remote.config.base.RunnerOptions attribute)</a>
+</li>
+      <li><a href="api/jobflow_remote.utils.db.html#jobflow_remote.utils.db.LockedDocumentError">LockedDocumentError</a>
+</li>
+      <li><a href="api/jobflow_remote.config.base.html#jobflow_remote.config.base.Project.log_dir">log_dir (jobflow_remote.config.base.Project attribute)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.daemon.html#jobflow_remote.jobs.daemon.DaemonManager.log_filepath">log_filepath (jobflow_remote.jobs.daemon.DaemonManager property)</a>
+</li>
+      <li><a href="api/jobflow_remote.config.base.html#jobflow_remote.config.base.Project.log_level">log_level (jobflow_remote.config.base.Project attribute)</a>
+</li>
+      <li><a href="api/jobflow_remote.config.base.html#jobflow_remote.config.base.RemoteWorker.login_shell">login_shell (jobflow_remote.config.base.RemoteWorker attribute)</a>
+</li>
+      <li><a href="api/jobflow_remote.config.base.html#jobflow_remote.config.base.LogLevel">LogLevel (class in jobflow_remote.config.base)</a>
+</li>
+  </ul></td>
+</tr></table>
+
+<h2 id="M">M</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api/jobflow_remote.cli.jf.html#jobflow_remote.cli.jf.main">main() (in module jobflow_remote.cli.jf)</a>
+</li>
+      <li><a href="api/jobflow_remote.cli.jf.html#jobflow_remote.cli.jf.main_result_callback">main_result_callback() (in module jobflow_remote.cli.jf)</a>
+</li>
+      <li><a href="api/jobflow_remote.utils.examples.html#jobflow_remote.utils.examples.make_list">make_list() (in module jobflow_remote.utils.examples)</a>
+</li>
+      <li><a href="api/jobflow_remote.config.base.html#jobflow_remote.config.base.BatchConfig.max_jobs">max_jobs (jobflow_remote.config.base.BatchConfig attribute)</a>
+
+      <ul>
+        <li><a href="api/jobflow_remote.config.base.html#jobflow_remote.config.base.WorkerBase.max_jobs">(jobflow_remote.config.base.WorkerBase attribute)</a>
+</li>
+      </ul></li>
+      <li><a href="api/jobflow_remote.config.base.html#jobflow_remote.config.base.RunnerOptions.max_step_attempts">max_step_attempts (jobflow_remote.config.base.RunnerOptions attribute)</a>
+</li>
+      <li><a href="api/jobflow_remote.config.base.html#jobflow_remote.config.base.BatchConfig.max_time">max_time (jobflow_remote.config.base.BatchConfig attribute)</a>
+</li>
+      <li><a href="api/jobflow_remote.config.base.html#jobflow_remote.config.base.BatchConfig.max_wait">max_wait (jobflow_remote.config.base.BatchConfig attribute)</a>
+</li>
+      <li><a href="api/jobflow_remote.config.base.html#jobflow_remote.config.base.Project.metadata">metadata (jobflow_remote.config.base.Project attribute)</a>
+
+      <ul>
+        <li><a href="api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.FlowDoc.metadata">(jobflow_remote.jobs.data.FlowDoc attribute)</a>
+</li>
+        <li><a href="api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.JobInfo.metadata">(jobflow_remote.jobs.data.JobInfo attribute)</a>
+</li>
+      </ul></li>
+      <li><a href="api/jobflow_remote.remote.host.base.html#jobflow_remote.remote.host.base.BaseHost.mkdir">mkdir() (jobflow_remote.remote.host.base.BaseHost method)</a>
+
+      <ul>
+        <li><a href="api/jobflow_remote.remote.host.local.html#jobflow_remote.remote.host.local.LocalHost.mkdir">(jobflow_remote.remote.host.local.LocalHost method)</a>
+</li>
+        <li><a href="api/jobflow_remote.remote.host.remote.html#jobflow_remote.remote.host.remote.RemoteHost.mkdir">(jobflow_remote.remote.host.remote.RemoteHost method)</a>
+</li>
+      </ul></li>
+      <li>
+    module
+
+      <ul>
+        <li><a href="api/index.html#module-jobflow_remote">jobflow_remote</a>, <a href="api/jobflow_remote.html#module-jobflow_remote">[1]</a>
+</li>
+        <li><a href="api/jobflow_remote.cli.html#module-jobflow_remote.cli">jobflow_remote.cli</a>
+</li>
+        <li><a href="api/jobflow_remote.cli.admin.html#module-jobflow_remote.cli.admin">jobflow_remote.cli.admin</a>
+</li>
+        <li><a href="api/jobflow_remote.cli.execution.html#module-jobflow_remote.cli.execution">jobflow_remote.cli.execution</a>
+</li>
+        <li><a href="api/jobflow_remote.cli.flow.html#module-jobflow_remote.cli.flow">jobflow_remote.cli.flow</a>
+</li>
+        <li><a href="api/jobflow_remote.cli.formatting.html#module-jobflow_remote.cli.formatting">jobflow_remote.cli.formatting</a>
+</li>
+        <li><a href="api/jobflow_remote.cli.jf.html#module-jobflow_remote.cli.jf">jobflow_remote.cli.jf</a>
+</li>
+        <li><a href="api/jobflow_remote.cli.jfr_typer.html#module-jobflow_remote.cli.jfr_typer">jobflow_remote.cli.jfr_typer</a>
+</li>
+        <li><a href="api/jobflow_remote.cli.job.html#module-jobflow_remote.cli.job">jobflow_remote.cli.job</a>
+</li>
+        <li><a href="api/jobflow_remote.cli.project.html#module-jobflow_remote.cli.project">jobflow_remote.cli.project</a>
+</li>
+        <li><a href="api/jobflow_remote.cli.runner.html#module-jobflow_remote.cli.runner">jobflow_remote.cli.runner</a>
+</li>
+        <li><a href="api/jobflow_remote.cli.types.html#module-jobflow_remote.cli.types">jobflow_remote.cli.types</a>
+</li>
+        <li><a href="api/jobflow_remote.cli.utils.html#module-jobflow_remote.cli.utils">jobflow_remote.cli.utils</a>
+</li>
+        <li><a href="api/jobflow_remote.config.html#module-jobflow_remote.config">jobflow_remote.config</a>
+</li>
+        <li><a href="api/jobflow_remote.config.base.html#module-jobflow_remote.config.base">jobflow_remote.config.base</a>
+</li>
+        <li><a href="api/jobflow_remote.config.helper.html#module-jobflow_remote.config.helper">jobflow_remote.config.helper</a>
+</li>
+        <li><a href="api/jobflow_remote.config.jobconfig.html#module-jobflow_remote.config.jobconfig">jobflow_remote.config.jobconfig</a>
+</li>
+        <li><a href="api/jobflow_remote.config.manager.html#module-jobflow_remote.config.manager">jobflow_remote.config.manager</a>
+</li>
+        <li><a href="api/jobflow_remote.config.settings.html#module-jobflow_remote.config.settings">jobflow_remote.config.settings</a>
+</li>
+        <li><a href="api/jobflow_remote.jobs.html#module-jobflow_remote.jobs">jobflow_remote.jobs</a>
+</li>
+        <li><a href="api/jobflow_remote.jobs.batch.html#module-jobflow_remote.jobs.batch">jobflow_remote.jobs.batch</a>
+</li>
+        <li><a href="api/jobflow_remote.jobs.daemon.html#module-jobflow_remote.jobs.daemon">jobflow_remote.jobs.daemon</a>
+</li>
+        <li><a href="api/jobflow_remote.jobs.data.html#module-jobflow_remote.jobs.data">jobflow_remote.jobs.data</a>
+</li>
+        <li><a href="api/jobflow_remote.jobs.graph.html#module-jobflow_remote.jobs.graph">jobflow_remote.jobs.graph</a>
+</li>
+        <li><a href="api/jobflow_remote.jobs.jobcontroller.html#module-jobflow_remote.jobs.jobcontroller">jobflow_remote.jobs.jobcontroller</a>
+</li>
+        <li><a href="api/jobflow_remote.jobs.run.html#module-jobflow_remote.jobs.run">jobflow_remote.jobs.run</a>
+</li>
+        <li><a href="api/jobflow_remote.jobs.runner.html#module-jobflow_remote.jobs.runner">jobflow_remote.jobs.runner</a>
+</li>
+        <li><a href="api/jobflow_remote.jobs.state.html#module-jobflow_remote.jobs.state">jobflow_remote.jobs.state</a>
+</li>
+        <li><a href="api/jobflow_remote.jobs.store.html#module-jobflow_remote.jobs.store">jobflow_remote.jobs.store</a>
+</li>
+        <li><a href="api/jobflow_remote.jobs.submit.html#module-jobflow_remote.jobs.submit">jobflow_remote.jobs.submit</a>
+</li>
+        <li><a href="api/jobflow_remote.remote.html#module-jobflow_remote.remote">jobflow_remote.remote</a>
+</li>
+        <li><a href="api/jobflow_remote.remote.data.html#module-jobflow_remote.remote.data">jobflow_remote.remote.data</a>
+</li>
+        <li><a href="api/jobflow_remote.remote.host.html#module-jobflow_remote.remote.host">jobflow_remote.remote.host</a>
+</li>
+        <li><a href="api/jobflow_remote.remote.host.base.html#module-jobflow_remote.remote.host.base">jobflow_remote.remote.host.base</a>
+</li>
+        <li><a href="api/jobflow_remote.remote.host.local.html#module-jobflow_remote.remote.host.local">jobflow_remote.remote.host.local</a>
+</li>
+        <li><a href="api/jobflow_remote.remote.host.remote.html#module-jobflow_remote.remote.host.remote">jobflow_remote.remote.host.remote</a>
+</li>
+        <li><a href="api/jobflow_remote.remote.queue.html#module-jobflow_remote.remote.queue">jobflow_remote.remote.queue</a>
+</li>
+        <li><a href="api/jobflow_remote.utils.html#module-jobflow_remote.utils">jobflow_remote.utils</a>
+</li>
+        <li><a href="api/jobflow_remote.utils.data.html#module-jobflow_remote.utils.data">jobflow_remote.utils.data</a>
+</li>
+        <li><a href="api/jobflow_remote.utils.db.html#module-jobflow_remote.utils.db">jobflow_remote.utils.db</a>
+</li>
+        <li><a href="api/jobflow_remote.utils.examples.html#module-jobflow_remote.utils.examples">jobflow_remote.utils.examples</a>
+</li>
+        <li><a href="api/jobflow_remote.utils.log.html#module-jobflow_remote.utils.log">jobflow_remote.utils.log</a>
+</li>
+        <li><a href="api/jobflow_remote.utils.schedule.html#module-jobflow_remote.utils.schedule">jobflow_remote.utils.schedule</a>
+</li>
+      </ul></li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api/jobflow_remote.config.base.html#jobflow_remote.config.base.ExecutionConfig.modules">modules (jobflow_remote.config.base.ExecutionConfig attribute)</a>
+</li>
+      <li><a href="api/jobflow_remote.utils.db.html#jobflow_remote.utils.db.MongoLock">MongoLock (class in jobflow_remote.utils.db)</a>
+</li>
+  </ul></td>
+</tr></table>
+
+<h2 id="N">N</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api/jobflow_remote.cli.types.html#jobflow_remote.cli.types.DictTypeParser.name">name (jobflow_remote.cli.types.DictTypeParser attribute)</a>
+
+      <ul>
+        <li><a href="api/jobflow_remote.config.base.html#jobflow_remote.config.base.Project.name">(jobflow_remote.config.base.Project attribute)</a>
+</li>
+        <li><a href="api/jobflow_remote.config.manager.html#jobflow_remote.config.manager.WorkerData.name">(jobflow_remote.config.manager.WorkerData attribute)</a>
+</li>
+        <li><a href="api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.FlowDoc.name">(jobflow_remote.jobs.data.FlowDoc attribute)</a>
+</li>
+        <li><a href="api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.FlowInfo.name">(jobflow_remote.jobs.data.FlowInfo attribute)</a>
+</li>
+        <li><a href="api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.JobInfo.name">(jobflow_remote.jobs.data.JobInfo attribute)</a>
+</li>
+      </ul></li>
+  </ul></td>
+</tr></table>
+
+<h2 id="O">O</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api/jobflow_remote.cli.job.html#jobflow_remote.cli.job.output">output() (in module jobflow_remote.cli.job)</a>
+</li>
+  </ul></td>
+</tr></table>
+
+<h2 id="P">P</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.FlowDoc.parents">parents (jobflow_remote.jobs.data.FlowDoc attribute)</a>
+
+      <ul>
+        <li><a href="api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.FlowInfo.parents">(jobflow_remote.jobs.data.FlowInfo attribute)</a>
+</li>
+        <li><a href="api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.JobDoc.parents">(jobflow_remote.jobs.data.JobDoc attribute)</a>
+</li>
+        <li><a href="api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.JobInfo.parents">(jobflow_remote.jobs.data.JobInfo attribute)</a>
+</li>
+      </ul></li>
+      <li><a href="api/jobflow_remote.jobs.daemon.html#jobflow_remote.jobs.daemon.DaemonStatus.PARTIALLY_RUNNING">PARTIALLY_RUNNING (jobflow_remote.jobs.daemon.DaemonStatus attribute)</a>
+</li>
+      <li><a href="api/jobflow_remote.config.base.html#jobflow_remote.config.base.RemoteWorker.passphrase">passphrase (jobflow_remote.config.base.RemoteWorker attribute)</a>
+</li>
+      <li><a href="api/jobflow_remote.config.base.html#jobflow_remote.config.base.RemoteWorker.password">password (jobflow_remote.config.base.RemoteWorker attribute)</a>
+</li>
+      <li><a href="api/jobflow_remote.cli.job.html#jobflow_remote.cli.job.pause">pause() (in module jobflow_remote.cli.job)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.jobcontroller.html#jobflow_remote.jobs.jobcontroller.JobController.pause_job">pause_job() (jobflow_remote.jobs.jobcontroller.JobController method)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.jobcontroller.html#jobflow_remote.jobs.jobcontroller.JobController.pause_jobs">pause_jobs() (jobflow_remote.jobs.jobcontroller.JobController method)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.state.html#jobflow_remote.jobs.state.FlowState.PAUSED">PAUSED (jobflow_remote.jobs.state.FlowState attribute)</a>
+
+      <ul>
+        <li><a href="api/jobflow_remote.jobs.state.html#jobflow_remote.jobs.state.JobState.PAUSED">(jobflow_remote.jobs.state.JobState attribute)</a>
+</li>
+      </ul></li>
+      <li><a href="api/jobflow_remote.jobs.daemon.html#jobflow_remote.jobs.daemon.DaemonManager.pid_filepath">pid_filepath (jobflow_remote.jobs.daemon.DaemonManager property)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.jobcontroller.html#jobflow_remote.jobs.jobcontroller.JobController.ping_flow_doc">ping_flow_doc() (jobflow_remote.jobs.jobcontroller.JobController method)</a>
+</li>
+      <li><a href="api/jobflow_remote.cli.job.html#jobflow_remote.cli.job.play">play() (in module jobflow_remote.cli.job)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.jobcontroller.html#jobflow_remote.jobs.jobcontroller.JobController.play_job">play_job() (jobflow_remote.jobs.jobcontroller.JobController method)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.jobcontroller.html#jobflow_remote.jobs.jobcontroller.JobController.play_jobs">play_jobs() (jobflow_remote.jobs.jobcontroller.JobController method)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.graph.html#jobflow_remote.jobs.graph.plot_dash">plot_dash() (in module jobflow_remote.jobs.graph)</a>
+</li>
+      <li><a href="api/jobflow_remote.config.base.html#jobflow_remote.config.base.RemoteWorker.port">port (jobflow_remote.config.base.RemoteWorker attribute)</a>
+</li>
+      <li><a href="api/jobflow_remote.config.base.html#jobflow_remote.config.base.ExecutionConfig.post_run">post_run (jobflow_remote.config.base.ExecutionConfig attribute)</a>
+
+      <ul>
+        <li><a href="api/jobflow_remote.config.base.html#jobflow_remote.config.base.WorkerBase.post_run">(jobflow_remote.config.base.WorkerBase attribute)</a>
+</li>
+      </ul></li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api/jobflow_remote.config.base.html#jobflow_remote.config.base.ExecutionConfig.pre_run">pre_run (jobflow_remote.config.base.ExecutionConfig attribute)</a>
+
+      <ul>
+        <li><a href="api/jobflow_remote.config.base.html#jobflow_remote.config.base.WorkerBase.pre_run">(jobflow_remote.config.base.WorkerBase attribute)</a>
+</li>
+      </ul></li>
+      <li><a href="api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.JobDoc.previous_state">previous_state (jobflow_remote.jobs.data.JobDoc attribute)</a>
+
+      <ul>
+        <li><a href="api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.JobInfo.previous_state">(jobflow_remote.jobs.data.JobInfo attribute)</a>
+</li>
+      </ul></li>
+      <li><a href="api/jobflow_remote.cli.utils.html#jobflow_remote.cli.utils.print_success_msg">print_success_msg() (in module jobflow_remote.cli.utils)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.JobDoc.priority">priority (jobflow_remote.jobs.data.JobDoc attribute)</a>
+
+      <ul>
+        <li><a href="api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.JobInfo.priority">(jobflow_remote.jobs.data.JobInfo attribute)</a>
+</li>
+      </ul></li>
+      <li><a href="api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.RemoteInfo.process_id">process_id (jobflow_remote.jobs.data.RemoteInfo attribute)</a>
+</li>
+      <li><a href="glossary.html#term-Project"><strong>Project</strong></a>
+</li>
+      <li><a href="api/jobflow_remote.config.manager.html#jobflow_remote.config.manager.ProjectData.project">project (jobflow_remote.config.manager.ProjectData attribute)</a>
+
+      <ul>
+        <li><a href="api/jobflow_remote.config.settings.html#jobflow_remote.config.settings.JobflowRemoteSettings.project">(jobflow_remote.config.settings.JobflowRemoteSettings attribute)</a>
+</li>
+      </ul></li>
+      <li><a href="api/jobflow_remote.config.manager.html#jobflow_remote.config.manager.ConfigManager.project_names_from_files">project_names_from_files() (jobflow_remote.config.manager.ConfigManager method)</a>
+</li>
+      <li><a href="api/jobflow_remote.config.manager.html#jobflow_remote.config.manager.ProjectData">ProjectData (class in jobflow_remote.config.manager)</a>
+</li>
+      <li><a href="api/jobflow_remote.config.manager.html#jobflow_remote.config.manager.ConfigManager.projects">projects (jobflow_remote.config.manager.ConfigManager property)</a>
+</li>
+      <li><a href="api/jobflow_remote.config.manager.html#jobflow_remote.config.manager.ConfigManager.projects_ext">projects_ext (jobflow_remote.config.manager.ConfigManager attribute)</a>
+</li>
+      <li><a href="api/jobflow_remote.config.settings.html#jobflow_remote.config.settings.JobflowRemoteSettings.projects_folder">projects_folder (jobflow_remote.config.settings.JobflowRemoteSettings attribute)</a>
+</li>
+      <li><a href="api/jobflow_remote.config.base.html#jobflow_remote.config.base.ProjectUndefined">ProjectUndefined</a>
+</li>
+      <li><a href="api/jobflow_remote.remote.host.base.html#jobflow_remote.remote.host.base.BaseHost.put">put() (jobflow_remote.remote.host.base.BaseHost method)</a>
+
+      <ul>
+        <li><a href="api/jobflow_remote.remote.host.local.html#jobflow_remote.remote.host.local.LocalHost.put">(jobflow_remote.remote.host.local.LocalHost method)</a>
+</li>
+        <li><a href="api/jobflow_remote.remote.host.remote.html#jobflow_remote.remote.host.remote.RemoteHost.put">(jobflow_remote.remote.host.remote.RemoteHost method)</a>
+</li>
+      </ul></li>
+  </ul></td>
+</tr></table>
+
+<h2 id="Q">Q</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api/jobflow_remote.config.base.html#jobflow_remote.config.base.Project.queue">queue (jobflow_remote.config.base.Project attribute)</a>
+</li>
+      <li><a href="api/jobflow_remote.cli.job.html#jobflow_remote.cli.job.queue_out">queue_out() (in module jobflow_remote.cli.job)</a>
+</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.RemoteInfo.queue_state">queue_state (jobflow_remote.jobs.data.RemoteInfo attribute)</a>
+</li>
+      <li><a href="api/jobflow_remote.remote.queue.html#jobflow_remote.remote.queue.QueueManager">QueueManager (class in jobflow_remote.remote.queue)</a>
+</li>
+  </ul></td>
+</tr></table>
+
+<h2 id="R">R</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api/jobflow_remote.jobs.state.html#jobflow_remote.jobs.state.FlowState.READY">READY (jobflow_remote.jobs.state.FlowState attribute)</a>
+
+      <ul>
+        <li><a href="api/jobflow_remote.jobs.state.html#jobflow_remote.jobs.state.JobState.READY">(jobflow_remote.jobs.state.JobState attribute)</a>
+</li>
+      </ul></li>
+      <li><a href="api/jobflow_remote.jobs.jobcontroller.html#jobflow_remote.jobs.jobcontroller.JobController.refresh_children">refresh_children() (jobflow_remote.jobs.jobcontroller.JobController method)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.runner.html#jobflow_remote.jobs.runner.Runner.refresh_num_current_jobs">refresh_num_current_jobs() (jobflow_remote.jobs.runner.Runner method)</a>
+</li>
+      <li><a href="api/jobflow_remote.utils.db.html#jobflow_remote.utils.db.MongoLock.release">release() (jobflow_remote.utils.db.MongoLock method)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.JobDoc.remote">remote (jobflow_remote.jobs.data.JobDoc attribute)</a>
+
+      <ul>
+        <li><a href="api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.JobInfo.remote">(jobflow_remote.jobs.data.JobInfo attribute)</a>
+</li>
+      </ul></li>
+      <li><a href="api/jobflow_remote.jobs.state.html#jobflow_remote.jobs.state.JobState.REMOTE_ERROR">REMOTE_ERROR (jobflow_remote.jobs.state.JobState attribute)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.batch.html#jobflow_remote.jobs.batch.RemoteBatchManager">RemoteBatchManager (class in jobflow_remote.jobs.batch)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.RemoteError">RemoteError</a>
+</li>
+      <li><a href="api/jobflow_remote.remote.host.remote.html#jobflow_remote.remote.host.remote.RemoteHost">RemoteHost (class in jobflow_remote.remote.host.remote)</a>
+</li>
+      <li><a href="api/jobflow_remote.cli.project.html#jobflow_remote.cli.project.remove">remove() (in module jobflow_remote.cli.project)</a>
+
+      <ul>
+        <li><a href="api/jobflow_remote.remote.host.base.html#jobflow_remote.remote.host.base.BaseHost.remove">(jobflow_remote.remote.host.base.BaseHost method)</a>
+</li>
+        <li><a href="api/jobflow_remote.remote.host.local.html#jobflow_remote.remote.host.local.LocalHost.remove">(jobflow_remote.remote.host.local.LocalHost method)</a>
+</li>
+        <li><a href="api/jobflow_remote.remote.host.remote.html#jobflow_remote.remote.host.remote.RemoteHost.remove">(jobflow_remote.remote.host.remote.RemoteHost method)</a>
+</li>
+      </ul></li>
+      <li><a href="api/jobflow_remote.jobs.jobcontroller.html#jobflow_remote.jobs.jobcontroller.JobController.remove_batch_process">remove_batch_process() (jobflow_remote.jobs.jobcontroller.JobController method)</a>
+</li>
+      <li><a href="api/jobflow_remote.config.manager.html#jobflow_remote.config.manager.ConfigManager.remove_exec_config">remove_exec_config() (jobflow_remote.config.manager.ConfigManager method)</a>
+</li>
+      <li><a href="api/jobflow_remote.cli.admin.html#jobflow_remote.cli.admin.remove_lock">remove_lock() (in module jobflow_remote.cli.admin)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.jobcontroller.html#jobflow_remote.jobs.jobcontroller.JobController.remove_lock_flow">remove_lock_flow() (jobflow_remote.jobs.jobcontroller.JobController method)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.jobcontroller.html#jobflow_remote.jobs.jobcontroller.JobController.remove_lock_job">remove_lock_job() (jobflow_remote.jobs.jobcontroller.JobController method)</a>
+</li>
+      <li><a href="api/jobflow_remote.utils.data.html#jobflow_remote.utils.data.remove_none">remove_none() (in module jobflow_remote.utils.data)</a>
+</li>
+      <li><a href="api/jobflow_remote.config.manager.html#jobflow_remote.config.manager.ConfigManager.remove_project">remove_project() (jobflow_remote.config.manager.ConfigManager method)</a>
+</li>
+      <li><a href="api/jobflow_remote.config.manager.html#jobflow_remote.config.manager.ConfigManager.remove_worker">remove_worker() (jobflow_remote.config.manager.ConfigManager method)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.DynamicResponseType.REPLACE">REPLACE (jobflow_remote.jobs.data.DynamicResponseType attribute)</a>
+</li>
+      <li><a href="api/jobflow_remote.cli.utils.html#jobflow_remote.cli.utils.ReprStr">ReprStr (class in jobflow_remote.cli.utils)</a>
+</li>
+      <li><a href="api/jobflow_remote.cli.job.html#jobflow_remote.cli.job.rerun">rerun() (in module jobflow_remote.cli.job)</a>
+</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api/jobflow_remote.jobs.jobcontroller.html#jobflow_remote.jobs.jobcontroller.JobController.rerun_job">rerun_job() (jobflow_remote.jobs.jobcontroller.JobController method)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.jobcontroller.html#jobflow_remote.jobs.jobcontroller.JobController.rerun_jobs">rerun_jobs() (jobflow_remote.jobs.jobcontroller.JobController method)</a>
+</li>
+      <li><a href="api/jobflow_remote.cli.admin.html#jobflow_remote.cli.admin.reset">reset() (in module jobflow_remote.cli.admin)</a>
+
+      <ul>
+        <li><a href="api/jobflow_remote.jobs.jobcontroller.html#jobflow_remote.jobs.jobcontroller.JobController.reset">(jobflow_remote.jobs.jobcontroller.JobController method)</a>
+</li>
+      </ul></li>
+      <li><a href="api/jobflow_remote.remote.data.html#jobflow_remote.remote.data.resolve_job_dict_args">resolve_job_dict_args() (in module jobflow_remote.remote.data)</a>
+</li>
+      <li><a href="api/jobflow_remote.config.base.html#jobflow_remote.config.base.WorkerBase.resources">resources (jobflow_remote.config.base.WorkerBase attribute)</a>
+
+      <ul>
+        <li><a href="api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.JobDoc.resources">(jobflow_remote.jobs.data.JobDoc attribute)</a>
+</li>
+      </ul></li>
+      <li><a href="api/jobflow_remote.cli.job.html#jobflow_remote.cli.job.resources">resources() (in module jobflow_remote.cli.job)</a>
+</li>
+      <li><a href="api/jobflow_remote.cli.job.html#jobflow_remote.cli.job.retry">retry() (in module jobflow_remote.cli.job)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.jobcontroller.html#jobflow_remote.jobs.jobcontroller.JobController.retry_job">retry_job() (jobflow_remote.jobs.jobcontroller.JobController method)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.jobcontroller.html#jobflow_remote.jobs.jobcontroller.JobController.retry_jobs">retry_jobs() (jobflow_remote.jobs.jobcontroller.JobController method)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.RemoteInfo.retry_time_limit">retry_time_limit (jobflow_remote.jobs.data.RemoteInfo attribute)</a>
+</li>
+      <li><a href="api/jobflow_remote.cli.execution.html#jobflow_remote.cli.execution.run">run() (in module jobflow_remote.cli.execution)</a>
+
+      <ul>
+        <li><a href="api/jobflow_remote.cli.runner.html#jobflow_remote.cli.runner.run">(in module jobflow_remote.cli.runner)</a>
+</li>
+        <li><a href="api/jobflow_remote.jobs.runner.html#jobflow_remote.jobs.runner.Runner.run">(jobflow_remote.jobs.runner.Runner method)</a>
+</li>
+      </ul></li>
+      <li><a href="api/jobflow_remote.cli.execution.html#jobflow_remote.cli.execution.run_batch">run_batch() (in module jobflow_remote.cli.execution)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.run.html#jobflow_remote.jobs.run.run_batch_jobs">run_batch_jobs() (in module jobflow_remote.jobs.run)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.JobDoc.run_dir">run_dir (jobflow_remote.jobs.data.JobDoc attribute)</a>
+
+      <ul>
+        <li><a href="api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.JobInfo.run_dir">(jobflow_remote.jobs.data.JobInfo attribute)</a>
+</li>
+      </ul></li>
+      <li><a href="api/jobflow_remote.jobs.run.html#jobflow_remote.jobs.run.run_remote_job">run_remote_job() (in module jobflow_remote.jobs.run)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.JobInfo.run_time">run_time (jobflow_remote.jobs.data.JobInfo property)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.runner.html#jobflow_remote.jobs.runner.Runner">Runner (class in jobflow_remote.jobs.runner)</a>
+</li>
+      <li><a href="api/jobflow_remote.config.base.html#jobflow_remote.config.base.Project.runner">runner (jobflow_remote.config.base.Project attribute)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.runner.html#jobflow_remote.jobs.runner.Runner.runner_options">runner_options (jobflow_remote.jobs.runner.Runner property)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.daemon.html#jobflow_remote.jobs.daemon.DaemonStatus.RUNNING">RUNNING (jobflow_remote.jobs.daemon.DaemonStatus attribute)</a>
+
+      <ul>
+        <li><a href="api/jobflow_remote.jobs.state.html#jobflow_remote.jobs.state.FlowState.RUNNING">(jobflow_remote.jobs.state.FlowState attribute)</a>
+</li>
+        <li><a href="api/jobflow_remote.jobs.state.html#jobflow_remote.jobs.state.JobState.RUNNING">(jobflow_remote.jobs.state.JobState attribute)</a>
+</li>
+      </ul></li>
+  </ul></td>
+</tr></table>
+
+<h2 id="S">S</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api/jobflow_remote.utils.schedule.html#jobflow_remote.utils.schedule.SafeScheduler">SafeScheduler (class in jobflow_remote.utils.schedule)</a>
+</li>
+      <li><a href="api/jobflow_remote.remote.queue.html#jobflow_remote.remote.queue.QueueManager.scheduler_io">scheduler_io (jobflow_remote.remote.queue.QueueManager attribute)</a>
+</li>
+      <li><a href="api/jobflow_remote.config.base.html#jobflow_remote.config.base.WorkerBase.scheduler_type">scheduler_type (jobflow_remote.config.base.WorkerBase attribute)</a>
+</li>
+      <li><a href="api/jobflow_remote.config.manager.html#jobflow_remote.config.manager.ConfigManager.select_project_name">select_project_name() (jobflow_remote.config.manager.ConfigManager method)</a>
+</li>
+      <li><a href="api/jobflow_remote.cli.utils.html#jobflow_remote.cli.utils.SerializeFileFormat">SerializeFileFormat (class in jobflow_remote.cli.utils)</a>
+</li>
+      <li><a href="api/jobflow_remote.config.manager.html#jobflow_remote.config.manager.ConfigManager.set_exec_config">set_exec_config() (jobflow_remote.config.manager.ConfigManager method)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.jobcontroller.html#jobflow_remote.jobs.jobcontroller.JobController.set_job_run_properties">set_job_run_properties() (jobflow_remote.jobs.jobcontroller.JobController method)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.jobcontroller.html#jobflow_remote.jobs.jobcontroller.JobController.set_job_state">set_job_state() (jobflow_remote.jobs.jobcontroller.JobController method)</a>
+</li>
+      <li><a href="api/jobflow_remote.config.manager.html#jobflow_remote.config.manager.ConfigManager.set_jobstore">set_jobstore() (jobflow_remote.config.manager.ConfigManager method)</a>
+</li>
+      <li><a href="api/jobflow_remote.remote.queue.html#jobflow_remote.remote.queue.set_name_out">set_name_out() (in module jobflow_remote.remote.queue)</a>
+</li>
+      <li><a href="api/jobflow_remote.config.manager.html#jobflow_remote.config.manager.ConfigManager.set_queue_db">set_queue_db() (jobflow_remote.config.manager.ConfigManager method)</a>
+</li>
+      <li><a href="api/jobflow_remote.config.jobconfig.html#jobflow_remote.config.jobconfig.set_run_config">set_run_config() (in module jobflow_remote.config.jobconfig)</a>
+</li>
+      <li><a href="api/jobflow_remote.cli.job.html#jobflow_remote.cli.job.set_state">set_state() (in module jobflow_remote.cli.job)</a>
+</li>
+      <li><a href="api/jobflow_remote.config.manager.html#jobflow_remote.config.manager.ConfigManager.set_worker">set_worker() (jobflow_remote.config.manager.ConfigManager method)</a>
+</li>
+      <li><a href="api/jobflow_remote.config.base.html#jobflow_remote.config.base.RemoteWorker.shell_cmd">shell_cmd (jobflow_remote.config.base.RemoteWorker attribute)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.state.html#jobflow_remote.jobs.state.JobState.short_value">short_value (jobflow_remote.jobs.state.JobState property)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.daemon.html#jobflow_remote.jobs.daemon.DaemonStatus.SHUT_DOWN">SHUT_DOWN (jobflow_remote.jobs.daemon.DaemonStatus attribute)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.daemon.html#jobflow_remote.jobs.daemon.DaemonManager.shut_down">shut_down() (jobflow_remote.jobs.daemon.DaemonManager method)</a>
+</li>
+      <li><a href="api/jobflow_remote.cli.runner.html#jobflow_remote.cli.runner.shutdown">shutdown() (in module jobflow_remote.cli.runner)</a>
+</li>
+      <li><a href="api/jobflow_remote.utils.examples.html#jobflow_remote.utils.examples.sleep">sleep() (in module jobflow_remote.utils.examples)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.daemon.html#jobflow_remote.jobs.daemon.DaemonManager.sock_filepath">sock_filepath (jobflow_remote.jobs.daemon.DaemonManager property)</a>
+</li>
+      <li><a href="api/jobflow_remote.cli.utils.html#jobflow_remote.cli.utils.SortOption">SortOption (class in jobflow_remote.cli.utils)</a>
+</li>
+      <li><a href="api/jobflow_remote.cli.runner.html#jobflow_remote.cli.runner.start">start() (in module jobflow_remote.cli.runner)</a>
+
+      <ul>
+        <li><a href="api/jobflow_remote.jobs.daemon.html#jobflow_remote.jobs.daemon.DaemonManager.start">(jobflow_remote.jobs.daemon.DaemonManager method)</a>
+</li>
+      </ul></li>
+      <li><a href="api/jobflow_remote.jobs.daemon.html#jobflow_remote.jobs.daemon.DaemonManager.start_processes">start_processes() (jobflow_remote.jobs.daemon.DaemonManager method)</a>
+</li>
+      <li><a href="api/jobflow_remote.cli.utils.html#jobflow_remote.cli.utils.start_profiling">start_profiling() (in module jobflow_remote.cli.utils)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.daemon.html#jobflow_remote.jobs.daemon.DaemonManager.start_supervisord">start_supervisord() (jobflow_remote.jobs.daemon.DaemonManager method)</a>
+</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.JobDoc.start_time">start_time (jobflow_remote.jobs.data.JobDoc attribute)</a>
+
+      <ul>
+        <li><a href="api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.JobInfo.start_time">(jobflow_remote.jobs.data.JobInfo attribute)</a>
+</li>
+      </ul></li>
+      <li><a href="api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.FlowDoc.state">state (jobflow_remote.jobs.data.FlowDoc attribute)</a>
+
+      <ul>
+        <li><a href="api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.FlowInfo.state">(jobflow_remote.jobs.data.FlowInfo attribute)</a>
+</li>
+        <li><a href="api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.JobDoc.state">(jobflow_remote.jobs.data.JobDoc attribute)</a>
+</li>
+        <li><a href="api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.JobInfo.state">(jobflow_remote.jobs.data.JobInfo attribute)</a>
+</li>
+      </ul></li>
+      <li><a href="api/jobflow_remote.cli.runner.html#jobflow_remote.cli.runner.status">status() (in module jobflow_remote.cli.runner)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.RemoteInfo.step_attempts">step_attempts (jobflow_remote.jobs.data.RemoteInfo attribute)</a>
+</li>
+      <li><a href="api/jobflow_remote.cli.job.html#jobflow_remote.cli.job.stop">stop() (in module jobflow_remote.cli.job)</a>
+
+      <ul>
+        <li><a href="api/jobflow_remote.cli.runner.html#jobflow_remote.cli.runner.stop">(in module jobflow_remote.cli.runner)</a>
+</li>
+        <li><a href="api/jobflow_remote.jobs.daemon.html#jobflow_remote.jobs.daemon.DaemonManager.stop">(jobflow_remote.jobs.daemon.DaemonManager method)</a>
+</li>
+      </ul></li>
+      <li><a href="api/jobflow_remote.jobs.jobcontroller.html#jobflow_remote.jobs.jobcontroller.JobController.stop_children">stop_children() (jobflow_remote.jobs.jobcontroller.JobController method)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.jobcontroller.html#jobflow_remote.jobs.jobcontroller.JobController.stop_job">stop_job() (jobflow_remote.jobs.jobcontroller.JobController method)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.jobcontroller.html#jobflow_remote.jobs.jobcontroller.JobController.stop_jobflow">stop_jobflow() (jobflow_remote.jobs.jobcontroller.JobController method)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.jobcontroller.html#jobflow_remote.jobs.jobcontroller.JobController.stop_jobs">stop_jobs() (jobflow_remote.jobs.jobcontroller.JobController method)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.daemon.html#jobflow_remote.jobs.daemon.DaemonStatus.STOPPED">STOPPED (jobflow_remote.jobs.daemon.DaemonStatus attribute)</a>
+
+      <ul>
+        <li><a href="api/jobflow_remote.jobs.state.html#jobflow_remote.jobs.state.FlowState.STOPPED">(jobflow_remote.jobs.state.FlowState attribute)</a>
+</li>
+        <li><a href="api/jobflow_remote.jobs.state.html#jobflow_remote.jobs.state.JobState.STOPPED">(jobflow_remote.jobs.state.JobState attribute)</a>
+</li>
+      </ul></li>
+      <li><a href="api/jobflow_remote.jobs.daemon.html#jobflow_remote.jobs.daemon.DaemonStatus.STOPPING">STOPPING (jobflow_remote.jobs.daemon.DaemonStatus attribute)</a>
+</li>
+      <li><a href="api/jobflow_remote.config.base.html#jobflow_remote.config.base.QueueConfig.store">store (jobflow_remote.config.base.QueueConfig attribute)</a>
+</li>
+      <li><a href="api/jobflow_remote.utils.data.html#jobflow_remote.utils.data.store_from_dict">store_from_dict() (in module jobflow_remote.utils.data)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.JobDoc.stored_data">stored_data (jobflow_remote.jobs.data.JobDoc attribute)</a>
+</li>
+      <li><a href="api/jobflow_remote.cli.utils.html#jobflow_remote.cli.utils.str_to_dict">str_to_dict() (in module jobflow_remote.cli.utils)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.runner.html#jobflow_remote.jobs.runner.Runner.submit">submit() (jobflow_remote.jobs.runner.Runner method)</a>
+
+      <ul>
+        <li><a href="api/jobflow_remote.remote.queue.html#jobflow_remote.remote.queue.QueueManager.submit">(jobflow_remote.remote.queue.QueueManager method)</a>
+</li>
+      </ul></li>
+      <li><a href="api/jobflow_remote.jobs.submit.html#jobflow_remote.jobs.submit.submit_flow">submit_flow() (in module jobflow_remote.jobs.submit)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.batch.html#jobflow_remote.jobs.batch.RemoteBatchManager.submit_job">submit_job() (jobflow_remote.jobs.batch.RemoteBatchManager method)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.state.html#jobflow_remote.jobs.state.JobState.SUBMITTED">SUBMITTED (jobflow_remote.jobs.state.JobState attribute)</a>
+</li>
+  </ul></td>
+</tr></table>
+
+<h2 id="T">T</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api/jobflow_remote.jobs.batch.html#jobflow_remote.jobs.batch.LocalBatchManager.terminate_job">terminate_job() (jobflow_remote.jobs.batch.LocalBatchManager method)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.state.html#jobflow_remote.jobs.state.JobState.TERMINATED">TERMINATED (jobflow_remote.jobs.state.JobState attribute)</a>
+</li>
+      <li><a href="api/jobflow_remote.remote.host.base.html#jobflow_remote.remote.host.base.BaseHost.test">test() (jobflow_remote.remote.host.base.BaseHost method)</a>
+</li>
+      <li><a href="api/jobflow_remote.config.base.html#jobflow_remote.config.base.WorkerBase.timeout_execute">timeout_execute (jobflow_remote.config.base.WorkerBase attribute)</a>
+</li>
+      <li><a href="api/jobflow_remote.config.base.html#jobflow_remote.config.base.Project.tmp_dir">tmp_dir (jobflow_remote.config.base.Project attribute)</a>
+</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api/jobflow_remote.config.base.html#jobflow_remote.config.base.LogLevel.to_logging">to_logging() (jobflow_remote.config.base.LogLevel method)</a>
+</li>
+      <li><a href="api/jobflow_remote.cli.utils.html#jobflow_remote.cli.utils.SerializeFileFormat.TOML">TOML (jobflow_remote.cli.utils.SerializeFileFormat attribute)</a>
+</li>
+      <li><a href="api/jobflow_remote.config.base.html#jobflow_remote.config.base.LocalWorker.type">type (jobflow_remote.config.base.LocalWorker attribute)</a>
+
+      <ul>
+        <li><a href="api/jobflow_remote.config.base.html#jobflow_remote.config.base.RemoteWorker.type">(jobflow_remote.config.base.RemoteWorker attribute)</a>
+</li>
+        <li><a href="api/jobflow_remote.config.base.html#jobflow_remote.config.base.WorkerBase.type">(jobflow_remote.config.base.WorkerBase attribute)</a>
+</li>
+      </ul></li>
+  </ul></td>
+</tr></table>
+
+<h2 id="U">U</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api/jobflow_remote.jobs.runner.html#jobflow_remote.jobs.runner.Runner.update_batch_jobs">update_batch_jobs() (jobflow_remote.jobs.runner.Runner method)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.jobcontroller.html#jobflow_remote.jobs.jobcontroller.JobController.update_flow_state">update_flow_state() (jobflow_remote.jobs.jobcontroller.JobController method)</a>
+</li>
+      <li><a href="api/jobflow_remote.config.manager.html#jobflow_remote.config.manager.ConfigManager.update_project">update_project() (jobflow_remote.config.manager.ConfigManager method)</a>
+</li>
+      <li><a href="api/jobflow_remote.remote.data.html#jobflow_remote.remote.data.update_store">update_store() (in module jobflow_remote.remote.data)</a>
+</li>
+      <li><a href="api/jobflow_remote.cli.utils.html#jobflow_remote.cli.utils.SortOption.UPDATED_ON">UPDATED_ON (jobflow_remote.cli.utils.SortOption attribute)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.FlowDoc.updated_on">updated_on (jobflow_remote.jobs.data.FlowDoc attribute)</a>
+
+      <ul>
+        <li><a href="api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.FlowInfo.updated_on">(jobflow_remote.jobs.data.FlowInfo attribute)</a>
+</li>
+        <li><a href="api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.JobDoc.updated_on">(jobflow_remote.jobs.data.JobDoc attribute)</a>
+</li>
+        <li><a href="api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.JobInfo.updated_on">(jobflow_remote.jobs.data.JobInfo attribute)</a>
+</li>
+      </ul></li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api/jobflow_remote.jobs.runner.html#jobflow_remote.jobs.runner.Runner.upload">upload() (jobflow_remote.jobs.runner.Runner method)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.state.html#jobflow_remote.jobs.state.JobState.UPLOADED">UPLOADED (jobflow_remote.jobs.state.JobState attribute)</a>
+</li>
+      <li><a href="api/jobflow_remote.config.base.html#jobflow_remote.config.base.RemoteWorker.user">user (jobflow_remote.config.base.RemoteWorker attribute)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.state.html#jobflow_remote.jobs.state.JobState.USER_STOPPED">USER_STOPPED (jobflow_remote.jobs.state.JobState attribute)</a>
+</li>
+      <li><a href="api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.FlowDoc.uuid">uuid (jobflow_remote.jobs.data.FlowDoc attribute)</a>
+
+      <ul>
+        <li><a href="api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.JobDoc.uuid">(jobflow_remote.jobs.data.JobDoc attribute)</a>
+</li>
+        <li><a href="api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.JobInfo.uuid">(jobflow_remote.jobs.data.JobInfo attribute)</a>
+</li>
+      </ul></li>
+      <li><a href="api/jobflow_remote.utils.data.html#jobflow_remote.utils.data.uuid_to_path">uuid_to_path() (in module jobflow_remote.utils.data)</a>
+</li>
+  </ul></td>
+</tr></table>
+
+<h2 id="V">V</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api/jobflow_remote.utils.examples.html#jobflow_remote.utils.examples.value">value() (in module jobflow_remote.utils.examples)</a>
+</li>
+  </ul></td>
+</tr></table>
+
+<h2 id="W">W</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api/jobflow_remote.jobs.state.html#jobflow_remote.jobs.state.FlowState.WAITING">WAITING (jobflow_remote.jobs.state.FlowState attribute)</a>
+
+      <ul>
+        <li><a href="api/jobflow_remote.jobs.state.html#jobflow_remote.jobs.state.JobState.WAITING">(jobflow_remote.jobs.state.JobState attribute)</a>
+</li>
+      </ul></li>
+      <li><a href="api/jobflow_remote.config.base.html#jobflow_remote.config.base.LogLevel.WARN">WARN (jobflow_remote.config.base.LogLevel attribute)</a>
+</li>
+      <li><a href="api/jobflow_remote.config.base.html#jobflow_remote.config.base.BatchConfig.work_dir">work_dir (jobflow_remote.config.base.BatchConfig attribute)</a>
+
+      <ul>
+        <li><a href="api/jobflow_remote.config.base.html#jobflow_remote.config.base.WorkerBase.work_dir">(jobflow_remote.config.base.WorkerBase attribute)</a>
+</li>
+      </ul></li>
+      <li><a href="glossary.html#term-Worker"><strong>Worker</strong></a>
+</li>
+      <li><a href="api/jobflow_remote.config.manager.html#jobflow_remote.config.manager.WorkerData.worker">worker (jobflow_remote.config.manager.WorkerData attribute)</a>
+
+      <ul>
+        <li><a href="api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.JobDoc.worker">(jobflow_remote.jobs.data.JobDoc attribute)</a>
+</li>
+        <li><a href="api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.JobInfo.worker">(jobflow_remote.jobs.data.JobInfo attribute)</a>
+</li>
+      </ul></li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api/jobflow_remote.cli.job.html#jobflow_remote.cli.job.worker">worker() (in module jobflow_remote.cli.job)</a>
+</li>
+      <li><a href="api/jobflow_remote.config.manager.html#jobflow_remote.config.manager.WorkerData">WorkerData (class in jobflow_remote.config.manager)</a>
+</li>
+      <li><a href="api/jobflow_remote.config.base.html#jobflow_remote.config.base.Project.workers">workers (jobflow_remote.config.base.Project attribute)</a>
+
+      <ul>
+        <li><a href="api/jobflow_remote.jobs.data.html#jobflow_remote.jobs.data.FlowInfo.workers">(jobflow_remote.jobs.data.FlowInfo attribute)</a>
+</li>
+      </ul></li>
+      <li><a href="api/jobflow_remote.jobs.daemon.html#jobflow_remote.jobs.daemon.DaemonManager.write_config">write_config() (jobflow_remote.jobs.daemon.DaemonManager method)</a>
+</li>
+      <li><a href="api/jobflow_remote.remote.queue.html#jobflow_remote.remote.queue.QueueManager.write_submission_script">write_submission_script() (jobflow_remote.remote.queue.QueueManager method)</a>
+</li>
+      <li><a href="api/jobflow_remote.remote.host.base.html#jobflow_remote.remote.host.base.BaseHost.write_text_file">write_text_file() (jobflow_remote.remote.host.base.BaseHost method)</a>
+
+      <ul>
+        <li><a href="api/jobflow_remote.remote.host.local.html#jobflow_remote.remote.host.local.LocalHost.write_text_file">(jobflow_remote.remote.host.local.LocalHost method)</a>
+</li>
+        <li><a href="api/jobflow_remote.remote.host.remote.html#jobflow_remote.remote.host.remote.RemoteHost.write_text_file">(jobflow_remote.remote.host.remote.RemoteHost method)</a>
+</li>
+      </ul></li>
+  </ul></td>
+</tr></table>
+
+<h2 id="Y">Y</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api/jobflow_remote.cli.utils.html#jobflow_remote.cli.utils.SerializeFileFormat.YAML">YAML (jobflow_remote.cli.utils.SerializeFileFormat attribute)</a>
+</li>
+  </ul></td>
+</tr></table>
+
+
+
+                </article>
+
+
+
+
+
+                <footer class="prev-next-footer">
+
+<div class="prev-next-area">
+</div>
+                </footer>
+
+            </div>
+
+
+
+
+          </div>
+          <footer class="bd-footer-content">
+
+          </footer>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="_static/scripts/bootstrap.js?digest=5b4479735964841361fd"></script>
+<script src="_static/scripts/pydata-sphinx-theme.js?digest=5b4479735964841361fd"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+
+    <div class="footer-items__start">
+
+        <div class="footer-item">
+
+  <p class="copyright">
+
+      © Copyright 2023, Matgenix SRL.
+      <br/>
+
+  </p>
+</div>
+
+        <div class="footer-item">
+
+  <p class="sphinx-version">
+    Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 7.2.6.
+    <br/>
+  </p>
+</div>
+
+    </div>
+
+
+
+    <div class="footer-items__end">
+
+        <div class="footer-item">
+<p class="theme-version">
+  Built with the <a href="https://pydata-sphinx-theme.readthedocs.io/en/stable/index.html">PyData Sphinx Theme</a> 0.14.4.
+</p></div>
+
+    </div>
+
+</div>
+
+  </footer>
+  </body>
+</html>

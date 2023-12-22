@@ -1,0 +1,673 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../../../" data-theme="light">
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>jobflow_remote.jobs.graph &#8212; Jobflow Remote v0.0.1.post117+gfc0fbc0.d20231222 Manual</title>
+
+
+
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "light";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "light";
+  </script>
+
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../../_static/styles/theme.css?digest=5b4479735964841361fd" rel="stylesheet" />
+<link href="../../../_static/styles/bootstrap.css?digest=5b4479735964841361fd" rel="stylesheet" />
+<link href="../../../_static/styles/pydata-sphinx-theme.css?digest=5b4479735964841361fd" rel="stylesheet" />
+
+
+  <link href="../../../_static/vendor/fontawesome/6.1.2/css/all.min.css?digest=5b4479735964841361fd" rel="stylesheet" />
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="../../../_static/vendor/fontawesome/6.1.2/webfonts/fa-solid-900.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../_static/vendor/fontawesome/6.1.2/webfonts/fa-brands-400.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../_static/vendor/fontawesome/6.1.2/webfonts/fa-regular-400.woff2" />
+
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=fa44fd50" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css?v=eafc0fe6" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/autodoc_pydantic.css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/design-style.1e8bd061cd6da7fc9cf755528e8ffc24.min.css?v=0a3b3ea7" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/jobflow_remote.css?v=7b6df8f0" />
+
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../../_static/scripts/bootstrap.js?digest=5b4479735964841361fd" />
+<link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=5b4479735964841361fd" />
+  <script src="../../../_static/vendor/fontawesome/6.1.2/js/all.min.js?digest=5b4479735964841361fd"></script>
+
+    <script src="../../../_static/documentation_options.js?v=e135783d"></script>
+    <script src="../../../_static/doctools.js?v=888ff710"></script>
+    <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../../_static/design-tabs.js?v=36754332"></script>
+    <script src="https://unpkg.com/mermaid@10.2.0/dist/mermaid.min.js"></script>
+    <script>mermaid.initialize({startOnLoad:true});</script>
+    <script>DOCUMENTATION_OPTIONS.pagename = '_modules/jobflow_remote/jobs/graph';</script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+    <meta name="docbuild:last-update" content="Dec 22, 2023"/>
+  </head>
+
+
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="light">
+
+
+
+  <a class="skip-link" href="#main-content">Skip to main content</a>
+
+  <div id="pst-scroll-pixel-helper"></div>
+
+
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>
+    Back to top
+  </button>
+
+
+  <input type="checkbox"
+          class="sidebar-toggle"
+          name="__primary"
+          id="__primary"/>
+  <label class="overlay overlay-primary" for="__primary"></label>
+
+  <input type="checkbox"
+          class="sidebar-toggle"
+          name="__secondary"
+          id="__secondary"/>
+  <label class="overlay overlay-secondary" for="__secondary"></label>
+
+  <div class="search-button__wrapper">
+    <div class="search-button__overlay"></div>
+    <div class="search-button__search-container">
+<form class="bd-search d-flex align-items-center"
+      action="../../../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         id="search-input"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form></div>
+  </div>
+
+
+  <div class="bd-header-announcement container-fluid bd-header-announcement">
+    <div class="bd-header-announcement__content"><p>Jobflow Remote is still in beta phase. The API may change at any time.</p></div>
+  </div>
+
+
+    <nav class="bd-header navbar navbar-expand-lg bd-navbar">
+<div class="bd-header__inner bd-page-width">
+  <label class="sidebar-toggle primary-toggle" for="__primary">
+    <span class="fa-solid fa-bars"></span>
+  </label>
+
+
+  <div class="col-lg-3 navbar-header-items__start">
+
+      <div class="navbar-item">
+
+
+
+<a class="navbar-brand logo" href="../../../index.html">
+
+
+
+
+
+
+    <p class="title logo__title">Jobflow Remote v0.0.1.post117+gfc0fbc0.d20231222 Manual</p>
+
+</a></div>
+
+  </div>
+
+  <div class="col-lg-9 navbar-header-items">
+
+    <div class="me-auto navbar-header-items__center">
+
+        <div class="navbar-item">
+<nav class="navbar-nav">
+  <p class="sidebar-header-items__title"
+     role="heading"
+     aria-level="1"
+     aria-label="Site Navigation">
+    Site Navigation
+  </p>
+  <ul class="bd-navbar-elements navbar-nav">
+
+                    <li class="nav-item">
+                      <a class="nav-link nav-internal" href="../../../user/index.html">
+                        User Guide
+                      </a>
+                    </li>
+
+
+                    <li class="nav-item">
+                      <a class="nav-link nav-internal" href="../../../api/index.html">
+                        API reference
+                      </a>
+                    </li>
+
+
+                    <li class="nav-item">
+                      <a class="nav-link nav-internal" href="../../../dev/index.html">
+                        Development
+                      </a>
+                    </li>
+
+  </ul>
+</nav></div>
+
+    </div>
+
+
+    <div class="navbar-header-items__end">
+
+        <div class="navbar-item navbar-persistent--container">
+
+
+ <script>
+ document.write(`
+   <button class="btn navbar-btn search-button-field search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass"></i>
+    <span class="search-button__default-text">Search</span>
+    <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+   </button>
+ `);
+ </script>
+        </div>
+
+
+        <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm navbar-btn theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="theme-switch nav-link" data-mode="light"><i class="fa-solid fa-sun fa-lg"></i></span>
+    <span class="theme-switch nav-link" data-mode="dark"><i class="fa-solid fa-moon fa-lg"></i></span>
+    <span class="theme-switch nav-link" data-mode="auto"><i class="fa-solid fa-circle-half-stroke fa-lg"></i></span>
+  </button>
+`);
+</script></div>
+
+    </div>
+
+  </div>
+
+
+    <div class="navbar-persistent--mobile">
+
+ <script>
+ document.write(`
+   <button class="btn navbar-btn search-button-field search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass"></i>
+    <span class="search-button__default-text">Search</span>
+    <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+   </button>
+ `);
+ </script>
+    </div>
+
+
+
+</div>
+
+    </nav>
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+
+      <div class="bd-sidebar-primary bd-sidebar hide-on-wide">
+
+
+
+  <div class="sidebar-header-items sidebar-primary__section">
+
+
+      <div class="sidebar-header-items__center">
+
+          <div class="navbar-item">
+<nav class="navbar-nav">
+  <p class="sidebar-header-items__title"
+     role="heading"
+     aria-level="1"
+     aria-label="Site Navigation">
+    Site Navigation
+  </p>
+  <ul class="bd-navbar-elements navbar-nav">
+
+                    <li class="nav-item">
+                      <a class="nav-link nav-internal" href="../../../user/index.html">
+                        User Guide
+                      </a>
+                    </li>
+
+
+                    <li class="nav-item">
+                      <a class="nav-link nav-internal" href="../../../api/index.html">
+                        API reference
+                      </a>
+                    </li>
+
+
+                    <li class="nav-item">
+                      <a class="nav-link nav-internal" href="../../../dev/index.html">
+                        Development
+                      </a>
+                    </li>
+
+  </ul>
+</nav></div>
+
+      </div>
+
+
+
+      <div class="sidebar-header-items__end">
+
+          <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm navbar-btn theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="theme-switch nav-link" data-mode="light"><i class="fa-solid fa-sun fa-lg"></i></span>
+    <span class="theme-switch nav-link" data-mode="dark"><i class="fa-solid fa-moon fa-lg"></i></span>
+    <span class="theme-switch nav-link" data-mode="auto"><i class="fa-solid fa-circle-half-stroke fa-lg"></i></span>
+  </button>
+`);
+</script></div>
+
+      </div>
+
+  </div>
+
+
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+
+  <div id="rtd-footer-container"></div>
+
+
+      </div>
+
+      <main id="main-content" class="bd-main">
+
+
+          <div class="bd-content">
+            <div class="bd-article-container">
+
+              <div class="bd-header-article">
+<div class="header-article-items header-article__inner">
+
+    <div class="header-article-items__start">
+
+        <div class="header-article-item">
+
+
+
+<nav aria-label="Breadcrumb">
+  <ul class="bd-breadcrumbs">
+
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../../../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+
+    <li class="breadcrumb-item"><a href="../../index.html" class="nav-link">Module code</a></li>
+
+    <li class="breadcrumb-item active" aria-current="page">jobflow_remo...</li>
+  </ul>
+</nav>
+</div>
+
+    </div>
+
+
+</div>
+</div>
+
+
+
+
+<div id="searchbox"></div>
+                <article class="bd-article" role="main">
+
+  <h1>Source code for jobflow_remote.jobs.graph</h1><div class="highlight"><pre>
+<span></span><span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">TYPE_CHECKING</span>
+
+<span class="kn">from</span> <span class="nn">jobflow_remote.jobs.state</span> <span class="kn">import</span> <span class="n">JobState</span>
+
+<span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>
+    <span class="kn">from</span> <span class="nn">networkx</span> <span class="kn">import</span> <span class="n">DiGraph</span>
+
+    <span class="kn">from</span> <span class="nn">jobflow_remote.jobs.data</span> <span class="kn">import</span> <span class="n">FlowInfo</span>
+
+
+<div class="viewcode-block" id="get_graph">
+<a class="viewcode-back" href="../../../api/jobflow_remote.jobs.graph.html#jobflow_remote.jobs.graph.get_graph">[docs]</a>
+<span class="k">def</span> <span class="nf">get_graph</span><span class="p">(</span><span class="n">flow</span><span class="p">:</span> <span class="n">FlowInfo</span><span class="p">,</span> <span class="n">label</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;name&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DiGraph</span><span class="p">:</span>
+    <span class="kn">import</span> <span class="nn">networkx</span> <span class="k">as</span> <span class="nn">nx</span>
+
+    <span class="n">graph</span> <span class="o">=</span> <span class="n">nx</span><span class="o">.</span><span class="n">DiGraph</span><span class="p">()</span>
+
+    <span class="n">ids_mapping</span> <span class="o">=</span> <span class="n">flow</span><span class="o">.</span><span class="n">ids_mapping</span>
+
+    <span class="c1"># Add nodes</span>
+    <span class="k">for</span> <span class="n">job_prop</span> <span class="ow">in</span> <span class="n">flow</span><span class="o">.</span><span class="n">iter_job_prop</span><span class="p">():</span>
+        <span class="n">db_id</span> <span class="o">=</span> <span class="n">job_prop</span><span class="p">[</span><span class="s2">&quot;db_id&quot;</span><span class="p">]</span>
+        <span class="n">job_prop</span><span class="p">[</span><span class="s2">&quot;label&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">job_prop</span><span class="p">[</span><span class="n">label</span><span class="p">]</span>
+        <span class="c1"># change this as the &quot;name&quot; is used in jobflow&#39;s graph plotting util</span>
+        <span class="n">job_prop</span><span class="p">[</span><span class="s2">&quot;job_name&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">job_prop</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;name&quot;</span><span class="p">)</span>
+        <span class="n">graph</span><span class="o">.</span><span class="n">add_node</span><span class="p">(</span><span class="n">db_id</span><span class="p">,</span> <span class="o">**</span><span class="n">job_prop</span><span class="p">)</span>
+
+    <span class="c1"># Add edges based on parents</span>
+    <span class="k">for</span> <span class="n">child_node</span><span class="p">,</span> <span class="n">parents</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">flow</span><span class="o">.</span><span class="n">db_ids</span><span class="p">,</span> <span class="n">flow</span><span class="o">.</span><span class="n">parents</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">parent_uuid</span> <span class="ow">in</span> <span class="n">parents</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">parent_node</span> <span class="ow">in</span> <span class="n">ids_mapping</span><span class="p">[</span><span class="n">parent_uuid</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+                <span class="n">graph</span><span class="o">.</span><span class="n">add_edge</span><span class="p">(</span><span class="n">parent_node</span><span class="p">,</span> <span class="n">child_node</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">graph</span></div>
+
+
+
+<div class="viewcode-block" id="get_graph_elements">
+<a class="viewcode-back" href="../../../api/jobflow_remote.jobs.graph.html#jobflow_remote.jobs.graph.get_graph_elements">[docs]</a>
+<span class="k">def</span> <span class="nf">get_graph_elements</span><span class="p">(</span><span class="n">flow</span><span class="p">:</span> <span class="n">FlowInfo</span><span class="p">):</span>
+    <span class="n">ids_mapping</span> <span class="o">=</span> <span class="n">flow</span><span class="o">.</span><span class="n">ids_mapping</span>
+
+    <span class="n">nodes</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">job_prop</span> <span class="ow">in</span> <span class="n">flow</span><span class="o">.</span><span class="n">iter_job_prop</span><span class="p">():</span>
+        <span class="n">db_id</span> <span class="o">=</span> <span class="n">job_prop</span><span class="p">[</span><span class="s2">&quot;db_id&quot;</span><span class="p">]</span>
+        <span class="n">nodes</span><span class="p">[</span><span class="n">db_id</span><span class="p">]</span> <span class="o">=</span> <span class="n">job_prop</span>
+
+    <span class="c1"># edges based on parents</span>
+    <span class="n">edges</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">child_node</span><span class="p">,</span> <span class="n">parents</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">flow</span><span class="o">.</span><span class="n">db_ids</span><span class="p">,</span> <span class="n">flow</span><span class="o">.</span><span class="n">parents</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">parent_uuid</span> <span class="ow">in</span> <span class="n">parents</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">parent_node</span> <span class="ow">in</span> <span class="n">ids_mapping</span><span class="p">[</span><span class="n">parent_uuid</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+                <span class="n">edges</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">parent_node</span><span class="p">,</span> <span class="n">child_node</span><span class="p">))</span>
+
+    <span class="c1"># group of nodes based on hosts</span>
+    <span class="c1"># from collections import defaultdict</span>
+    <span class="c1"># groups = defaultdict(list)</span>
+    <span class="n">hosts</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="c1"># for job_prop in flow.iter_job_prop():</span>
+    <span class="c1">#     for host in job_prop[&quot;hosts&quot;]:</span>
+    <span class="c1">#         groups[host].append(job_prop[&quot;db_id&quot;])</span>
+    <span class="k">for</span> <span class="n">job_prop</span> <span class="ow">in</span> <span class="n">flow</span><span class="o">.</span><span class="n">iter_job_prop</span><span class="p">():</span>
+        <span class="n">hosts</span><span class="p">[</span><span class="n">job_prop</span><span class="p">[</span><span class="s2">&quot;db_id&quot;</span><span class="p">]]</span> <span class="o">=</span> <span class="n">job_prop</span><span class="p">[</span><span class="s2">&quot;hosts&quot;</span><span class="p">]</span>
+
+    <span class="k">return</span> <span class="n">nodes</span><span class="p">,</span> <span class="n">edges</span><span class="p">,</span> <span class="n">hosts</span></div>
+
+
+
+<div class="viewcode-block" id="plot_dash">
+<a class="viewcode-back" href="../../../api/jobflow_remote.jobs.graph.html#jobflow_remote.jobs.graph.plot_dash">[docs]</a>
+<span class="k">def</span> <span class="nf">plot_dash</span><span class="p">(</span><span class="n">flow</span><span class="p">:</span> <span class="n">FlowInfo</span><span class="p">):</span>
+    <span class="n">nodes</span><span class="p">,</span> <span class="n">edges</span><span class="p">,</span> <span class="n">hosts</span> <span class="o">=</span> <span class="n">get_graph_elements</span><span class="p">(</span><span class="n">flow</span><span class="p">)</span>
+
+    <span class="kn">import</span> <span class="nn">dash_cytoscape</span> <span class="k">as</span> <span class="nn">cyto</span>
+    <span class="kn">from</span> <span class="nn">dash</span> <span class="kn">import</span> <span class="n">Dash</span><span class="p">,</span> <span class="n">Input</span><span class="p">,</span> <span class="n">Output</span><span class="p">,</span> <span class="n">callback</span><span class="p">,</span> <span class="n">html</span>
+
+    <span class="n">app</span> <span class="o">=</span> <span class="n">Dash</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">flow</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2"> - </span><span class="si">{</span><span class="n">flow</span><span class="o">.</span><span class="n">flow_id</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="n">elements</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="c1"># parent elements</span>
+    <span class="n">hosts_hierarchy</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="n">jobs_inner_hosts</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="n">hosts_set</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+    <span class="k">for</span> <span class="n">db_id</span><span class="p">,</span> <span class="n">job_hosts</span> <span class="ow">in</span> <span class="n">hosts</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="n">job_hosts</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">reversed</span><span class="p">(</span><span class="n">job_hosts</span><span class="p">))</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">job_hosts</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">2</span><span class="p">:</span>
+            <span class="k">continue</span>
+        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">host</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">job_hosts</span><span class="p">[</span><span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="mi">1</span><span class="p">):</span>
+            <span class="n">hosts_hierarchy</span><span class="p">[</span><span class="n">job_hosts</span><span class="p">[</span><span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">]]</span> <span class="o">=</span> <span class="n">host</span>
+
+        <span class="n">hosts_set</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">job_hosts</span><span class="p">[</span><span class="mi">1</span><span class="p">:])</span>
+        <span class="n">jobs_inner_hosts</span><span class="p">[</span><span class="n">db_id</span><span class="p">]</span> <span class="o">=</span> <span class="n">job_hosts</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+
+    <span class="k">for</span> <span class="n">host</span> <span class="ow">in</span> <span class="n">hosts_set</span><span class="p">:</span>
+        <span class="n">elements</span><span class="o">.</span><span class="n">append</span><span class="p">({</span><span class="s2">&quot;data&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="n">host</span><span class="p">,</span> <span class="s2">&quot;parent&quot;</span><span class="p">:</span> <span class="n">hosts_hierarchy</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">host</span><span class="p">)}})</span>
+
+    <span class="k">for</span> <span class="n">db_id</span><span class="p">,</span> <span class="n">node_info</span> <span class="ow">in</span> <span class="n">nodes</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="n">node_info</span><span class="p">[</span><span class="s2">&quot;id&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">db_id</span><span class="p">)</span>
+        <span class="n">node_info</span><span class="p">[</span><span class="s2">&quot;label&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">node_info</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">]</span>
+        <span class="n">node_info</span><span class="p">[</span><span class="s2">&quot;parent&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">jobs_inner_hosts</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">db_id</span><span class="p">)</span>
+        <span class="n">elements</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+            <span class="p">{</span>
+                <span class="s2">&quot;data&quot;</span><span class="p">:</span> <span class="n">node_info</span><span class="p">,</span>
+            <span class="p">}</span>
+        <span class="p">)</span>
+
+    <span class="k">for</span> <span class="n">edge</span> <span class="ow">in</span> <span class="n">edges</span><span class="p">:</span>
+        <span class="n">elements</span><span class="o">.</span><span class="n">append</span><span class="p">({</span><span class="s2">&quot;data&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;source&quot;</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">edge</span><span class="p">[</span><span class="mi">0</span><span class="p">]),</span> <span class="s2">&quot;target&quot;</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">edge</span><span class="p">[</span><span class="mi">1</span><span class="p">])}})</span>
+
+    <span class="n">stylesheet</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="p">{</span>
+            <span class="s2">&quot;selector&quot;</span><span class="p">:</span> <span class="sa">f</span><span class="s1">&#39;[state = &quot;</span><span class="si">{</span><span class="n">state</span><span class="si">}</span><span class="s1">&quot;]&#39;</span><span class="p">,</span>
+            <span class="s2">&quot;style&quot;</span><span class="p">:</span> <span class="p">{</span>
+                <span class="s2">&quot;background-color&quot;</span><span class="p">:</span> <span class="n">color</span><span class="p">,</span>
+            <span class="p">},</span>
+        <span class="p">}</span>
+        <span class="k">for</span> <span class="n">state</span><span class="p">,</span> <span class="n">color</span> <span class="ow">in</span> <span class="n">COLOR_MAPPING</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+    <span class="p">]</span>
+    <span class="n">stylesheet</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+        <span class="p">{</span>
+            <span class="s2">&quot;selector&quot;</span><span class="p">:</span> <span class="s2">&quot;node&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;style&quot;</span><span class="p">:</span> <span class="p">{</span>
+                <span class="s2">&quot;label&quot;</span><span class="p">:</span> <span class="s2">&quot;data(name)&quot;</span><span class="p">,</span>
+            <span class="p">},</span>
+        <span class="p">}</span>
+    <span class="p">)</span>
+    <span class="n">stylesheet</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+        <span class="p">{</span>
+            <span class="s2">&quot;selector&quot;</span><span class="p">:</span> <span class="s2">&quot;node:parent&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;style&quot;</span><span class="p">:</span> <span class="p">{</span>
+                <span class="s2">&quot;background-opacity&quot;</span><span class="p">:</span> <span class="mf">0.2</span><span class="p">,</span>
+                <span class="s2">&quot;background-color&quot;</span><span class="p">:</span> <span class="s2">&quot;#2B65EC&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;border-color&quot;</span><span class="p">:</span> <span class="s2">&quot;#2B65EC&quot;</span><span class="p">,</span>
+            <span class="p">},</span>
+        <span class="p">}</span>
+    <span class="p">)</span>
+
+    <span class="n">app</span><span class="o">.</span><span class="n">layout</span> <span class="o">=</span> <span class="n">html</span><span class="o">.</span><span class="n">Div</span><span class="p">(</span>
+        <span class="p">[</span>
+            <span class="n">cyto</span><span class="o">.</span><span class="n">Cytoscape</span><span class="p">(</span>
+                <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;flow-graph&quot;</span><span class="p">,</span>
+                <span class="n">layout</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;breadthfirst&quot;</span><span class="p">,</span> <span class="s2">&quot;directed&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">},</span>
+                <span class="c1"># layout={&#39;name&#39;: &#39;cose&#39;},</span>
+                <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;width&quot;</span><span class="p">:</span> <span class="s2">&quot;100%&quot;</span><span class="p">,</span> <span class="s2">&quot;height&quot;</span><span class="p">:</span> <span class="s2">&quot;500px&quot;</span><span class="p">},</span>
+                <span class="n">elements</span><span class="o">=</span><span class="n">elements</span><span class="p">,</span>
+                <span class="n">stylesheet</span><span class="o">=</span><span class="n">stylesheet</span><span class="p">,</span>
+            <span class="p">),</span>
+            <span class="n">html</span><span class="o">.</span><span class="n">P</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;job-info-output&quot;</span><span class="p">),</span>
+        <span class="p">]</span>
+    <span class="p">)</span>
+
+    <span class="nd">@callback</span><span class="p">(</span>
+        <span class="n">Output</span><span class="p">(</span><span class="s2">&quot;job-info-output&quot;</span><span class="p">,</span> <span class="s2">&quot;children&quot;</span><span class="p">),</span> <span class="n">Input</span><span class="p">(</span><span class="s2">&quot;flow-graph&quot;</span><span class="p">,</span> <span class="s2">&quot;mouseoverNodeData&quot;</span><span class="p">)</span>
+    <span class="p">)</span>
+    <span class="k">def</span> <span class="nf">displayTapNodeData</span><span class="p">(</span><span class="n">data</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">data</span><span class="p">:</span>
+            <span class="k">return</span> <span class="nb">str</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+
+    <span class="n">app</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">debug</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="get_mermaid">
+<a class="viewcode-back" href="../../../api/jobflow_remote.jobs.graph.html#jobflow_remote.jobs.graph.get_mermaid">[docs]</a>
+<span class="k">def</span> <span class="nf">get_mermaid</span><span class="p">(</span><span class="n">flow</span><span class="p">:</span> <span class="n">FlowInfo</span><span class="p">,</span> <span class="n">show_subflows</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">):</span>
+    <span class="n">nodes</span><span class="p">,</span> <span class="n">edges</span><span class="p">,</span> <span class="n">hosts</span> <span class="o">=</span> <span class="n">get_graph_elements</span><span class="p">(</span><span class="n">flow</span><span class="p">)</span>
+    <span class="kn">from</span> <span class="nn">monty.collections</span> <span class="kn">import</span> <span class="n">tree</span>
+
+    <span class="n">hosts_hierarchy</span> <span class="o">=</span> <span class="n">tree</span><span class="p">()</span>
+    <span class="k">for</span> <span class="n">db_id</span><span class="p">,</span> <span class="n">job_hosts</span> <span class="ow">in</span> <span class="n">hosts</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="n">d</span> <span class="o">=</span> <span class="n">hosts_hierarchy</span>
+        <span class="k">for</span> <span class="n">host</span> <span class="ow">in</span> <span class="nb">reversed</span><span class="p">(</span><span class="n">job_hosts</span><span class="p">):</span>
+            <span class="n">d</span> <span class="o">=</span> <span class="n">d</span><span class="p">[</span><span class="n">host</span><span class="p">]</span>
+        <span class="n">d</span><span class="p">[</span><span class="n">db_id</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="n">lines</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;flowchart TD&quot;</span><span class="p">]</span>
+
+    <span class="c1"># add style classes</span>
+    <span class="k">for</span> <span class="n">state</span><span class="p">,</span> <span class="n">color</span> <span class="ow">in</span> <span class="n">COLOR_MAPPING</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="c1"># this could be optimised by compressing in one line and using a</span>
+        <span class="c1"># same class for states with the same color</span>
+        <span class="n">lines</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;    classDef </span><span class="si">{</span><span class="n">state</span><span class="si">}</span><span class="s2"> fill:</span><span class="si">{</span><span class="n">color</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="c1"># add edges</span>
+    <span class="k">for</span> <span class="n">parent_db_id</span><span class="p">,</span> <span class="n">child_db_id</span> <span class="ow">in</span> <span class="n">edges</span><span class="p">:</span>
+        <span class="n">parent</span> <span class="o">=</span> <span class="n">nodes</span><span class="p">[</span><span class="n">parent_db_id</span><span class="p">]</span>
+        <span class="n">child</span> <span class="o">=</span> <span class="n">nodes</span><span class="p">[</span><span class="n">child_db_id</span><span class="p">]</span>
+        <span class="n">line</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;    </span><span class="si">{</span><span class="n">parent_db_id</span><span class="si">}</span><span class="s2">(</span><span class="si">{</span><span class="n">parent</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">) --&gt; </span><span class="si">{</span><span class="n">child_db_id</span><span class="si">}</span><span class="s2">(</span><span class="si">{</span><span class="n">child</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">)&quot;</span>
+        <span class="p">)</span>
+        <span class="n">lines</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">line</span><span class="p">)</span>
+
+    <span class="n">subgraph_styles</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="c1"># add subgraphs</span>
+    <span class="k">def</span> <span class="nf">add_subgraph</span><span class="p">(</span><span class="n">nested_hosts_hierarchy</span><span class="p">,</span> <span class="n">indent_level</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">show_subflows</span><span class="p">:</span>
+            <span class="n">prefix</span> <span class="o">=</span> <span class="s2">&quot;    &quot;</span> <span class="o">*</span> <span class="n">indent_level</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">prefix</span> <span class="o">=</span> <span class="s2">&quot;    &quot;</span>
+
+        <span class="k">for</span> <span class="n">ref_id</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">nested_hosts_hierarchy</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">x</span><span class="p">)):</span>
+            <span class="n">subhosts</span> <span class="o">=</span> <span class="n">nested_hosts_hierarchy</span><span class="p">[</span><span class="n">ref_id</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">subhosts</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">indent_level</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="ow">and</span> <span class="n">show_subflows</span><span class="p">:</span>
+                    <span class="c1"># don&#39;t  put any title</span>
+                    <span class="n">lines</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">prefix</span><span class="si">}</span><span class="s2">subgraph </span><span class="si">{</span><span class="n">ref_id</span><span class="si">}</span><span class="s2">[&#39;&#39;]&quot;</span><span class="p">)</span>
+                    <span class="n">subgraph_styles</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                        <span class="sa">f</span><span class="s2">&quot;    style </span><span class="si">{</span><span class="n">ref_id</span><span class="si">}</span><span class="s2"> fill:#2B65EC,opacity:0.2&quot;</span>
+                    <span class="p">)</span>
+
+                <span class="n">add_subgraph</span><span class="p">(</span><span class="n">subhosts</span><span class="p">,</span> <span class="n">indent_level</span><span class="o">=</span><span class="n">indent_level</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
+
+                <span class="k">if</span> <span class="n">indent_level</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="ow">and</span> <span class="n">show_subflows</span><span class="p">:</span>
+                    <span class="n">lines</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">prefix</span><span class="si">}</span><span class="s2">end&quot;</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">job</span> <span class="o">=</span> <span class="n">nodes</span><span class="p">[</span><span class="n">ref_id</span><span class="p">]</span>
+                <span class="n">lines</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">prefix</span><span class="si">}{</span><span class="n">ref_id</span><span class="si">}</span><span class="s2">:::</span><span class="si">{</span><span class="n">job</span><span class="p">[</span><span class="s1">&#39;state&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">value</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="n">add_subgraph</span><span class="p">(</span><span class="n">hosts_hierarchy</span><span class="p">)</span>
+    <span class="n">lines</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">subgraph_styles</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">lines</span><span class="p">)</span></div>
+
+
+
+<span class="n">BLUE_COLOR</span> <span class="o">=</span> <span class="s2">&quot;#5E6BFF&quot;</span>
+<span class="n">RED_COLOR</span> <span class="o">=</span> <span class="s2">&quot;#fC3737&quot;</span>
+<span class="n">COLOR_MAPPING</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="n">JobState</span><span class="o">.</span><span class="n">WAITING</span><span class="o">.</span><span class="n">value</span><span class="p">:</span> <span class="s2">&quot;#aaaaaa&quot;</span><span class="p">,</span>
+    <span class="n">JobState</span><span class="o">.</span><span class="n">READY</span><span class="o">.</span><span class="n">value</span><span class="p">:</span> <span class="s2">&quot;#DAF7A6&quot;</span><span class="p">,</span>
+    <span class="n">JobState</span><span class="o">.</span><span class="n">CHECKED_OUT</span><span class="o">.</span><span class="n">value</span><span class="p">:</span> <span class="n">BLUE_COLOR</span><span class="p">,</span>
+    <span class="n">JobState</span><span class="o">.</span><span class="n">UPLOADED</span><span class="o">.</span><span class="n">value</span><span class="p">:</span> <span class="n">BLUE_COLOR</span><span class="p">,</span>
+    <span class="n">JobState</span><span class="o">.</span><span class="n">SUBMITTED</span><span class="o">.</span><span class="n">value</span><span class="p">:</span> <span class="n">BLUE_COLOR</span><span class="p">,</span>
+    <span class="n">JobState</span><span class="o">.</span><span class="n">RUNNING</span><span class="o">.</span><span class="n">value</span><span class="p">:</span> <span class="n">BLUE_COLOR</span><span class="p">,</span>
+    <span class="n">JobState</span><span class="o">.</span><span class="n">TERMINATED</span><span class="o">.</span><span class="n">value</span><span class="p">:</span> <span class="n">BLUE_COLOR</span><span class="p">,</span>
+    <span class="n">JobState</span><span class="o">.</span><span class="n">DOWNLOADED</span><span class="o">.</span><span class="n">value</span><span class="p">:</span> <span class="n">BLUE_COLOR</span><span class="p">,</span>
+    <span class="n">JobState</span><span class="o">.</span><span class="n">REMOTE_ERROR</span><span class="o">.</span><span class="n">value</span><span class="p">:</span> <span class="n">RED_COLOR</span><span class="p">,</span>
+    <span class="n">JobState</span><span class="o">.</span><span class="n">COMPLETED</span><span class="o">.</span><span class="n">value</span><span class="p">:</span> <span class="s2">&quot;#47bf00&quot;</span><span class="p">,</span>
+    <span class="n">JobState</span><span class="o">.</span><span class="n">FAILED</span><span class="o">.</span><span class="n">value</span><span class="p">:</span> <span class="n">RED_COLOR</span><span class="p">,</span>
+    <span class="n">JobState</span><span class="o">.</span><span class="n">PAUSED</span><span class="o">.</span><span class="n">value</span><span class="p">:</span> <span class="s2">&quot;#EAE200&quot;</span><span class="p">,</span>
+    <span class="n">JobState</span><span class="o">.</span><span class="n">STOPPED</span><span class="o">.</span><span class="n">value</span><span class="p">:</span> <span class="n">RED_COLOR</span><span class="p">,</span>
+    <span class="n">JobState</span><span class="o">.</span><span class="n">USER_STOPPED</span><span class="o">.</span><span class="n">value</span><span class="p">:</span> <span class="n">RED_COLOR</span><span class="p">,</span>
+    <span class="n">JobState</span><span class="o">.</span><span class="n">BATCH_SUBMITTED</span><span class="o">.</span><span class="n">value</span><span class="p">:</span> <span class="n">BLUE_COLOR</span><span class="p">,</span>
+    <span class="n">JobState</span><span class="o">.</span><span class="n">BATCH_RUNNING</span><span class="o">.</span><span class="n">value</span><span class="p">:</span> <span class="n">BLUE_COLOR</span><span class="p">,</span>
+<span class="p">}</span>
+</pre></div>
+
+                </article>
+
+
+
+
+
+                <footer class="prev-next-footer">
+
+<div class="prev-next-area">
+</div>
+                </footer>
+
+            </div>
+
+
+
+
+          </div>
+          <footer class="bd-footer-content">
+
+          </footer>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="../../../_static/scripts/bootstrap.js?digest=5b4479735964841361fd"></script>
+<script src="../../../_static/scripts/pydata-sphinx-theme.js?digest=5b4479735964841361fd"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+
+    <div class="footer-items__start">
+
+        <div class="footer-item">
+
+  <p class="copyright">
+
+      © Copyright 2023, Matgenix SRL.
+      <br/>
+
+  </p>
+</div>
+
+        <div class="footer-item">
+
+  <p class="sphinx-version">
+    Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 7.2.6.
+    <br/>
+  </p>
+</div>
+
+    </div>
+
+
+
+    <div class="footer-items__end">
+
+        <div class="footer-item">
+<p class="theme-version">
+  Built with the <a href="https://pydata-sphinx-theme.readthedocs.io/en/stable/index.html">PyData Sphinx Theme</a> 0.14.4.
+</p></div>
+
+    </div>
+
+</div>
+
+  </footer>
+  </body>
+</html>

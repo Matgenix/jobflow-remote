@@ -1,0 +1,663 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../" data-theme="light">
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>jobflow_remote.utils.db module &#8212; Jobflow Remote v0.0.1.post117+gfc0fbc0.d20231222 Manual</title>
+
+
+
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "light";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "light";
+  </script>
+
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../_static/styles/theme.css?digest=5b4479735964841361fd" rel="stylesheet" />
+<link href="../_static/styles/bootstrap.css?digest=5b4479735964841361fd" rel="stylesheet" />
+<link href="../_static/styles/pydata-sphinx-theme.css?digest=5b4479735964841361fd" rel="stylesheet" />
+
+
+  <link href="../_static/vendor/fontawesome/6.1.2/css/all.min.css?digest=5b4479735964841361fd" rel="stylesheet" />
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.1.2/webfonts/fa-solid-900.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.1.2/webfonts/fa-brands-400.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.1.2/webfonts/fa-regular-400.woff2" />
+
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=fa44fd50" />
+    <link rel="stylesheet" type="text/css" href="../_static/graphviz.css?v=eafc0fe6" />
+    <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../_static/autodoc_pydantic.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/design-style.1e8bd061cd6da7fc9cf755528e8ffc24.min.css?v=0a3b3ea7" />
+    <link rel="stylesheet" type="text/css" href="../_static/jobflow_remote.css?v=7b6df8f0" />
+
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=5b4479735964841361fd" />
+<link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=5b4479735964841361fd" />
+  <script src="../_static/vendor/fontawesome/6.1.2/js/all.min.js?digest=5b4479735964841361fd"></script>
+
+    <script src="../_static/documentation_options.js?v=e135783d"></script>
+    <script src="../_static/doctools.js?v=888ff710"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../_static/copybutton.js?v=f281be69"></script>
+    <script src="../_static/design-tabs.js?v=36754332"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'api/jobflow_remote.utils.db';</script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="jobflow_remote.utils.examples module" href="jobflow_remote.utils.examples.html" />
+    <link rel="prev" title="jobflow_remote.utils.data module" href="jobflow_remote.utils.data.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+    <meta name="docbuild:last-update" content="Dec 22, 2023"/>
+  </head>
+
+
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="light">
+
+
+
+  <a class="skip-link" href="#main-content">Skip to main content</a>
+
+  <div id="pst-scroll-pixel-helper"></div>
+
+
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>
+    Back to top
+  </button>
+
+
+  <input type="checkbox"
+          class="sidebar-toggle"
+          name="__primary"
+          id="__primary"/>
+  <label class="overlay overlay-primary" for="__primary"></label>
+
+  <input type="checkbox"
+          class="sidebar-toggle"
+          name="__secondary"
+          id="__secondary"/>
+  <label class="overlay overlay-secondary" for="__secondary"></label>
+
+  <div class="search-button__wrapper">
+    <div class="search-button__overlay"></div>
+    <div class="search-button__search-container">
+<form class="bd-search d-flex align-items-center"
+      action="../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         id="search-input"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form></div>
+  </div>
+
+
+  <div class="bd-header-announcement container-fluid bd-header-announcement">
+    <div class="bd-header-announcement__content"><p>Jobflow Remote is still in beta phase. The API may change at any time.</p></div>
+  </div>
+
+
+    <nav class="bd-header navbar navbar-expand-lg bd-navbar">
+<div class="bd-header__inner bd-page-width">
+  <label class="sidebar-toggle primary-toggle" for="__primary">
+    <span class="fa-solid fa-bars"></span>
+  </label>
+
+
+  <div class="col-lg-3 navbar-header-items__start">
+
+      <div class="navbar-item">
+
+
+
+<a class="navbar-brand logo" href="../index.html">
+
+
+
+
+
+
+    <p class="title logo__title">Jobflow Remote v0.0.1.post117+gfc0fbc0.d20231222 Manual</p>
+
+</a></div>
+
+  </div>
+
+  <div class="col-lg-9 navbar-header-items">
+
+    <div class="me-auto navbar-header-items__center">
+
+        <div class="navbar-item">
+<nav class="navbar-nav">
+  <p class="sidebar-header-items__title"
+     role="heading"
+     aria-level="1"
+     aria-label="Site Navigation">
+    Site Navigation
+  </p>
+  <ul class="bd-navbar-elements navbar-nav">
+
+                    <li class="nav-item">
+                      <a class="nav-link nav-internal" href="../user/index.html">
+                        User Guide
+                      </a>
+                    </li>
+
+
+                    <li class="nav-item">
+                      <a class="nav-link nav-internal" href="index.html">
+                        API reference
+                      </a>
+                    </li>
+
+
+                    <li class="nav-item">
+                      <a class="nav-link nav-internal" href="../dev/index.html">
+                        Development
+                      </a>
+                    </li>
+
+  </ul>
+</nav></div>
+
+    </div>
+
+
+    <div class="navbar-header-items__end">
+
+        <div class="navbar-item navbar-persistent--container">
+
+
+ <script>
+ document.write(`
+   <button class="btn navbar-btn search-button-field search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass"></i>
+    <span class="search-button__default-text">Search</span>
+    <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+   </button>
+ `);
+ </script>
+        </div>
+
+
+        <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm navbar-btn theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="theme-switch nav-link" data-mode="light"><i class="fa-solid fa-sun fa-lg"></i></span>
+    <span class="theme-switch nav-link" data-mode="dark"><i class="fa-solid fa-moon fa-lg"></i></span>
+    <span class="theme-switch nav-link" data-mode="auto"><i class="fa-solid fa-circle-half-stroke fa-lg"></i></span>
+  </button>
+`);
+</script></div>
+
+    </div>
+
+  </div>
+
+
+    <div class="navbar-persistent--mobile">
+
+ <script>
+ document.write(`
+   <button class="btn navbar-btn search-button-field search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass"></i>
+    <span class="search-button__default-text">Search</span>
+    <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+   </button>
+ `);
+ </script>
+    </div>
+
+
+
+    <label class="sidebar-toggle secondary-toggle" for="__secondary" tabindex="0">
+      <span class="fa-solid fa-outdent"></span>
+    </label>
+
+</div>
+
+    </nav>
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+
+      <div class="bd-sidebar-primary bd-sidebar">
+
+
+
+  <div class="sidebar-header-items sidebar-primary__section">
+
+
+      <div class="sidebar-header-items__center">
+
+          <div class="navbar-item">
+<nav class="navbar-nav">
+  <p class="sidebar-header-items__title"
+     role="heading"
+     aria-level="1"
+     aria-label="Site Navigation">
+    Site Navigation
+  </p>
+  <ul class="bd-navbar-elements navbar-nav">
+
+                    <li class="nav-item">
+                      <a class="nav-link nav-internal" href="../user/index.html">
+                        User Guide
+                      </a>
+                    </li>
+
+
+                    <li class="nav-item">
+                      <a class="nav-link nav-internal" href="index.html">
+                        API reference
+                      </a>
+                    </li>
+
+
+                    <li class="nav-item">
+                      <a class="nav-link nav-internal" href="../dev/index.html">
+                        Development
+                      </a>
+                    </li>
+
+  </ul>
+</nav></div>
+
+      </div>
+
+
+
+      <div class="sidebar-header-items__end">
+
+          <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm navbar-btn theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="theme-switch nav-link" data-mode="light"><i class="fa-solid fa-sun fa-lg"></i></span>
+    <span class="theme-switch nav-link" data-mode="dark"><i class="fa-solid fa-moon fa-lg"></i></span>
+    <span class="theme-switch nav-link" data-mode="auto"><i class="fa-solid fa-circle-half-stroke fa-lg"></i></span>
+  </button>
+`);
+</script></div>
+
+      </div>
+
+  </div>
+
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+<nav class="bd-docs-nav bd-links"
+     aria-label="Section Navigation">
+  <p class="bd-links__title" role="heading" aria-level="1">Section Navigation</p>
+  <div class="bd-toc-item navbar-nav"><ul class="current nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="jobflow_remote.cli.html">jobflow_remote.cli package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="jobflow_remote.config.html">jobflow_remote.config package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="jobflow_remote.jobs.html">jobflow_remote.jobs package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="jobflow_remote.remote.html">jobflow_remote.remote package</a></li>
+<li class="toctree-l1 current active has-children"><a class="reference internal" href="jobflow_remote.utils.html">jobflow_remote.utils package</a><input checked="" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-1"><i class="fa-solid fa-chevron-down"></i></label><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="jobflow_remote.utils.data.html">jobflow_remote.utils.data module</a></li>
+<li class="toctree-l2 current active"><a class="current reference internal" href="#">jobflow_remote.utils.db module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="jobflow_remote.utils.examples.html">jobflow_remote.utils.examples module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="jobflow_remote.utils.log.html">jobflow_remote.utils.log module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="jobflow_remote.utils.schedule.html">jobflow_remote.utils.schedule module</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</nav></div>
+    </div>
+
+
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+
+  <div id="rtd-footer-container"></div>
+
+
+      </div>
+
+      <main id="main-content" class="bd-main">
+
+
+          <div class="bd-content">
+            <div class="bd-article-container">
+
+              <div class="bd-header-article">
+<div class="header-article-items header-article__inner">
+
+    <div class="header-article-items__start">
+
+        <div class="header-article-item">
+
+
+
+<nav aria-label="Breadcrumb">
+  <ul class="bd-breadcrumbs">
+
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+
+    <li class="breadcrumb-item"><a href="index.html" class="nav-link">API Reference</a></li>
+
+
+    <li class="breadcrumb-item"><a href="jobflow_remote.utils.html" class="nav-link">jobflow_remote.utils package</a></li>
+
+    <li class="breadcrumb-item active" aria-current="page">jobflow_remo...</li>
+  </ul>
+</nav>
+</div>
+
+    </div>
+
+
+</div>
+</div>
+
+
+
+
+<div id="searchbox"></div>
+                <article class="bd-article" role="main">
+
+  <section id="module-jobflow_remote.utils.db">
+<span id="jobflow-remote-utils-db-module"></span><h1>jobflow_remote.utils.db module<a class="headerlink" href="#module-jobflow_remote.utils.db" title="Link to this heading">#</a></h1>
+<dl class="py exception">
+<dt class="sig sig-object py" id="jobflow_remote.utils.db.FlowLockedError">
+<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">jobflow_remote.utils.db.</span></span><span class="sig-name descname"><span class="pre">FlowLockedError</span></span><a class="reference internal" href="../_modules/jobflow_remote/utils/db.html#FlowLockedError"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#jobflow_remote.utils.db.FlowLockedError" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#jobflow_remote.utils.db.LockedDocumentError" title="jobflow_remote.utils.db.LockedDocumentError"><code class="xref py py-class docutils literal notranslate"><span class="pre">LockedDocumentError</span></code></a></p>
+<p>Exception to signal a problem when locking a Flow document.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="jobflow_remote.utils.db.FlowLockedError.from_flow_doc">
+<em class="property"><span class="pre">classmethod</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">from_flow_doc</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">doc</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.12)"><span class="pre">dict</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">additional_msg</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.12)"><span class="pre">str</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.12)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/jobflow_remote/utils/db.html#FlowLockedError.from_flow_doc"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#jobflow_remote.utils.db.FlowLockedError.from_flow_doc" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py exception">
+<dt class="sig sig-object py" id="jobflow_remote.utils.db.JobLockedError">
+<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">jobflow_remote.utils.db.</span></span><span class="sig-name descname"><span class="pre">JobLockedError</span></span><a class="reference internal" href="../_modules/jobflow_remote/utils/db.html#JobLockedError"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#jobflow_remote.utils.db.JobLockedError" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#jobflow_remote.utils.db.LockedDocumentError" title="jobflow_remote.utils.db.LockedDocumentError"><code class="xref py py-class docutils literal notranslate"><span class="pre">LockedDocumentError</span></code></a></p>
+<p>Exception to signal a problem when locking a Job document.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="jobflow_remote.utils.db.JobLockedError.from_job_doc">
+<em class="property"><span class="pre">classmethod</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">from_job_doc</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">doc</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.12)"><span class="pre">dict</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">additional_msg</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.12)"><span class="pre">str</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.12)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/jobflow_remote/utils/db.html#JobLockedError.from_job_doc"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#jobflow_remote.utils.db.JobLockedError.from_job_doc" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py exception">
+<dt class="sig sig-object py" id="jobflow_remote.utils.db.LockedDocumentError">
+<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">jobflow_remote.utils.db.</span></span><span class="sig-name descname"><span class="pre">LockedDocumentError</span></span><a class="reference internal" href="../_modules/jobflow_remote/utils/db.html#LockedDocumentError"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#jobflow_remote.utils.db.LockedDocumentError" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/exceptions.html#Exception" title="(in Python v3.12)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Exception</span></code></a></p>
+<p>Exception to signal a problem when locking the document.</p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="jobflow_remote.utils.db.MongoLock">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">jobflow_remote.utils.db.</span></span><span class="sig-name descname"><span class="pre">MongoLock</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">collection</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Collection</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">filter</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Mapping</span><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.12)"><span class="pre">str</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">update</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Mapping</span><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.12)"><span class="pre">str</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.12)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">break_lock</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.12)"><span class="pre">bool</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lock_id</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.12)"><span class="pre">str</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.12)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sleep</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.12)"><span class="pre">int</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.12)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_wait</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.12)"><span class="pre">int</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">600</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">projection</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Mapping</span><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.12)"><span class="pre">str</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Iterable</span><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.12)"><span class="pre">str</span></a><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.12)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">get_locked_doc</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.12)"><span class="pre">bool</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/jobflow_remote/utils/db.html#MongoLock"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#jobflow_remote.utils.db.MongoLock" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.12)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
+<p>Context manager to lock a document in a MongoDB database.</p>
+<dl class="simple">
+<dt>Main characteristics and functionalities:</dt><dd><ul class="simple">
+<li><p>Lock is acquired by setting a lock_id and lock_time value in the
+locked document.</p></li>
+<li><p>Filter the document to select based on a query and sorting.
+It uses find_one_and_update, thus resulting in a single document locked.</p></li>
+<li><p>Can wait for a lock to be released.</p></li>
+<li><p>Can forcibly break an existing lock</p></li>
+<li><p>Can return the locked document even if the lock could not be acquired
+(useful for determining if a document is locked or no document matches
+the query)</p></li>
+<li><p>Accepts all the arguments that can be passed to find_one_and_update</p></li>
+<li><p>A custom update can be performed on the document when acquiring the lock.</p></li>
+<li><p>Allows to pass properties that will be set in the document at the moment
+of releasing the lock.</p></li>
+<li><p>Lock id value can be customized. If not a randomly generated uuid is used.</p></li>
+</ul>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<p>Trying to acquire the lock on a document based on the state
+&gt;&gt;&gt; with MongoLock(collection, {“state”: “READY”}) as lock:
+…     print(lock.locked_document[“state”])
+READY</p>
+<p>If lock cannot be acquired (no document matching filter or that
+document is locked) the <cite>lock.locked_document</cite> is None.</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="k">with</span> <span class="n">MongoLock</span><span class="p">(</span><span class="n">collection</span><span class="p">,</span> <span class="p">{</span><span class="s2">&quot;state&quot;</span><span class="p">:</span> <span class="s2">&quot;READY&quot;</span><span class="p">})</span> <span class="k">as</span> <span class="n">lock</span><span class="p">:</span>
+<span class="gp">... </span>    <span class="nb">print</span><span class="p">(</span><span class="n">lock</span><span class="o">.</span><span class="n">locked_document</span><span class="p">)</span>
+<span class="go">None</span>
+</pre></div>
+</div>
+<p>Wait for 60 seconds in case the required document is already locked.
+Check the status every 10 seconds. If lock cannot be acquired
+locked_document is None</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="k">with</span> <span class="n">MongoLock</span><span class="p">(</span>
+<span class="go">        collection,</span>
+<span class="go">        {&quot;uuid&quot;: &quot;5b84228b-d019-47fe-b0a0-564b36aa85ed&quot;},</span>
+<span class="go">        sleep=10,</span>
+<span class="go">        max_wait=60,</span>
+<span class="go">    ) as lock:</span>
+<span class="go">...     print(lock.locked_document)</span>
+<span class="go">None</span>
+</pre></div>
+</div>
+<p>In case lock cannot be acquired expose the locked document</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="k">with</span> <span class="n">MongoLock</span><span class="p">(</span>
+<span class="go">        collection,</span>
+<span class="go">        {&quot;uuid&quot;: &quot;5b84228b-d019-47fe-b0a0-564b36aa85ed&quot;},</span>
+<span class="go">        get_locked_doc=True,</span>
+<span class="go">    ) as lock:</span>
+<span class="go">...     print(lock.locked_document)</span>
+<span class="go">None</span>
+<span class="go">...     print(lock.unavailable_document[&#39;lock_id&#39;])</span>
+<span class="go">8d68404f-c77a-461b-859c-40bb0af1979f</span>
+</pre></div>
+</div>
+<p>Set values in the document upon lock release</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="k">with</span> <span class="n">MongoLock</span><span class="p">(</span><span class="n">collection</span><span class="p">,</span> <span class="p">{</span><span class="s2">&quot;state&quot;</span><span class="p">:</span> <span class="s2">&quot;READY&quot;</span><span class="p">})</span> <span class="k">as</span> <span class="n">lock</span><span class="p">:</span>
+<span class="gp">... </span>    <span class="k">if</span> <span class="n">lock</span><span class="o">.</span><span class="n">locked_document</span><span class="p">:</span>
+<span class="gp">... </span>        <span class="c1"># Perform some operations based on the job...</span>
+<span class="gp">... </span>        <span class="n">lock</span><span class="o">.</span><span class="n">update_on_release</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;$set&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;state&quot;</span><span class="p">:</span> <span class="s2">&quot;CHECKED_OUT&quot;</span><span class="p">}}</span>
+</pre></div>
+</div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>collection</strong> – The MongoDB collection containing the document to lock.</p></li>
+<li><p><strong>filter</strong> – A MongoDB query to select the document.</p></li>
+<li><p><strong>update</strong> – A dictionary that will be passed to find_one_and_update to update the
+locked document at the moment of acquiring the lock.</p></li>
+<li><p><strong>break_lock</strong> – True if the context manager is allowed to forcibly break a lock.</p></li>
+<li><p><strong>lock_id</strong> – The is used for the lock in the document. If None a randomly generated
+uuid will be used.</p></li>
+<li><p><strong>sleep</strong> – The amount of second to sleep between consecutive checks while waiting
+for a lock to be released.</p></li>
+<li><p><strong>max_wait</strong> – The amount of seconds to wait for a lock to be released.</p></li>
+<li><p><strong>projection</strong> – The projection passed to the find_one_and_update that locks the document.</p></li>
+<li><p><strong>get_locked_doc</strong> – If True, if the lock cannot be acquired because the document matching
+the filter is already locked, the locked document will be fetched and
+set in the unavailable_document attribute.</p></li>
+<li><p><strong>kwargs</strong> – All the other args are passed to find_one_and_update.</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="jobflow_remote.utils.db.MongoLock.LOCK_KEY">
+<span class="sig-name descname"><span class="pre">LOCK_KEY</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'lock_id'</span></em><a class="headerlink" href="#jobflow_remote.utils.db.MongoLock.LOCK_KEY" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="jobflow_remote.utils.db.MongoLock.LOCK_TIME_KEY">
+<span class="sig-name descname"><span class="pre">LOCK_TIME_KEY</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'lock_time'</span></em><a class="headerlink" href="#jobflow_remote.utils.db.MongoLock.LOCK_TIME_KEY" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="jobflow_remote.utils.db.MongoLock.acquire">
+<span class="sig-name descname"><span class="pre">acquire</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/jobflow_remote/utils/db.html#MongoLock.acquire"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#jobflow_remote.utils.db.MongoLock.acquire" title="Link to this definition">#</a></dt>
+<dd><p>Acquire the lock</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="jobflow_remote.utils.db.MongoLock.get_lock_id">
+<em class="property"><span class="pre">classmethod</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">get_lock_id</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">d</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.12)"><span class="pre">dict</span></a></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/jobflow_remote/utils/db.html#MongoLock.get_lock_id"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#jobflow_remote.utils.db.MongoLock.get_lock_id" title="Link to this definition">#</a></dt>
+<dd><p>Get the lock id on a dictionary.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="jobflow_remote.utils.db.MongoLock.get_lock_time">
+<em class="property"><span class="pre">classmethod</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">get_lock_time</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">d</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.12)"><span class="pre">dict</span></a></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/jobflow_remote/utils/db.html#MongoLock.get_lock_time"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#jobflow_remote.utils.db.MongoLock.get_lock_time" title="Link to this definition">#</a></dt>
+<dd><p>Get the time the document was locked on a dictionary.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="jobflow_remote.utils.db.MongoLock.release">
+<span class="sig-name descname"><span class="pre">release</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">exc_type</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">exc_val</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">exc_tb</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/jobflow_remote/utils/db.html#MongoLock.release"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#jobflow_remote.utils.db.MongoLock.release" title="Link to this definition">#</a></dt>
+<dd><p>Release the lock.</p>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+
+
+                </article>
+
+
+
+
+
+                <footer class="prev-next-footer">
+
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="jobflow_remote.utils.data.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">jobflow_remote.utils.data module</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="jobflow_remote.utils.examples.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">jobflow_remote.utils.examples module</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+
+            </div>
+
+
+
+                <div class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+  <div class="sidebar-secondary-item">
+
+  <div class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> On this page
+  </div>
+  <nav class="bd-toc-nav page-toc">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#jobflow_remote.utils.db.FlowLockedError"><code class="docutils literal notranslate"><span class="pre">FlowLockedError</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#jobflow_remote.utils.db.FlowLockedError.from_flow_doc"><code class="docutils literal notranslate"><span class="pre">FlowLockedError.from_flow_doc()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#jobflow_remote.utils.db.JobLockedError"><code class="docutils literal notranslate"><span class="pre">JobLockedError</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#jobflow_remote.utils.db.JobLockedError.from_job_doc"><code class="docutils literal notranslate"><span class="pre">JobLockedError.from_job_doc()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#jobflow_remote.utils.db.LockedDocumentError"><code class="docutils literal notranslate"><span class="pre">LockedDocumentError</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#jobflow_remote.utils.db.MongoLock"><code class="docutils literal notranslate"><span class="pre">MongoLock</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#jobflow_remote.utils.db.MongoLock.LOCK_KEY"><code class="docutils literal notranslate"><span class="pre">MongoLock.LOCK_KEY</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#jobflow_remote.utils.db.MongoLock.LOCK_TIME_KEY"><code class="docutils literal notranslate"><span class="pre">MongoLock.LOCK_TIME_KEY</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#jobflow_remote.utils.db.MongoLock.acquire"><code class="docutils literal notranslate"><span class="pre">MongoLock.acquire()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#jobflow_remote.utils.db.MongoLock.get_lock_id"><code class="docutils literal notranslate"><span class="pre">MongoLock.get_lock_id()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#jobflow_remote.utils.db.MongoLock.get_lock_time"><code class="docutils literal notranslate"><span class="pre">MongoLock.get_lock_time()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#jobflow_remote.utils.db.MongoLock.release"><code class="docutils literal notranslate"><span class="pre">MongoLock.release()</span></code></a></li>
+</ul>
+</li>
+</ul>
+  </nav></div>
+
+</div></div>
+
+
+          </div>
+          <footer class="bd-footer-content">
+
+          </footer>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="../_static/scripts/bootstrap.js?digest=5b4479735964841361fd"></script>
+<script src="../_static/scripts/pydata-sphinx-theme.js?digest=5b4479735964841361fd"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+
+    <div class="footer-items__start">
+
+        <div class="footer-item">
+
+  <p class="copyright">
+
+      © Copyright 2023, Matgenix SRL.
+      <br/>
+
+  </p>
+</div>
+
+        <div class="footer-item">
+
+  <p class="sphinx-version">
+    Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 7.2.6.
+    <br/>
+  </p>
+</div>
+
+    </div>
+
+
+
+    <div class="footer-items__end">
+
+        <div class="footer-item">
+<p class="theme-version">
+  Built with the <a href="https://pydata-sphinx-theme.readthedocs.io/en/stable/index.html">PyData Sphinx Theme</a> 0.14.4.
+</p></div>
+
+    </div>
+
+</div>
+
+  </footer>
+  </body>
+</html>

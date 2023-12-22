@@ -1,0 +1,1438 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../../../" data-theme="light">
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>jobflow_remote.jobs.runner &#8212; Jobflow Remote v0.0.1.post117+gfc0fbc0.d20231222 Manual</title>
+
+
+
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "light";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "light";
+  </script>
+
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../../_static/styles/theme.css?digest=5b4479735964841361fd" rel="stylesheet" />
+<link href="../../../_static/styles/bootstrap.css?digest=5b4479735964841361fd" rel="stylesheet" />
+<link href="../../../_static/styles/pydata-sphinx-theme.css?digest=5b4479735964841361fd" rel="stylesheet" />
+
+
+  <link href="../../../_static/vendor/fontawesome/6.1.2/css/all.min.css?digest=5b4479735964841361fd" rel="stylesheet" />
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="../../../_static/vendor/fontawesome/6.1.2/webfonts/fa-solid-900.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../_static/vendor/fontawesome/6.1.2/webfonts/fa-brands-400.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../_static/vendor/fontawesome/6.1.2/webfonts/fa-regular-400.woff2" />
+
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=fa44fd50" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css?v=eafc0fe6" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/autodoc_pydantic.css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/design-style.1e8bd061cd6da7fc9cf755528e8ffc24.min.css?v=0a3b3ea7" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/jobflow_remote.css?v=7b6df8f0" />
+
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../../_static/scripts/bootstrap.js?digest=5b4479735964841361fd" />
+<link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=5b4479735964841361fd" />
+  <script src="../../../_static/vendor/fontawesome/6.1.2/js/all.min.js?digest=5b4479735964841361fd"></script>
+
+    <script src="../../../_static/documentation_options.js?v=e135783d"></script>
+    <script src="../../../_static/doctools.js?v=888ff710"></script>
+    <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../../_static/design-tabs.js?v=36754332"></script>
+    <script src="https://unpkg.com/mermaid@10.2.0/dist/mermaid.min.js"></script>
+    <script>mermaid.initialize({startOnLoad:true});</script>
+    <script>DOCUMENTATION_OPTIONS.pagename = '_modules/jobflow_remote/jobs/runner';</script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+    <meta name="docbuild:last-update" content="Dec 22, 2023"/>
+  </head>
+
+
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="light">
+
+
+
+  <a class="skip-link" href="#main-content">Skip to main content</a>
+
+  <div id="pst-scroll-pixel-helper"></div>
+
+
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>
+    Back to top
+  </button>
+
+
+  <input type="checkbox"
+          class="sidebar-toggle"
+          name="__primary"
+          id="__primary"/>
+  <label class="overlay overlay-primary" for="__primary"></label>
+
+  <input type="checkbox"
+          class="sidebar-toggle"
+          name="__secondary"
+          id="__secondary"/>
+  <label class="overlay overlay-secondary" for="__secondary"></label>
+
+  <div class="search-button__wrapper">
+    <div class="search-button__overlay"></div>
+    <div class="search-button__search-container">
+<form class="bd-search d-flex align-items-center"
+      action="../../../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         id="search-input"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form></div>
+  </div>
+
+
+  <div class="bd-header-announcement container-fluid bd-header-announcement">
+    <div class="bd-header-announcement__content"><p>Jobflow Remote is still in beta phase. The API may change at any time.</p></div>
+  </div>
+
+
+    <nav class="bd-header navbar navbar-expand-lg bd-navbar">
+<div class="bd-header__inner bd-page-width">
+  <label class="sidebar-toggle primary-toggle" for="__primary">
+    <span class="fa-solid fa-bars"></span>
+  </label>
+
+
+  <div class="col-lg-3 navbar-header-items__start">
+
+      <div class="navbar-item">
+
+
+
+<a class="navbar-brand logo" href="../../../index.html">
+
+
+
+
+
+
+    <p class="title logo__title">Jobflow Remote v0.0.1.post117+gfc0fbc0.d20231222 Manual</p>
+
+</a></div>
+
+  </div>
+
+  <div class="col-lg-9 navbar-header-items">
+
+    <div class="me-auto navbar-header-items__center">
+
+        <div class="navbar-item">
+<nav class="navbar-nav">
+  <p class="sidebar-header-items__title"
+     role="heading"
+     aria-level="1"
+     aria-label="Site Navigation">
+    Site Navigation
+  </p>
+  <ul class="bd-navbar-elements navbar-nav">
+
+                    <li class="nav-item">
+                      <a class="nav-link nav-internal" href="../../../user/index.html">
+                        User Guide
+                      </a>
+                    </li>
+
+
+                    <li class="nav-item">
+                      <a class="nav-link nav-internal" href="../../../api/index.html">
+                        API reference
+                      </a>
+                    </li>
+
+
+                    <li class="nav-item">
+                      <a class="nav-link nav-internal" href="../../../dev/index.html">
+                        Development
+                      </a>
+                    </li>
+
+  </ul>
+</nav></div>
+
+    </div>
+
+
+    <div class="navbar-header-items__end">
+
+        <div class="navbar-item navbar-persistent--container">
+
+
+ <script>
+ document.write(`
+   <button class="btn navbar-btn search-button-field search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass"></i>
+    <span class="search-button__default-text">Search</span>
+    <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+   </button>
+ `);
+ </script>
+        </div>
+
+
+        <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm navbar-btn theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="theme-switch nav-link" data-mode="light"><i class="fa-solid fa-sun fa-lg"></i></span>
+    <span class="theme-switch nav-link" data-mode="dark"><i class="fa-solid fa-moon fa-lg"></i></span>
+    <span class="theme-switch nav-link" data-mode="auto"><i class="fa-solid fa-circle-half-stroke fa-lg"></i></span>
+  </button>
+`);
+</script></div>
+
+    </div>
+
+  </div>
+
+
+    <div class="navbar-persistent--mobile">
+
+ <script>
+ document.write(`
+   <button class="btn navbar-btn search-button-field search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass"></i>
+    <span class="search-button__default-text">Search</span>
+    <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+   </button>
+ `);
+ </script>
+    </div>
+
+
+
+</div>
+
+    </nav>
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+
+      <div class="bd-sidebar-primary bd-sidebar hide-on-wide">
+
+
+
+  <div class="sidebar-header-items sidebar-primary__section">
+
+
+      <div class="sidebar-header-items__center">
+
+          <div class="navbar-item">
+<nav class="navbar-nav">
+  <p class="sidebar-header-items__title"
+     role="heading"
+     aria-level="1"
+     aria-label="Site Navigation">
+    Site Navigation
+  </p>
+  <ul class="bd-navbar-elements navbar-nav">
+
+                    <li class="nav-item">
+                      <a class="nav-link nav-internal" href="../../../user/index.html">
+                        User Guide
+                      </a>
+                    </li>
+
+
+                    <li class="nav-item">
+                      <a class="nav-link nav-internal" href="../../../api/index.html">
+                        API reference
+                      </a>
+                    </li>
+
+
+                    <li class="nav-item">
+                      <a class="nav-link nav-internal" href="../../../dev/index.html">
+                        Development
+                      </a>
+                    </li>
+
+  </ul>
+</nav></div>
+
+      </div>
+
+
+
+      <div class="sidebar-header-items__end">
+
+          <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm navbar-btn theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="theme-switch nav-link" data-mode="light"><i class="fa-solid fa-sun fa-lg"></i></span>
+    <span class="theme-switch nav-link" data-mode="dark"><i class="fa-solid fa-moon fa-lg"></i></span>
+    <span class="theme-switch nav-link" data-mode="auto"><i class="fa-solid fa-circle-half-stroke fa-lg"></i></span>
+  </button>
+`);
+</script></div>
+
+      </div>
+
+  </div>
+
+
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+
+  <div id="rtd-footer-container"></div>
+
+
+      </div>
+
+      <main id="main-content" class="bd-main">
+
+
+          <div class="bd-content">
+            <div class="bd-article-container">
+
+              <div class="bd-header-article">
+<div class="header-article-items header-article__inner">
+
+    <div class="header-article-items__start">
+
+        <div class="header-article-item">
+
+
+
+<nav aria-label="Breadcrumb">
+  <ul class="bd-breadcrumbs">
+
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../../../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+
+    <li class="breadcrumb-item"><a href="../../index.html" class="nav-link">Module code</a></li>
+
+    <li class="breadcrumb-item active" aria-current="page">jobflow_remo...</li>
+  </ul>
+</nav>
+</div>
+
+    </div>
+
+
+</div>
+</div>
+
+
+
+
+<div id="searchbox"></div>
+                <article class="bd-article" role="main">
+
+  <h1>Source code for jobflow_remote.jobs.runner</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;The Runner orchestrating the Jobs execution&quot;&quot;&quot;</span>
+
+<span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">import</span> <span class="nn">json</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">import</span> <span class="nn">shutil</span>
+<span class="kn">import</span> <span class="nn">signal</span>
+<span class="kn">import</span> <span class="nn">time</span>
+<span class="kn">import</span> <span class="nn">traceback</span>
+<span class="kn">import</span> <span class="nn">uuid</span>
+<span class="kn">from</span> <span class="nn">collections</span> <span class="kn">import</span> <span class="n">defaultdict</span>
+<span class="kn">from</span> <span class="nn">datetime</span> <span class="kn">import</span> <span class="n">datetime</span>
+<span class="kn">from</span> <span class="nn">pathlib</span> <span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">TYPE_CHECKING</span>
+
+<span class="kn">from</span> <span class="nn">jobflow.utils</span> <span class="kn">import</span> <span class="n">suuid</span>
+<span class="kn">from</span> <span class="nn">monty.json</span> <span class="kn">import</span> <span class="n">MontyDecoder</span>
+<span class="kn">from</span> <span class="nn">monty.os</span> <span class="kn">import</span> <span class="n">makedirs_p</span>
+<span class="kn">from</span> <span class="nn">qtoolkit.core.data_objects</span> <span class="kn">import</span> <span class="n">QState</span><span class="p">,</span> <span class="n">SubmissionStatus</span>
+
+<span class="kn">from</span> <span class="nn">jobflow_remote</span> <span class="kn">import</span> <span class="n">JobController</span>
+<span class="kn">from</span> <span class="nn">jobflow_remote.config.base</span> <span class="kn">import</span> <span class="p">(</span>
+    <span class="n">ConfigError</span><span class="p">,</span>
+    <span class="n">ExecutionConfig</span><span class="p">,</span>
+    <span class="n">LogLevel</span><span class="p">,</span>
+    <span class="n">Project</span><span class="p">,</span>
+    <span class="n">RunnerOptions</span><span class="p">,</span>
+    <span class="n">WorkerBase</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span> <span class="nn">jobflow_remote.config.manager</span> <span class="kn">import</span> <span class="n">ConfigManager</span>
+<span class="kn">from</span> <span class="nn">jobflow_remote.jobs.batch</span> <span class="kn">import</span> <span class="n">RemoteBatchManager</span>
+<span class="kn">from</span> <span class="nn">jobflow_remote.jobs.data</span> <span class="kn">import</span> <span class="n">IN_FILENAME</span><span class="p">,</span> <span class="n">OUT_FILENAME</span><span class="p">,</span> <span class="n">RemoteError</span>
+<span class="kn">from</span> <span class="nn">jobflow_remote.jobs.state</span> <span class="kn">import</span> <span class="n">JobState</span>
+<span class="kn">from</span> <span class="nn">jobflow_remote.remote.data</span> <span class="kn">import</span> <span class="p">(</span>
+    <span class="n">get_job_path</span><span class="p">,</span>
+    <span class="n">get_remote_in_file</span><span class="p">,</span>
+    <span class="n">get_remote_store</span><span class="p">,</span>
+    <span class="n">get_remote_store_filenames</span><span class="p">,</span>
+    <span class="n">resolve_job_dict_args</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span> <span class="nn">jobflow_remote.remote.host</span> <span class="kn">import</span> <span class="n">BaseHost</span>
+<span class="kn">from</span> <span class="nn">jobflow_remote.remote.queue</span> <span class="kn">import</span> <span class="n">ERR_FNAME</span><span class="p">,</span> <span class="n">OUT_FNAME</span><span class="p">,</span> <span class="n">QueueManager</span><span class="p">,</span> <span class="n">set_name_out</span>
+<span class="kn">from</span> <span class="nn">jobflow_remote.utils.log</span> <span class="kn">import</span> <span class="n">initialize_runner_logger</span>
+<span class="kn">from</span> <span class="nn">jobflow_remote.utils.schedule</span> <span class="kn">import</span> <span class="n">SafeScheduler</span>
+
+<span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>
+    <span class="kn">from</span> <span class="nn">jobflow_remote.utils.db</span> <span class="kn">import</span> <span class="n">MongoLock</span>
+
+<span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="Runner">
+<a class="viewcode-back" href="../../../api/jobflow_remote.jobs.runner.html#jobflow_remote.jobs.runner.Runner">[docs]</a>
+<span class="k">class</span> <span class="nc">Runner</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Object orchestrating the execution of all the Jobs.</span>
+
+<span class="sd">    Advances the status of the Jobs, handles the communication with the workers</span>
+<span class="sd">    and updates the queue and output databases.</span>
+
+<span class="sd">    The main entry point is the `run` method. It is supposed to be executed</span>
+<span class="sd">    by a daemon, but can also be run directly for testing purposes.</span>
+<span class="sd">    It allows to run all the steps required to advance the Job&#39;s states or even</span>
+<span class="sd">    a subset of them, to parallelize the different tasks.</span>
+
+<span class="sd">    The runner instantiates a pool of workers and hosts given in the project</span>
+<span class="sd">    definition. A single connection will be opened if multiple workers share</span>
+<span class="sd">    the same host.</span>
+
+<span class="sd">    The Runner schedules the execution of the specific tasks at regular intervals</span>
+<span class="sd">    and relies on objects like QueueManager, BaseHost and JobController to</span>
+<span class="sd">    interact with workers and databases.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">project_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">log_level</span><span class="p">:</span> <span class="n">LogLevel</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">runner_id</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        project_name</span>
+<span class="sd">            Name of the project. Used to retrieve all the configurations required</span>
+<span class="sd">            to execute the runner.</span>
+<span class="sd">        log_level</span>
+<span class="sd">            Logging level of the Runner.</span>
+<span class="sd">        runner_id</span>
+<span class="sd">            A unique identifier for the Runner process. Used to identify the</span>
+<span class="sd">            runner process in logging and in the DB locks.</span>
+<span class="sd">            If None a uuid will be generated.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">stop_signal</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">runner_id</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">runner_id</span> <span class="ow">or</span> <span class="nb">str</span><span class="p">(</span><span class="n">uuid</span><span class="o">.</span><span class="n">uuid4</span><span class="p">())</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">config_manager</span><span class="p">:</span> <span class="n">ConfigManager</span> <span class="o">=</span> <span class="n">ConfigManager</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">project_name</span> <span class="o">=</span> <span class="n">project_name</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">project</span><span class="p">:</span> <span class="n">Project</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">config_manager</span><span class="o">.</span><span class="n">get_project</span><span class="p">(</span><span class="n">project_name</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">job_controller</span><span class="p">:</span> <span class="n">JobController</span> <span class="o">=</span> <span class="n">JobController</span><span class="o">.</span><span class="n">from_project</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">project</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">workers</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">WorkerBase</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">project</span><span class="o">.</span><span class="n">workers</span>
+        <span class="c1"># Build the dictionary of hosts. The reference is the worker name.</span>
+        <span class="c1"># If two hosts match, use the same instance</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">hosts</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">BaseHost</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">wname</span><span class="p">,</span> <span class="n">w</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">workers</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="n">new_host</span> <span class="o">=</span> <span class="n">w</span><span class="o">.</span><span class="n">get_host</span><span class="p">()</span>
+            <span class="k">for</span> <span class="n">host</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">hosts</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+                <span class="k">if</span> <span class="n">new_host</span> <span class="o">==</span> <span class="n">host</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">hosts</span><span class="p">[</span><span class="n">wname</span><span class="p">]</span> <span class="o">=</span> <span class="n">host</span>
+                    <span class="k">break</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">hosts</span><span class="p">[</span><span class="n">wname</span><span class="p">]</span> <span class="o">=</span> <span class="n">new_host</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">limited_workers</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="n">name</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;max&quot;</span><span class="p">:</span> <span class="n">w</span><span class="o">.</span><span class="n">max_jobs</span><span class="p">,</span> <span class="s2">&quot;current&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">}</span>
+            <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">w</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">workers</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">w</span><span class="o">.</span><span class="n">max_jobs</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">w</span><span class="o">.</span><span class="n">batch</span>
+        <span class="p">}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">batch_workers</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">wname</span><span class="p">,</span> <span class="n">w</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">workers</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="k">if</span> <span class="n">w</span><span class="o">.</span><span class="n">batch</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">batch_workers</span><span class="p">[</span><span class="n">wname</span><span class="p">]</span> <span class="o">=</span> <span class="n">RemoteBatchManager</span><span class="p">(</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">hosts</span><span class="p">[</span><span class="n">wname</span><span class="p">],</span> <span class="n">w</span><span class="o">.</span><span class="n">batch</span><span class="o">.</span><span class="n">jobs_handle_dir</span>
+                <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">queue_managers</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">log_level</span> <span class="o">=</span> <span class="n">log_level</span> <span class="k">if</span> <span class="n">log_level</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="bp">self</span><span class="o">.</span><span class="n">project</span><span class="o">.</span><span class="n">log_level</span>
+        <span class="n">initialize_runner_logger</span><span class="p">(</span>
+            <span class="n">log_folder</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">project</span><span class="o">.</span><span class="n">log_dir</span><span class="p">,</span>
+            <span class="n">level</span><span class="o">=</span><span class="n">log_level</span><span class="o">.</span><span class="n">to_logging</span><span class="p">(),</span>
+            <span class="n">runner_id</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">runner_id</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="c1"># TODO it could be better to create a pool of stores that are connected</span>
+        <span class="c1"># How to deal with cases where the connection gets closed?</span>
+        <span class="c1"># how to deal with file based stores?</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">jobstore</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">project</span><span class="o">.</span><span class="n">get_jobstore</span><span class="p">()</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">runner_options</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RunnerOptions</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        The Runner options defined in the project.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">project</span><span class="o">.</span><span class="n">runner</span>
+
+<div class="viewcode-block" id="Runner.handle_signal">
+<a class="viewcode-back" href="../../../api/jobflow_remote.jobs.runner.html#jobflow_remote.jobs.runner.Runner.handle_signal">[docs]</a>
+    <span class="k">def</span> <span class="nf">handle_signal</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">signum</span><span class="p">,</span> <span class="n">frame</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Handle the SIGTERM signal in the Runner.</span>
+<span class="sd">        Sets a variable that will stop the Runner loop.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Received signal: </span><span class="si">{</span><span class="n">signum</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">stop_signal</span> <span class="o">=</span> <span class="kc">True</span></div>
+
+
+<div class="viewcode-block" id="Runner.get_worker">
+<a class="viewcode-back" href="../../../api/jobflow_remote.jobs.runner.html#jobflow_remote.jobs.runner.Runner.get_worker">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_worker</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">worker_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">WorkerBase</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Get the worker from the pool of workers instantiated by the Runner.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        worker_name</span>
+<span class="sd">            The name of the worker.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">            An instance of the corresponding worker.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">worker_name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">workers</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">ConfigError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;No worker </span><span class="si">{</span><span class="n">worker_name</span><span class="si">}</span><span class="s2"> is defined in project </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">project_name</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">workers</span><span class="p">[</span><span class="n">worker_name</span><span class="p">]</span></div>
+
+
+<div class="viewcode-block" id="Runner.get_host">
+<a class="viewcode-back" href="../../../api/jobflow_remote.jobs.runner.html#jobflow_remote.jobs.runner.Runner.get_host">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_host</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">worker_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">BaseHost</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Get the host associated to a worker from the pool of hosts instantiated</span>
+<span class="sd">        by the Runner.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        worker_name</span>
+<span class="sd">            The name of the worker.</span>
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">            An instance of the Host associated to the worker.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">host</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">hosts</span><span class="p">[</span><span class="n">worker_name</span><span class="p">]</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">host</span><span class="o">.</span><span class="n">is_connected</span><span class="p">:</span>
+            <span class="n">host</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">host</span></div>
+
+
+<div class="viewcode-block" id="Runner.get_queue_manager">
+<a class="viewcode-back" href="../../../api/jobflow_remote.jobs.runner.html#jobflow_remote.jobs.runner.Runner.get_queue_manager">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_queue_manager</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">worker_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">QueueManager</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Get an instance of the queue manager associated to a worker, based on its host.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        worker_name</span>
+<span class="sd">            The name of the worker.</span>
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">             An instance of the QueueManager associated to the worker.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">worker_name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">queue_managers</span><span class="p">:</span>
+            <span class="n">worker</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_worker</span><span class="p">(</span><span class="n">worker_name</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">queue_managers</span><span class="p">[</span><span class="n">worker_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">QueueManager</span><span class="p">(</span>
+                <span class="n">worker</span><span class="o">.</span><span class="n">get_scheduler_io</span><span class="p">(),</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_host</span><span class="p">(</span><span class="n">worker_name</span><span class="p">)</span>
+            <span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">queue_managers</span><span class="p">[</span><span class="n">worker_name</span><span class="p">]</span></div>
+
+
+<div class="viewcode-block" id="Runner.run">
+<a class="viewcode-back" href="../../../api/jobflow_remote.jobs.runner.html#jobflow_remote.jobs.runner.Runner.run">[docs]</a>
+    <span class="k">def</span> <span class="nf">run</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">transfer</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+        <span class="n">complete</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+        <span class="n">queue</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+        <span class="n">checkout</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Start the runner.</span>
+
+<span class="sd">        Which actions are being performed can be tuned by the arguments.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        transfer</span>
+<span class="sd">            If True actions related to file transfer are performed by the runner.</span>
+<span class="sd">        complete</span>
+<span class="sd">            If True Job completion is performed by the runner.</span>
+<span class="sd">        queue</span>
+<span class="sd">            If True interactions with the queue manager are handled by the Runner.</span>
+<span class="sd">        checkout</span>
+<span class="sd">            If True the checkout of Jobs is performed by the Runner.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">signal</span><span class="o">.</span><span class="n">signal</span><span class="p">(</span><span class="n">signal</span><span class="o">.</span><span class="n">SIGTERM</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">handle_signal</span><span class="p">)</span>
+
+        <span class="n">states</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">if</span> <span class="n">transfer</span><span class="p">:</span>
+            <span class="n">states</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">JobState</span><span class="o">.</span><span class="n">CHECKED_OUT</span><span class="o">.</span><span class="n">value</span><span class="p">)</span>
+            <span class="n">states</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">JobState</span><span class="o">.</span><span class="n">TERMINATED</span><span class="o">.</span><span class="n">value</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">complete</span><span class="p">:</span>
+            <span class="n">states</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">JobState</span><span class="o">.</span><span class="n">DOWNLOADED</span><span class="o">.</span><span class="n">value</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">queue</span><span class="p">:</span>
+            <span class="n">states</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">JobState</span><span class="o">.</span><span class="n">UPLOADED</span><span class="o">.</span><span class="n">value</span><span class="p">)</span>
+
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Runner run options: transfer: </span><span class="si">{</span><span class="n">transfer</span><span class="si">}</span><span class="s2"> complete: </span><span class="si">{</span><span class="n">complete</span><span class="si">}</span><span class="s2"> queue: </span><span class="si">{</span><span class="n">queue</span><span class="si">}</span><span class="s2"> checkout: </span><span class="si">{</span><span class="n">checkout</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="p">)</span>
+
+        <span class="n">scheduler</span> <span class="o">=</span> <span class="n">SafeScheduler</span><span class="p">(</span><span class="n">seconds_after_failure</span><span class="o">=</span><span class="mi">120</span><span class="p">)</span>
+
+        <span class="c1"># run a first call for each case, since schedule will wait for the delay</span>
+        <span class="c1"># to make the first execution.</span>
+        <span class="k">if</span> <span class="n">checkout</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">checkout</span><span class="p">()</span>
+            <span class="n">scheduler</span><span class="o">.</span><span class="n">every</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">runner_options</span><span class="o">.</span><span class="n">delay_checkout</span><span class="p">)</span><span class="o">.</span><span class="n">seconds</span><span class="o">.</span><span class="n">do</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">checkout</span>
+            <span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">transfer</span> <span class="ow">or</span> <span class="n">queue</span> <span class="ow">or</span> <span class="n">complete</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">advance_state</span><span class="p">(</span><span class="n">states</span><span class="p">)</span>
+            <span class="n">scheduler</span><span class="o">.</span><span class="n">every</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">runner_options</span><span class="o">.</span><span class="n">delay_advance_status</span><span class="p">)</span><span class="o">.</span><span class="n">seconds</span><span class="o">.</span><span class="n">do</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">advance_state</span><span class="p">,</span> <span class="n">states</span><span class="o">=</span><span class="n">states</span>
+            <span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">queue</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">check_run_status</span><span class="p">()</span>
+            <span class="n">scheduler</span><span class="o">.</span><span class="n">every</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">runner_options</span><span class="o">.</span><span class="n">delay_check_run_status</span><span class="p">)</span><span class="o">.</span><span class="n">seconds</span><span class="o">.</span><span class="n">do</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">check_run_status</span>
+            <span class="p">)</span>
+            <span class="c1"># Limited workers will only affect the process interacting with the queue</span>
+            <span class="c1"># manager. When a job is submitted or terminated the count in the</span>
+            <span class="c1"># limited_workers can be directly updated, since by construction only one</span>
+            <span class="c1"># process will take care of the queue state.</span>
+            <span class="c1"># The refresh can be run on a relatively high delay since it should only</span>
+            <span class="c1"># account for actions from the user (e.g. rerun, cancel), that can alter</span>
+            <span class="c1"># the number of submitted/running jobs.</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">limited_workers</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">refresh_num_current_jobs</span><span class="p">()</span>
+                <span class="n">scheduler</span><span class="o">.</span><span class="n">every</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">runner_options</span><span class="o">.</span><span class="n">delay_refresh_limited</span><span class="p">)</span><span class="o">.</span><span class="n">seconds</span><span class="o">.</span><span class="n">do</span><span class="p">(</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">refresh_num_current_jobs</span>
+                <span class="p">)</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">batch_workers</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">update_batch_jobs</span><span class="p">()</span>
+                <span class="n">scheduler</span><span class="o">.</span><span class="n">every</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">runner_options</span><span class="o">.</span><span class="n">delay_update_batch</span><span class="p">)</span><span class="o">.</span><span class="n">seconds</span><span class="o">.</span><span class="n">do</span><span class="p">(</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">update_batch_jobs</span>
+                <span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">complete</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">advance_state</span><span class="p">(</span><span class="n">states</span><span class="p">)</span>
+            <span class="n">scheduler</span><span class="o">.</span><span class="n">every</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">runner_options</span><span class="o">.</span><span class="n">delay_advance_status</span><span class="p">)</span><span class="o">.</span><span class="n">seconds</span><span class="o">.</span><span class="n">do</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">advance_state</span><span class="p">,</span> <span class="n">states</span><span class="o">=</span><span class="n">states</span>
+            <span class="p">)</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
+                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">stop_signal</span><span class="p">:</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;stopping due to sigterm&quot;</span><span class="p">)</span>
+                    <span class="k">break</span>
+                <span class="n">scheduler</span><span class="o">.</span><span class="n">run_pending</span><span class="p">()</span>
+                <span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+        <span class="k">finally</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">cleanup</span><span class="p">()</span></div>
+
+
+    <span class="k">def</span> <span class="nf">_get_limited_worker_query</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">states</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">dict</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Generate the query to be used for fetching Jobs for workers with limited</span>
+<span class="sd">        number of Jobs allowed.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        states</span>
+<span class="sd">            The states to be used in the query.</span>
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">            A dictionary with the query.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">states</span> <span class="o">=</span> <span class="p">[</span><span class="n">s</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">states</span> <span class="k">if</span> <span class="n">s</span> <span class="o">!=</span> <span class="n">JobState</span><span class="o">.</span><span class="n">UPLOADED</span><span class="o">.</span><span class="n">value</span><span class="p">]</span>
+
+        <span class="n">available_workers</span> <span class="o">=</span> <span class="p">[</span><span class="n">w</span> <span class="k">for</span> <span class="n">w</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">workers</span> <span class="k">if</span> <span class="n">w</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">limited_workers</span><span class="p">]</span>
+        <span class="k">for</span> <span class="n">worker</span><span class="p">,</span> <span class="n">status</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">limited_workers</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="k">if</span> <span class="n">status</span><span class="p">[</span><span class="s2">&quot;current&quot;</span><span class="p">]</span> <span class="o">&lt;</span> <span class="n">status</span><span class="p">[</span><span class="s2">&quot;max&quot;</span><span class="p">]:</span>
+                <span class="n">available_workers</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">worker</span><span class="p">)</span>
+
+        <span class="n">states_query</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;state&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;$in&quot;</span><span class="p">:</span> <span class="n">states</span><span class="p">}}</span>
+        <span class="n">uploaded_query</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">&quot;state&quot;</span><span class="p">:</span> <span class="n">JobState</span><span class="o">.</span><span class="n">UPLOADED</span><span class="o">.</span><span class="n">value</span><span class="p">,</span>
+            <span class="s2">&quot;worker&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;$in&quot;</span><span class="p">:</span> <span class="n">available_workers</span><span class="p">},</span>
+        <span class="p">}</span>
+
+        <span class="k">if</span> <span class="n">states</span> <span class="ow">and</span> <span class="n">available_workers</span><span class="p">:</span>
+            <span class="n">query</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;$or&quot;</span><span class="p">:</span> <span class="p">[</span><span class="n">states_query</span><span class="p">,</span> <span class="n">uploaded_query</span><span class="p">]}</span>
+            <span class="k">return</span> <span class="n">query</span>
+        <span class="k">elif</span> <span class="n">states</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">states_query</span>
+        <span class="k">elif</span> <span class="n">available_workers</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">uploaded_query</span>
+
+        <span class="k">return</span> <span class="kc">None</span>
+
+<div class="viewcode-block" id="Runner.advance_state">
+<a class="viewcode-back" href="../../../api/jobflow_remote.jobs.runner.html#jobflow_remote.jobs.runner.Runner.advance_state">[docs]</a>
+    <span class="k">def</span> <span class="nf">advance_state</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">states</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Acquire the lock and advance the state of a single job.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        states</span>
+<span class="sd">            The state of the Jobs that can be queried.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">states_methods</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="n">JobState</span><span class="o">.</span><span class="n">CHECKED_OUT</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">upload</span><span class="p">,</span>
+            <span class="n">JobState</span><span class="o">.</span><span class="n">UPLOADED</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">submit</span><span class="p">,</span>
+            <span class="n">JobState</span><span class="o">.</span><span class="n">TERMINATED</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">download</span><span class="p">,</span>
+            <span class="n">JobState</span><span class="o">.</span><span class="n">DOWNLOADED</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">complete_job</span><span class="p">,</span>
+        <span class="p">}</span>
+
+        <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
+            <span class="c1"># handle the case of workers with limited number of jobs</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">limited_workers</span> <span class="ow">and</span> <span class="n">JobState</span><span class="o">.</span><span class="n">UPLOADED</span><span class="o">.</span><span class="n">value</span> <span class="ow">in</span> <span class="n">states</span><span class="p">:</span>
+                <span class="n">query</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_limited_worker_query</span><span class="p">(</span><span class="n">states</span><span class="o">=</span><span class="n">states</span><span class="p">)</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">query</span><span class="p">:</span>
+                    <span class="k">return</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">query</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;state&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;$in&quot;</span><span class="p">:</span> <span class="n">states</span><span class="p">}}</span>
+
+            <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">job_controller</span><span class="o">.</span><span class="n">lock_job_for_update</span><span class="p">(</span>
+                <span class="n">query</span><span class="o">=</span><span class="n">query</span><span class="p">,</span>
+                <span class="n">max_step_attempts</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">runner_options</span><span class="o">.</span><span class="n">max_step_attempts</span><span class="p">,</span>
+                <span class="n">delta_retry</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">runner_options</span><span class="o">.</span><span class="n">delta_retry</span><span class="p">,</span>
+            <span class="p">)</span> <span class="k">as</span> <span class="n">lock</span><span class="p">:</span>
+                <span class="n">doc</span> <span class="o">=</span> <span class="n">lock</span><span class="o">.</span><span class="n">locked_document</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">doc</span><span class="p">:</span>
+                    <span class="k">return</span>
+
+                <span class="n">state</span> <span class="o">=</span> <span class="n">JobState</span><span class="p">(</span><span class="n">doc</span><span class="p">[</span><span class="s2">&quot;state&quot;</span><span class="p">])</span>
+
+                <span class="n">states_methods</span><span class="p">[</span><span class="n">state</span><span class="p">](</span><span class="n">lock</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Runner.upload">
+<a class="viewcode-back" href="../../../api/jobflow_remote.jobs.runner.html#jobflow_remote.jobs.runner.Runner.upload">[docs]</a>
+    <span class="k">def</span> <span class="nf">upload</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">lock</span><span class="p">:</span> <span class="n">MongoLock</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Upload files for a locked Job in the CHECKED_OUT state.</span>
+<span class="sd">        If successful set the state to UPLOADED.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        lock</span>
+<span class="sd">            The MongoLock with the locked Job document.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">doc</span> <span class="o">=</span> <span class="n">lock</span><span class="o">.</span><span class="n">locked_document</span>
+        <span class="n">db_id</span> <span class="o">=</span> <span class="n">doc</span><span class="p">[</span><span class="s2">&quot;db_id&quot;</span><span class="p">]</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;upload db_id: </span><span class="si">{</span><span class="n">db_id</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="n">job_dict</span> <span class="o">=</span> <span class="n">doc</span><span class="p">[</span><span class="s2">&quot;job&quot;</span><span class="p">]</span>
+
+        <span class="n">worker</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_worker</span><span class="p">(</span><span class="n">doc</span><span class="p">[</span><span class="s2">&quot;worker&quot;</span><span class="p">])</span>
+        <span class="n">host</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_host</span><span class="p">(</span><span class="n">doc</span><span class="p">[</span><span class="s2">&quot;worker&quot;</span><span class="p">])</span>
+        <span class="n">store</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">jobstore</span>
+        <span class="c1"># TODO would it be better/feasible to keep a pool of the required</span>
+        <span class="c1"># Stores already connected, to avoid opening and closing them?</span>
+        <span class="n">store</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">resolve_job_dict_args</span><span class="p">(</span><span class="n">job_dict</span><span class="p">,</span> <span class="n">store</span><span class="p">)</span>
+        <span class="k">finally</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">store</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+            <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                <span class="n">logging</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;error while closing the store </span><span class="si">{</span><span class="n">store</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+        <span class="n">remote_path</span> <span class="o">=</span> <span class="n">get_job_path</span><span class="p">(</span><span class="n">job_dict</span><span class="p">[</span><span class="s2">&quot;uuid&quot;</span><span class="p">],</span> <span class="n">job_dict</span><span class="p">[</span><span class="s2">&quot;index&quot;</span><span class="p">],</span> <span class="n">worker</span><span class="o">.</span><span class="n">work_dir</span><span class="p">)</span>
+
+        <span class="c1"># Set the value of the original store for dynamical workflow. Usually it</span>
+        <span class="c1"># will be None don&#39;t add the serializer, at this stage the default_orjson</span>
+        <span class="c1"># serializer could undergo refactoring and this could break deserialization</span>
+        <span class="c1"># of older FWs. It is set in the FireTask at runtime.</span>
+        <span class="n">remote_store</span> <span class="o">=</span> <span class="n">get_remote_store</span><span class="p">(</span>
+            <span class="n">store</span><span class="o">=</span><span class="n">store</span><span class="p">,</span> <span class="n">launch_dir</span><span class="o">=</span><span class="n">remote_path</span><span class="p">,</span> <span class="n">add_orjson_serializer</span><span class="o">=</span><span class="kc">False</span>
+        <span class="p">)</span>
+
+        <span class="n">created</span> <span class="o">=</span> <span class="n">host</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">remote_path</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">created</span><span class="p">:</span>
+            <span class="n">err_msg</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Could not create remote directory </span><span class="si">{</span><span class="n">remote_path</span><span class="si">}</span><span class="s2"> for db_id </span><span class="si">{</span><span class="n">db_id</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="n">err_msg</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="n">RemoteError</span><span class="p">(</span><span class="n">err_msg</span><span class="p">,</span> <span class="n">no_retry</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+        <span class="n">serialized_input</span> <span class="o">=</span> <span class="n">get_remote_in_file</span><span class="p">(</span><span class="n">job_dict</span><span class="p">,</span> <span class="n">remote_store</span><span class="p">)</span>
+
+        <span class="n">path_file</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">remote_path</span><span class="p">,</span> <span class="n">IN_FILENAME</span><span class="p">)</span>
+        <span class="n">host</span><span class="o">.</span><span class="n">put</span><span class="p">(</span><span class="n">serialized_input</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">path_file</span><span class="p">))</span>
+
+        <span class="n">set_output</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">&quot;$set&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;run_dir&quot;</span><span class="p">:</span> <span class="n">remote_path</span><span class="p">,</span> <span class="s2">&quot;state&quot;</span><span class="p">:</span> <span class="n">JobState</span><span class="o">.</span><span class="n">UPLOADED</span><span class="o">.</span><span class="n">value</span><span class="p">}</span>
+        <span class="p">}</span>
+        <span class="n">lock</span><span class="o">.</span><span class="n">update_on_release</span> <span class="o">=</span> <span class="n">set_output</span></div>
+
+
+<div class="viewcode-block" id="Runner.submit">
+<a class="viewcode-back" href="../../../api/jobflow_remote.jobs.runner.html#jobflow_remote.jobs.runner.Runner.submit">[docs]</a>
+    <span class="k">def</span> <span class="nf">submit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">lock</span><span class="p">:</span> <span class="n">MongoLock</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Submit to the queue for a locked Job in the UPLOADED state.</span>
+<span class="sd">        If successful set the state to SUBMITTED.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        lock</span>
+<span class="sd">            The MongoLock with the locked Job document.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">doc</span> <span class="o">=</span> <span class="n">lock</span><span class="o">.</span><span class="n">locked_document</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;submit db_id: </span><span class="si">{</span><span class="n">doc</span><span class="p">[</span><span class="s1">&#39;db_id&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="n">job_dict</span> <span class="o">=</span> <span class="n">doc</span><span class="p">[</span><span class="s2">&quot;job&quot;</span><span class="p">]</span>
+
+        <span class="n">worker_name</span> <span class="o">=</span> <span class="n">doc</span><span class="p">[</span><span class="s2">&quot;worker&quot;</span><span class="p">]</span>
+        <span class="n">worker</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_worker</span><span class="p">(</span><span class="n">worker_name</span><span class="p">)</span>
+
+        <span class="n">remote_path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">doc</span><span class="p">[</span><span class="s2">&quot;run_dir&quot;</span><span class="p">])</span>
+
+        <span class="n">script_commands</span> <span class="o">=</span> <span class="p">[</span><span class="sa">f</span><span class="s2">&quot;jf execution run </span><span class="si">{</span><span class="n">remote_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">]</span>
+
+        <span class="n">queue_manager</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_queue_manager</span><span class="p">(</span><span class="n">worker_name</span><span class="p">)</span>
+        <span class="n">qout_fpath</span> <span class="o">=</span> <span class="n">remote_path</span> <span class="o">/</span> <span class="n">OUT_FNAME</span>
+        <span class="n">qerr_fpath</span> <span class="o">=</span> <span class="n">remote_path</span> <span class="o">/</span> <span class="n">ERR_FNAME</span>
+
+        <span class="n">exec_config</span> <span class="o">=</span> <span class="n">doc</span><span class="p">[</span><span class="s2">&quot;exec_config&quot;</span><span class="p">]</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">exec_config</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="n">exec_config</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">config_manager</span><span class="o">.</span><span class="n">get_exec_config</span><span class="p">(</span>
+                <span class="n">exec_config_name</span><span class="o">=</span><span class="n">exec_config</span><span class="p">,</span> <span class="n">project_name</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">project_name</span>
+            <span class="p">)</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">exec_config</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
+            <span class="n">exec_config</span> <span class="o">=</span> <span class="n">ExecutionConfig</span><span class="o">.</span><span class="n">parse_obj</span><span class="p">(</span><span class="n">exec_config</span><span class="p">)</span>
+
+        <span class="c1"># define an empty default if it is not set</span>
+        <span class="n">exec_config</span> <span class="o">=</span> <span class="n">exec_config</span> <span class="ow">or</span> <span class="n">ExecutionConfig</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="n">worker_name</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">batch_workers</span><span class="p">:</span>
+            <span class="n">resources</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">=</span> <span class="p">{}</span>
+
+            <span class="n">set_name_out</span><span class="p">(</span>
+                <span class="n">resources</span><span class="p">,</span> <span class="n">job_dict</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">],</span> <span class="n">out_fpath</span><span class="o">=</span><span class="n">qout_fpath</span><span class="p">,</span> <span class="n">err_fpath</span><span class="o">=</span><span class="n">qerr_fpath</span>
+            <span class="p">)</span>
+            <span class="n">shell_manager</span> <span class="o">=</span> <span class="n">queue_manager</span><span class="o">.</span><span class="n">get_shell_manager</span><span class="p">()</span>
+            <span class="n">shell_manager</span><span class="o">.</span><span class="n">write_submission_script</span><span class="p">(</span>
+                <span class="n">commands</span><span class="o">=</span><span class="n">script_commands</span><span class="p">,</span>
+                <span class="n">pre_run</span><span class="o">=</span><span class="n">exec_config</span><span class="o">.</span><span class="n">pre_run</span><span class="p">,</span>
+                <span class="n">post_run</span><span class="o">=</span><span class="n">exec_config</span><span class="o">.</span><span class="n">post_run</span><span class="p">,</span>
+                <span class="n">options</span><span class="o">=</span><span class="n">resources</span><span class="p">,</span>
+                <span class="n">export</span><span class="o">=</span><span class="n">exec_config</span><span class="o">.</span><span class="n">export</span><span class="p">,</span>
+                <span class="n">modules</span><span class="o">=</span><span class="n">exec_config</span><span class="o">.</span><span class="n">modules</span><span class="p">,</span>
+                <span class="n">work_dir</span><span class="o">=</span><span class="n">remote_path</span><span class="p">,</span>
+                <span class="n">create_submit_dir</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+            <span class="p">)</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">batch_workers</span><span class="p">[</span><span class="n">worker_name</span><span class="p">]</span><span class="o">.</span><span class="n">submit_job</span><span class="p">(</span>
+                <span class="n">job_id</span><span class="o">=</span><span class="n">doc</span><span class="p">[</span><span class="s2">&quot;uuid&quot;</span><span class="p">],</span> <span class="n">index</span><span class="o">=</span><span class="n">doc</span><span class="p">[</span><span class="s2">&quot;index&quot;</span><span class="p">]</span>
+            <span class="p">)</span>
+            <span class="n">lock</span><span class="o">.</span><span class="n">update_on_release</span> <span class="o">=</span> <span class="p">{</span>
+                <span class="s2">&quot;$set&quot;</span><span class="p">:</span> <span class="p">{</span>
+                    <span class="s2">&quot;state&quot;</span><span class="p">:</span> <span class="n">JobState</span><span class="o">.</span><span class="n">BATCH_SUBMITTED</span><span class="o">.</span><span class="n">value</span><span class="p">,</span>
+                <span class="p">}</span>
+            <span class="p">}</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># decode in case it contains a QResources. It was not deserialized before.</span>
+            <span class="n">resources</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">MontyDecoder</span><span class="p">()</span><span class="o">.</span><span class="n">process_decoded</span><span class="p">(</span><span class="n">doc</span><span class="p">[</span><span class="s2">&quot;resources&quot;</span><span class="p">])</span>
+                <span class="ow">or</span> <span class="n">worker</span><span class="o">.</span><span class="n">resources</span>
+                <span class="ow">or</span> <span class="p">{}</span>
+            <span class="p">)</span>
+            <span class="n">set_name_out</span><span class="p">(</span>
+                <span class="n">resources</span><span class="p">,</span> <span class="n">job_dict</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">],</span> <span class="n">out_fpath</span><span class="o">=</span><span class="n">qout_fpath</span><span class="p">,</span> <span class="n">err_fpath</span><span class="o">=</span><span class="n">qerr_fpath</span>
+            <span class="p">)</span>
+
+            <span class="n">pre_run</span> <span class="o">=</span> <span class="n">worker</span><span class="o">.</span><span class="n">pre_run</span> <span class="ow">or</span> <span class="s2">&quot;&quot;</span>
+            <span class="k">if</span> <span class="n">exec_config</span><span class="o">.</span><span class="n">pre_run</span><span class="p">:</span>
+                <span class="n">pre_run</span> <span class="o">+=</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span> <span class="o">+</span> <span class="n">exec_config</span><span class="o">.</span><span class="n">pre_run</span>
+            <span class="n">post_run</span> <span class="o">=</span> <span class="n">worker</span><span class="o">.</span><span class="n">post_run</span> <span class="ow">or</span> <span class="s2">&quot;&quot;</span>
+            <span class="k">if</span> <span class="n">exec_config</span><span class="o">.</span><span class="n">post_run</span><span class="p">:</span>
+                <span class="n">post_run</span> <span class="o">+=</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span> <span class="o">+</span> <span class="n">exec_config</span><span class="o">.</span><span class="n">post_run</span>
+
+            <span class="n">submit_result</span> <span class="o">=</span> <span class="n">queue_manager</span><span class="o">.</span><span class="n">submit</span><span class="p">(</span>
+                <span class="n">commands</span><span class="o">=</span><span class="n">script_commands</span><span class="p">,</span>
+                <span class="n">pre_run</span><span class="o">=</span><span class="n">pre_run</span><span class="p">,</span>
+                <span class="n">post_run</span><span class="o">=</span><span class="n">post_run</span><span class="p">,</span>
+                <span class="n">options</span><span class="o">=</span><span class="n">resources</span><span class="p">,</span>
+                <span class="n">export</span><span class="o">=</span><span class="n">exec_config</span><span class="o">.</span><span class="n">export</span><span class="p">,</span>
+                <span class="n">modules</span><span class="o">=</span><span class="n">exec_config</span><span class="o">.</span><span class="n">modules</span><span class="p">,</span>
+                <span class="n">work_dir</span><span class="o">=</span><span class="n">remote_path</span><span class="p">,</span>
+                <span class="n">create_submit_dir</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+            <span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">submit_result</span><span class="o">.</span><span class="n">status</span> <span class="o">==</span> <span class="n">SubmissionStatus</span><span class="o">.</span><span class="n">FAILED</span><span class="p">:</span>
+                <span class="n">err_msg</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;submission failed. </span><span class="si">{</span><span class="nb">repr</span><span class="p">(</span><span class="n">submit_result</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
+                <span class="k">raise</span> <span class="n">RemoteError</span><span class="p">(</span><span class="n">err_msg</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
+            <span class="k">elif</span> <span class="n">submit_result</span><span class="o">.</span><span class="n">status</span> <span class="o">==</span> <span class="n">SubmissionStatus</span><span class="o">.</span><span class="n">JOB_ID_UNKNOWN</span><span class="p">:</span>
+                <span class="n">err_msg</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;submission succeeded but ID not known. Job may be running but status cannot be checked. </span><span class="si">{</span><span class="nb">repr</span><span class="p">(</span><span class="n">submit_result</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
+                <span class="k">raise</span> <span class="n">RemoteError</span><span class="p">(</span><span class="n">err_msg</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
+            <span class="k">elif</span> <span class="n">submit_result</span><span class="o">.</span><span class="n">status</span> <span class="o">==</span> <span class="n">SubmissionStatus</span><span class="o">.</span><span class="n">SUCCESSFUL</span><span class="p">:</span>
+                <span class="n">lock</span><span class="o">.</span><span class="n">update_on_release</span> <span class="o">=</span> <span class="p">{</span>
+                    <span class="s2">&quot;$set&quot;</span><span class="p">:</span> <span class="p">{</span>
+                        <span class="s2">&quot;remote.process_id&quot;</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">submit_result</span><span class="o">.</span><span class="n">job_id</span><span class="p">),</span>
+                        <span class="s2">&quot;state&quot;</span><span class="p">:</span> <span class="n">JobState</span><span class="o">.</span><span class="n">SUBMITTED</span><span class="o">.</span><span class="n">value</span><span class="p">,</span>
+                    <span class="p">}</span>
+                <span class="p">}</span>
+                <span class="k">if</span> <span class="n">worker_name</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">limited_workers</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">limited_workers</span><span class="p">[</span><span class="n">worker_name</span><span class="p">][</span><span class="s2">&quot;current&quot;</span><span class="p">]</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">RemoteError</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;unhandled submission status </span><span class="si">{</span><span class="n">submit_result</span><span class="o">.</span><span class="n">status</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="kc">True</span>
+                <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Runner.download">
+<a class="viewcode-back" href="../../../api/jobflow_remote.jobs.runner.html#jobflow_remote.jobs.runner.Runner.download">[docs]</a>
+    <span class="k">def</span> <span class="nf">download</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">lock</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Download the final files for a locked Job in the TERMINATED state.</span>
+<span class="sd">        If successful set the state to DOWNLOADED.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        lock</span>
+<span class="sd">            The MongoLock with the locked Job document.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">doc</span> <span class="o">=</span> <span class="n">lock</span><span class="o">.</span><span class="n">locked_document</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;download db_id: </span><span class="si">{</span><span class="n">doc</span><span class="p">[</span><span class="s1">&#39;db_id&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="c1"># job_doc = JobDoc(**doc)</span>
+        <span class="n">job_dict</span> <span class="o">=</span> <span class="n">doc</span><span class="p">[</span><span class="s2">&quot;job&quot;</span><span class="p">]</span>
+
+        <span class="c1"># If the worker is local do not copy the files in the temporary folder</span>
+        <span class="c1"># It should not arrive to this point, since it should go directly</span>
+        <span class="c1"># from SUBMITTED/RUNNING to DOWNLOADED in case of local worker</span>
+        <span class="n">worker</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_worker</span><span class="p">(</span><span class="n">doc</span><span class="p">[</span><span class="s2">&quot;worker&quot;</span><span class="p">])</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">worker</span><span class="o">.</span><span class="n">is_local</span><span class="p">:</span>
+            <span class="n">host</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_host</span><span class="p">(</span><span class="n">doc</span><span class="p">[</span><span class="s2">&quot;worker&quot;</span><span class="p">])</span>
+            <span class="n">store</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">jobstore</span>
+
+            <span class="n">remote_path</span> <span class="o">=</span> <span class="n">doc</span><span class="p">[</span><span class="s2">&quot;run_dir&quot;</span><span class="p">]</span>
+            <span class="n">local_base_dir</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">project</span><span class="o">.</span><span class="n">tmp_dir</span><span class="p">,</span> <span class="s2">&quot;download&quot;</span><span class="p">)</span>
+            <span class="n">local_path</span> <span class="o">=</span> <span class="n">get_job_path</span><span class="p">(</span>
+                <span class="n">job_dict</span><span class="p">[</span><span class="s2">&quot;uuid&quot;</span><span class="p">],</span> <span class="n">job_dict</span><span class="p">[</span><span class="s2">&quot;index&quot;</span><span class="p">],</span> <span class="n">local_base_dir</span>
+            <span class="p">)</span>
+
+            <span class="n">makedirs_p</span><span class="p">(</span><span class="n">local_path</span><span class="p">)</span>
+
+            <span class="n">fnames</span> <span class="o">=</span> <span class="p">[</span><span class="n">OUT_FILENAME</span><span class="p">]</span>
+            <span class="n">fnames</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">get_remote_store_filenames</span><span class="p">(</span><span class="n">store</span><span class="p">))</span>
+
+            <span class="k">for</span> <span class="n">fname</span> <span class="ow">in</span> <span class="n">fnames</span><span class="p">:</span>
+                <span class="c1"># in principle fabric should work by just passing the</span>
+                <span class="c1"># destination folder, but it fails</span>
+                <span class="n">remote_file_path</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="n">remote_path</span><span class="p">,</span> <span class="n">fname</span><span class="p">))</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="n">host</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">remote_file_path</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="n">local_path</span><span class="p">,</span> <span class="n">fname</span><span class="p">)))</span>
+                <span class="k">except</span> <span class="ne">FileNotFoundError</span><span class="p">:</span>
+                    <span class="c1"># if files are missing it should not retry</span>
+                    <span class="n">err_msg</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;file </span><span class="si">{</span><span class="n">remote_file_path</span><span class="si">}</span><span class="s2"> for job </span><span class="si">{</span><span class="n">job_dict</span><span class="p">[</span><span class="s1">&#39;uuid&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2"> does not exist&quot;</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="n">err_msg</span><span class="p">)</span>
+                    <span class="k">raise</span> <span class="n">RemoteError</span><span class="p">(</span><span class="n">err_msg</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
+
+        <span class="n">lock</span><span class="o">.</span><span class="n">update_on_release</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;$set&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;state&quot;</span><span class="p">:</span> <span class="n">JobState</span><span class="o">.</span><span class="n">DOWNLOADED</span><span class="o">.</span><span class="n">value</span><span class="p">}}</span></div>
+
+
+<div class="viewcode-block" id="Runner.complete_job">
+<a class="viewcode-back" href="../../../api/jobflow_remote.jobs.runner.html#jobflow_remote.jobs.runner.Runner.complete_job">[docs]</a>
+    <span class="k">def</span> <span class="nf">complete_job</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">lock</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Complete a locked Job in the DOWNLOADED state.</span>
+<span class="sd">        If successful set the state to COMPLETED, otherwise to FAILED.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        lock</span>
+<span class="sd">            The MongoLock with the locked Job document.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">doc</span> <span class="o">=</span> <span class="n">lock</span><span class="o">.</span><span class="n">locked_document</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;complete job db_id: </span><span class="si">{</span><span class="n">doc</span><span class="p">[</span><span class="s1">&#39;db_id&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="c1"># if the worker is local the files were not copied to the temporary</span>
+        <span class="c1"># folder, but the files could be directly updated</span>
+        <span class="n">worker</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_worker</span><span class="p">(</span><span class="n">doc</span><span class="p">[</span><span class="s2">&quot;worker&quot;</span><span class="p">])</span>
+        <span class="k">if</span> <span class="n">worker</span><span class="o">.</span><span class="n">is_local</span><span class="p">:</span>
+            <span class="n">local_path</span> <span class="o">=</span> <span class="n">doc</span><span class="p">[</span><span class="s2">&quot;run_dir&quot;</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">local_base_dir</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">project</span><span class="o">.</span><span class="n">tmp_dir</span><span class="p">,</span> <span class="s2">&quot;download&quot;</span><span class="p">)</span>
+            <span class="n">local_path</span> <span class="o">=</span> <span class="n">get_job_path</span><span class="p">(</span><span class="n">doc</span><span class="p">[</span><span class="s2">&quot;uuid&quot;</span><span class="p">],</span> <span class="n">doc</span><span class="p">[</span><span class="s2">&quot;index&quot;</span><span class="p">],</span> <span class="n">local_base_dir</span><span class="p">)</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">store</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">jobstore</span>
+            <span class="n">completed</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">job_controller</span><span class="o">.</span><span class="n">complete_job</span><span class="p">(</span><span class="n">doc</span><span class="p">,</span> <span class="n">local_path</span><span class="p">,</span> <span class="n">store</span><span class="p">)</span>
+
+        <span class="k">except</span> <span class="n">json</span><span class="o">.</span><span class="n">JSONDecodeError</span><span class="p">:</span>
+            <span class="c1"># if an empty file is copied this error can appear, do not retry</span>
+            <span class="n">err_msg</span> <span class="o">=</span> <span class="n">traceback</span><span class="o">.</span><span class="n">format_exc</span><span class="p">()</span>
+            <span class="k">raise</span> <span class="n">RemoteError</span><span class="p">(</span><span class="n">err_msg</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
+
+        <span class="c1"># remove local folder with downloaded files if successfully completed</span>
+        <span class="k">if</span> <span class="n">completed</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">runner_options</span><span class="o">.</span><span class="n">delete_tmp_folder</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">worker</span><span class="o">.</span><span class="n">is_local</span><span class="p">:</span>
+            <span class="n">shutil</span><span class="o">.</span><span class="n">rmtree</span><span class="p">(</span><span class="n">local_path</span><span class="p">,</span> <span class="n">ignore_errors</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">completed</span><span class="p">:</span>
+            <span class="n">err_msg</span> <span class="o">=</span> <span class="s2">&quot;the parsed output does not contain the required information to complete the job&quot;</span>
+            <span class="k">raise</span> <span class="n">RemoteError</span><span class="p">(</span><span class="n">err_msg</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Runner.check_run_status">
+<a class="viewcode-back" href="../../../api/jobflow_remote.jobs.runner.html#jobflow_remote.jobs.runner.Runner.check_run_status">[docs]</a>
+    <span class="k">def</span> <span class="nf">check_run_status</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Check the status of all the jobs submitted to a queue.</span>
+
+<span class="sd">        If Jobs started update their state from SUBMITTED to RUNNING.</span>
+<span class="sd">        If Jobs terminated set their state to TERMINATED if running on a remote</span>
+<span class="sd">        host. If on a local host set them directly to DOWNLOADED.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;check_run_status&quot;</span><span class="p">)</span>
+        <span class="c1"># check for jobs that could have changed state</span>
+        <span class="n">workers_ids_docs</span> <span class="o">=</span> <span class="n">defaultdict</span><span class="p">(</span><span class="nb">dict</span><span class="p">)</span>
+        <span class="n">db_filter</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">&quot;state&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;$in&quot;</span><span class="p">:</span> <span class="p">[</span><span class="n">JobState</span><span class="o">.</span><span class="n">SUBMITTED</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="n">JobState</span><span class="o">.</span><span class="n">RUNNING</span><span class="o">.</span><span class="n">value</span><span class="p">]},</span>
+            <span class="s2">&quot;lock_id&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+            <span class="s2">&quot;remote.retry_time_limit&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;$not&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;$gt&quot;</span><span class="p">:</span> <span class="n">datetime</span><span class="o">.</span><span class="n">utcnow</span><span class="p">()}},</span>
+        <span class="p">}</span>
+        <span class="n">projection</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="s2">&quot;db_id&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;uuid&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;index&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;remote&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;worker&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;state&quot;</span><span class="p">,</span>
+        <span class="p">]</span>
+        <span class="k">for</span> <span class="n">doc</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">job_controller</span><span class="o">.</span><span class="n">get_jobs</span><span class="p">(</span><span class="n">db_filter</span><span class="p">,</span> <span class="n">projection</span><span class="p">):</span>
+            <span class="n">worker_name</span> <span class="o">=</span> <span class="n">doc</span><span class="p">[</span><span class="s2">&quot;worker&quot;</span><span class="p">]</span>
+            <span class="n">remote_doc</span> <span class="o">=</span> <span class="n">doc</span><span class="p">[</span><span class="s2">&quot;remote&quot;</span><span class="p">]</span>
+            <span class="n">workers_ids_docs</span><span class="p">[</span><span class="n">worker_name</span><span class="p">][</span><span class="n">remote_doc</span><span class="p">[</span><span class="s2">&quot;process_id&quot;</span><span class="p">]]</span> <span class="o">=</span> <span class="n">doc</span>
+
+        <span class="k">for</span> <span class="n">worker_name</span><span class="p">,</span> <span class="n">ids_docs</span> <span class="ow">in</span> <span class="n">workers_ids_docs</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="n">error</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">ids_docs</span><span class="p">:</span>
+                <span class="k">continue</span>
+
+            <span class="n">qjobs_dict</span> <span class="o">=</span> <span class="p">{}</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">ids_list</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">ids_docs</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span>
+                <span class="n">queue</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_queue_manager</span><span class="p">(</span><span class="n">worker_name</span><span class="p">)</span>
+                <span class="n">qjobs</span> <span class="o">=</span> <span class="n">queue</span><span class="o">.</span><span class="n">get_jobs_list</span><span class="p">(</span><span class="n">ids_list</span><span class="p">)</span>
+                <span class="n">qjobs_dict</span> <span class="o">=</span> <span class="p">{</span><span class="n">qjob</span><span class="o">.</span><span class="n">job_id</span><span class="p">:</span> <span class="n">qjob</span> <span class="k">for</span> <span class="n">qjob</span> <span class="ow">in</span> <span class="n">qjobs</span><span class="p">}</span>
+            <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;error trying to get jobs list for worker: </span><span class="si">{</span><span class="n">worker_name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+                    <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                <span class="p">)</span>
+                <span class="n">error</span> <span class="o">=</span> <span class="n">traceback</span><span class="o">.</span><span class="n">format_exc</span><span class="p">()</span>
+
+            <span class="k">for</span> <span class="n">doc_id</span><span class="p">,</span> <span class="n">doc</span> <span class="ow">in</span> <span class="n">ids_docs</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                <span class="c1"># TODO if failed should maybe be handled differently?</span>
+                <span class="n">remote_doc</span> <span class="o">=</span> <span class="n">doc</span><span class="p">[</span><span class="s2">&quot;remote&quot;</span><span class="p">]</span>
+                <span class="n">qjob</span> <span class="o">=</span> <span class="n">qjobs_dict</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">doc_id</span><span class="p">)</span>
+                <span class="n">qstate</span> <span class="o">=</span> <span class="n">qjob</span><span class="o">.</span><span class="n">state</span> <span class="k">if</span> <span class="n">qjob</span> <span class="k">else</span> <span class="kc">None</span>
+                <span class="n">next_state</span> <span class="o">=</span> <span class="kc">None</span>
+                <span class="n">start_time</span> <span class="o">=</span> <span class="kc">None</span>
+                <span class="k">if</span> <span class="p">(</span>
+                    <span class="n">qstate</span> <span class="o">==</span> <span class="n">QState</span><span class="o">.</span><span class="n">RUNNING</span>
+                    <span class="ow">and</span> <span class="n">doc</span><span class="p">[</span><span class="s2">&quot;state&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="n">JobState</span><span class="o">.</span><span class="n">SUBMITTED</span><span class="o">.</span><span class="n">value</span>
+                <span class="p">):</span>
+                    <span class="n">next_state</span> <span class="o">=</span> <span class="n">JobState</span><span class="o">.</span><span class="n">RUNNING</span>
+                    <span class="n">start_time</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">utcnow</span><span class="p">()</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                        <span class="sa">f</span><span class="s2">&quot;remote job with id </span><span class="si">{</span><span class="n">remote_doc</span><span class="p">[</span><span class="s1">&#39;process_id&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2"> is running&quot;</span>
+                    <span class="p">)</span>
+                <span class="k">elif</span> <span class="n">qstate</span> <span class="ow">in</span> <span class="p">[</span><span class="kc">None</span><span class="p">,</span> <span class="n">QState</span><span class="o">.</span><span class="n">DONE</span><span class="p">,</span> <span class="n">QState</span><span class="o">.</span><span class="n">FAILED</span><span class="p">]:</span>
+                    <span class="n">worker</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_worker</span><span class="p">(</span><span class="n">worker_name</span><span class="p">)</span>
+                    <span class="c1"># if the worker is local go directly to DOWNLOADED, as files</span>
+                    <span class="c1"># are not copied locally</span>
+                    <span class="k">if</span> <span class="ow">not</span> <span class="n">worker</span><span class="o">.</span><span class="n">is_local</span><span class="p">:</span>
+                        <span class="n">next_state</span> <span class="o">=</span> <span class="n">JobState</span><span class="o">.</span><span class="n">TERMINATED</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="n">next_state</span> <span class="o">=</span> <span class="n">JobState</span><span class="o">.</span><span class="n">DOWNLOADED</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                        <span class="sa">f</span><span class="s2">&quot;terminated remote job with id </span><span class="si">{</span><span class="n">remote_doc</span><span class="p">[</span><span class="s1">&#39;process_id&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span>
+                    <span class="p">)</span>
+                <span class="k">elif</span> <span class="ow">not</span> <span class="n">error</span> <span class="ow">and</span> <span class="n">remote_doc</span><span class="p">[</span><span class="s2">&quot;step_attempts&quot;</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                    <span class="c1"># reset the step attempts if succeeding in case there was</span>
+                    <span class="c1"># an error earlier. Setting the state to the same as the</span>
+                    <span class="c1"># current triggers the update that cleans the state</span>
+                    <span class="n">next_state</span> <span class="o">=</span> <span class="n">JobState</span><span class="p">(</span><span class="n">remote_doc</span><span class="p">[</span><span class="s2">&quot;state&quot;</span><span class="p">])</span>
+
+                <span class="c1"># the document needs to be updated only in case of error or if a</span>
+                <span class="c1"># next state has been set.</span>
+                <span class="c1"># Only update if the state did not change in the meanwhile</span>
+                <span class="k">if</span> <span class="n">next_state</span> <span class="ow">or</span> <span class="n">error</span><span class="p">:</span>
+                    <span class="n">lock_filter</span> <span class="o">=</span> <span class="p">{</span>
+                        <span class="s2">&quot;uuid&quot;</span><span class="p">:</span> <span class="n">doc</span><span class="p">[</span><span class="s2">&quot;uuid&quot;</span><span class="p">],</span>
+                        <span class="s2">&quot;index&quot;</span><span class="p">:</span> <span class="n">doc</span><span class="p">[</span><span class="s2">&quot;index&quot;</span><span class="p">],</span>
+                        <span class="s2">&quot;state&quot;</span><span class="p">:</span> <span class="n">doc</span><span class="p">[</span><span class="s2">&quot;state&quot;</span><span class="p">],</span>
+                    <span class="p">}</span>
+                    <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">job_controller</span><span class="o">.</span><span class="n">lock_job_for_update</span><span class="p">(</span>
+                        <span class="n">query</span><span class="o">=</span><span class="n">lock_filter</span><span class="p">,</span>
+                        <span class="n">max_step_attempts</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">runner_options</span><span class="o">.</span><span class="n">max_step_attempts</span><span class="p">,</span>
+                        <span class="n">delta_retry</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">runner_options</span><span class="o">.</span><span class="n">delta_retry</span><span class="p">,</span>
+                    <span class="p">)</span> <span class="k">as</span> <span class="n">lock</span><span class="p">:</span>
+                        <span class="k">if</span> <span class="n">lock</span><span class="o">.</span><span class="n">locked_document</span><span class="p">:</span>
+                            <span class="k">if</span> <span class="n">error</span><span class="p">:</span>
+                                <span class="k">raise</span> <span class="n">RemoteError</span><span class="p">(</span><span class="n">error</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
+                            <span class="n">set_output</span> <span class="o">=</span> <span class="p">{</span>
+                                <span class="s2">&quot;$set&quot;</span><span class="p">:</span> <span class="p">{</span>
+                                    <span class="s2">&quot;remote.queue_state&quot;</span><span class="p">:</span> <span class="n">qstate</span><span class="o">.</span><span class="n">value</span>
+                                    <span class="k">if</span> <span class="n">qstate</span>
+                                    <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+                                    <span class="s2">&quot;state&quot;</span><span class="p">:</span> <span class="n">next_state</span><span class="o">.</span><span class="n">value</span><span class="p">,</span>
+                                <span class="p">}</span>
+                            <span class="p">}</span>
+                            <span class="k">if</span> <span class="n">start_time</span><span class="p">:</span>
+                                <span class="n">set_output</span><span class="p">[</span><span class="s2">&quot;$set&quot;</span><span class="p">][</span><span class="s2">&quot;start_time&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">start_time</span>
+                            <span class="n">lock</span><span class="o">.</span><span class="n">update_on_release</span> <span class="o">=</span> <span class="n">set_output</span>
+                    <span class="c1"># decrease the amount of jobs running if it is a limited worker</span>
+                    <span class="k">if</span> <span class="p">(</span>
+                        <span class="n">next_state</span> <span class="ow">in</span> <span class="p">(</span><span class="n">JobState</span><span class="o">.</span><span class="n">TERMINATED</span><span class="p">,</span> <span class="n">JobState</span><span class="o">.</span><span class="n">DOWNLOADED</span><span class="p">)</span>
+                        <span class="ow">and</span> <span class="n">worker_name</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">limited_workers</span>
+                    <span class="p">):</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">limited_workers</span><span class="p">[</span><span class="n">doc</span><span class="p">[</span><span class="s2">&quot;worker&quot;</span><span class="p">]][</span><span class="s2">&quot;current&quot;</span><span class="p">]</span> <span class="o">-=</span> <span class="mi">1</span></div>
+
+
+<div class="viewcode-block" id="Runner.checkout">
+<a class="viewcode-back" href="../../../api/jobflow_remote.jobs.runner.html#jobflow_remote.jobs.runner.Runner.checkout">[docs]</a>
+    <span class="k">def</span> <span class="nf">checkout</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Checkout READY Jobs.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;checkout jobs&quot;</span><span class="p">)</span>
+        <span class="n">n_checked_out</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
+            <span class="n">reserved</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">job_controller</span><span class="o">.</span><span class="n">checkout_job</span><span class="p">()</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">reserved</span><span class="p">:</span>
+                <span class="k">break</span>
+
+            <span class="n">n_checked_out</span> <span class="o">+=</span> <span class="mi">1</span>
+
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;checked out </span><span class="si">{</span><span class="n">n_checked_out</span><span class="si">}</span><span class="s2"> jobs&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Runner.refresh_num_current_jobs">
+<a class="viewcode-back" href="../../../api/jobflow_remote.jobs.runner.html#jobflow_remote.jobs.runner.Runner.refresh_num_current_jobs">[docs]</a>
+    <span class="k">def</span> <span class="nf">refresh_num_current_jobs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Update the number of jobs currently running for worker with limited</span>
+<span class="sd">        number of Jobs.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">state</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">limited_workers</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="n">query</span> <span class="o">=</span> <span class="p">{</span>
+                <span class="s2">&quot;state&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;$in&quot;</span><span class="p">:</span> <span class="p">[</span><span class="n">JobState</span><span class="o">.</span><span class="n">SUBMITTED</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="n">JobState</span><span class="o">.</span><span class="n">RUNNING</span><span class="o">.</span><span class="n">value</span><span class="p">]},</span>
+                <span class="s2">&quot;worker&quot;</span><span class="p">:</span> <span class="n">name</span><span class="p">,</span>
+            <span class="p">}</span>
+            <span class="n">state</span><span class="p">[</span><span class="s2">&quot;current&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">job_controller</span><span class="o">.</span><span class="n">count_jobs</span><span class="p">(</span><span class="n">query</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Runner.update_batch_jobs">
+<a class="viewcode-back" href="../../../api/jobflow_remote.jobs.runner.html#jobflow_remote.jobs.runner.Runner.update_batch_jobs">[docs]</a>
+    <span class="k">def</span> <span class="nf">update_batch_jobs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Update the status of batch jobs.</span>
+
+<span class="sd">        Includes submitting to the remote queue, checking the status of</span>
+<span class="sd">        running jobs in the queue and handle the files with the Jobs information</span>
+<span class="sd">        about their status.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;update batch jobs&quot;</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">worker_name</span><span class="p">,</span> <span class="n">batch_manager</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">batch_workers</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="n">worker</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_worker</span><span class="p">(</span><span class="n">worker_name</span><span class="p">)</span>
+            <span class="c1"># first check the processes that are running from the folder</span>
+            <span class="c1">#  and set them to running if needed</span>
+            <span class="n">running_jobs</span> <span class="o">=</span> <span class="n">batch_manager</span><span class="o">.</span><span class="n">get_running</span><span class="p">()</span>
+            <span class="k">for</span> <span class="n">job_id</span><span class="p">,</span> <span class="n">job_index</span><span class="p">,</span> <span class="n">process_running_uuid</span> <span class="ow">in</span> <span class="n">running_jobs</span><span class="p">:</span>
+                <span class="n">lock_filter</span> <span class="o">=</span> <span class="p">{</span>
+                    <span class="s2">&quot;uuid&quot;</span><span class="p">:</span> <span class="n">job_id</span><span class="p">,</span>
+                    <span class="s2">&quot;index&quot;</span><span class="p">:</span> <span class="n">job_index</span><span class="p">,</span>
+                    <span class="s2">&quot;state&quot;</span><span class="p">:</span> <span class="n">JobState</span><span class="o">.</span><span class="n">BATCH_SUBMITTED</span><span class="o">.</span><span class="n">value</span><span class="p">,</span>
+                <span class="p">}</span>
+                <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">job_controller</span><span class="o">.</span><span class="n">lock_job_for_update</span><span class="p">(</span>
+                    <span class="n">query</span><span class="o">=</span><span class="n">lock_filter</span><span class="p">,</span>
+                    <span class="n">max_step_attempts</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">runner_options</span><span class="o">.</span><span class="n">max_step_attempts</span><span class="p">,</span>
+                    <span class="n">delta_retry</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">runner_options</span><span class="o">.</span><span class="n">delta_retry</span><span class="p">,</span>
+                <span class="p">)</span> <span class="k">as</span> <span class="n">lock</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="n">lock</span><span class="o">.</span><span class="n">locked_document</span><span class="p">:</span>
+                        <span class="n">set_output</span> <span class="o">=</span> <span class="p">{</span>
+                            <span class="s2">&quot;$set&quot;</span><span class="p">:</span> <span class="p">{</span>
+                                <span class="s2">&quot;state&quot;</span><span class="p">:</span> <span class="n">JobState</span><span class="o">.</span><span class="n">BATCH_RUNNING</span><span class="o">.</span><span class="n">value</span><span class="p">,</span>
+                                <span class="s2">&quot;start_time&quot;</span><span class="p">:</span> <span class="n">datetime</span><span class="o">.</span><span class="n">utcnow</span><span class="p">(),</span>
+                                <span class="s2">&quot;remote.process_id&quot;</span><span class="p">:</span> <span class="n">process_running_uuid</span><span class="p">,</span>
+                            <span class="p">}</span>
+                        <span class="p">}</span>
+                        <span class="n">lock</span><span class="o">.</span><span class="n">update_on_release</span> <span class="o">=</span> <span class="n">set_output</span>
+
+            <span class="c1"># Check the processes that should be running on the remote queue</span>
+            <span class="c1"># and update the state in the DB if something changed</span>
+            <span class="n">batch_processes_data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">job_controller</span><span class="o">.</span><span class="n">get_batch_processes</span><span class="p">(</span><span class="n">worker_name</span><span class="p">)</span>
+            <span class="n">processes</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">batch_processes_data</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span>
+            <span class="n">queue_manager</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_queue_manager</span><span class="p">(</span><span class="n">worker_name</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">processes</span><span class="p">:</span>
+                <span class="n">qjobs</span> <span class="o">=</span> <span class="n">queue_manager</span><span class="o">.</span><span class="n">get_jobs_list</span><span class="p">(</span><span class="n">processes</span><span class="p">)</span>
+                <span class="n">running_processes</span> <span class="o">=</span> <span class="p">{</span><span class="n">qjob</span><span class="o">.</span><span class="n">job_id</span> <span class="k">for</span> <span class="n">qjob</span> <span class="ow">in</span> <span class="n">qjobs</span><span class="p">}</span>
+                <span class="n">stopped_processes</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">processes</span><span class="p">)</span> <span class="o">-</span> <span class="n">running_processes</span>
+                <span class="k">for</span> <span class="n">pid</span> <span class="ow">in</span> <span class="n">stopped_processes</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">job_controller</span><span class="o">.</span><span class="n">remove_batch_process</span><span class="p">(</span><span class="n">pid</span><span class="p">,</span> <span class="n">worker_name</span><span class="p">)</span>
+                    <span class="c1"># check if there are jobs that were in the running folder of a</span>
+                    <span class="c1"># process that finished and set them to remote error</span>
+                    <span class="k">for</span> <span class="n">job_id</span><span class="p">,</span> <span class="n">job_index</span><span class="p">,</span> <span class="n">process_running_uuid</span> <span class="ow">in</span> <span class="n">running_jobs</span><span class="p">:</span>
+                        <span class="k">if</span> <span class="n">batch_processes_data</span><span class="p">[</span><span class="n">pid</span><span class="p">]</span> <span class="o">==</span> <span class="n">process_running_uuid</span><span class="p">:</span>
+                            <span class="n">lock_filter</span> <span class="o">=</span> <span class="p">{</span>
+                                <span class="s2">&quot;uuid&quot;</span><span class="p">:</span> <span class="n">job_id</span><span class="p">,</span>
+                                <span class="s2">&quot;index&quot;</span><span class="p">:</span> <span class="n">job_index</span><span class="p">,</span>
+                                <span class="s2">&quot;state&quot;</span><span class="p">:</span> <span class="p">{</span>
+                                    <span class="s2">&quot;$in&quot;</span><span class="p">:</span> <span class="p">(</span>
+                                        <span class="n">JobState</span><span class="o">.</span><span class="n">BATCH_SUBMITTED</span><span class="o">.</span><span class="n">value</span><span class="p">,</span>
+                                        <span class="n">JobState</span><span class="o">.</span><span class="n">BATCH_RUNNING</span><span class="o">.</span><span class="n">value</span><span class="p">,</span>
+                                    <span class="p">)</span>
+                                <span class="p">},</span>
+                            <span class="p">}</span>
+                            <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">job_controller</span><span class="o">.</span><span class="n">lock_job_for_update</span><span class="p">(</span>
+                                <span class="n">query</span><span class="o">=</span><span class="n">lock_filter</span><span class="p">,</span>
+                                <span class="n">max_step_attempts</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">runner_options</span><span class="o">.</span><span class="n">max_step_attempts</span><span class="p">,</span>
+                                <span class="n">delta_retry</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">runner_options</span><span class="o">.</span><span class="n">delta_retry</span><span class="p">,</span>
+                            <span class="p">)</span> <span class="k">as</span> <span class="n">lock</span><span class="p">:</span>
+                                <span class="k">if</span> <span class="n">lock</span><span class="o">.</span><span class="n">locked_document</span><span class="p">:</span>
+                                    <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+                                        <span class="sa">f</span><span class="s2">&quot;The batch process that was running the job (process_id: </span><span class="si">{</span><span class="n">pid</span><span class="si">}</span><span class="s2">, uuid: </span><span class="si">{</span><span class="n">process_running_uuid</span><span class="si">}</span><span class="s2"> was likely killed before terminating the job execution&quot;</span>
+                                    <span class="p">)</span>
+
+                <span class="n">processes</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">running_processes</span><span class="p">)</span>
+
+            <span class="c1"># check that enough processes are submitted and submit the required</span>
+            <span class="c1"># amount to reach max_jobs, if needed.</span>
+            <span class="n">n_jobs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">job_controller</span><span class="o">.</span><span class="n">count_jobs</span><span class="p">(</span>
+                <span class="p">{</span>
+                    <span class="s2">&quot;state&quot;</span><span class="p">:</span> <span class="p">{</span>
+                        <span class="s2">&quot;$in&quot;</span><span class="p">:</span> <span class="p">(</span>
+                            <span class="n">JobState</span><span class="o">.</span><span class="n">BATCH_SUBMITTED</span><span class="o">.</span><span class="n">value</span><span class="p">,</span>
+                            <span class="n">JobState</span><span class="o">.</span><span class="n">BATCH_RUNNING</span><span class="o">.</span><span class="n">value</span><span class="p">,</span>
+                        <span class="p">)</span>
+                    <span class="p">},</span>
+                    <span class="s2">&quot;worker&quot;</span><span class="p">:</span> <span class="n">worker_name</span><span class="p">,</span>
+                <span class="p">}</span>
+            <span class="p">)</span>
+            <span class="n">n_processes</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">processes</span><span class="p">)</span>
+            <span class="n">n_jobs_to_submit</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span>
+                <span class="nb">max</span><span class="p">(</span><span class="n">worker</span><span class="o">.</span><span class="n">max_jobs</span> <span class="o">-</span> <span class="n">n_processes</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span> <span class="nb">max</span><span class="p">(</span><span class="n">n_jobs</span> <span class="o">-</span> <span class="n">n_processes</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+            <span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;submitting </span><span class="si">{</span><span class="n">n_jobs_to_submit</span><span class="si">}</span><span class="s2"> batch jobs for worker </span><span class="si">{</span><span class="n">worker_name</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="p">)</span>
+            <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_jobs_to_submit</span><span class="p">):</span>
+                <span class="n">resources</span> <span class="o">=</span> <span class="n">worker</span><span class="o">.</span><span class="n">resources</span> <span class="ow">or</span> <span class="p">{}</span>
+                <span class="n">process_running_uuid</span> <span class="o">=</span> <span class="n">suuid</span><span class="p">()</span>
+                <span class="n">remote_path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span>
+                    <span class="n">get_job_path</span><span class="p">(</span><span class="n">process_running_uuid</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="n">worker</span><span class="o">.</span><span class="n">batch</span><span class="o">.</span><span class="n">work_dir</span><span class="p">)</span>
+                <span class="p">)</span>
+                <span class="n">qout_fpath</span> <span class="o">=</span> <span class="n">remote_path</span> <span class="o">/</span> <span class="n">OUT_FNAME</span>
+                <span class="n">qerr_fpath</span> <span class="o">=</span> <span class="n">remote_path</span> <span class="o">/</span> <span class="n">ERR_FNAME</span>
+                <span class="n">set_name_out</span><span class="p">(</span>
+                    <span class="n">resources</span><span class="p">,</span>
+                    <span class="sa">f</span><span class="s2">&quot;batch_</span><span class="si">{</span><span class="n">process_running_uuid</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+                    <span class="n">out_fpath</span><span class="o">=</span><span class="n">qout_fpath</span><span class="p">,</span>
+                    <span class="n">err_fpath</span><span class="o">=</span><span class="n">qerr_fpath</span><span class="p">,</span>
+                <span class="p">)</span>
+
+                <span class="c1"># note that here the worker.work_dir needs to be passed,</span>
+                <span class="c1"># not the worker.batch.work_dir</span>
+                <span class="n">command</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;jf execution run-batch </span><span class="si">{</span><span class="n">worker</span><span class="o">.</span><span class="n">work_dir</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">worker</span><span class="o">.</span><span class="n">batch</span><span class="o">.</span><span class="n">jobs_handle_dir</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">process_running_uuid</span><span class="si">}</span><span class="s2">&quot;</span>
+                <span class="k">if</span> <span class="n">worker</span><span class="o">.</span><span class="n">batch</span><span class="o">.</span><span class="n">max_jobs</span><span class="p">:</span>
+                    <span class="n">command</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">&quot; -mj </span><span class="si">{</span><span class="n">worker</span><span class="o">.</span><span class="n">batch</span><span class="o">.</span><span class="n">max_jobs</span><span class="si">}</span><span class="s2">&quot;</span>
+                <span class="k">if</span> <span class="n">worker</span><span class="o">.</span><span class="n">batch</span><span class="o">.</span><span class="n">max_time</span><span class="p">:</span>
+                    <span class="n">command</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">&quot; -mt </span><span class="si">{</span><span class="n">worker</span><span class="o">.</span><span class="n">batch</span><span class="o">.</span><span class="n">max_time</span><span class="si">}</span><span class="s2">&quot;</span>
+                <span class="k">if</span> <span class="n">worker</span><span class="o">.</span><span class="n">batch</span><span class="o">.</span><span class="n">max_wait</span><span class="p">:</span>
+                    <span class="n">command</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">&quot; -mw </span><span class="si">{</span><span class="n">worker</span><span class="o">.</span><span class="n">batch</span><span class="o">.</span><span class="n">max_wait</span><span class="si">}</span><span class="s2">&quot;</span>
+
+                <span class="n">submit_result</span> <span class="o">=</span> <span class="n">queue_manager</span><span class="o">.</span><span class="n">submit</span><span class="p">(</span>
+                    <span class="n">commands</span><span class="o">=</span><span class="p">[</span><span class="n">command</span><span class="p">],</span>
+                    <span class="n">pre_run</span><span class="o">=</span><span class="n">worker</span><span class="o">.</span><span class="n">pre_run</span><span class="p">,</span>
+                    <span class="n">post_run</span><span class="o">=</span><span class="n">worker</span><span class="o">.</span><span class="n">post_run</span><span class="p">,</span>
+                    <span class="n">options</span><span class="o">=</span><span class="n">resources</span><span class="p">,</span>
+                    <span class="n">work_dir</span><span class="o">=</span><span class="n">remote_path</span><span class="p">,</span>
+                    <span class="n">create_submit_dir</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                <span class="p">)</span>
+
+                <span class="k">if</span> <span class="n">submit_result</span><span class="o">.</span><span class="n">status</span> <span class="o">==</span> <span class="n">SubmissionStatus</span><span class="o">.</span><span class="n">FAILED</span><span class="p">:</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;submission failed. </span><span class="si">{</span><span class="nb">repr</span><span class="p">(</span><span class="n">submit_result</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="k">elif</span> <span class="n">submit_result</span><span class="o">.</span><span class="n">status</span> <span class="o">==</span> <span class="n">SubmissionStatus</span><span class="o">.</span><span class="n">JOB_ID_UNKNOWN</span><span class="p">:</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
+                        <span class="sa">f</span><span class="s2">&quot;submission succeeded but ID not known. Job may be running but status cannot be checked. </span><span class="si">{</span><span class="nb">repr</span><span class="p">(</span><span class="n">submit_result</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
+                    <span class="p">)</span>
+
+                <span class="k">elif</span> <span class="n">submit_result</span><span class="o">.</span><span class="n">status</span> <span class="o">==</span> <span class="n">SubmissionStatus</span><span class="o">.</span><span class="n">SUCCESSFUL</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">job_controller</span><span class="o">.</span><span class="n">add_batch_process</span><span class="p">(</span>
+                        <span class="n">submit_result</span><span class="o">.</span><span class="n">job_id</span><span class="p">,</span> <span class="n">process_running_uuid</span><span class="p">,</span> <span class="n">worker_name</span>
+                    <span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
+                        <span class="sa">f</span><span class="s2">&quot;unhandled submission status </span><span class="si">{</span><span class="n">submit_result</span><span class="o">.</span><span class="n">status</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="kc">True</span>
+                    <span class="p">)</span>
+
+            <span class="c1"># check for jobs that have terminated in the batch runner and</span>
+            <span class="c1"># update the DB state accordingly</span>
+            <span class="n">terminated_jobs</span> <span class="o">=</span> <span class="n">batch_manager</span><span class="o">.</span><span class="n">get_terminated</span><span class="p">()</span>
+            <span class="k">for</span> <span class="n">job_id</span><span class="p">,</span> <span class="n">job_index</span><span class="p">,</span> <span class="n">process_running_uuid</span> <span class="ow">in</span> <span class="n">terminated_jobs</span><span class="p">:</span>
+                <span class="n">lock_filter</span> <span class="o">=</span> <span class="p">{</span>
+                    <span class="s2">&quot;uuid&quot;</span><span class="p">:</span> <span class="n">job_id</span><span class="p">,</span>
+                    <span class="s2">&quot;index&quot;</span><span class="p">:</span> <span class="n">job_index</span><span class="p">,</span>
+                    <span class="s2">&quot;state&quot;</span><span class="p">:</span> <span class="p">{</span>
+                        <span class="s2">&quot;$in&quot;</span><span class="p">:</span> <span class="p">(</span>
+                            <span class="n">JobState</span><span class="o">.</span><span class="n">BATCH_SUBMITTED</span><span class="o">.</span><span class="n">value</span><span class="p">,</span>
+                            <span class="n">JobState</span><span class="o">.</span><span class="n">BATCH_RUNNING</span><span class="o">.</span><span class="n">value</span><span class="p">,</span>
+                        <span class="p">)</span>
+                    <span class="p">},</span>
+                <span class="p">}</span>
+                <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">job_controller</span><span class="o">.</span><span class="n">lock_job_for_update</span><span class="p">(</span>
+                    <span class="n">query</span><span class="o">=</span><span class="n">lock_filter</span><span class="p">,</span>
+                    <span class="n">max_step_attempts</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">runner_options</span><span class="o">.</span><span class="n">max_step_attempts</span><span class="p">,</span>
+                    <span class="n">delta_retry</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">runner_options</span><span class="o">.</span><span class="n">delta_retry</span><span class="p">,</span>
+                <span class="p">)</span> <span class="k">as</span> <span class="n">lock</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="n">lock</span><span class="o">.</span><span class="n">locked_document</span><span class="p">:</span>
+                        <span class="k">if</span> <span class="ow">not</span> <span class="n">worker</span><span class="o">.</span><span class="n">is_local</span><span class="p">:</span>
+                            <span class="n">next_state</span> <span class="o">=</span> <span class="n">JobState</span><span class="o">.</span><span class="n">TERMINATED</span>
+                        <span class="k">else</span><span class="p">:</span>
+                            <span class="n">next_state</span> <span class="o">=</span> <span class="n">JobState</span><span class="o">.</span><span class="n">DOWNLOADED</span>
+                        <span class="n">set_output</span> <span class="o">=</span> <span class="p">{</span>
+                            <span class="s2">&quot;$set&quot;</span><span class="p">:</span> <span class="p">{</span>
+                                <span class="s2">&quot;state&quot;</span><span class="p">:</span> <span class="n">next_state</span><span class="o">.</span><span class="n">value</span><span class="p">,</span>
+                                <span class="s2">&quot;remote.process_id&quot;</span><span class="p">:</span> <span class="n">process_running_uuid</span><span class="p">,</span>
+                            <span class="p">}</span>
+                        <span class="p">}</span>
+                        <span class="n">lock</span><span class="o">.</span><span class="n">update_on_release</span> <span class="o">=</span> <span class="n">set_output</span>
+                <span class="n">batch_manager</span><span class="o">.</span><span class="n">delete_terminated</span><span class="p">(</span>
+                    <span class="p">[(</span><span class="n">job_id</span><span class="p">,</span> <span class="n">job_index</span><span class="p">,</span> <span class="n">process_running_uuid</span><span class="p">)]</span>
+                <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Runner.cleanup">
+<a class="viewcode-back" href="../../../api/jobflow_remote.jobs.runner.html#jobflow_remote.jobs.runner.Runner.cleanup">[docs]</a>
+    <span class="k">def</span> <span class="nf">cleanup</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Close all the connections after stopping the Runner.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">worker_name</span><span class="p">,</span> <span class="n">host</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">hosts</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">host</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+            <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                <span class="n">logging</span><span class="o">.</span><span class="n">exception</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;error while closing connection to worker </span><span class="si">{</span><span class="n">worker_name</span><span class="si">}</span><span class="s2">&quot;</span>
+                <span class="p">)</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">jobstore</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">exception</span><span class="p">(</span><span class="s2">&quot;error while closing connection to jobstore&quot;</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">job_controller</span><span class="o">.</span><span class="n">close</span><span class="p">()</span></div>
+</div>
+
+</pre></div>
+
+                </article>
+
+
+
+
+
+                <footer class="prev-next-footer">
+
+<div class="prev-next-area">
+</div>
+                </footer>
+
+            </div>
+
+
+
+
+          </div>
+          <footer class="bd-footer-content">
+
+          </footer>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="../../../_static/scripts/bootstrap.js?digest=5b4479735964841361fd"></script>
+<script src="../../../_static/scripts/pydata-sphinx-theme.js?digest=5b4479735964841361fd"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+
+    <div class="footer-items__start">
+
+        <div class="footer-item">
+
+  <p class="copyright">
+
+      © Copyright 2023, Matgenix SRL.
+      <br/>
+
+  </p>
+</div>
+
+        <div class="footer-item">
+
+  <p class="sphinx-version">
+    Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 7.2.6.
+    <br/>
+  </p>
+</div>
+
+    </div>
+
+
+
+    <div class="footer-items__end">
+
+        <div class="footer-item">
+<p class="theme-version">
+  Built with the <a href="https://pydata-sphinx-theme.readthedocs.io/en/stable/index.html">PyData Sphinx Theme</a> 0.14.4.
+</p></div>
+
+    </div>
+
+</div>
+
+  </footer>
+  </body>
+</html>

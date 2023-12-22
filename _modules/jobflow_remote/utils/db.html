@@ -1,0 +1,765 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../../../" data-theme="light">
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>jobflow_remote.utils.db &#8212; Jobflow Remote v0.0.1.post117+gfc0fbc0.d20231222 Manual</title>
+
+
+
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "light";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "light";
+  </script>
+
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../../_static/styles/theme.css?digest=5b4479735964841361fd" rel="stylesheet" />
+<link href="../../../_static/styles/bootstrap.css?digest=5b4479735964841361fd" rel="stylesheet" />
+<link href="../../../_static/styles/pydata-sphinx-theme.css?digest=5b4479735964841361fd" rel="stylesheet" />
+
+
+  <link href="../../../_static/vendor/fontawesome/6.1.2/css/all.min.css?digest=5b4479735964841361fd" rel="stylesheet" />
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="../../../_static/vendor/fontawesome/6.1.2/webfonts/fa-solid-900.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../_static/vendor/fontawesome/6.1.2/webfonts/fa-brands-400.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../_static/vendor/fontawesome/6.1.2/webfonts/fa-regular-400.woff2" />
+
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=fa44fd50" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css?v=eafc0fe6" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/autodoc_pydantic.css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/design-style.1e8bd061cd6da7fc9cf755528e8ffc24.min.css?v=0a3b3ea7" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/jobflow_remote.css?v=7b6df8f0" />
+
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../../_static/scripts/bootstrap.js?digest=5b4479735964841361fd" />
+<link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=5b4479735964841361fd" />
+  <script src="../../../_static/vendor/fontawesome/6.1.2/js/all.min.js?digest=5b4479735964841361fd"></script>
+
+    <script src="../../../_static/documentation_options.js?v=e135783d"></script>
+    <script src="../../../_static/doctools.js?v=888ff710"></script>
+    <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../../_static/design-tabs.js?v=36754332"></script>
+    <script src="https://unpkg.com/mermaid@10.2.0/dist/mermaid.min.js"></script>
+    <script>mermaid.initialize({startOnLoad:true});</script>
+    <script>DOCUMENTATION_OPTIONS.pagename = '_modules/jobflow_remote/utils/db';</script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+    <meta name="docbuild:last-update" content="Dec 22, 2023"/>
+  </head>
+
+
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="light">
+
+
+
+  <a class="skip-link" href="#main-content">Skip to main content</a>
+
+  <div id="pst-scroll-pixel-helper"></div>
+
+
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>
+    Back to top
+  </button>
+
+
+  <input type="checkbox"
+          class="sidebar-toggle"
+          name="__primary"
+          id="__primary"/>
+  <label class="overlay overlay-primary" for="__primary"></label>
+
+  <input type="checkbox"
+          class="sidebar-toggle"
+          name="__secondary"
+          id="__secondary"/>
+  <label class="overlay overlay-secondary" for="__secondary"></label>
+
+  <div class="search-button__wrapper">
+    <div class="search-button__overlay"></div>
+    <div class="search-button__search-container">
+<form class="bd-search d-flex align-items-center"
+      action="../../../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         id="search-input"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form></div>
+  </div>
+
+
+  <div class="bd-header-announcement container-fluid bd-header-announcement">
+    <div class="bd-header-announcement__content"><p>Jobflow Remote is still in beta phase. The API may change at any time.</p></div>
+  </div>
+
+
+    <nav class="bd-header navbar navbar-expand-lg bd-navbar">
+<div class="bd-header__inner bd-page-width">
+  <label class="sidebar-toggle primary-toggle" for="__primary">
+    <span class="fa-solid fa-bars"></span>
+  </label>
+
+
+  <div class="col-lg-3 navbar-header-items__start">
+
+      <div class="navbar-item">
+
+
+
+<a class="navbar-brand logo" href="../../../index.html">
+
+
+
+
+
+
+    <p class="title logo__title">Jobflow Remote v0.0.1.post117+gfc0fbc0.d20231222 Manual</p>
+
+</a></div>
+
+  </div>
+
+  <div class="col-lg-9 navbar-header-items">
+
+    <div class="me-auto navbar-header-items__center">
+
+        <div class="navbar-item">
+<nav class="navbar-nav">
+  <p class="sidebar-header-items__title"
+     role="heading"
+     aria-level="1"
+     aria-label="Site Navigation">
+    Site Navigation
+  </p>
+  <ul class="bd-navbar-elements navbar-nav">
+
+                    <li class="nav-item">
+                      <a class="nav-link nav-internal" href="../../../user/index.html">
+                        User Guide
+                      </a>
+                    </li>
+
+
+                    <li class="nav-item">
+                      <a class="nav-link nav-internal" href="../../../api/index.html">
+                        API reference
+                      </a>
+                    </li>
+
+
+                    <li class="nav-item">
+                      <a class="nav-link nav-internal" href="../../../dev/index.html">
+                        Development
+                      </a>
+                    </li>
+
+  </ul>
+</nav></div>
+
+    </div>
+
+
+    <div class="navbar-header-items__end">
+
+        <div class="navbar-item navbar-persistent--container">
+
+
+ <script>
+ document.write(`
+   <button class="btn navbar-btn search-button-field search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass"></i>
+    <span class="search-button__default-text">Search</span>
+    <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+   </button>
+ `);
+ </script>
+        </div>
+
+
+        <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm navbar-btn theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="theme-switch nav-link" data-mode="light"><i class="fa-solid fa-sun fa-lg"></i></span>
+    <span class="theme-switch nav-link" data-mode="dark"><i class="fa-solid fa-moon fa-lg"></i></span>
+    <span class="theme-switch nav-link" data-mode="auto"><i class="fa-solid fa-circle-half-stroke fa-lg"></i></span>
+  </button>
+`);
+</script></div>
+
+    </div>
+
+  </div>
+
+
+    <div class="navbar-persistent--mobile">
+
+ <script>
+ document.write(`
+   <button class="btn navbar-btn search-button-field search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass"></i>
+    <span class="search-button__default-text">Search</span>
+    <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+   </button>
+ `);
+ </script>
+    </div>
+
+
+
+</div>
+
+    </nav>
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+
+      <div class="bd-sidebar-primary bd-sidebar hide-on-wide">
+
+
+
+  <div class="sidebar-header-items sidebar-primary__section">
+
+
+      <div class="sidebar-header-items__center">
+
+          <div class="navbar-item">
+<nav class="navbar-nav">
+  <p class="sidebar-header-items__title"
+     role="heading"
+     aria-level="1"
+     aria-label="Site Navigation">
+    Site Navigation
+  </p>
+  <ul class="bd-navbar-elements navbar-nav">
+
+                    <li class="nav-item">
+                      <a class="nav-link nav-internal" href="../../../user/index.html">
+                        User Guide
+                      </a>
+                    </li>
+
+
+                    <li class="nav-item">
+                      <a class="nav-link nav-internal" href="../../../api/index.html">
+                        API reference
+                      </a>
+                    </li>
+
+
+                    <li class="nav-item">
+                      <a class="nav-link nav-internal" href="../../../dev/index.html">
+                        Development
+                      </a>
+                    </li>
+
+  </ul>
+</nav></div>
+
+      </div>
+
+
+
+      <div class="sidebar-header-items__end">
+
+          <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm navbar-btn theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="theme-switch nav-link" data-mode="light"><i class="fa-solid fa-sun fa-lg"></i></span>
+    <span class="theme-switch nav-link" data-mode="dark"><i class="fa-solid fa-moon fa-lg"></i></span>
+    <span class="theme-switch nav-link" data-mode="auto"><i class="fa-solid fa-circle-half-stroke fa-lg"></i></span>
+  </button>
+`);
+</script></div>
+
+      </div>
+
+  </div>
+
+
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+
+  <div id="rtd-footer-container"></div>
+
+
+      </div>
+
+      <main id="main-content" class="bd-main">
+
+
+          <div class="bd-content">
+            <div class="bd-article-container">
+
+              <div class="bd-header-article">
+<div class="header-article-items header-article__inner">
+
+    <div class="header-article-items__start">
+
+        <div class="header-article-item">
+
+
+
+<nav aria-label="Breadcrumb">
+  <ul class="bd-breadcrumbs">
+
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../../../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+
+    <li class="breadcrumb-item"><a href="../../index.html" class="nav-link">Module code</a></li>
+
+    <li class="breadcrumb-item active" aria-current="page">jobflow_remo...</li>
+  </ul>
+</nav>
+</div>
+
+    </div>
+
+
+</div>
+</div>
+
+
+
+
+<div id="searchbox"></div>
+                <article class="bd-article" role="main">
+
+  <h1>Source code for jobflow_remote.utils.db</h1><div class="highlight"><pre>
+<span></span><span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">import</span> <span class="nn">copy</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">import</span> <span class="nn">time</span>
+<span class="kn">import</span> <span class="nn">warnings</span>
+<span class="kn">from</span> <span class="nn">collections</span> <span class="kn">import</span> <span class="n">defaultdict</span>
+<span class="kn">from</span> <span class="nn">datetime</span> <span class="kn">import</span> <span class="n">datetime</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">TYPE_CHECKING</span><span class="p">,</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Iterable</span><span class="p">,</span> <span class="n">Mapping</span>
+
+<span class="kn">from</span> <span class="nn">jobflow.utils</span> <span class="kn">import</span> <span class="n">suuid</span>
+<span class="kn">from</span> <span class="nn">pymongo</span> <span class="kn">import</span> <span class="n">ReturnDocument</span>
+
+<span class="kn">from</span> <span class="nn">jobflow_remote.utils.data</span> <span class="kn">import</span> <span class="n">deep_merge_dict</span>
+
+<span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>
+    <span class="kn">from</span> <span class="nn">pymongo.collection</span> <span class="kn">import</span> <span class="n">Collection</span>
+
+<span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="MongoLock">
+<a class="viewcode-back" href="../../../api/jobflow_remote.utils.db.html#jobflow_remote.utils.db.MongoLock">[docs]</a>
+<span class="k">class</span> <span class="nc">MongoLock</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Context manager to lock a document in a MongoDB database.</span>
+
+<span class="sd">    Main characteristics and functionalities:</span>
+<span class="sd">        * Lock is acquired by setting a lock_id and lock_time value in the</span>
+<span class="sd">          locked document.</span>
+<span class="sd">        * Filter the document to select based on a query and sorting.</span>
+<span class="sd">          It uses find_one_and_update, thus resulting in a single document locked.</span>
+<span class="sd">        * Can wait for a lock to be released.</span>
+<span class="sd">        * Can forcibly break an existing lock</span>
+<span class="sd">        * Can return the locked document even if the lock could not be acquired</span>
+<span class="sd">          (useful for determining if a document is locked or no document matches</span>
+<span class="sd">          the query)</span>
+<span class="sd">        * Accepts all the arguments that can be passed to find_one_and_update</span>
+<span class="sd">        * A custom update can be performed on the document when acquiring the lock.</span>
+<span class="sd">        * Allows to pass properties that will be set in the document at the moment</span>
+<span class="sd">          of releasing the lock.</span>
+<span class="sd">        * Lock id value can be customized. If not a randomly generated uuid is used.</span>
+
+<span class="sd">    Examples</span>
+<span class="sd">    --------</span>
+
+<span class="sd">    Trying to acquire the lock on a document based on the state</span>
+<span class="sd">    &gt;&gt;&gt; with MongoLock(collection, {&quot;state&quot;: &quot;READY&quot;}) as lock:</span>
+<span class="sd">    ...     print(lock.locked_document[&quot;state&quot;])</span>
+<span class="sd">    READY</span>
+
+<span class="sd">    If lock cannot be acquired (no document matching filter or that</span>
+<span class="sd">    document is locked) the `lock.locked_document` is None.</span>
+
+<span class="sd">    &gt;&gt;&gt; with MongoLock(collection, {&quot;state&quot;: &quot;READY&quot;}) as lock:</span>
+<span class="sd">    ...     print(lock.locked_document)</span>
+<span class="sd">    None</span>
+
+<span class="sd">    Wait for 60 seconds in case the required document is already locked.</span>
+<span class="sd">    Check the status every 10 seconds. If lock cannot be acquired</span>
+<span class="sd">    locked_document is None</span>
+
+<span class="sd">    &gt;&gt;&gt; with MongoLock(</span>
+<span class="sd">            collection,</span>
+<span class="sd">            {&quot;uuid&quot;: &quot;5b84228b-d019-47fe-b0a0-564b36aa85ed&quot;},</span>
+<span class="sd">            sleep=10,</span>
+<span class="sd">            max_wait=60,</span>
+<span class="sd">        ) as lock:</span>
+<span class="sd">    ...     print(lock.locked_document)</span>
+<span class="sd">    None</span>
+
+<span class="sd">    In case lock cannot be acquired expose the locked document</span>
+
+<span class="sd">    &gt;&gt;&gt; with MongoLock(</span>
+<span class="sd">            collection,</span>
+<span class="sd">            {&quot;uuid&quot;: &quot;5b84228b-d019-47fe-b0a0-564b36aa85ed&quot;},</span>
+<span class="sd">            get_locked_doc=True,</span>
+<span class="sd">        ) as lock:</span>
+<span class="sd">    ...     print(lock.locked_document)</span>
+<span class="sd">    None</span>
+<span class="sd">    ...     print(lock.unavailable_document[&#39;lock_id&#39;])</span>
+<span class="sd">    8d68404f-c77a-461b-859c-40bb0af1979f</span>
+
+<span class="sd">    Set values in the document upon lock release</span>
+
+<span class="sd">    &gt;&gt;&gt; with MongoLock(collection, {&quot;state&quot;: &quot;READY&quot;}) as lock:</span>
+<span class="sd">    ...     if lock.locked_document:</span>
+<span class="sd">    ...         # Perform some operations based on the job...</span>
+<span class="sd">    ...         lock.update_on_release = {&quot;$set&quot;: {&quot;state&quot;: &quot;CHECKED_OUT&quot;}}</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">LOCK_KEY</span> <span class="o">=</span> <span class="s2">&quot;lock_id&quot;</span>
+    <span class="n">LOCK_TIME_KEY</span> <span class="o">=</span> <span class="s2">&quot;lock_time&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">collection</span><span class="p">:</span> <span class="n">Collection</span><span class="p">,</span>
+        <span class="nb">filter</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
+        <span class="n">update</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">break_lock</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="n">lock_id</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">sleep</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">max_wait</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">600</span><span class="p">,</span>
+        <span class="n">projection</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="n">Iterable</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">get_locked_doc</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        collection</span>
+<span class="sd">            The MongoDB collection containing the document to lock.</span>
+<span class="sd">        filter</span>
+<span class="sd">            A MongoDB query to select the document.</span>
+<span class="sd">        update</span>
+<span class="sd">            A dictionary that will be passed to find_one_and_update to update the</span>
+<span class="sd">            locked document at the moment of acquiring the lock.</span>
+<span class="sd">        break_lock</span>
+<span class="sd">            True if the context manager is allowed to forcibly break a lock.</span>
+<span class="sd">        lock_id</span>
+<span class="sd">            The is used for the lock in the document. If None a randomly generated</span>
+<span class="sd">            uuid will be used.</span>
+<span class="sd">        sleep</span>
+<span class="sd">            The amount of second to sleep between consecutive checks while waiting</span>
+<span class="sd">            for a lock to be released.</span>
+<span class="sd">        max_wait</span>
+<span class="sd">            The amount of seconds to wait for a lock to be released.</span>
+<span class="sd">        projection</span>
+<span class="sd">            The projection passed to the find_one_and_update that locks the document.</span>
+<span class="sd">        get_locked_doc</span>
+<span class="sd">            If True, if the lock cannot be acquired because the document matching</span>
+<span class="sd">            the filter is already locked, the locked document will be fetched and</span>
+<span class="sd">            set in the unavailable_document attribute.</span>
+<span class="sd">        kwargs</span>
+<span class="sd">            All the other args are passed to find_one_and_update.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">collection</span> <span class="o">=</span> <span class="n">collection</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">filter</span> <span class="o">=</span> <span class="nb">filter</span> <span class="ow">or</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">update</span> <span class="o">=</span> <span class="n">update</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">break_lock</span> <span class="o">=</span> <span class="n">break_lock</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">locked_document</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">unavailable_document</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">lock_id</span> <span class="o">=</span> <span class="n">lock_id</span> <span class="ow">or</span> <span class="n">suuid</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">kwargs</span> <span class="o">=</span> <span class="n">kwargs</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">update_on_release</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">sleep</span> <span class="o">=</span> <span class="n">sleep</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">max_wait</span> <span class="o">=</span> <span class="n">max_wait</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">projection</span> <span class="o">=</span> <span class="n">projection</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">get_locked_doc</span> <span class="o">=</span> <span class="n">get_locked_doc</span>
+
+<div class="viewcode-block" id="MongoLock.get_lock_time">
+<a class="viewcode-back" href="../../../api/jobflow_remote.utils.db.html#jobflow_remote.utils.db.MongoLock.get_lock_time">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">get_lock_time</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">d</span><span class="p">:</span> <span class="nb">dict</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Get the time the document was locked on a dictionary.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">d</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="bp">cls</span><span class="o">.</span><span class="n">LOCK_TIME_KEY</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="MongoLock.get_lock_id">
+<a class="viewcode-back" href="../../../api/jobflow_remote.utils.db.html#jobflow_remote.utils.db.MongoLock.get_lock_id">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">get_lock_id</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">d</span><span class="p">:</span> <span class="nb">dict</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Get the lock id on a dictionary.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">d</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="bp">cls</span><span class="o">.</span><span class="n">LOCK_KEY</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="MongoLock.acquire">
+<a class="viewcode-back" href="../../../api/jobflow_remote.utils.db.html#jobflow_remote.utils.db.MongoLock.acquire">[docs]</a>
+    <span class="k">def</span> <span class="nf">acquire</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Acquire the lock</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Set the lock expiration time</span>
+        <span class="n">now</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">utcnow</span><span class="p">()</span>
+        <span class="n">db_filter</span> <span class="o">=</span> <span class="n">copy</span><span class="o">.</span><span class="n">deepcopy</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">filter</span><span class="p">)</span>
+
+        <span class="n">projection</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">projection</span>
+        <span class="c1"># if projecting always get the lock as well</span>
+        <span class="k">if</span> <span class="n">projection</span><span class="p">:</span>
+            <span class="n">projection</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">projection</span><span class="p">)</span>
+            <span class="n">projection</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="bp">self</span><span class="o">.</span><span class="n">LOCK_KEY</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">lock_id</span><span class="p">])</span>
+
+        <span class="c1"># Modify the filter if the document should not be fetched if</span>
+        <span class="c1"># the lock cannot be acquired. Otherwise, keep the original filter.</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">break_lock</span> <span class="ow">and</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">sleep</span> <span class="ow">and</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_locked_doc</span><span class="p">:</span>
+            <span class="n">db_filter</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="bp">self</span><span class="o">.</span><span class="n">LOCK_KEY</span><span class="p">:</span> <span class="kc">None</span><span class="p">})</span>
+
+        <span class="c1"># Prepare the update to be performed when acquiring the lock.</span>
+        <span class="c1"># A combination of the input update and the setting of the lock.</span>
+        <span class="n">lock_set</span> <span class="o">=</span> <span class="p">{</span><span class="bp">self</span><span class="o">.</span><span class="n">LOCK_KEY</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">lock_id</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">LOCK_TIME_KEY</span><span class="p">:</span> <span class="n">now</span><span class="p">}</span>
+        <span class="n">update</span> <span class="o">=</span> <span class="n">defaultdict</span><span class="p">(</span><span class="nb">dict</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">update</span><span class="p">:</span>
+            <span class="n">update</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">copy</span><span class="o">.</span><span class="n">deepcopy</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">update</span><span class="p">))</span>
+
+        <span class="n">update</span><span class="p">[</span><span class="s2">&quot;$set&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">lock_set</span><span class="p">)</span>
+
+        <span class="c1"># If the document should be fetched even if the lock could not be acquired</span>
+        <span class="c1"># the updates should be made conditional.</span>
+        <span class="c1"># Note: sleep needs to fetch the document, otherwise it is impossible to</span>
+        <span class="c1"># determine if the filter did not return any document or if the document</span>
+        <span class="c1"># was locked.</span>
+        <span class="k">if</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">sleep</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_locked_doc</span><span class="p">)</span> <span class="ow">and</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">break_lock</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">operation</span><span class="p">,</span> <span class="n">dict_vals</span> <span class="ow">in</span> <span class="n">update</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">dict_vals</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                    <span class="n">cond</span> <span class="o">=</span> <span class="p">{</span>
+                        <span class="s2">&quot;$cond&quot;</span><span class="p">:</span> <span class="p">{</span>
+                            <span class="s2">&quot;if&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;$gt&quot;</span><span class="p">:</span> <span class="p">[</span><span class="sa">f</span><span class="s2">&quot;$</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">LOCK_KEY</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">]},</span>
+                            <span class="s2">&quot;then&quot;</span><span class="p">:</span> <span class="sa">f</span><span class="s2">&quot;$</span><span class="si">{</span><span class="n">k</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+                            <span class="s2">&quot;else&quot;</span><span class="p">:</span> <span class="n">v</span><span class="p">,</span>
+                        <span class="p">}</span>
+                    <span class="p">}</span>
+                    <span class="n">update</span><span class="p">[</span><span class="n">operation</span><span class="p">][</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="n">cond</span>
+            <span class="n">update</span> <span class="o">=</span> <span class="p">[</span><span class="nb">dict</span><span class="p">(</span><span class="n">update</span><span class="p">)]</span>
+
+        <span class="c1"># Try to acquire the lock by updating the document with a unique identifier</span>
+        <span class="c1"># and the lock expiration time</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;try acquiring lock with filter: </span><span class="si">{</span><span class="n">db_filter</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">t0</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+        <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
+            <span class="n">result</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">collection</span><span class="o">.</span><span class="n">find_one_and_update</span><span class="p">(</span>
+                <span class="n">db_filter</span><span class="p">,</span>
+                <span class="n">update</span><span class="p">,</span>
+                <span class="n">upsert</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                <span class="n">return_document</span><span class="o">=</span><span class="n">ReturnDocument</span><span class="o">.</span><span class="n">AFTER</span><span class="p">,</span>
+                <span class="o">**</span><span class="bp">self</span><span class="o">.</span><span class="n">kwargs</span><span class="p">,</span>
+            <span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">result</span><span class="p">:</span>
+                <span class="n">lock_acquired</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_lock_id</span><span class="p">(</span><span class="n">result</span><span class="p">)</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">lock_id</span>
+                <span class="k">if</span> <span class="n">lock_acquired</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">locked_document</span> <span class="o">=</span> <span class="n">result</span>
+                    <span class="k">break</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="c1"># if the lock could not be acquired optionally sleep or</span>
+                    <span class="c1"># exit if waited for enough time.</span>
+                    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">sleep</span> <span class="ow">and</span> <span class="p">(</span><span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">-</span> <span class="n">t0</span><span class="p">)</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">max_wait</span><span class="p">:</span>
+                        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;sleeping&quot;</span><span class="p">)</span>
+                        <span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">sleep</span><span class="p">)</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">unavailable_document</span> <span class="o">=</span> <span class="n">result</span>
+                        <span class="k">break</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="c1"># If no document the conditions could not be met.</span>
+                <span class="c1"># Either the requested filter does not find match a document</span>
+                <span class="c1"># or those fitting are locked.</span>
+                <span class="k">break</span></div>
+
+
+<div class="viewcode-block" id="MongoLock.release">
+<a class="viewcode-back" href="../../../api/jobflow_remote.utils.db.html#jobflow_remote.utils.db.MongoLock.release">[docs]</a>
+    <span class="k">def</span> <span class="nf">release</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">exc_type</span><span class="p">,</span> <span class="n">exc_val</span><span class="p">,</span> <span class="n">exc_tb</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Release the lock.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Release the lock by removing the unique identifier and lock expiration time</span>
+        <span class="n">update</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;$set&quot;</span><span class="p">:</span> <span class="p">{</span><span class="bp">self</span><span class="o">.</span><span class="n">LOCK_KEY</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">LOCK_TIME_KEY</span><span class="p">:</span> <span class="kc">None</span><span class="p">}}</span>
+        <span class="c1"># TODO maybe set on release only if no exception was raised?</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">update_on_release</span><span class="p">:</span>
+            <span class="n">update</span> <span class="o">=</span> <span class="n">deep_merge_dict</span><span class="p">(</span><span class="n">update</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">update_on_release</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;release lock with update: </span><span class="si">{</span><span class="n">update</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="c1"># TODO if failed to release the lock maybe retry before failing</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">collection</span><span class="o">.</span><span class="n">update_one</span><span class="p">(</span>
+            <span class="p">{</span><span class="s2">&quot;_id&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">locked_document</span><span class="p">[</span><span class="s2">&quot;_id&quot;</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">LOCK_KEY</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">lock_id</span><span class="p">},</span>
+            <span class="n">update</span><span class="p">,</span>
+            <span class="n">upsert</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="c1"># Check if the lock was successfully released</span>
+        <span class="k">if</span> <span class="n">result</span><span class="o">.</span><span class="n">modified_count</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">msg</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;Could not release lock for document </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">locked_document</span><span class="p">[</span><span class="s1">&#39;_id&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="n">msg</span><span class="p">,</span> <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">locked_document</span> <span class="o">=</span> <span class="kc">None</span></div>
+
+
+    <span class="k">def</span> <span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">acquire</span><span class="p">()</span>
+        <span class="k">return</span> <span class="bp">self</span>
+
+    <span class="k">def</span> <span class="fm">__exit__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">exc_type</span><span class="p">,</span> <span class="n">exc_val</span><span class="p">,</span> <span class="n">exc_tb</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">locked_document</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">release</span><span class="p">(</span><span class="n">exc_type</span><span class="p">,</span> <span class="n">exc_val</span><span class="p">,</span> <span class="n">exc_tb</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="LockedDocumentError">
+<a class="viewcode-back" href="../../../api/jobflow_remote.utils.db.html#jobflow_remote.utils.db.LockedDocumentError">[docs]</a>
+<span class="k">class</span> <span class="nc">LockedDocumentError</span><span class="p">(</span><span class="ne">Exception</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Exception to signal a problem when locking the document.</span>
+<span class="sd">    &quot;&quot;&quot;</span></div>
+
+
+
+<div class="viewcode-block" id="JobLockedError">
+<a class="viewcode-back" href="../../../api/jobflow_remote.utils.db.html#jobflow_remote.utils.db.JobLockedError">[docs]</a>
+<span class="k">class</span> <span class="nc">JobLockedError</span><span class="p">(</span><span class="n">LockedDocumentError</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Exception to signal a problem when locking a Job document.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="JobLockedError.from_job_doc">
+<a class="viewcode-back" href="../../../api/jobflow_remote.utils.db.html#jobflow_remote.utils.db.JobLockedError.from_job_doc">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">from_job_doc</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">doc</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="n">additional_msg</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
+        <span class="n">lock_id</span> <span class="o">=</span> <span class="n">doc</span><span class="p">[</span><span class="n">MongoLock</span><span class="o">.</span><span class="n">LOCK_KEY</span><span class="p">]</span>
+        <span class="n">lock_date</span> <span class="o">=</span> <span class="n">doc</span><span class="p">[</span><span class="n">MongoLock</span><span class="o">.</span><span class="n">LOCK_TIME_KEY</span><span class="p">]</span>
+        <span class="n">date_str</span> <span class="o">=</span> <span class="n">lock_date</span><span class="o">.</span><span class="n">isoformat</span><span class="p">(</span><span class="n">timespec</span><span class="o">=</span><span class="s2">&quot;seconds&quot;</span><span class="p">)</span> <span class="k">if</span> <span class="n">lock_date</span> <span class="k">else</span> <span class="kc">None</span>
+        <span class="n">msg</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;Job with db_id </span><span class="si">{</span><span class="n">doc</span><span class="p">[</span><span class="s1">&#39;db_id&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2"> is locked with lock_id </span><span class="si">{</span><span class="n">lock_id</span><span class="si">}</span><span class="s2"> since </span><span class="si">{</span><span class="n">date_str</span><span class="si">}</span><span class="s2"> UTC.&quot;</span>
+        <span class="k">if</span> <span class="n">additional_msg</span><span class="p">:</span>
+            <span class="n">msg</span> <span class="o">+=</span> <span class="s2">&quot; &quot;</span> <span class="o">+</span> <span class="n">additional_msg</span>
+        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="FlowLockedError">
+<a class="viewcode-back" href="../../../api/jobflow_remote.utils.db.html#jobflow_remote.utils.db.FlowLockedError">[docs]</a>
+<span class="k">class</span> <span class="nc">FlowLockedError</span><span class="p">(</span><span class="n">LockedDocumentError</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Exception to signal a problem when locking a Flow document.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="FlowLockedError.from_flow_doc">
+<a class="viewcode-back" href="../../../api/jobflow_remote.utils.db.html#jobflow_remote.utils.db.FlowLockedError.from_flow_doc">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">from_flow_doc</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">doc</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="n">additional_msg</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
+        <span class="n">lock_id</span> <span class="o">=</span> <span class="n">doc</span><span class="p">[</span><span class="n">MongoLock</span><span class="o">.</span><span class="n">LOCK_KEY</span><span class="p">]</span>
+        <span class="n">lock_date</span> <span class="o">=</span> <span class="n">doc</span><span class="p">[</span><span class="n">MongoLock</span><span class="o">.</span><span class="n">LOCK_TIME_KEY</span><span class="p">]</span>
+        <span class="n">date_str</span> <span class="o">=</span> <span class="n">lock_date</span><span class="o">.</span><span class="n">isoformat</span><span class="p">(</span><span class="n">timespec</span><span class="o">=</span><span class="s2">&quot;seconds&quot;</span><span class="p">)</span> <span class="k">if</span> <span class="n">lock_date</span> <span class="k">else</span> <span class="kc">None</span>
+        <span class="n">msg</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;Flow with uuid </span><span class="si">{</span><span class="n">doc</span><span class="p">[</span><span class="s1">&#39;uuid&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2"> is locked with lock_id </span><span class="si">{</span><span class="n">lock_id</span><span class="si">}</span><span class="s2"> since </span><span class="si">{</span><span class="n">date_str</span><span class="si">}</span><span class="s2"> UTC.&quot;</span>
+        <span class="k">if</span> <span class="n">additional_msg</span><span class="p">:</span>
+            <span class="n">msg</span> <span class="o">+=</span> <span class="s2">&quot; &quot;</span> <span class="o">+</span> <span class="n">additional_msg</span>
+        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span></div>
+</div>
+
+</pre></div>
+
+                </article>
+
+
+
+
+
+                <footer class="prev-next-footer">
+
+<div class="prev-next-area">
+</div>
+                </footer>
+
+            </div>
+
+
+
+
+          </div>
+          <footer class="bd-footer-content">
+
+          </footer>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="../../../_static/scripts/bootstrap.js?digest=5b4479735964841361fd"></script>
+<script src="../../../_static/scripts/pydata-sphinx-theme.js?digest=5b4479735964841361fd"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+
+    <div class="footer-items__start">
+
+        <div class="footer-item">
+
+  <p class="copyright">
+
+      © Copyright 2023, Matgenix SRL.
+      <br/>
+
+  </p>
+</div>
+
+        <div class="footer-item">
+
+  <p class="sphinx-version">
+    Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 7.2.6.
+    <br/>
+  </p>
+</div>
+
+    </div>
+
+
+
+    <div class="footer-items__end">
+
+        <div class="footer-item">
+<p class="theme-version">
+  Built with the <a href="https://pydata-sphinx-theme.readthedocs.io/en/stable/index.html">PyData Sphinx Theme</a> 0.14.4.
+</p></div>
+
+    </div>
+
+</div>
+
+  </footer>
+  </body>
+</html>
