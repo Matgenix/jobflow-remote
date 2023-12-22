@@ -12,7 +12,6 @@ authors = [{ name = "Guido Petretto", email = "guido.petretto@matgenix.com" }]
 dynamic = ["version"]
 classifiers = [
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
@@ -24,8 +23,21 @@ classifiers = [
     "Topic :: Other/Nonlisted Topic",
     "Topic :: Scientific/Engineering",
 ]
-requires-python = ">=3.8"
-dependencies =[]
+requires-python = ">=3.9"
+dependencies =[
+    "jobflow",
+    "pydantic>=2.0.1",
+    "fabric",
+    "tomlkit",
+    "qtoolkit",
+    "typer",
+    "rich",
+    "psutil",
+    "supervisor",
+    "ruamel.yaml",
+    "schedule",
+    "flufl.lock"
+]
 
 [project.optional-dependencies]
 dev = [
@@ -38,9 +50,18 @@ tests = [
 maintain = [
     "git-changelog>=0.6",
 ]
+docs = [
+    "sphinx",
+    "sphinx_design",
+    "pydata-sphinx-theme",
+    "sphinx-copybutton",
+    "autodoc_pydantic>=2.0.0",
+    "sphinxcontrib-mermaid"
+]
 strict = []
 
 [project.scripts]
+jf = "jobflow_remote.cli.jf:app"
 
 [project.urls]
 homepage = "https://Matgenix.github.io/jobflow_remote/"
@@ -63,7 +84,7 @@ max-line-length = 88
 max-doc-length = 88
 select = "C, E, F, W, B"
 extend-ignore = "E203, W503, E501, F401, RST21"
-min-python-version = "3.8.0"
+min-python-version = "3.9.0"
 docstring-convention = "numpy"
 rst-roles = "class, func, ref, obj"
 
