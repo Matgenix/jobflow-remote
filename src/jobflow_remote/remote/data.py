@@ -80,25 +80,89 @@ def get_remote_store_filenames(store: JobStore) -> list[str]:
     return filenames
 
 
-def update_store(store, remote_store, save, db_id):
-    # TODO is it correct?
-    data = list(remote_store.query(load=save))
-    if len(data) > 1:
-        raise RuntimeError("something wrong with the remote store")
-
-    # Set the db_id here and not directly in the Job's metadata to avoid
-    # that it gets passed down to its children/replacements.
-    if "db_id" not in data[0]["metadata"]:
-        data[0]["metadata"]["db_id"] = db_id
-
-    store.connect()
+def update_store(store: JobStore, remote_store: JobStore, db_id: int):
     try:
-        for d in data:
-            data = dict(d)
-            data.pop("_id")
-            store.update(data, key=["uuid", "index"], save=save)
+        store.connect()
+        remote_store.connect()
+
+        additional_stores = set(store.additional_stores.keys())
+        additional_remote_stores = set(remote_store.additional_stores.keys())
+
+        # This checks that the additional stores in the two stores match correctly.
+        # It should not happen if not because of a bug, so the check could maybe be
+        # removed
+        if additional_stores ^ additional_remote_stores:
+            raise ValueError(
+                f"The additional stores in the local and remote JobStore do not "
+                f"match: {additional_stores ^ additional_remote_stores}"
+            )
+
+        # copy the data store by store, not using directly the JobStore.
+        # This avoids the need to deserialize the store content and the "save"
+        # argument.
+        for add_store_name, remote_add_store in remote_store.additional_stores.items():
+            add_store = store.additional_stores[add_store_name]
+
+            for d in remote_add_store.query():
+                data = dict(d)
+                data.pop("_id", None)
+                add_store.update(data)
+        main_docs_list = list(remote_store.docs_store.query({}))
+        if len(main_docs_list) > 1:
+            raise RuntimeError(
+                "The downloaded output store contains more than one document"
+            )
+        main_doc = main_docs_list[0]
+        main_doc.pop("_id", None)
+        # Set the db_id here and not directly in the Job's metadata to prevent
+        # it from being propagated to its children/replacements.
+        if "db_id" not in main_doc["metadata"]:
+            main_doc["metadata"]["db_id"] = db_id
+        store.docs_store.update(main_doc, key=["uuid", "index"])
     finally:
         try:
             store.close()
         except Exception:
             logging.error(f"error while closing the store {store}", exc_info=True)
+        try:
+            remote_store.close()
+        except Exception:
+            logging.error(
+                f"error while closing the remote store {remote_store}", exc_info=True
+            )
+
+
+def resolve_job_dict_args(job_dict: dict, store: JobStore) -> dict:
+    """
+    Resolve the references in a serialized Job.
+
+    Similar to Job.resolve_args, but without the need to deserialize the Job.
+    The references are resolved inplace.
+
+    Parameters
+    ----------
+    job_dict
+        The serialized version of a Job.
+    store
+        The JobStore from where the references should be resolved.
+
+    Returns
+    -------
+        The updated version of the input dictionary with references resolved.
+    """
+    from jobflow.core.reference import OnMissing, find_and_resolve_references
+
+    on_missing = OnMissing(job_dict["config"]["on_missing_references"])
+    cache: dict[str, Any] = {}
+    resolved_args = find_and_resolve_references(
+        job_dict["function_args"], store, cache=cache, on_missing=on_missing
+    )
+    resolved_kwargs = find_and_resolve_references(
+        job_dict["function_kwargs"], store, cache=cache, on_missing=on_missing
+    )
+    resolved_args = tuple(resolved_args)
+
+    # substitution is in place
+    job_dict["function_args"] = resolved_args
+    job_dict["function_kwargs"] = resolved_kwargs
+    return job_dict

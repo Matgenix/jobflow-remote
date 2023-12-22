@@ -179,14 +179,13 @@ def loading_spinner(processing: bool = True):
         yield progress
 
 
-def get_job_db_ids(job_db_id: str | int, job_index: int | None):
-    try:
-        db_id = int(job_db_id)
-        job_id = None
-    except ValueError:
+def get_job_db_ids(job_db_id: str, job_index: int | None):
+    if check_valid_uuid(job_db_id, raise_on_error=False):
         db_id = None
         job_id = job_db_id
-        check_valid_uuid(job_id)
+    else:
+        db_id = job_db_id
+        job_id = None
 
     if job_index and db_id is not None:
         out_console.print(
@@ -239,15 +238,18 @@ def cli_error_handler(func):
     return wrapper
 
 
-def check_valid_uuid(uuid_str):
+def check_valid_uuid(uuid_str, raise_on_error: bool = True) -> bool:
     try:
         uuid_obj = uuid.UUID(uuid_str)
         if str(uuid_obj) == uuid_str:
-            return
+            return True
     except ValueError:
         pass
 
-    raise typer.BadParameter(f"UUID {uuid_str} is in the wrong format.")
+    if raise_on_error:
+        raise typer.BadParameter(f"UUID {uuid_str} is in the wrong format.")
+    else:
+        return False
 
 
 def str_to_dict(string: str | None) -> dict | None:
@@ -291,10 +293,10 @@ def get_start_date(start_date: datetime | None, days: int | None, hours: int | N
 def execute_multi_jobs_cmd(
     single_cmd: Callable,
     multi_cmd: Callable,
-    job_db_id: str | int | None = None,
+    job_db_id: str | None = None,
     job_index: int | None = None,
     job_ids: list[str] | None = None,
-    db_ids: int | list[int] | None = None,
+    db_ids: str | list[str] | None = None,
     flow_ids: str | list[str] | None = None,
     state: JobState | None = None,
     start_date: datetime | None = None,

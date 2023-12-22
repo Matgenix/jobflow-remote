@@ -27,7 +27,7 @@ def generate_dummy_project(name: str, full: bool = False) -> Project:
         workers["example_local"] = local_worker
         exec_config = {"example_config": generate_dummy_exec_config()}
 
-    queue = generate_dummy_queue()
+    queue = {"store": generate_dummy_queue()}
 
     jobstore = generate_dummy_jobstore()
 

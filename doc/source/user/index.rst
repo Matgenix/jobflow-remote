@@ -15,6 +15,8 @@ details are found in :ref:`reference`.
    install
    projectconf
    quickstart
+   tuning
+   states
 
 .. toctree::
    :caption: Advanced usage and interoperability

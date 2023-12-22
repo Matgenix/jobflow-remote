@@ -231,7 +231,7 @@ COLOR_MAPPING = {
     JobState.FAILED.value: RED_COLOR,
     JobState.PAUSED.value: "#EAE200",
     JobState.STOPPED.value: RED_COLOR,
-    JobState.CANCELLED.value: RED_COLOR,
+    JobState.USER_STOPPED.value: RED_COLOR,
     JobState.BATCH_SUBMITTED.value: BLUE_COLOR,
     JobState.BATCH_RUNNING.value: BLUE_COLOR,
 }
