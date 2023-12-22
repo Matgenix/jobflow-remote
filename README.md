@@ -1,38 +1,22 @@
 # jobflow-remote
 
-[![tests](https://img.shields.io/github/actions/workflow/status/Matgenix/jobflow_remote/testing.yml?branch=main&label=tests)](https://github.com/Matgenix/jobflow_remote/actions?query=workflow%3Atesting)
-[![code coverage](https://img.shields.io/codecov/c/gh/Matgenix/jobflow_remote)](https://codecov.io/gh/Matgenix/jobflow_remote)
-[![pypi version](https://img.shields.io/pypi/v/jobflow_remote?color=blue)](https://pypi.org/project/jobflow_remote)
-![supported python versions](https://img.shields.io/pypi/pyversions/jobflow_remote)
+[![tests](https://img.shields.io/github/actions/workflow/status/Matgenix/jobflow-remote/testing.yml?branch=main&label=tests)](https://github.com/Matgenix/jobflow-remote/actions?query=workflow%3Atesting)
+[![code coverage](https://img.shields.io/codecov/c/gh/Matgenix/jobflow-remote)](https://codecov.io/gh/Matgenix/jobflow-remote)
+[![pypi version](https://img.shields.io/pypi/v/jobflow-remote?color=blue)](https://pypi.org/project/jobflow-remote)
+![supported python versions](https://img.shields.io/pypi/pyversions/jobflow-remote)
 
 **[Full Documentation][docs]**
 
-jobflow-remote is a Python package to run jobflow workflows on remote resources.
-
-## Quick start
-
-How to get started.
-
-## Installation
-
-How to install.
-
-## User guide
-
-How to use the software.
+Jobflow Remote is a Python package to run [jobflow](https://materialsproject.github.io/jobflow) workflows on remote resources.
 
 ## Need help?
 
-Ask questions about jobflow-remote on the [jobflow-remote support forum][help-forum].
+Ask questions about Jobflow Remote on the [Jobflow Remote support forum][help-forum].
 If you've found an issue with jobflow-remote, please submit a bug report on [GitHub Issues][issues].
-
-## Reference
-
-Full reference
 
 ## What’s new?
 
-Track changes to jobflow_remote through the [changelog][changelog].
+Track changes to jobflow-remote through the [changelog][changelog].
 
 ## Contributing
 
@@ -43,8 +27,9 @@ We maintain a list of all contributors [here][contributors].
 ### Code of conduct
 
 Help us keep jobflow-remote open and inclusive.
-Please read and follow our [Code of Conduct][codeofconduct]
-[![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-2.1-4baaaa.svg)](CODE_OF_CONDUCT.md).
+Please read and follow our [Code of Conduct][codeofconduct].
+
+[![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-2.1-4baaaa.svg)](CODE_OF_CONDUCT.md)
 
 ## License
 
