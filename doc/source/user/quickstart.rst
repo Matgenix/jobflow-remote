@@ -1,7 +1,7 @@
 .. _quickstart:
 
 =========================
-Jobflow-Remote quickstart
+Jobflow Remote quickstart
 =========================
 
 After completing the :ref:`install`, it is possible to start submitting

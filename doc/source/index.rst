@@ -1,7 +1,7 @@
 .. _jobflow_remote_docs_mainpage:
 
 ############################
-Jobflow-Remote documentation
+Jobflow Remote documentation
 ############################
 
 .. toctree::
@@ -16,12 +16,8 @@ Jobflow-Remote documentation
 
 **Version**: |version|
 
-**Useful links**:
-TO BE ADDED
-
-Jobflow-Remote is a package to submit jobflow flows remotely.
-
-
+Jobflow Remote is a package to submit `Jobflow
+<https://materialsproject.github.io/jobflow/>`_ flows remotely.
 
 .. grid:: 1 2 2 2
 
@@ -32,7 +28,7 @@ Jobflow-Remote is a package to submit jobflow flows remotely.
         ^^^^^^^^^^^^^^^
 
         If you want to get started quickly, check out our quickstart section.
-        It contains an introduction to Jobflow-Remote's main concepts.
+        It contains an introduction to Jobflow Remote's main concepts.
 
         +++
 
@@ -50,7 +46,7 @@ Jobflow-Remote is a package to submit jobflow flows remotely.
         ^^^^^^^^^^
 
         The user guide provides in-depth information on the
-        key concepts of Jobflow-Remote with useful background information and explanation.
+        key concepts of Jobflow Remote with useful background information and explanation.
 
         +++
 
@@ -68,7 +64,7 @@ Jobflow-Remote is a package to submit jobflow flows remotely.
         ^^^^^^^^^^^^^
 
         The reference guide contains a detailed description of the functions,
-        modules, and objects included in Jobflow-Remote. The reference describes how the
+        modules, and objects included in Jobflow Remote. The reference describes how the
         methods work and which parameters can be used. It assumes that you have an
         understanding of the key concepts.
 
@@ -89,7 +85,7 @@ Jobflow-Remote is a package to submit jobflow flows remotely.
 
         Want to add to the codebase?
         The contributing guidelines will guide you through the
-        process of improving Jobflow-Remote.
+        process of improving Jobflow Remote.
 
         +++
 
