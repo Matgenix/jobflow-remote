@@ -95,7 +95,12 @@ def build_and_launch_container(
     try:
         print(f"\n * Launching container for {image_name}...")
         container = docker_client.containers.run(
-            image_name, detach=True, remove=True, tty=True, ports=ports
+            image_name,
+            detach=True,
+            remove=True,
+            auto_remove=True,
+            tty=True,
+            ports=ports,
         )
         assert isinstance(container, Container)
         print(" * Waiting for container to be ready...", end="")
@@ -209,7 +214,7 @@ def write_tmp_settings(
                 work_dir="/home/jobflow/jfr",
                 user="jobflow",
                 password="jobflow",
-                pre_run="/home/jobflow/.venv/bin/activate",
+                pre_run="source /home/jobflow/.venv/bin/activate",
                 resources={"partition": "debug", "ntasks": 1, "time": "00:01:00"},
             ),
         },

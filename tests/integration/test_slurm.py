@@ -11,18 +11,32 @@ def test_project_init(random_project_name):
     assert len(project.workers) == 2
 
 
-def test_project_check(job_controller):
+def test_project_check(job_controller, capsys):
     from jobflow_remote.cli.project import check
 
-    assert check(print_errors=True) is None
+    check(print_errors=True)
+    captured = capsys.readouterr()
+    assert not captured.err
+    expected = [
+        "✓ Worker test_local_worker",
+        "✓ Worker test_remote_worker",
+        "✓ Jobstore",
+        "✓ Queue store",
+    ]
+    for line in expected:
+        assert line in captured.out
 
 
-@pytest.mark.parametrize("worker", ["test_local_worker", "test_remote_worker"])
+@pytest.mark.parametrize(
+    "worker",
+    ["test_local_worker", "test_remote_worker"],
+)
 def test_submit_flow(worker, job_controller):
     from jobflow import Flow
 
     from jobflow_remote import submit_flow
     from jobflow_remote.jobs.runner import Runner
+    from jobflow_remote.jobs.state import FlowState, JobState
     from jobflow_remote.testing import add
 
     add_first = add(1, 5)
@@ -34,16 +48,21 @@ def test_submit_flow(worker, job_controller):
     runner = Runner()
     runner.run(ticks=10)
 
-    jobs = job_controller.get_jobs({})
-    assert len(jobs) == 2
+    assert len(job_controller.get_jobs({})) == 2
+    assert job_controller.count_jobs(state=JobState.COMPLETED) == 2
+    assert job_controller.count_flows(state=FlowState.COMPLETED) == 1
 
 
-@pytest.mark.parametrize("worker", ["test_local_worker", "test_remote_worker"])
+@pytest.mark.parametrize(
+    "worker",
+    ["test_local_worker", "test_remote_worker"],
+)
 def test_submit_flow_with_dependencies(worker, job_controller):
     from jobflow import Flow
 
     from jobflow_remote import submit_flow
     from jobflow_remote.jobs.runner import Runner
+    from jobflow_remote.jobs.state import FlowState, JobState
     from jobflow_remote.testing import add, write_file
 
     add_parent_1 = add(1, 1)
@@ -57,4 +76,35 @@ def test_submit_flow_with_dependencies(worker, job_controller):
     runner = Runner()
     runner.run(ticks=10)
 
+    assert job_controller.count_jobs(state=JobState.COMPLETED) == 4
     assert len(job_controller.get_jobs({})) == 4
+    assert job_controller.count_flows(state=FlowState.COMPLETED) == 1
+
+
+@pytest.mark.parametrize(
+    "worker",
+    ["test_local_worker", "test_remote_worker"],
+)
+def test_expected_failure(worker, job_controller):
+    from jobflow import Flow
+
+    from jobflow_remote import submit_flow
+    from jobflow_remote.jobs.runner import Runner
+    from jobflow_remote.jobs.state import FlowState, JobState
+    from jobflow_remote.testing import always_fails
+
+    job_1 = always_fails()
+    job_2 = always_fails()
+
+    flow = Flow([job_1, job_2])
+    submit_flow(flow, worker=worker)
+
+    assert job_controller.count_jobs({}) == 2
+    assert len(job_controller.get_jobs({})) == 2
+    assert job_controller.count_flows({}) == 1
+
+    runner = Runner()
+    runner.run(ticks=10)
+
+    assert job_controller.count_jobs(state=JobState.FAILED) == 2
+    assert job_controller.count_flows(state=FlowState.FAILED) == 1

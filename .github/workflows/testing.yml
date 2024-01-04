@@ -58,7 +58,7 @@ jobs:
         run: pytest --cov=jobflow_remote --cov-report=xml --ignore tests/integration
       
       - name: Integration tests
-        run: pytest --cov=jobflow_remote --cov-append --cov-report=xml tests/integration
+        run: pytest --cov=jobflow_remote --cov-append --cov-report=xml tests/integration -s
 
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v3
