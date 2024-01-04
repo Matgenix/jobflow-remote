@@ -9,6 +9,12 @@ def add(a, b):
 
 
 @job
+def always_fails():
+    """A job that always fails."""
+    raise RuntimeError("This job failed.")
+
+
+@job
 def write_file(n):
     with open("results.txt", "w") as f:
         f.write(str(n))

@@ -30,8 +30,12 @@ SHELL ["/bin/bash", "--login", "-c"]
 # is built at the root of the jobflow repo
 RUN mkdir jobflow-remote
 COPY src/jobflow_remote jobflow-remote/src/jobflow_remote
-COPY .git/ jobflow-remote/.git
 COPY pyproject.toml jobflow-remote/
+
+# versioningit refuses to install a package without its full git history
+# so here we remove versioningit config from pyproject.toml as we don't need
+# the full version number (which allows us to cache many more layers)
+RUN sed -i '/\[tool.versioningit.vcs\]/,+3d' jobflow-remote/pyproject.toml
 
 # Annoyingly we want to use this with the Python SDK
 # which does not support buildkit yet
@@ -43,7 +47,7 @@ USER ${USERNAME}
 
 # Install jobflow in a local native virtualenv
 WORKDIR /home/${USERNAME}/jobflow-remote
-RUN git config --global --add safe.directory /home/${USERNAME}/jobflow-remote
+# RUN git config --global --add safe.directory /home/${USERNAME}/jobflow-remote
 RUN python3 -m venv /home/${USERNAME}/.venv
 RUN /home/${USERNAME}/.venv/bin/pip install -U pip
 RUN /home/${USERNAME}/.venv/bin/pip install --verbose -e .
