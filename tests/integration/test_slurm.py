@@ -11,14 +11,14 @@ def test_project_init(random_project_name):
     assert len(project.workers) == 2
 
 
-def test_project_check():
+def test_project_check(job_controller):
     from jobflow_remote.cli.project import check
 
     assert check(print_errors=True) is None
 
 
 @pytest.mark.parametrize("worker", ["test_local_worker", "test_remote_worker"])
-def test_submit_flow(worker):
+def test_submit_flow(worker, job_controller):
     from jobflow import Flow
 
     from jobflow_remote import submit_flow
@@ -32,12 +32,14 @@ def test_submit_flow(worker):
     submit_flow(flow, worker=worker)
 
     runner = Runner()
-    runner.tick_delay = 0.2
-    runner.run(ticks=100)
+    runner.run(ticks=10)
+
+    jobs = job_controller.get_jobs({})
+    assert len(jobs) == 2
 
 
 @pytest.mark.parametrize("worker", ["test_local_worker", "test_remote_worker"])
-def test_submit_flow_with_dependencies(worker):
+def test_submit_flow_with_dependencies(worker, job_controller):
     from jobflow import Flow
 
     from jobflow_remote import submit_flow
@@ -53,5 +55,6 @@ def test_submit_flow_with_dependencies(worker):
     submit_flow(flow, worker=worker)
 
     runner = Runner()
-    runner.tick_delay = 0.2
     runner.run(ticks=10)
+
+    assert len(job_controller.get_jobs({})) == 4

@@ -7,10 +7,10 @@ import socket
 import tempfile
 import time
 from pathlib import Path
-from typing import Dict, Optional
 
 import docker
 import pytest
+from docker.models.containers import Container
 
 
 def _get_free_port(upper_bound=50_000):
@@ -60,9 +60,9 @@ def docker_client():
 
 def build_and_launch_container(
     docker_client: docker.client.DockerClient,
-    dockerfile: Optional[os.PathLike] = None,
-    image_name: Optional[str] = None,
-    ports: Optional[Dict[str, int]] = None,
+    dockerfile: Path | None = None,
+    image_name: str | None = None,
+    ports: dict[str, int] | None = None,
 ):
     """Builds and/or launches a container, returning the container object.
 
@@ -78,42 +78,43 @@ def build_and_launch_container(
 
     """
 
+    if dockerfile is not None:
+        print(f" * Building {image_name}")
+        _, logs = docker_client.images.build(
+            path=str(Path(__file__).parent.parent.parent.resolve()),
+            dockerfile=dockerfile,
+            tag=image_name,
+            rm=True,
+            quiet=False,
+        )
+
+        for step in logs:
+            if step.get("stream"):
+                print(step["stream"], end="")
+
     try:
-        if dockerfile is not None:
-            print(f"Building {image_name}")
-            _, logs = docker_client.images.build(
-                path=str(Path(__file__).parent.parent.parent.resolve()),
-                dockerfile=dockerfile,
-                tag=image_name,
-                rm=True,
-                quiet=False,
-            )
-
-            for step in logs:
-                if step.get("stream"):
-                    print(step["stream"], end="")
-
-        print(f"Launching container for {image_name}...")
+        print(f"\n * Launching container for {image_name}...")
         container = docker_client.containers.run(
             image_name, detach=True, remove=True, tty=True, ports=ports
         )
-        print("Waiting for container to be ready", end="")
+        assert isinstance(container, Container)
+        print(" * Waiting for container to be ready...", end="")
         while container.status != "running":
             print(".", end="")
-            time.sleep(10)
+            time.sleep(1)
             container.reload()
         print("")
-        print(f"Container {container.id} launched.")
-        print(f"{container.logs().decode()}")
+        print(f" * Container {container.id} launched.")
+        print(f"{container.logs().decode()}\n")
 
         yield container
     finally:
         try:
-            print(f"Stopping container {container.id}...")
+            print(f"\n * Stopping container {container.id}...")
             container.stop()
-            print("Done!")
-        except:
-            pass
+            print(" * Done!")
+        except Exception as exc:
+            print(f" x Failed to stop container: {exc}")
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -122,7 +123,7 @@ def slurm_container(docker_client, slurm_ssh_port):
     ports = {"22/tcp": slurm_ssh_port}
     yield from build_and_launch_container(
         docker_client,
-        "./tests/integration/dockerfiles/Dockerfile.slurm",
+        Path("./tests/integration/dockerfiles/Dockerfile.slurm"),
         "jobflow-slurm:latest",
         ports=ports,
     )
@@ -183,11 +184,14 @@ def write_tmp_settings(
             }
         },
         queue={
-            "type": "MongoStore",
-            "database": store_database_name,
-            "host": "localhost",
-            "port": db_port,
-            "collection_name": "jobs",
+            "store": {
+                "type": "MongoStore",
+                "database": store_database_name,
+                "host": "localhost",
+                "port": db_port,
+                "collection_name": "jobs",
+            },
+            "flows_collection": "flows",
         },
         log_level="debug",
         workers={
@@ -205,7 +209,7 @@ def write_tmp_settings(
                 work_dir="/home/jobflow/jfr",
                 user="jobflow",
                 password="jobflow",
-                pre_run="micromamba activate jobflow",
+                pre_run="/home/jobflow/.venv/bin/activate",
                 resources={"partition": "debug", "ntasks": 1, "time": "00:01:00"},
             ),
         },
@@ -217,7 +221,7 @@ def write_tmp_settings(
             delta_retry=(1, 1, 1),
         ),
     )
-    project_json = project.json(indent=2)
+    project_json = project.model_dump_json(indent=2)
     with open(tmp_dir / f"{random_project_name}.json", "w") as f:
         f.write(project_json)
 
@@ -225,11 +229,23 @@ def write_tmp_settings(
     shutil.rmtree(tmp_dir)
 
 
+@pytest.fixture(scope="function")
+def job_controller(random_project_name):
+    """Yields a jobcontroller instance for the test suite that also sets up the jobstore,
+    resetting it after every test.
+    """
+    from jobflow_remote.jobs.jobcontroller import JobController
+
+    jc = JobController.from_project_name(random_project_name)
+    assert jc.reset()
+    yield jc
+
+
 @pytest.fixture(scope="session")
-def daemon_manager():
+def daemon_manager(random_project_name):
     from jobflow_remote.jobs.daemon import DaemonManager
 
-    yield DaemonManager()
+    yield DaemonManager.from_project_name(random_project_name)
 
 
 @pytest.fixture(scope="session")

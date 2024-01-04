@@ -208,6 +208,7 @@ class Runner:
         complete: bool = True,
         queue: bool = True,
         checkout: bool = True,
+        ticks: int | None = None,
     ):
         """
         Start the runner.
@@ -224,6 +225,8 @@ class Runner:
             If True interactions with the queue manager are handled by the Runner.
         checkout
             If True the checkout of Jobs is performed by the Runner.
+        ticks
+            If provided, the Runner will run for this number of ticks before exiting.
         """
         signal.signal(signal.SIGTERM, self.handle_signal)
 
@@ -286,12 +289,20 @@ class Runner:
             )
 
         try:
-            while True:
+            ticks_remaining: int | bool = True
+            if ticks is not None:
+                ticks_remaining = ticks
+
+            while ticks_remaining:
                 if self.stop_signal:
                     logger.info("stopping due to sigterm")
                     break
                 scheduler.run_pending()
                 time.sleep(1)
+
+                if ticks is not None:
+                    ticks_remaining -= 1
+
         finally:
             self.cleanup()
 
