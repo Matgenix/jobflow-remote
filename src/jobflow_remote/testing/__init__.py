@@ -1,4 +1,5 @@
 """A series of toy workflows that can be used for testing."""
+
 from jobflow import job
 
 
