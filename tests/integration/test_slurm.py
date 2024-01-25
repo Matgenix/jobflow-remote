@@ -1,4 +1,11 @@
+import os
+
 import pytest
+
+pytestmark = pytest.mark.skipif(
+    not os.environ.get("CI"),
+    reason="Only run integration tests in CI, unless forced with 'CI' env var",
+)
 
 
 def test_project_init(random_project_name):

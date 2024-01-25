@@ -56,7 +56,7 @@ jobs:
 
       - name: Unit tests
         run: pytest --cov=jobflow_remote --cov-report=xml --ignore tests/integration
-      
+
       - name: Integration tests
         run: pytest --cov=jobflow_remote --cov-append --cov-report=xml tests/integration -s
 
