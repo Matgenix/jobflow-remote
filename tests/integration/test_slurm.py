@@ -11,6 +11,22 @@ def test_project_init(random_project_name):
     assert len(project.workers) == 2
 
 
+def test_paramiko_ssh_connection(job_controller, slurm_ssh_port):
+    from paramiko import SSHClient
+    from paramiko.client import WarningPolicy
+
+    client = SSHClient()
+    client.set_missing_host_key_policy(WarningPolicy)
+    client.connect(
+        "localhost",
+        port=slurm_ssh_port,
+        username="jobflow",
+        password="jobflow",
+        look_for_keys=False,
+        allow_agent=False,
+    )
+
+
 def test_project_check(job_controller, capsys):
     from jobflow_remote.cli.project import check
 
@@ -49,8 +65,20 @@ def test_submit_flow(worker, job_controller):
     runner.run(ticks=10)
 
     assert len(job_controller.get_jobs({})) == 2
-    assert job_controller.count_jobs(state=JobState.COMPLETED) == 2
-    assert job_controller.count_flows(state=FlowState.COMPLETED) == 1
+    job_1, job_2 = job_controller.get_jobs({})
+    assert job_1["job"]["function_args"] == [1, 5]
+    assert job_1["job"]["name"] == "add"
+
+    output_1 = job_controller.jobstore.get_output(uuid=job_1["uuid"])
+    assert output_1 == 6
+    output_2 = job_controller.jobstore.get_output(uuid=job_2["uuid"])
+    assert output_2 == 11
+    assert (
+        job_controller.count_jobs(state=JobState.COMPLETED) == 2
+    ), f"Jobs not marked as completed, full job info:\n{job_controller.get_jobs({})}"
+    assert (
+        job_controller.count_flows(state=FlowState.COMPLETED) == 1
+    ), f"Flows not marked as completed, full flow info:\n{job_controller.get_flows({})}"
 
 
 @pytest.mark.parametrize(
@@ -74,11 +102,29 @@ def test_submit_flow_with_dependencies(worker, job_controller):
     submit_flow(flow, worker=worker)
 
     runner = Runner()
-    runner.run(ticks=10)
+    runner.run(ticks=20)
 
-    assert job_controller.count_jobs(state=JobState.COMPLETED) == 4
     assert len(job_controller.get_jobs({})) == 4
-    assert job_controller.count_flows(state=FlowState.COMPLETED) == 1
+    job_1, job_2, job_3, job_4 = job_controller.get_jobs({})
+    assert job_1["job"]["function_args"] == [1, 1]
+
+    output_1 = job_controller.jobstore.get_output(uuid=job_1["uuid"])
+    assert output_1 == 2
+    output_2 = job_controller.jobstore.get_output(uuid=job_2["uuid"])
+    assert output_2 == 4
+
+    output_3 = job_controller.jobstore.get_output(uuid=job_3["uuid"])
+    assert output_3 == 6
+
+    output_4 = job_controller.jobstore.get_output(uuid=job_4["uuid"])
+    assert output_4 is None
+
+    assert (
+        job_controller.count_jobs(state=JobState.COMPLETED) == 4
+    ), f"Jobs not marked as completed, full job info:\n{job_controller.get_jobs({})}"
+    assert (
+        job_controller.count_flows(state=FlowState.COMPLETED) == 1
+    ), f"Flows not marked as completed, full flow info:\n{job_controller.get_flows({})}"
 
 
 @pytest.mark.parametrize(

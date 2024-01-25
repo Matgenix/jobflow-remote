@@ -10,7 +10,6 @@ USER root
 # Install OpenSSH server and set it to run on startup
 RUN apt update && apt install -y openssh-server && apt clean && rm -rf /var/lib/apt/lists/*
 RUN sed -i 's/#PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config
-RUN sed -i 's/#PermitEmptyPasswords no/PermitEmptyPasswords yes/g' /etc/ssh/sshd_config
 RUN sed -ie 's/^SCRIPT/service ssh start\nSCRIPT/g' /etc/startup.sh
 
 # Create desired user with blank password then give user access to startup script as sudo without password
