@@ -138,6 +138,50 @@ def test_submit_flow_with_dependencies(worker, job_controller):
     "worker",
     ["test_local_worker", "test_remote_worker"],
 )
+def test_job_with_callable_kwarg(worker, job_controller):
+    """Test whether a callable can be successfully provided as a keyword
+    argument to a job.
+
+    """
+    import math
+
+    from jobflow import Flow
+
+    from jobflow_remote import submit_flow
+    from jobflow_remote.jobs.runner import Runner
+    from jobflow_remote.jobs.state import FlowState, JobState
+    from jobflow_remote.testing import arithmetic
+
+    job_1 = arithmetic(1, -2, op=math.copysign)
+    job_2 = arithmetic([job_1.output], [1], op=math.dist)
+    job_3 = arithmetic(job_2.output, 2, op=math.pow)
+
+    flow = Flow([job_1, job_2, job_3])
+    submit_flow(flow, worker=worker)
+
+    runner = Runner()
+    runner.run(ticks=10)
+
+    assert job_controller.count_jobs({}) == 3
+    assert len(job_controller.get_jobs({})) == 3
+    assert job_controller.count_flows({}) == 1
+
+    jobs = job_controller.get_jobs({})
+    outputs = [job_controller.jobstore.get_output(uuid=job["uuid"]) for job in jobs]
+    assert outputs == [-1, 2, 4]
+
+    assert (
+        job_controller.count_jobs(state=JobState.COMPLETED) == 3
+    ), f"Jobs not marked as completed, full job info:\n{job_controller.get_jobs({})}"
+    assert (
+        job_controller.count_flows(state=FlowState.COMPLETED) == 1
+    ), f"Flows not marked as completed, full flow info:\n{job_controller.get_flows({})}"
+
+
+@pytest.mark.parametrize(
+    "worker",
+    ["test_local_worker", "test_remote_worker"],
+)
 def test_expected_failure(worker, job_controller):
     from jobflow import Flow
 
