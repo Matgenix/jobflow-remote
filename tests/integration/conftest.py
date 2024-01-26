@@ -6,11 +6,20 @@ import shutil
 import socket
 import tempfile
 import time
+from functools import partialmethod
 from pathlib import Path
 
 import docker
+import fabric
 import pytest
 from docker.models.containers import Container
+
+
+@pytest.fixture(autouse=True)
+def mock_fabric_run(monkeypatch):
+    monkeypatch.setattr(
+        fabric.Connection, "run", partialmethod(fabric.Connection.run, in_stream=False)
+    )
 
 
 def _get_free_port(upper_bound=50_000):
@@ -216,6 +225,7 @@ def write_tmp_settings(
                 password="jobflow",
                 pre_run="source /home/jobflow/.venv/bin/activate",
                 resources={"partition": "debug", "ntasks": 1, "time": "00:01:00"},
+                connect_kwargs={"allow_agent": False, "look_for_keys": False},
             ),
         },
         runner=dict(
