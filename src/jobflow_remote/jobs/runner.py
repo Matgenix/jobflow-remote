@@ -737,9 +737,9 @@ class Runner:
                                 raise RemoteError(error, False)
                             set_output = {
                                 "$set": {
-                                    "remote.queue_state": qstate.value
-                                    if qstate
-                                    else None,
+                                    "remote.queue_state": (
+                                        qstate.value if qstate else None
+                                    ),
                                     "state": next_state.value,
                                 }
                             }

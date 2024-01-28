@@ -1,7 +1,8 @@
+from typing import Annotated
+
 import typer
 from rich.prompt import Confirm
 from rich.text import Text
-from typing_extensions import Annotated
 
 from jobflow_remote.cli.formatting import get_exec_config_table, get_worker_table
 from jobflow_remote.cli.jf import app

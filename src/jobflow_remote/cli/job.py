@@ -1,13 +1,12 @@
 import io
 from pathlib import Path
-from typing import Optional
+from typing import Annotated, Optional
 
 import typer
 from monty.json import jsanitize
 from monty.serialization import dumpfn
 from qtoolkit.core.data_objects import QResources
 from rich.pretty import pprint
-from typing_extensions import Annotated
 
 from jobflow_remote import SETTINGS
 from jobflow_remote.cli.formatting import format_job_info, get_job_info_table

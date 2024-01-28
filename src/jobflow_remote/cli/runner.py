@@ -1,9 +1,9 @@
 import os
+from typing import Annotated
 
 import typer
 from rich.table import Table
 from rich.text import Text
-from typing_extensions import Annotated
 
 from jobflow_remote.cli.jf import app
 from jobflow_remote.cli.jfr_typer import JFRTyper
