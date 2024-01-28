@@ -1,17 +1,16 @@
 import json
 from datetime import datetime
-from typing import List, Optional
+from typing import Annotated, Optional
 
 import click
 import typer
-from typing_extensions import Annotated
 
 from jobflow_remote.cli.utils import SerializeFileFormat, SortOption
 from jobflow_remote.config.base import LogLevel
 from jobflow_remote.jobs.state import FlowState, JobState
 
 job_ids_indexes_opt = Annotated[
-    Optional[List[str]],
+    Optional[list[str]],
     typer.Option(
         "--job-id",
         "-jid",
@@ -23,7 +22,7 @@ job_ids_indexes_opt = Annotated[
 
 
 job_ids_opt = Annotated[
-    Optional[List[str]],
+    Optional[list[str]],
     typer.Option(
         "--job-id",
         "-jid",
@@ -34,7 +33,7 @@ job_ids_opt = Annotated[
 
 
 db_ids_opt = Annotated[
-    Optional[List[str]],
+    Optional[list[str]],
     typer.Option(
         "--db-id",
         "-did",
@@ -44,7 +43,7 @@ db_ids_opt = Annotated[
 
 
 flow_ids_opt = Annotated[
-    Optional[List[str]],
+    Optional[list[str]],
     typer.Option(
         "--flow-id",
         "-fid",

@@ -13,9 +13,9 @@ class JFRTyper(typer.Typer):
 
     def __init__(self, *args, **kwargs):
         if "epilog" not in kwargs:
-            kwargs[
-                "epilog"
-            ] = "Run [bold]'jf -h'[/] to display the [bold]global options[/]"
+            kwargs["epilog"] = (
+                "Run [bold]'jf -h'[/] to display the [bold]global options[/]"
+            )
 
         if "rich_markup_mode" not in kwargs:
             kwargs["rich_markup_mode"] = "rich"

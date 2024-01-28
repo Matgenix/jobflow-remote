@@ -5,8 +5,9 @@ import logging
 import time
 import warnings
 from collections import defaultdict
+from collections.abc import Iterable, Mapping
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Iterable, Mapping
+from typing import TYPE_CHECKING, Any
 
 from jobflow.utils import suuid
 from pymongo import ReturnDocument
