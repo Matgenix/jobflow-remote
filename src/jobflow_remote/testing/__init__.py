@@ -1,4 +1,5 @@
 """A series of toy workflows that can be used for testing."""
+
 from typing import Callable, Optional, Union
 
 from jobflow import job

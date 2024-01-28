@@ -35,7 +35,7 @@ class JobflowRemoteSettings(BaseSettings):
 
     @model_validator(mode="before")
     @classmethod
-    def load_default_settings(cls, values):
+    def load_default_settings(cls, values: dict) -> dict:
         """
         Load settings from file or environment variables.
 

@@ -415,7 +415,9 @@ class FlowInfo(BaseModel):
                 parents.append(job_doc["parents"] or [])
                 job_hosts.append(job_doc["job"]["hosts"] or [])
         else:
-            db_ids, job_ids, job_indexes = list(zip(*d["ids"]))
+            db_ids, job_ids, job_indexes = list(  # type:ignore[assignment]
+                zip(*d["ids"])
+            )
             # parents could be determined in this case as well from the Flow document.
             # However, to match the correct order it would require lopping over them.
             # To keep the generation faster add this only if a use case shows up.
