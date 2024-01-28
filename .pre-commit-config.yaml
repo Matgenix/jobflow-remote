@@ -57,6 +57,7 @@ repos:
     - tokenize-rt==4.1.0
     - types-pkg_resources==0.1.2
     - types-paramiko
+    - pydantic~=2.0
 - repo: https://github.com/codespell-project/codespell
   rev: v2.2.6
   hooks:
