@@ -34,3 +34,10 @@ def arithmetic(
         return op(a, b)
 
     return None
+
+
+@job
+def check_env_var() -> str:
+    import os
+
+    return os.environ.get("TESTING_ENV_VAR", "unset")

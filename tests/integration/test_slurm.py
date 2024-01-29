@@ -205,3 +205,32 @@ def test_expected_failure(worker, job_controller):
 
     assert job_controller.count_jobs(state=JobState.FAILED) == 2
     assert job_controller.count_flows(state=FlowState.FAILED) == 1
+
+
+@pytest.mark.parametrize(
+    "worker",
+    ["test_local_worker", "test_remote_worker"],
+)
+def test_exec_config(worker, job_controller, random_project_name):
+    """Tests that an environment variable set in the exec config
+    is available to the job.
+
+    """
+
+    from jobflow_remote import submit_flow
+    from jobflow_remote.jobs.runner import Runner
+    from jobflow_remote.testing import check_env_var
+
+    job = check_env_var()
+    submit_flow(job, worker=worker, exec_config="test")
+
+    assert job_controller.count_jobs({}) == 1
+    assert len(job_controller.get_jobs({})) == 1
+    assert job_controller.count_flows({}) == 1
+
+    runner = Runner()
+    runner.run(ticks=5)
+
+    job = job_controller.get_jobs({})[0]
+    output = job_controller.jobstore.get_output(uuid=job["uuid"])
+    assert output == random_project_name
