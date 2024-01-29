@@ -113,6 +113,7 @@ def build_and_launch_container(
         )
         assert isinstance(container, Container)
         print(" * Waiting for container to be ready...", end="")
+        time.sleep(1)
         while container.status != "running":
             print(".", end="")
             time.sleep(1)
