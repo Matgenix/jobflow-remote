@@ -92,6 +92,7 @@ rst-roles = "class, func, ref, obj"
 [tool.mypy]
 ignore_missing_imports = true
 no_strict_optional = true
+follow_imports = "skip"
 
 [tool.pytest.ini_options]
 filterwarnings = [
