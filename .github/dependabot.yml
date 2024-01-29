@@ -1,0 +1,19 @@
+version: 2
+updates:
+- package-ecosystem: pip
+  directory: "/"
+  schedule:
+    interval: daily
+  open-pull-requests-limit: 50
+  target-branch: develop
+  labels:
+  - dependency_updates
+  rebase-strategy: "disabled"
+- package-ecosystem: github-actions
+  directory: "/"
+  schedule:
+    interval: daily
+    time: "05:33"
+  target-branch: develop
+  labels:
+  - CI
