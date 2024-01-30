@@ -133,8 +133,8 @@ def run_batch_jobs(
         else:
             wait = 0
             count += 1
-            job_id, index = job_str.split("_")
-            index = int(index)
+            job_id, _index = job_str.split("_")
+            index: int = int(_index)
             logger.info(f"Starting job with id {job_id} and index {index}")
             job_path = get_job_path(job_id=job_id, index=index, base_path=base_run_dir)
             try:
