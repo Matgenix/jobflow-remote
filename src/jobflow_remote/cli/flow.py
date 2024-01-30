@@ -59,7 +59,7 @@ def flows_list(
     hours: hours_opt = None,
     verbosity: verbosity_opt = 0,
     max_results: max_results_opt = 100,
-    sort: sort_opt = SortOption.UPDATED_ON.value,
+    sort: sort_opt = SortOption.UPDATED_ON,
     reverse_sort: reverse_sort_flag_opt = False,
 ):
     """
@@ -72,7 +72,7 @@ def flows_list(
 
     start_date = get_start_date(start_date, days, hours)
 
-    sort = [(sort.value, 1 if reverse_sort else -1)]
+    db_sort: list[tuple[str, int]] = [(sort.value, 1 if reverse_sort else -1)]
 
     with loading_spinner():
         flows_info = jc.get_flows_info(
@@ -84,7 +84,7 @@ def flows_list(
             end_date=end_date,
             name=name,
             limit=max_results,
-            sort=sort,
+            sort=db_sort,
             full=verbosity > 0,
         )
 
