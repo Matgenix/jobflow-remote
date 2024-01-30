@@ -234,3 +234,66 @@ def test_exec_config(worker, job_controller, random_project_name):
     job = job_controller.get_jobs({})[0]
     output = job_controller.jobstore.get_output(uuid=job["uuid"])
     assert output == random_project_name
+
+
+@pytest.mark.parametrize(
+    "worker",
+    ["test_local_worker", "test_remote_worker"],
+)
+def test_additional_stores(worker, job_controller):
+    from jobflow import Flow
+
+    from jobflow_remote import submit_flow
+    from jobflow_remote.jobs.runner import Runner
+    from jobflow_remote.jobs.state import FlowState, JobState
+    from jobflow_remote.testing import add_big
+
+    job = add_big(100, 100)
+    flow = Flow(job)
+    submit_flow(flow, worker=worker)
+
+    assert job_controller.count_jobs({}) == 1
+    assert job_controller.count_flows({}) == 1
+
+    runner = Runner()
+    runner.run(ticks=10)
+
+    doc = job_controller.get_jobs({})[0]
+    fs = job_controller.jobstore.additional_stores["big_files"]
+    assert fs.count({"job_uuid": doc["job"]["uuid"]}) == 1
+    assert job_controller.count_jobs(state=JobState.COMPLETED) == 1
+    assert job_controller.count_flows(state=FlowState.COMPLETED) == 1
+    assert job_controller.jobstore.get_output(uuid=doc["job"]["uuid"])["result"] == 200
+    blob_uuid = job_controller.jobstore.get_output(uuid=doc["job"]["uuid"])["data"][
+        "blob_uuid"
+    ]
+    assert list(fs.query({"blob_uuid": blob_uuid}))[0]["job_uuid"] == doc["job"]["uuid"]
+
+
+@pytest.mark.parametrize(
+    "worker",
+    ["test_local_worker", "test_remote_worker"],
+)
+def test_undefined_additional_stores(worker, job_controller):
+    from jobflow import Flow
+
+    from jobflow_remote import submit_flow
+    from jobflow_remote.jobs.runner import Runner
+    from jobflow_remote.jobs.state import FlowState, JobState
+    from jobflow_remote.testing import add_big_undefined_store
+
+    job = add_big_undefined_store(100, 100)
+    flow = Flow(job)
+    submit_flow(flow, worker=worker)
+
+    assert job_controller.count_jobs({}) == 1
+    assert job_controller.count_flows({}) == 1
+
+    runner = Runner()
+    runner.run(ticks=10)
+
+    # Probably this should error somewhere
+    doc = job_controller.get_jobs({})[0]
+    assert job_controller.count_jobs(state=JobState.COMPLETED) == 1
+    assert job_controller.count_flows(state=FlowState.COMPLETED) == 1
+    assert job_controller.jobstore.get_output(uuid=doc["job"]["uuid"])["result"] == 200
