@@ -74,7 +74,7 @@ def jobs_list(
     hours: hours_opt = None,
     verbosity: verbosity_opt = 0,
     max_results: max_results_opt = 100,
-    sort: sort_opt = SortOption.UPDATED_ON.value,
+    sort: sort_opt = SortOption.UPDATED_ON,
     reverse_sort: reverse_sort_flag_opt = False,
     locked: locked_opt = False,
     custom_query: query_opt = None,
@@ -92,14 +92,14 @@ def jobs_list(
 
     start_date = get_start_date(start_date, days, hours)
 
-    sort = [(sort.value, 1 if reverse_sort else -1)]
+    db_sort: list[tuple[str, int]] = [(sort.value, 1 if reverse_sort else -1)]
 
     with loading_spinner():
         if custom_query:
             jobs_info = jc.get_jobs_info_query(
                 query=custom_query,
                 limit=max_results,
-                sort=sort,
+                sort=db_sort,
             )
         else:
             jobs_info = jc.get_jobs_info(
@@ -113,7 +113,7 @@ def jobs_list(
                 name=name,
                 metadata=metadata_dict,
                 limit=max_results,
-                sort=sort,
+                sort=db_sort,
             )
 
         table = get_job_info_table(jobs_info, verbosity=verbosity)

@@ -375,7 +375,7 @@ class JobController:
         name: str | None = None,
         metadata: dict | None = None,
         locked: bool = False,
-        sort: list[tuple] | None = None,
+        sort: list[tuple[str, int]] | None = None,
         limit: int = 0,
     ) -> list[JobInfo]:
         """
