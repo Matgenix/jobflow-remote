@@ -1,4 +1,4 @@
-from typing import Annotated
+from typing import Annotated, Iterable
 
 import typer
 from rich.prompt import Confirm
@@ -171,7 +171,7 @@ def check(
 
     check_all = all(not v for v in (jobstore, worker, queue))
 
-    workers_to_test = []
+    workers_to_test: Iterable[str] = []
     if check_all:
         workers_to_test = project.workers.keys()
     elif worker:
