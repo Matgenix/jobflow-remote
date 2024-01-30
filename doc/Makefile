@@ -65,10 +65,10 @@ build/generate-stamp: $(wildcard source/reference/*.rst)
 generate-rst-from-md:
 	# generate contributing docs
 	mkdir -p source/dev
-	pandoc --from=markdown --to=rst --output=source/dev/_index.rst ../CONTRIBUTING.md
-	echo ".. _devindex:" > source/dev/index.rst
-	cat source/dev/_index.rst >> source/dev/index.rst
-	rm source/dev/_index.rst
+	pandoc --from=markdown --to=rst --output=source/dev/_contributing.rst ../CONTRIBUTING.md
+	echo ".. _contributing:" > source/dev/contributing.rst
+	cat source/dev/_contributing.rst >> source/dev/contributing.rst
+	rm source/dev/_contributing.rst
 	# generate changelog
 	pandoc --from=markdown --to=rst --output=source/_changelog.rst ../CHANGELOG.md
 	echo ".. _changelog:" > source/changelog.rst
