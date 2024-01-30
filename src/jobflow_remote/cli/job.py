@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 import io
 from pathlib import Path
-from typing import Annotated, Optional
+from typing import Annotated
 
 import typer
 from monty.json import jsanitize
@@ -685,7 +687,7 @@ def resources(
         typer.Option(
             "--qresources",
             "-qr",
-            help="If present the values will be interpreted as arguments for a QResources object",
+            help="If present the values in `resources_value` will be interpreted as arguments for a QResources object",
         ),
     ] = False,
     job_id: job_ids_indexes_opt = None,
@@ -705,10 +707,10 @@ def resources(
     Set the resources for the selected Jobs. Only READY or WAITING Jobs.
     """
 
-    resources_value = str_to_dict(resources_value)
+    resources: dict | QResources = str_to_dict(resources_value)
 
     if qresources:
-        resources_value = QResources(**resources_value)
+        resources = QResources(**resources)
 
     jc = get_job_controller()
     execute_multi_jobs_cmd(
@@ -791,7 +793,7 @@ def output(
     job_db_id: job_db_id_arg,
     job_index: job_index_arg = None,
     file_path: Annotated[
-        Optional[str],
+        str | None,
         typer.Option(
             "--path",
             "-p",
