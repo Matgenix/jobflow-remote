@@ -196,7 +196,16 @@ def write_tmp_settings(
                 "host": "localhost",
                 "port": db_port,
                 "collection_name": "docs",
-            }
+            },
+            "additional_stores": {
+                "big_files": {
+                    "type": "GridFSStore",
+                    "database": store_database_name,
+                    "host": "localhost",
+                    "port": db_port,
+                    "collection_name": "data",
+                },
+            },
         },
         queue={
             "store": {
