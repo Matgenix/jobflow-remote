@@ -96,7 +96,7 @@ def current_project(ctx: typer.Context):
 @app_project.command()
 def generate(
     name: Annotated[str, typer.Argument(help="Name of the project")],
-    file_format: serialize_file_format_opt = SerializeFileFormat.YAML.value,
+    file_format: serialize_file_format_opt = SerializeFileFormat.YAML,
     full: Annotated[
         bool,
         typer.Option(
