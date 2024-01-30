@@ -101,16 +101,16 @@ class RemoteBatchManager:
         """
         terminated = []
         for i in self.host.listdir(self.terminated_dir):
-            job_id, index, process_uuid = i.split("_")
-            index = int(index)
+            job_id, _index, process_uuid = i.split("_")
+            index = int(_index)
             terminated.append((job_id, index, process_uuid))
         return terminated
 
     def get_running(self) -> list[tuple[str, int, str]]:
         running = []
         for filename in self.host.listdir(self.running_dir):
-            job_id, index, process_uuid = filename.split("_")
-            index = int(index)
+            job_id, _index, process_uuid = filename.split("_")
+            index = int(_index)
             running.append((job_id, index, process_uuid))
         return running
 
