@@ -57,6 +57,12 @@ def slurm_ssh_port():
 
 
 @pytest.fixture(scope="session")
+def slurm_ssh_mfa_port():
+    """The exposed local port for SSH connections to the Slurm + MFA container."""
+    yield _get_free_port()
+
+
+@pytest.fixture(scope="session")
 def db_port():
     """The exposed local port for connections to the MongoDB stores."""
     yield _get_free_port()
@@ -72,6 +78,7 @@ def build_and_launch_container(
     dockerfile: Path | None = None,
     image_name: str | None = None,
     ports: dict[str, int] | None = None,
+    target: str | None = None,
 ):
     """Builds and/or launches a container, returning the container object.
 
@@ -81,6 +88,7 @@ def build_and_launch_container(
         image_name: Either the tag to attach to the built image, or an image
             name to pull from the web (may require authenticated docker client).
         ports: A port specification to use for the launched container.
+        target: The docker build target to use.
 
     Yields:
         The launched container object, then stops the container after use.
@@ -95,6 +103,7 @@ def build_and_launch_container(
             tag=image_name,
             rm=True,
             quiet=False,
+            target=target,
         )
 
         for step in logs:
@@ -139,7 +148,22 @@ def slurm_container(docker_client, slurm_ssh_port):
     yield from build_and_launch_container(
         docker_client,
         Path("./tests/integration/dockerfiles/Dockerfile.slurm"),
-        "jobflow-slurm:latest",
+        image_name="jobflow-slurm:latest",
+        ports=ports,
+    )
+
+
+@pytest.fixture(scope="session", autouse=True)
+def slurm_container_mfa(docker_client, slurm_ssh_mfa_port):
+    """Build and launch a container running Slurm + SSH with multi-factor authentication,
+    exposed on a random available port.
+
+    """
+    ports = {"22/tcp": slurm_ssh_mfa_port}
+    yield from build_and_launch_container(
+        docker_client,
+        Path("./tests/integration/dockerfiles/Dockerfile.slurm.mfa"),
+        image_name="jobflow-slurm-mfa:latest",
         ports=ports,
     )
 
@@ -171,6 +195,7 @@ def write_tmp_settings(
     random_project_name,
     store_database_name,
     slurm_ssh_port,
+    slurm_ssh_mfa_port,
     db_port,
 ):
     """Collects the various sub-configs and writes them to a temporary file in a temporary directory."""
@@ -220,6 +245,18 @@ def write_tmp_settings(
                 type="remote",
                 host="localhost",
                 port=slurm_ssh_port,
+                scheduler_type="slurm",
+                work_dir="/home/jobflow/jfr",
+                user="jobflow",
+                password="jobflow",
+                pre_run="source /home/jobflow/.venv/bin/activate",
+                resources={"partition": "debug", "ntasks": 1, "time": "00:01:00"},
+                connect_kwargs={"allow_agent": False, "look_for_keys": False},
+            ),
+            "test_remote_worker_mfa": dict(
+                type="remote",
+                host="localhost",
+                port=slurm_ssh_mfa_port,
                 scheduler_type="slurm",
                 work_dir="/home/jobflow/jfr",
                 user="jobflow",
