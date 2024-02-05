@@ -38,7 +38,7 @@ serverurl=unix://$sock_file
 
 [program:runner_daemon]
 priority=100
-command=jf -p $project runner run -pid --single -log $loglevel
+command=jf -p $project runner run -pid -log $loglevel
 autostart=true
 autorestart=false
 numprocs=1
