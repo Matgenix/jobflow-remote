@@ -29,7 +29,7 @@ dependencies =[
     "pydantic ~= 2.5",
     "fabric ~= 3.2",
     "tomlkit ~= 0.12",
-    "qtoolkit ~= 0.1",
+    "qtoolkit ~= 0.1, >= 0.1.3",
     "typer ~= 0.9",
     "rich ~= 13.7",
     "psutil ~= 5.9",
