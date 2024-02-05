@@ -37,17 +37,24 @@ jobs:
         pip install -r requirements/requirements.txt
         pip install -e .[docs]
 
-    - name: Set git config
-      run: |
-        git config --global user.name "${{ env.GIT_USER_NAME }}"
-        git config --global user.email "${{ env.GIT_USER_EMAIL }}"
-
     - name: Update changelog
       uses: CharMixer/auto-changelog-action@v1
       with:
         token: ${{ secrets.RELEASE_PAT_BOT }}
         release_branch: ${{ env.PUBLISH_UPDATE_BRANCH }}
         exclude_labels: "duplicate,question,invalid,wontfix,dependency_updates,skip_changelog"
+
+    - name: Configure git and commit CHANGELOG
+      run: |
+        git config --global user.email "${GIT_USER_EMAIL}"
+        git config --global user.name "${GIT_USER_NAME}"
+        git commit CHANGELOG.md -m "Release ${GITHUB_REF#refs/tags/}"
+
+    - name: Move tag to new HEAD
+      run: |
+        TAG_MSG=.github/utils/release_tag_msg.txt
+        sed -i "s|TAG_NAME|${GITHUB_REF#refs/tags/}|" "${TAG_MSG}"
+        git tag -af -F "${TAG_MSG}" ${GITHUB_REF#refs/tags/}
 
     - name: Update '${{ env.PUBLISH_UPDATE_BRANCH }}'
       uses: CasperWA/push-protected@v2
