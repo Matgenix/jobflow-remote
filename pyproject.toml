@@ -64,7 +64,7 @@ jf = "jobflow_remote.cli.jf:app"
 homepage = "https://Matgenix.github.io/jobflow-remote/"
 repository = "https://github.com/Matgenix/jobflow-remote"
 documentation = "https://Matgenix.github.io/jobflow-remote/"
-changelog = "https://github.com/Matgenix/jobflow-remote/CHANGELOG.md"
+changelog = "https://matgenix.github.io/jobflow-remote/changelog"
 
 [tool.setuptools.package-data]
 jobflow_remote = ["py.typed"]
