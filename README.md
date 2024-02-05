@@ -35,6 +35,13 @@ Please read and follow our [Code of Conduct][codeofconduct].
 
 jobflow-remote is released under a modified BSD license; the full text can be found [here][license].
 
+
+## Citation
+
+If you use Jobflow in your work, please cite it as follows:
+
+- "Jobflow: Computational Workflows Made Simple", A.S. Rosen, M. Gallant, J. George, J. Riebesell, H. Sahasrabuddhe, J.X. Shen, M. Wen, M.L. Evans, G. Petretto, D. Waroquiers, G.‑M. Rignanese, K.A. Persson, A. Jain, A.M. Ganose, _Journal of Open Source Software_, 9(93), 5995 (2024) DOI: [10.21105/joss.05995](https://doi.org/10.21105/joss.05995)
+
 ## Acknowledgements
 
 jobflow-remote is developed and maintained by Matgenix SRL.
@@ -43,10 +50,10 @@ A full list of all contributors can be found [here][contributors].
 
 [help-forum]: https://github.com//Matgenix/jobflow-remote/issues
 [issues]: https://github.com//Matgenix/jobflow-remote/issues
-[installation]: https://https://github.com//Matgenix/jobflow-remote/blob/main/INSTALL.md
-[contributing]: https://github.com/Matgenix/jobflow-remote/blob/main/CONTRIBUTING.md
-[codeofconduct]: https://github.com/Matgenix/jobflow-remote/blob/main/CODE_OF_CONDUCT.md
-[changelog]: https://github.com//Matgenix/jobflow-remote/blob/main/CHANGELOG.md
-[contributors]: https://Matgenix.github.io/jobflow-remote/graphs/contributors
-[license]: https://raw.githubusercontent.com/Matgenix/jobflow-remote/blob/main/LICENSE
+[installation]: https://github.com//Matgenix/jobflow-remote/blob/develop/INSTALL.md
+[contributing]: https://github.com/Matgenix/jobflow-remote/blob/develop/CONTRIBUTING.md
+[codeofconduct]: https://github.com/Matgenix/jobflow-remote/blob/develop/CODE_OF_CONDUCT.md
+[changelog]: https://github.com//Matgenix/jobflow-remote/blob/develop/CHANGELOG.md
+[contributors]: https://github.com/Matgenix/jobflow-remote/graphs/contributors
+[license]: https://raw.githubusercontent.com/Matgenix/jobflow-remote/blob/develop/LICENSE
 [docs]: https://Matgenix.github.io/jobflow-remote/
