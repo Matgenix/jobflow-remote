@@ -18,6 +18,7 @@ from jobflow.utils import suuid
 from monty.json import MontyDecoder
 from monty.os import makedirs_p
 from qtoolkit.core.data_objects import QState, SubmissionStatus
+from rich.prompt import Confirm
 
 from jobflow_remote import JobController
 from jobflow_remote.config.base import (
@@ -76,6 +77,7 @@ class Runner:
         project_name: str | None = None,
         log_level: LogLevel | None = None,
         runner_id: str | None = None,
+        connect_interactive: bool = False,
     ):
         """
         Parameters
@@ -89,6 +91,9 @@ class Runner:
             A unique identifier for the Runner process. Used to identify the
             runner process in logging and in the DB locks.
             If None a uuid will be generated.
+        connect_interactive:
+            If True during initialization will open connections to the hosts
+            marked as interactive.
         """
         self.stop_signal = False
         self.runner_id: str = runner_id or str(uuid.uuid4())
@@ -130,6 +135,14 @@ class Runner:
         # How to deal with cases where the connection gets closed?
         # how to deal with file based stores?
         self.jobstore = self.project.get_jobstore()
+
+        if connect_interactive:
+            for host_name, host in self.hosts.items():
+                if host.interactive_login and not host.is_connected:
+                    if Confirm.ask(
+                        f"Do you want to open the connection for the host of the {host_name} worker?"
+                    ):
+                        host.connect()
 
     @property
     def runner_options(self) -> RunnerOptions:
