@@ -179,6 +179,31 @@ def loading_spinner(processing: bool = True):
         yield progress
 
 
+@contextmanager
+def hide_progress(progress: Progress):
+    """
+    Hide the progress bar or spinning icon if an input is required from the user.
+
+    Adapted from a related github issue for rich:
+    https://github.com/Textualize/rich/issues/1535#issuecomment-1745297594
+
+    Parameters
+    ----------
+    progress
+        The Progress object in use
+    """
+    transient = progress.live.transient  # save the old value
+    progress.live.transient = True
+    progress.stop()
+    progress.live.transient = transient  # restore the old value
+    try:
+        yield
+    finally:
+        # make space for the progress to use so it doesn't overwrite any previous lines
+        print("\n" * (len(progress.tasks) - 2))
+        progress.start()
+
+
 def get_job_db_ids(job_db_id: str, job_index: int | None):
     if check_valid_uuid(job_db_id, raise_on_error=False):
         db_id = None

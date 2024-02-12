@@ -1,16 +1,22 @@
 from __future__ import annotations
 
+import getpass
 import logging
 import subprocess
+import time
 from enum import Enum
 from pathlib import Path
 from string import Template
+from typing import Callable
 from xmlrpc.client import Fault
 
 import psutil
 from monty.os import makedirs_p
-from supervisor import childutils
+from supervisor import childutils, states, xmlrpc
+from supervisor.compat import xmlrpclib
+from supervisor.options import ClientOptions
 from supervisor.states import RUNNING_STATES, STOPPED_STATES, ProcessStates
+from supervisor.supervisorctl import Controller, fgthread
 from supervisor.xmlrpc import Faults
 
 from jobflow_remote.config import ConfigManager, Project
@@ -38,7 +44,7 @@ serverurl=unix://$sock_file
 
 [program:runner_daemon]
 priority=100
-command=jf -p $project runner run -pid -log $loglevel
+command=jf -p $project runner run -pid -log $loglevel $connect_interactive
 autostart=true
 autorestart=false
 numprocs=1
@@ -67,7 +73,7 @@ serverurl=unix://$sock_file
 
 [program:runner_daemon_checkout]
 priority=100
-command=jf -p $project runner run -pid --checkout -log $loglevel
+command=jf -p $project runner run -pid --checkout -log $loglevel $connect_interactive
 autostart=true
 autorestart=false
 numprocs=1
@@ -76,7 +82,7 @@ stopwaitsecs=86400
 
 [program:runner_daemon_transfer]
 priority=100
-command=jf -p $project runner run -pid --transfer -log $loglevel
+command=jf -p $project runner run -pid --transfer -log $loglevel $connect_interactive
 autostart=true
 autorestart=false
 numprocs=$num_procs_transfer
@@ -85,7 +91,7 @@ stopwaitsecs=86400
 
 [program:runner_daemon_queue]
 priority=100
-command=jf -p $project runner run -pid --queue -log $loglevel
+command=jf -p $project runner run -pid --queue -log $loglevel $connect_interactive
 autostart=true
 autorestart=false
 numprocs=1
@@ -94,7 +100,7 @@ stopwaitsecs=86400
 
 [program:runner_daemon_complete]
 priority=100
-command=jf -p $project runner run -pid --complete -log $loglevel
+command=jf -p $project runner run -pid --complete -log $loglevel $connect_interactive
 autostart=true
 autorestart=false
 numprocs=$num_procs_complete
@@ -157,7 +163,8 @@ class DaemonManager:
     def sock_filepath(self) -> Path:
         path = self.daemon_dir / "s.sock"
         if len(str(path)) > 97:
-            msg = f"socket path {path} is too long for UNIX systems. Set the daemon_dir value in the project configuration so that the socket path is shorter"
+            msg = f"socket path {path} is too long for UNIX systems. Set the daemon_dir value "
+            "in the project configuration so that the socket path is shorter"
             raise DaemonError(msg)
         return path
 
@@ -273,7 +280,14 @@ class DaemonManager:
         if not process_active:
             return None
 
-        pids = {"supervisord": {"pid": self.get_supervisord_pid(), "state": "RUNNING"}}
+        pids = {
+            "supervisord": {
+                "pid": self.get_supervisord_pid(),
+                "statename": "RUNNING",
+                "state": ProcessStates.RUNNING,
+                "group": None,
+            }
+        }
 
         if not self.sock_filepath.is_socket():
             raise DaemonError(
@@ -288,7 +302,8 @@ class DaemonManager:
             )
 
         for pi in proc_info:
-            pids[pi.get("name")] = {"pid": pi.get("pid"), "state": pi.get("statename")}
+            name = f"{pi.get('group')}:{pi.get('name')}"
+            pids[name] = pi
 
         return pids
 
@@ -299,6 +314,7 @@ class DaemonManager:
         single: bool = True,
         log_level: str = "info",
         nodaemon: bool = False,
+        connect_interactive: bool = False,
     ):
         if single:
             conf = self.conf_template_single.substitute(
@@ -308,6 +324,9 @@ class DaemonManager:
                 nodaemon="true" if nodaemon else "false",
                 project=self.project.name,
                 loglevel=log_level,
+                connect_interactive=(
+                    "--connect-interactive" if connect_interactive else ""
+                ),
             )
         else:
             conf = self.conf_template_split.substitute(
@@ -319,6 +338,9 @@ class DaemonManager:
                 nodaemon="true" if nodaemon else "false",
                 project=self.project.name,
                 loglevel=log_level,
+                connect_interactive=(
+                    "--connect-interactive" if connect_interactive else ""
+                ),
             )
         with open(self.conf_filepath, "w") as f:
             f.write(conf)
@@ -330,6 +352,7 @@ class DaemonManager:
         single: bool = True,
         log_level: str = "info",
         nodaemon: bool = False,
+        connect_interactive: bool = False,
     ) -> str | None:
         makedirs_p(self.daemon_dir)
         makedirs_p(self.log_dir)
@@ -339,6 +362,7 @@ class DaemonManager:
             single=single,
             log_level=log_level,
             nodaemon=nodaemon,
+            connect_interactive=connect_interactive,
         )
         cp = subprocess.run(
             f"supervisord -c {str(self.conf_filepath)}",
@@ -377,6 +401,7 @@ class DaemonManager:
         single: bool = True,
         log_level: str = "info",
         raise_on_error: bool = False,
+        connect_interactive: bool = False,
     ) -> bool:
         status = self.check_status()
         if status == DaemonStatus.RUNNING:
@@ -387,6 +412,7 @@ class DaemonManager:
                 num_procs_complete=num_procs_complete,
                 single=single,
                 log_level=log_level,
+                connect_interactive=connect_interactive,
             )
         elif status == DaemonStatus.STOPPED:
             self.shut_down(raise_on_error=raise_on_error)
@@ -395,6 +421,7 @@ class DaemonManager:
                 num_procs_complete=num_procs_complete,
                 single=single,
                 log_level=log_level,
+                connect_interactive=connect_interactive,
             )
             # else:
             #     error = self.start_processes()
@@ -483,3 +510,98 @@ class DaemonManager:
                 raise
             return False
         return True
+
+    def wait_start(self, timeout: int = 30):
+
+        time_limit = time.time() + timeout
+        while True:
+            processes_info = self.get_processes_info()
+            all_started = True
+            for name, proc_info in processes_info.items():
+                if proc_info["state"] not in RUNNING_STATES:
+                    raise DaemonError(f"Process {name} is not in a running state")
+                if proc_info["state"] != ProcessStates.RUNNING:
+                    all_started = False
+                    break
+            if all_started:
+                break
+            if time.time() > time_limit:
+                raise DaemonError(
+                    f"The processes did not start within {timeout} seconds"
+                )
+            time.sleep(2)
+
+    def foreground_processes(
+        self,
+        processes_names: list | None = None,
+        print_function: Callable | None = None,
+    ):
+        processes_info = self.get_processes_info()
+        if processes_names is None:
+            processes_names = [
+                pn for pn in processes_info.keys() if pn != "supervisord"
+            ]
+
+        for name in processes_names:
+            if name not in processes_info:
+                raise ValueError(
+                    f"Process with name {name} is not among the available processes"
+                )
+            if processes_info[name]["state"] != ProcessStates.RUNNING:
+                raise RuntimeError(
+                    f"Process {name} is not running. Cannot attach to it."
+                )
+            self.foreground_process(name, print_function)
+
+    def foreground_process(self, name, print_function: Callable | None = None):
+
+        # This is adapted from supervisor.supervisorctl.DefaultControllerPlugin.do_fg
+        a = None
+        if print_function is None:
+            print_function = print
+        try:
+            ctl = self.get_controller()
+
+            supervisor = ctl.get_supervisor()
+
+            print_function(f"Entering foreground for process {name} (CTRL+C to exit)")
+
+            # this thread takes care of the output/error messages
+            a = fgthread(name, ctl)
+            a.start()
+
+            # this takes care of the user input
+            while True:
+                # Always avoid echoing the output. It may not be a password, but since
+                # the daemon process cannot control the choice here, it is safer to
+                # hide everything
+                # inp = raw_input() + '\n'
+                inp = getpass.getpass("") + "\n"
+                try:
+                    supervisor.sendProcessStdin(name, inp)
+                except xmlrpclib.Fault as e:
+                    if e.faultCode == xmlrpc.Faults.NOT_RUNNING:
+                        print_function("Process got killed")
+                    else:
+                        print_function("ERROR: " + str(e))
+                    print_function("Exiting foreground")
+                    a.kill()
+                    return
+
+                info = supervisor.getProcessInfo(name)
+                if info["state"] != states.ProcessStates.RUNNING:
+                    print_function("Process got killed")
+                    print_function("Exiting foreground")
+                    a.kill()
+                    return
+        except (KeyboardInterrupt, EOFError):
+            print_function("Exiting foreground")
+            if a:
+                a.kill()
+
+    def get_controller(self):
+        options = ClientOptions()
+        args = ["-c", self.conf_filepath]
+        options.realize(args, doc="")
+        ctl = Controller(options)
+        return ctl

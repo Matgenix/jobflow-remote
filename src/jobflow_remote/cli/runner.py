@@ -68,6 +68,14 @@ def run(
             help="Enable the checkout option in the runner",
         ),
     ] = False,
+    connect_interactive: Annotated[
+        bool,
+        typer.Option(
+            "--connect-interactive",
+            "-i",
+            help="Activate the connection for interactive remote host",
+        ),
+    ] = False,
 ):
     """
     Execute the Runner in the foreground.
@@ -75,7 +83,11 @@ def run(
     Should be used by the daemon or for testing purposes.
     """
     runner_id = os.getpid() if set_pid else None
-    runner = Runner(log_level=log_level, runner_id=str(runner_id))
+    runner = Runner(
+        log_level=log_level,
+        runner_id=str(runner_id),
+        connect_interactive=connect_interactive,
+    )
     if not (transfer or complete or queue or checkout):
         transfer = complete = queue = checkout = True
 
@@ -109,14 +121,30 @@ def start(
         ),
     ] = False,
     log_level: log_level_opt = LogLevel.INFO,
+<<<<<<< HEAD
+=======
+    connect_interactive: Annotated[
+        bool,
+        typer.Option(
+            "--connect-interactive",
+            "-i",
+            help="Wait for the daemon to start and manually log in the "
+            "connection for interactive remote host. Requires --single.",
+        ),
+    ] = False,
+>>>>>>> 41173ee (Allow interactive authentication for workers)
 ):
     """
     Start the Runner as a daemon
     """
+    # This is not a strict requirement, but for the moment only allow the single
+    # process daemon
+    if connect_interactive and not single:
+        exit_with_error_msg("--connect-interactive option requires --single")
     cm = get_config_manager()
     dm = DaemonManager.from_project(cm.get_project())
     with loading_spinner(False) as progress:
-        progress.add_task(description="Starting the daemon...", total=None)
+        task_id = progress.add_task(description="Starting the daemon...", total=None)
         try:
             dm.start(
                 num_procs_transfer=transfer,
@@ -124,11 +152,22 @@ def start(
                 single=single,
                 log_level=log_level.value,
                 raise_on_error=True,
+                connect_interactive=connect_interactive,
             )
         except DaemonError as e:
             exit_with_error_msg(
                 f"Error while starting the daemon: {getattr(e, 'message', e)}"
             )
+        if connect_interactive:
+            progress.update(task_id, description="Waiting for processes to start...")
+            try:
+                dm.wait_start()
+            except DaemonError as e:
+                exit_with_error_msg(
+                    f"Error while waiting the processes to start: {getattr(e, 'message', e)}"
+                )
+    if connect_interactive:
+        dm.foreground_processes(print_function=out_console.print)
 
 
 @app_runner.command()
@@ -255,7 +294,7 @@ def info():
             procs_info_dict = dm.get_processes_info()
     except DaemonError as e:
         exit_with_error_msg(
-            f"Error while stopping the daemon: {getattr(e, 'message', e)}"
+            f"Error while fetching information from the daemon: {getattr(e, 'message', e)}"
         )
     if not procs_info_dict:
         exit_with_warning_msg("Daemon is not running")
@@ -265,6 +304,26 @@ def info():
     table.add_column("State")
 
     for name, proc_info in procs_info_dict.items():
-        table.add_row(name, str(proc_info["pid"]), str(proc_info["state"]))
+        table.add_row(name, str(proc_info["pid"]), str(proc_info["statename"]))
 
     out_console.print(table)
+
+
+@app_runner.command()
+def foreground():
+    """
+    Connect to the daemon processes in the foreground
+    """
+    cm = get_config_manager()
+    dm = DaemonManager.from_project(cm.get_project())
+    procs_info_dict = None
+    try:
+        with loading_spinner():
+            procs_info_dict = dm.get_processes_info()
+    except DaemonError as e:
+        exit_with_error_msg(
+            f"Error while fetching information from the daemon: {getattr(e, 'message', e)}"
+        )
+    if not procs_info_dict:
+        exit_with_warning_msg("Daemon is not running")
+    dm.foreground_processes(print_function=out_console.print)

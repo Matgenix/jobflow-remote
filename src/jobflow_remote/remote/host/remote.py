@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import getpass
 import io
 import logging
 import shlex
@@ -7,6 +8,9 @@ import traceback
 from pathlib import Path
 
 import fabric
+from fabric import Config
+from fabric.auth import OpenSSHAuthStrategy
+from paramiko.auth_strategy import AuthSource
 from paramiko.ssh_exception import SSHException
 
 from jobflow_remote.remote.host.base import BaseHost
@@ -36,6 +40,7 @@ class RemoteHost(BaseHost):
         shell_cmd="bash",
         login_shell=True,
         retry_on_closed_connection=True,
+        interactive_login=False,
     ):
         self.host = host
         self.user = user
@@ -51,20 +56,44 @@ class RemoteHost(BaseHost):
         self.shell_cmd = shell_cmd
         self.login_shell = login_shell
         self.retry_on_closed_connection = retry_on_closed_connection
+        self._interactive_login = interactive_login
         self._create_connection()
 
     def _create_connection(self):
-        self._connection = fabric.Connection(
-            host=self.host,
-            user=self.user,
-            port=self.port,
-            config=self.config,
-            gateway=self.gateway,
-            forward_agent=self.forward_agent,
-            connect_timeout=self.connect_timeout,
-            connect_kwargs=self.connect_kwargs,
-            inline_ssh_env=self.inline_ssh_env,
-        )
+        if self.interactive_login:
+            # if auth_timeout is not explicitly set, use a larger value than
+            # the default to avoid the timeout while user get access to the process
+            connect_kwargs = dict(self.connect_kwargs) if self.connect_kwargs else {}
+            if "auth_timeout" not in connect_kwargs:
+                connect_kwargs["auth_timeout"] = 120
+            config = self.config
+            if not config:
+                config = Config()
+                config.authentication.strategy_class = InteractiveAuthStrategy
+            self._connection = fabric.Connection(
+                host=self.host,
+                user=self.user,
+                port=self.port,
+                config=config,
+                gateway=self.gateway,
+                forward_agent=self.forward_agent,
+                connect_timeout=self.connect_timeout,
+                connect_kwargs=connect_kwargs,
+                inline_ssh_env=self.inline_ssh_env,
+            )
+
+        else:
+            self._connection = fabric.Connection(
+                host=self.host,
+                user=self.user,
+                port=self.port,
+                config=self.config,
+                gateway=self.gateway,
+                forward_agent=self.forward_agent,
+                connect_timeout=self.connect_timeout,
+                connect_kwargs=self.connect_kwargs,
+                inline_ssh_env=self.inline_ssh_env,
+            )
 
     def __eq__(self, other):
         if not isinstance(other, RemoteHost):
@@ -260,3 +289,64 @@ class RemoteHost(BaseHost):
             # problem for how the queue managers are handled in the Runner.
             self.connect()
         return True
+
+    @property
+    def interactive_login(self) -> bool:
+        return self._interactive_login
+
+
+def inter_handler(title, instructions, prompt_list):
+    """
+    Handler function for interactive prompts from the server.
+    Used by Interactive AuthSource.
+    """
+
+    if title:
+        print(title.strip())
+    if instructions:
+        print(instructions.strip())
+
+    resp = []  # Initialize the response container
+
+    # Walk the list of prompts that the server sent that we need to answer
+    for pr in prompt_list:
+        if pr[1]:
+            in_value = input(pr[0])
+        else:
+            in_value = getpass.getpass(pr[0])
+        resp.append(in_value)
+
+    return tuple(resp)  # Convert the response list to a tuple and return it
+
+
+class Interactive(AuthSource):
+    """
+    Interactive AuthSource. Prompts the user for all the requests coming
+    from the server.
+    """
+
+    def __init__(self, username):
+        super().__init__(username=username)
+
+    def __repr__(self):
+        return super()._repr(user=self.username)
+
+    def authenticate(self, transport):
+        return transport.auth_interactive(self.username, inter_handler)
+
+
+class InteractiveAuthStrategy(OpenSSHAuthStrategy):
+    """
+    AuthStrategy based on OpenSSHAuthStrategy that tries to use public keys
+    and then switches to an interactive approach forwording the requests
+    from the server.
+    """
+
+    def get_sources(self):
+        # TODO: initial none-auth + tracking the response's allowed types.
+        # however, SSHClient never did this deeply, and there's no guarantee a
+        # server _will_ send anything but "any" anyways...
+        # Public keys of all kinds typically first.
+        yield from self.get_pubkeys()
+
+        yield Interactive(username=self.username)
