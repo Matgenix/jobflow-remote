@@ -316,6 +316,10 @@ class RemoteWorker(WorkerBase):
     login_shell: bool = Field(
         True, description="Whether to use a login shell when executing the command"
     )
+    interactive_login: bool = Field(
+        False,
+        description="Whether the authentication to the host should be interactive",
+    )
 
     def get_host(self) -> BaseHost:
         """
@@ -345,6 +349,7 @@ class RemoteWorker(WorkerBase):
             keepalive=self.keepalive,
             shell_cmd=self.shell_cmd,
             login_shell=self.login_shell,
+            interactive_login=self.interactive_login,
         )
 
     @property
