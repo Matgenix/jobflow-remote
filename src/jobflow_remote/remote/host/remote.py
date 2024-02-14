@@ -343,10 +343,20 @@ class InteractiveAuthStrategy(OpenSSHAuthStrategy):
     """
 
     def get_sources(self):
-        # TODO: initial none-auth + tracking the response's allowed types.
-        # however, SSHClient never did this deeply, and there's no guarantee a
-        # server _will_ send anything but "any" anyways...
-        # Public keys of all kinds typically first.
-        yield from self.get_pubkeys()
+        # get_pubkeys from OpenSSHAuthStrategy
+        # With the current implementation exceptions may be raised in case if a key
+        # in ~/.ssh cannot be parsed.
+        # TODO For the moment just skip the public keys altogether. The only
+        # solution would be to import the get_pubkeys code here. Preferably wait
+        # for improvements in fabric.
+        try:
+            yield from self.get_pubkeys()
+        except Exception as e:
+            logger.warning(
+                "Error while trying the authentication with all the public keys "
+                f"available: {getattr(e, 'message', str(e))}. This may be due to the "
+                "format of one of the keys. Authentication will proceed with "
+                "interactive prompts"
+            )
 
         yield Interactive(username=self.username)
