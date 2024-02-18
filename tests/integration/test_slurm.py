@@ -292,8 +292,6 @@ def test_undefined_additional_stores(worker, job_controller):
     runner = Runner()
     runner.run(ticks=10)
 
-    # Probably this should error somewhere
-    doc = job_controller.get_jobs({})[0]
-    assert job_controller.count_jobs(state=JobState.COMPLETED) == 1
-    assert job_controller.count_flows(state=FlowState.COMPLETED) == 1
-    assert job_controller.jobstore.get_output(uuid=doc["job"]["uuid"])["result"] == 200
+    # The job should fail, as the additional store is not defined
+    assert job_controller.count_jobs(state=JobState.FAILED) == 1
+    assert job_controller.count_flows(state=FlowState.FAILED) == 1

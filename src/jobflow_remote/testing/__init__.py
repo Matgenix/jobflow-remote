@@ -45,7 +45,20 @@ def check_env_var() -> str:
 
 @job(big_files="data")
 def add_big(a: float, b: float):
-    """Adds two numbers together and writes the answer to an artificially large file."""
+    """Adds two numbers together and writes the answer to an artificially large file
+    which is stored in a pre-defined store."""
+    import pathlib
+
+    result = a + b
+    with open("file.txt", "w") as f:
+        f.writelines([f"{result}"] * int(1e5))
+    return Response({"data": pathlib.Path("file.txt"), "result": a + b})
+
+
+@job(undefined_store="data")
+def add_big_undefined_store(a: float, b: float):
+    """Adds two numbers together and writes the answer to an artificially large file
+    which is attempted to be stored in a undefined store."""
     import pathlib
 
     result = a + b
