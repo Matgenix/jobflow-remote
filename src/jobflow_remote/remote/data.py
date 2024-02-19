@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 import io
 import logging
 import os
@@ -7,11 +8,18 @@ from pathlib import Path
 from typing import Any
 
 import orjson
+from jobflow.core.job import Job
 from jobflow.core.store import JobStore
 from maggma.stores.mongolike import JSONStore
 from monty.json import jsanitize
 
+from jobflow_remote.jobs.data import RemoteError
 from jobflow_remote.utils.data import uuid_to_path
+
+JOB_INIT_ARGS = {k for k in inspect.signature(Job).parameters.keys() if k != "kwargs"}
+"""A set of the arguments of the Job constructor which
+can be used to detect additional custom arguments
+"""
 
 
 def get_job_path(
@@ -165,4 +173,16 @@ def resolve_job_dict_args(job_dict: dict, store: JobStore) -> dict:
     # substitution is in place
     job_dict["function_args"] = resolved_args
     job_dict["function_kwargs"] = resolved_kwargs
+
+    additional_store_names = set(job_dict.keys()) - JOB_INIT_ARGS
+    for store_name in additional_store_names:
+        # Exclude MSON fields
+        if store_name.startswith("@"):
+            continue
+        if store_name not in store.additional_stores:
+            raise RemoteError(
+                f"Additional store {store_name!r} is not configured for this project.",
+                no_retry=True,
+            )
+
     return job_dict

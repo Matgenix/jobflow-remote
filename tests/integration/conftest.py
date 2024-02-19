@@ -198,7 +198,7 @@ def write_tmp_settings(
                 "collection_name": "docs",
             },
             "additional_stores": {
-                "big_files": {
+                "big_data": {
                     "type": "GridFSStore",
                     "database": store_database_name,
                     "host": "localhost",
