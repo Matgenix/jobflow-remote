@@ -43,16 +43,16 @@ def check_env_var() -> str:
     return os.environ.get("TESTING_ENV_VAR", "unset")
 
 
-@job(big_files="data")
+@job(big_data="data")
 def add_big(a: float, b: float):
-    """Adds two numbers together and writes the answer to an artificially large file
-    which is stored in a pre-defined store."""
-    import pathlib
+    """Adds two numbers together and inflates the answer
+    to a large list list and tries to store that within
+    the defined store.
 
+    """
     result = a + b
-    with open("file.txt", "w") as f:
-        f.writelines([f"{result}"] * int(1e5))
-    return Response({"data": pathlib.Path("file.txt"), "result": a + b})
+    big_array = [result] * 5_000
+    return Response({"data": big_array, "result": a + b})
 
 
 @job(undefined_store="data")

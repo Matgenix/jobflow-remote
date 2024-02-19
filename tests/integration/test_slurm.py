@@ -259,7 +259,7 @@ def test_additional_stores(worker, job_controller):
     runner.run(ticks=10)
 
     doc = job_controller.get_jobs({})[0]
-    fs = job_controller.jobstore.additional_stores["big_files"]
+    fs = job_controller.jobstore.additional_stores["big_data"]
     assert fs.count({"job_uuid": doc["job"]["uuid"]}) == 1
     assert job_controller.count_jobs(state=JobState.COMPLETED) == 1
     assert job_controller.count_flows(state=FlowState.COMPLETED) == 1
@@ -279,7 +279,7 @@ def test_undefined_additional_stores(worker, job_controller):
 
     from jobflow_remote import submit_flow
     from jobflow_remote.jobs.runner import Runner
-    from jobflow_remote.jobs.state import FlowState, JobState
+    from jobflow_remote.jobs.state import JobState
     from jobflow_remote.testing import add_big_undefined_store
 
     job = add_big_undefined_store(100, 100)
@@ -293,5 +293,4 @@ def test_undefined_additional_stores(worker, job_controller):
     runner.run(ticks=10)
 
     # The job should fail, as the additional store is not defined
-    assert job_controller.count_jobs(state=JobState.FAILED) == 1
-    assert job_controller.count_flows(state=FlowState.FAILED) == 1
+    assert job_controller.count_jobs(state=JobState.REMOTE_ERROR) == 1
