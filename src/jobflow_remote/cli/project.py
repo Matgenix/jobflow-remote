@@ -191,7 +191,7 @@ def check(
         for worker_name in workers_to_test:
             progress.update(task_id, description=f"Checking worker {worker_name}")
             worker_to_test = project.workers[worker_name]
-            if worker_to_test.interactive_login:
+            if worker_to_test.get_host().interactive_login:
                 with hide_progress(progress):
                     err = check_worker(worker_to_test)
             else:
