@@ -264,12 +264,57 @@ class LocalWorker(WorkerBase):
         )
 
 
+class ConnectionData(BaseModel):
+    """
+    The representation of a fabric connection.
+    Mainly used in case of nested gateways.
+    """
+
+    host: str = Field(description="The host to which to connect")
+    user: Optional[str] = Field(None, description="Login username")
+    port: Optional[int] = Field(None, description="Port number")
+    password: Optional[str] = Field(None, description="Login password")
+    key_filename: Optional[Union[str, list[str]]] = Field(
+        None,
+        description="The filename, or list of filenames, of optional private key(s) "
+        "and/or certs to try for authentication",
+    )
+    passphrase: Optional[str] = Field(
+        None, description="Passphrase used for decrypting private keys"
+    )
+    gateway: Optional[Union[str, "ConnectionData"]] = Field(
+        None, description="A shell command string to use as a proxy or gateway"
+    )
+    connect_kwargs: Optional[dict] = Field(
+        None,
+        description="Other keyword arguments passed to paramiko.client.SSHClient.connect",
+    )
+
+    def get_connect_kwargs(self) -> dict:
+        """
+        Return the fully filled connect_kwargs for Fabric.
+
+        Returns
+        -------
+        The RemoteHost.
+        """
+        connect_kwargs = dict(self.connect_kwargs) if self.connect_kwargs else {}
+        if self.password:
+            connect_kwargs["password"] = self.password
+        if self.key_filename:
+            connect_kwargs["key_filename"] = self.key_filename
+        if self.passphrase:
+            connect_kwargs["passphrase"] = self.passphrase
+
+        return connect_kwargs
+
+
 class RemoteWorker(WorkerBase):
     """
     Worker representing a remote host reached through an SSH connection.
 
-    Uses a Fabric Connection. Check Fabric documentation for more datails on the
-    options defininf a Connection.
+    Uses a Fabric Connection. Check Fabric documentation for more details on the
+    options defining a Connection.
     """
 
     type: Literal["remote"] = Field(
@@ -287,7 +332,7 @@ class RemoteWorker(WorkerBase):
     passphrase: Optional[str] = Field(
         None, description="Passphrase used for decrypting private keys"
     )
-    gateway: Optional[str] = Field(
+    gateway: Optional[Union[str, ConnectionData]] = Field(
         None, description="A shell command string to use as a proxy or gateway"
     )
     forward_agent: Optional[bool] = Field(
