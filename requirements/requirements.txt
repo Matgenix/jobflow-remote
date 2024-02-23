@@ -1,5 +1,5 @@
 jobflow==0.1.17
-pydantic==2.6.1
+pydantic==2.6.2
 fabric==3.2.2
 tomlkit==0.12.3
 qtoolkit==0.1.3
