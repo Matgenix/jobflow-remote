@@ -1,16 +1,22 @@
 from __future__ import annotations
 
+import datetime
 import inspect
 import io
 import logging
 import os
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 import orjson
 from jobflow.core.job import Job
 from jobflow.core.store import JobStore
-from maggma.stores.mongolike import JSONStore
+from maggma.core import Sort, Store
+from maggma.utils import to_dt
+from monty.io import zopen
+
+# from maggma.stores.mongolike import JSONStore
 from monty.json import jsanitize
 
 from jobflow_remote.jobs.data import RemoteError
@@ -58,16 +64,14 @@ def get_remote_store(
     if add_orjson_serializer:
         serialization_default = default_orjson_serializer
 
-    docs_store = JSONStore(
-        os.path.join(launch_dir, "remote_job_data.json"),
-        read_only=False,
+    docs_store = MinimalJSONStore(
+        os.path.join(launch_dir, "remote_job_data.json.gz"),
         serialization_default=serialization_default,
     )
     additional_stores = {}
     for k in store.additional_stores.keys():
-        additional_stores[k] = JSONStore(
-            os.path.join(launch_dir, f"additional_store_{k}.json"),
-            read_only=False,
+        additional_stores[k] = MinimalJSONStore(
+            os.path.join(launch_dir, f"additional_store_{k}.json.gz"),
             serialization_default=serialization_default,
         )
     remote_store = JobStore(
@@ -81,9 +85,9 @@ def get_remote_store(
 
 
 def get_remote_store_filenames(store: JobStore) -> list[str]:
-    filenames = ["remote_job_data.json"]
+    filenames = ["remote_job_data.json.gz"]
     for k in store.additional_stores.keys():
-        filenames.append(f"additional_store_{k}.json")
+        filenames.append(f"additional_store_{k}.json.gz")
 
     return filenames
 
@@ -215,3 +219,244 @@ def check_additional_stores(job: dict | Job, store: JobStore) -> list[str]:
         if store_name not in store.additional_stores:
             missing_stores.append(store_name)
     return missing_stores
+
+
+class MinimalFileStore(Store):
+    """
+    A Minimal Store for access to a single file.
+    Only methods required by jobflow-remote are implemented.
+    """
+
+    @property
+    def _collection(self):
+        raise NotImplementedError
+
+    @property
+    def name(self) -> str:
+        return f"json://{self.path}"
+
+    def close(self):
+        pass
+
+    def count(self, criteria: dict | None = None) -> int:
+        return len(self.data)
+
+    def query(
+        self,
+        criteria: dict | None = None,
+        properties: dict | list | None = None,
+        sort: dict[str, Sort | int] | None = None,
+        skip: int = 0,
+        limit: int = 0,
+    ) -> Iterator[dict]:
+        if criteria or properties or sort or skip or sort:
+            raise NotImplementedError(
+                "Query only implemented to return the whole set of docs"
+            )
+
+        return iter(self.data)
+
+    def ensure_index(self, key: str, unique: bool = False) -> bool:
+        raise NotImplementedError
+
+    def groupby(
+        self,
+        keys: list[str] | str,
+        criteria: dict | None = None,
+        properties: dict | list | None = None,
+        sort: dict[str, Sort | int] | None = None,
+        skip: int = 0,
+        limit: int = 0,
+    ) -> Iterator[tuple[dict, list[dict]]]:
+        raise NotImplementedError
+
+    def __init__(
+        self,
+        path: str,
+        serialization_option: int | None = None,
+        serialization_default: Callable[[Any], Any] | None = None,
+        **kwargs,
+    ):
+        """
+        Args:
+            path: paths for json files to turn into a Store
+        """
+
+        self.path = path
+
+        self.kwargs = kwargs
+
+        self.default_sort = None
+        self.serialization_option = serialization_option
+        self.serialization_default = serialization_default
+        self.data: list[dict] = []
+
+        super().__init__(**kwargs)
+
+    def connect(self, force_reset: bool = False):
+        """
+        Loads the files into the collection in memory.
+        """
+
+        # create the .json file if it does not exist
+        if not Path(self.path).exists():
+            self.update_file()
+        else:
+            self.data = self.read_file()
+
+    def update(self, docs: list[dict] | dict, key: list | str | None = None):
+        """
+        Update documents into the Store.
+
+        For a file-writable JSONStore, the json file is updated.
+
+        Args:
+            docs: the document or list of documents to update
+            key: field name(s) to determine uniqueness for a
+                 document, can be a list of multiple fields,
+                 a single field, or None if the Store's key
+                 field is to be used
+        """
+        if not isinstance(docs, (list, tuple)):
+            docs = [docs]
+
+        self.data.extend(docs)
+
+        self.update_file()
+
+    def update_file(self):
+        raise NotImplementedError
+
+    def read_file(self) -> list:
+        raise NotImplementedError
+
+    def remove_docs(self, criteria: dict):
+        """
+        Remove docs matching the query dictionary.
+
+        For a file-writable JSONStore, the json file is updated.
+
+        Args:
+            criteria: query dictionary to match
+        """
+        raise NotImplementedError
+
+    def __hash__(self):
+        return hash((*self.path, self.last_updated_field))
+
+    def __eq__(self, other: object) -> bool:
+        """
+        Check equality for JSONStore.
+
+        Args:
+            other: other JSONStore to compare with
+        """
+        if not isinstance(other, self.__class__):
+            return False
+
+        fields = ["path", "last_updated_field"]
+        return all(getattr(self, f) == getattr(other, f) for f in fields)
+
+
+class MinimalJSONStore(MinimalFileStore):
+
+    def __init__(
+        self,
+        path: str,
+        serialization_option: int | None = None,
+        serialization_default: Callable[[Any], Any] | None = None,
+        **kwargs,
+    ):
+        """
+        Args:
+            path: paths for json files to turn into a Store
+            serialization_option:
+                option that will be passed to the orjson.dump when saving to the
+                json file.
+            serialization_default:
+                default that will be passed to the orjson.dump when saving to the
+                json file.
+        """
+        self.serialization_option = serialization_option
+        self.serialization_default = serialization_default
+
+        super().__init__(path=path, **kwargs)
+
+    def update_file(self):
+        """
+        Updates the json file when a write-like operation is performed.
+        """
+        with zopen(self.path, "wb") as f:
+            for d in self.data:
+                d.pop("_id", None)
+            bytesdata = orjson.dumps(
+                self.data,
+                option=self.serialization_option,
+                default=self.serialization_default,
+            )
+            f.write(bytesdata)
+
+    def read_file(self) -> list:
+        """
+        Helper method to read the contents of a JSON file and generate
+        a list of docs.
+        """
+        with zopen(self.path, "rb") as f:
+            data = f.read()
+            objects = orjson.loads(data)
+            objects = [objects] if not isinstance(objects, list) else objects
+            # datetime objects deserialize to str. Try to convert the last_updated
+            # field back to datetime.
+            # # TODO - there may still be problems caused if a JSONStore is init'ed from
+            # documents that don't contain a last_updated field
+            # See Store.last_updated in store.py.
+            for obj in objects:
+                if obj.get(self.last_updated_field):
+                    obj[self.last_updated_field] = to_dt(obj[self.last_updated_field])
+
+        return objects
+
+
+def decode_datetime(obj):
+    if "__datetime__" in obj:
+        obj = datetime.datetime.strptime(obj["as_str"], "%Y%m%dT%H:%M:%S.%f")
+    return obj
+
+
+def encode_datetime(obj):
+    if isinstance(obj, datetime.datetime):
+        return {"__datetime__": True, "as_str": obj.strftime("%Y%m%dT%H:%M:%S.%f")}
+    return obj
+
+
+class MinimalMsgpackStore(MinimalFileStore):
+
+    def update_file(self):
+        """
+        Updates the msgpack file when a write-like operation is performed.
+        """
+        import msgpack
+
+        with zopen(self.path, "wb") as f:
+            msgpack.pack(self.data, f, default=encode_datetime, use_bin_type=True)
+
+    def read_file(self) -> list:
+        """
+        Helper method to read the contents of a msgpack file and generate
+        a list of docs.
+        """
+        import msgpack
+
+        with zopen(self.path, "rb") as f:
+            objects = msgpack.unpack(f, object_hook=decode_datetime, raw=False)
+            objects = [objects] if not isinstance(objects, list) else objects
+            # datetime objects deserialize to str. Try to convert the last_updated
+            # field back to datetime.
+            # # TODO - there may still be problems caused if a JSONStore is init'ed from
+            # documents that don't contain a last_updated field
+            # See Store.last_updated in store.py.
+            for obj in objects:
+                if obj.get(self.last_updated_field):
+                    obj[self.last_updated_field] = to_dt(obj[self.last_updated_field])
+
+        return objects
