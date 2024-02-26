@@ -87,6 +87,14 @@ class BaseHost(MSONable):
     def remove(self, path: str | Path):
         raise NotImplementedError
 
+    @property
+    def interactive_login(self) -> bool:
+        """
+        True if the host requires interactive actions upon login.
+        False by default. Subclasses should override the method to customize the value
+        """
+        return False
+
 
 class HostError(Exception):
     pass
