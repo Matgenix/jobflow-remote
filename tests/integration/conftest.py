@@ -251,6 +251,14 @@ def write_tmp_settings(
     with open(tmp_dir / f"{random_project_name}.json", "w") as f:
         f.write(project_json)
 
+    # In some cases it seems that the SETTINGS have already been imported
+    # and thus not taking the new configurations into account.
+    # Regenerate the JobflowRemoteSettings after setting paths and project
+    import jobflow_remote
+    from jobflow_remote.config.settings import JobflowRemoteSettings
+
+    jobflow_remote.SETTINGS = JobflowRemoteSettings()
+
     yield
     shutil.rmtree(tmp_dir)
 

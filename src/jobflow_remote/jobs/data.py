@@ -51,7 +51,10 @@ def get_initial_job_doc_dict(
     # take the resources either from the job, if they are defined
     # (they can be defined dynamically by the update_config) or the
     # defined value
-    job_resources = job.config.manager_config.get("resources") or resources
+    # Since  the resources can be dictionaries also allow to be an empty
+    # dictionary.
+    config_resources = job.config.manager_config.get("resources")
+    job_resources = config_resources if config_resources is not None else resources
     job_exec_config = job.config.manager_config.get("exec_config") or exec_config
     worker = job.config.manager_config.get("worker") or worker
 

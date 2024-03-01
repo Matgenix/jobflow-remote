@@ -16,6 +16,7 @@ from jobflow_remote.cli.types import (
 )
 from jobflow_remote.cli.utils import (
     check_stopped_runner,
+    exit_with_error_msg,
     get_config_manager,
     get_job_controller,
     get_job_ids_indexes,
@@ -83,8 +84,38 @@ def reset(
         )
 
 
-@app_admin.command()
+@app_admin.command(hidden=True)
 def remove_lock(
+    job_id: job_ids_indexes_opt = None,
+    db_id: db_ids_opt = None,
+    state: job_state_opt = None,
+    start_date: start_date_opt = None,
+    end_date: end_date_opt = None,
+    force: force_opt = False,
+):
+    """
+    DEPRECATED: use unlock instead
+    Forcibly removes the lock from the documents of the selected jobs.
+    WARNING: can lead to inconsistencies if the processes is actually running
+    """
+
+    out_console.print(
+        "remove-lock command has been DEPRECATED. Use unlock instead.",
+        style="bold yellow",
+    )
+
+    unlock(
+        job_id=job_id,
+        db_id=db_id,
+        state=state,
+        start_date=start_date,
+        end_date=end_date,
+        force=force,
+    )
+
+
+@app_admin.command()
+def unlock(
     job_id: job_ids_indexes_opt = None,
     db_id: db_ids_opt = None,
     state: job_state_opt = None,
@@ -115,6 +146,9 @@ def remove_lock(
                 locked=True,
                 end_date=end_date,
             )
+
+        if not jobs_info:
+            exit_with_error_msg("No data matching the request")
 
         text = Text.from_markup(
             f"[red]This operation will [bold]remove the lock[/bold] for (roughly) [bold]{len(jobs_info)} Job(s)[/bold]. Proceed anyway?[/red]"

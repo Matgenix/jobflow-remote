@@ -133,13 +133,20 @@ def _check_workdir(worker: WorkerBase, host: BaseHost) -> str | None:
         exc = traceback.format_exc()
         return f"Error while testing worker:\n {exc}"
 
+    canary_file = worker.work_dir / ".jf_heartbeat"
     try:
-        canary_file = worker.work_dir / ".jf_heartbeat"
+        # First try to create the folder. The runner will create is anyway and
+        # it should be less confusing for the user.
+        host.mkdir(worker.work_dir)
         host.write_text_file(canary_file, "\n")
         return None
     except FileNotFoundError as exc:
         raise FileNotFoundError(
-            f"Could not write to {canary_file} on {worker.host}. Does the folder exist on the remote?\nThe folder should be specified as an absolute path with no shell expansions or environment variables."
+            f"Could not write to {canary_file}. Does the folder exist on the remote?\nThe folder should be specified as an absolute path with no shell expansions or environment variables."
+        ) from exc
+    except PermissionError as exc:
+        raise PermissionError(
+            f"Could not write to {canary_file}. Do you have the rights to access that folder?"
         ) from exc
     finally:
         # Must be enclosed in quotes with '!r' as the path may contain spaces

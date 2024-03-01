@@ -42,8 +42,10 @@ def get_job_info_table(jobs_info: list[JobInfo], verbosity: int):
     for ji in jobs_info:
         state = ji.state.name
 
-        if ji.remote.retry_time_limit is not None:
+        if ji.state in (JobState.REMOTE_ERROR, JobState.FAILED):
             state = f"[bold red]{state}[/]"
+        elif ji.remote.retry_time_limit is not None:
+            state = f"[bold orange3]{state}[/]"
 
         row = [
             str(ji.db_id),

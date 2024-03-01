@@ -464,7 +464,7 @@ class Runner:
 
         remote_path = Path(doc["run_dir"])
 
-        script_commands = [f"jf execution run {remote_path}"]
+        script_commands = [f"jf -fe execution run {remote_path}"]
 
         queue_manager = self.get_queue_manager(worker_name)
         qout_fpath = remote_path / OUT_FNAME
@@ -895,7 +895,7 @@ class Runner:
 
                 # note that here the worker.work_dir needs to be passed,
                 # not the worker.batch.work_dir
-                command = f"jf execution run-batch {worker.work_dir} {worker.batch.jobs_handle_dir} {process_running_uuid}"
+                command = f"jf -fe execution run-batch {worker.work_dir} {worker.batch.jobs_handle_dir} {process_running_uuid}"
                 if worker.batch.max_jobs:
                     command += f" -mj {worker.batch.max_jobs}"
                 if worker.batch.max_time:

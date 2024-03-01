@@ -16,14 +16,25 @@ def set_run_config(
     exec_config: str | ExecutionConfig | None = None,
     resources: dict | QResources | None = None,
     worker: str | None = None,
+    dynamic: bool = True,
 ) -> Flow | Job:
     """
     Modify in place a Flow or a Job by setting the properties in the
     "manager_config" entry in the JobConfig associated to each Job
-    matching the filter. Uses the Flow/Job update_config() method,
+    matching the filter.
+
+    The values left as None will not be set and their value may be
+    filled by those set in the submit_flow.
+    If you want/need to leave resources or exec_config empty pass
+    an empty QResources (or an empty dict) or an empty ExecutionConfig.
+
+    Uses the Flow/Job update_config() method,
     so follows the same conventions, also setting the options in
     the config_updates of the Job, to allow setting the same properties
-    also in dynamically generated Jobs.
+    also in dynamically generated Jobs, if the dynamic option is True.
+
+    Note that calling this function will override all previously set
+    values for matching Jobs, even if not specified here.
 
     Parameters
     ----------
@@ -41,6 +52,9 @@ def set_run_config(
         The resources to be set for the selected Jobs.
     worker
         The worker where the selected Jobs will be executed.
+    dynamic
+        The updates will be propagated to Jobs/Flows dynamically generated at
+        runtime.
 
     Returns
     -------
@@ -50,15 +64,18 @@ def set_run_config(
     if not exec_config and not resources and not worker:
         return flow_or_job
     config: dict = {"manager_config": {}}
-    if exec_config:
+    if exec_config is not None:
         config["manager_config"]["exec_config"] = exec_config
-    if resources:
+    if resources is not None:
         config["manager_config"]["resources"] = resources
-    if worker:
+    if worker is not None:
         config["manager_config"]["worker"] = worker
 
     flow_or_job.update_config(
-        config=config, name_filter=name_filter, function_filter=function_filter
+        config=config,
+        name_filter=name_filter,
+        function_filter=function_filter,
+        dynamic=dynamic,
     )
 
     return flow_or_job

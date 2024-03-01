@@ -2,6 +2,8 @@ import os
 
 import pytest
 
+from jobflow_remote.testing import create_detour
+
 pytestmark = pytest.mark.skipif(
     not os.environ.get("CI"),
     reason="Only run integration tests in CI, unless forced with 'CI' env var",
@@ -278,13 +280,21 @@ def test_undefined_additional_stores(worker, job_controller):
     from jobflow import Flow
 
     from jobflow_remote import submit_flow
+    from jobflow_remote.config import ConfigError
     from jobflow_remote.jobs.runner import Runner
     from jobflow_remote.jobs.state import JobState
     from jobflow_remote.testing import add_big_undefined_store
 
+    # If the Job is passed directly it fails during the submission
     job = add_big_undefined_store(100, 100)
     flow = Flow(job)
-    submit_flow(flow, worker=worker)
+    with pytest.raises(ConfigError):
+        submit_flow(flow, worker=worker)
+
+    # If the job with missing additional sore is created dynamically
+    # it will fail at runtime
+    job = create_detour(detour_job=add_big_undefined_store(100, 100))
+    submit_flow(job)
 
     assert job_controller.count_jobs({}) == 1
     assert job_controller.count_flows({}) == 1
@@ -292,5 +302,8 @@ def test_undefined_additional_stores(worker, job_controller):
     runner = Runner()
     runner.run(ticks=10)
 
+    assert job_controller.count_jobs({}) == 2
+
     # The job should fail, as the additional store is not defined
+    assert job_controller.count_jobs(state=JobState.COMPLETED) == 1
     assert job_controller.count_jobs(state=JobState.REMOTE_ERROR) == 1
