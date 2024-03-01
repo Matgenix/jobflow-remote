@@ -16,7 +16,9 @@ details are found in :ref:`reference`.
    projectconf
    quickstart
    tuning
+   errors
    states
+   advancedoptions
 
 .. toctree::
    :hidden:

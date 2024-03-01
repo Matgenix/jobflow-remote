@@ -79,6 +79,12 @@ couldn't let the daemon running on the same machine this could be a convenient s
    :alt: All-in-one configuration
    :align: center
 
+.. note::
+    Some CLI commands try to check if the Runner Process is active before
+    executing the action (e.g. ``jf admin reset``) in order to avoid inconsistencies
+    in the database. However, in this configuration the check would not be possible.
+    It is thus responsibility of the user to avoid running potentially breaking
+    commands while the Runner is active.
 
 Install
 =======
