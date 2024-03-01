@@ -67,7 +67,6 @@ class ConfigManager:
         self.exclude_none = exclude_none
         self.warn = warn
         self.projects_folder = Path(SETTINGS.projects_folder)
-        makedirs_p(self.projects_folder)
         self.projects_data = self.load_projects_data()
 
     @property

@@ -2,7 +2,7 @@
 
 from typing import Callable, Optional, Union
 
-from jobflow import Response, job
+from jobflow import Job, Response, job
 
 
 @job
@@ -46,9 +46,8 @@ def check_env_var() -> str:
 @job(big_data="data")
 def add_big(a: float, b: float):
     """Adds two numbers together and inflates the answer
-    to a large list list and tries to store that within
+    to a large list and tries to store that within
     the defined store.
-
     """
     result = a + b
     big_array = [result] * 5_000
@@ -65,3 +64,13 @@ def add_big_undefined_store(a: float, b: float):
     with open("file.txt", "w") as f:
         f.writelines([f"{result}"] * int(1e5))
     return Response({"data": pathlib.Path("file.txt"), "result": a + b})
+
+
+@job
+def create_detour(detour_job: Job):
+    """
+    Create a detour based on the passed Job.
+    """
+    from jobflow import Flow
+
+    return Response(detour=Flow(detour_job))

@@ -2424,9 +2424,6 @@ class JobController:
         query = {"job.hosts": flow_uuid}
         return list(self.jobs.find(query, projection=projection))
 
-    # TODO exec_config and resources can be removed and taken from the job.
-    # The value could be set in each job by the submit_job or by the user.
-    # Doing the same for the worker? In this way it could be set dynamically
     def add_flow(
         self,
         flow: jobflow.Flow | jobflow.Job | list[jobflow.Job],
@@ -2527,11 +2524,11 @@ class JobController:
         # arguments to take advantage of standard Flow/Job methods.
         new_flow = deserialize_partial_flow(new_flow_dict)
 
-        # get job parents
+        # get job parents. Job parents are identified only by their uuid.
         if response_type == DynamicResponseType.REPLACE:
             job_parents = job_doc["parents"]
         else:
-            job_parents = [(job_doc["uuid"], job_doc["index"])]
+            job_parents = [job_doc["uuid"]]
 
         # add new jobs to flow
         flow_dict = dict(flow_dict)

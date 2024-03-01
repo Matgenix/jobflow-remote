@@ -174,15 +174,42 @@ def resolve_job_dict_args(job_dict: dict, store: JobStore) -> dict:
     job_dict["function_args"] = resolved_args
     job_dict["function_kwargs"] = resolved_kwargs
 
-    additional_store_names = set(job_dict.keys()) - JOB_INIT_ARGS
+    missing_store = check_additional_stores(job_dict, store)
+    if missing_store:
+        raise RemoteError(
+            f"Additional store {missing_store!r} is not configured for this project.",
+            no_retry=True,
+        )
+
+    return job_dict
+
+
+def check_additional_stores(job: dict | Job, store: JobStore) -> str | None:
+    """
+    Check if all the required additional stores have been defined in
+    the output JobStore. If any is missing return the name of the missing Store.
+
+    Parameters
+    ----------
+    job
+        A Job or its serialized version.
+    store
+        The JobStore from where the references should be resolved.
+
+    Returns
+    -------
+        The name of a missing additional store or None if all are correctly defined.
+    """
+    if isinstance(job, dict):
+        additional_store_names = set(job.keys()) - JOB_INIT_ARGS
+    else:
+        # TODO expose the _kwargs attribute in jobflow through an
+        # "additional_stores" property
+        additional_store_names = set(job._kwargs.keys())
     for store_name in additional_store_names:
         # Exclude MSON fields
         if store_name.startswith("@"):
             continue
         if store_name not in store.additional_stores:
-            raise RemoteError(
-                f"Additional store {store_name!r} is not configured for this project.",
-                no_retry=True,
-            )
-
-    return job_dict
+            return store_name
+    return None

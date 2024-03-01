@@ -23,6 +23,7 @@ from jobflow_remote.cli.types import (
     job_db_id_arg,
     job_ids_indexes_opt,
     job_index_arg,
+    job_index_opt,
     job_state_arg,
     job_state_opt,
     locked_opt,
@@ -43,6 +44,7 @@ from jobflow_remote.cli.utils import (
     check_stopped_runner,
     execute_multi_jobs_cmd,
     exit_with_error_msg,
+    exit_with_warning_msg,
     get_config_manager,
     get_job_controller,
     get_job_db_ids,
@@ -53,6 +55,7 @@ from jobflow_remote.cli.utils import (
     print_success_msg,
     str_to_dict,
 )
+from jobflow_remote.jobs.state import JobState
 from jobflow_remote.remote.queue import ERR_FNAME, OUT_FNAME
 
 app_job = JFRTyper(
@@ -126,12 +129,21 @@ def jobs_list(
                 f"The number of Jobs printed may be limited by the maximum selected: {max_results}",
                 style="yellow",
             )
-        if any(ji.remote.retry_time_limit is not None for ji in jobs_info):
+        remote_errors = False
+        if any(
+            ji.remote.retry_time_limit is not None and ji.state != JobState.REMOTE_ERROR
+            for ji in jobs_info
+        ):
             text = (
-                "Some jobs (state in red) have failed while interacting with"
-                " the worker, but will be retried again.\nGet more information about"
-                " the error with 'jf job info JOB_ID'"
+                "Some jobs (state in orange) have failed while interacting with"
+                " the worker, but will be retried."
             )
+            out_console.print(text, style="yellow")
+            remote_errors = True
+        if remote_errors or any(
+            ji.state in (JobState.REMOTE_ERROR, JobState.FAILED) for ji in jobs_info
+        ):
+            text = "Get more information about the errors with 'jf job info JOB_ID'"
             out_console.print(text, style="yellow")
 
 
@@ -507,6 +519,9 @@ def queue_out(
 
     remote_dir = job_info.run_dir
 
+    if not remote_dir:
+        exit_with_warning_msg("The remote folder has not been created yet")
+
     out_path = Path(remote_dir, OUT_FNAME)
     err_path = Path(remote_dir, ERR_FNAME)
     out = None
@@ -838,3 +853,135 @@ def output(
         dumpfn(job_output, file_path)
     else:
         pprint(job_output)
+
+
+app_job_files = JFRTyper(
+    name="files",
+    help="Commands for managing the files associated to a job",
+    no_args_is_help=True,
+)
+app_job.add_typer(app_job_files)
+
+
+@app_job_files.command(name="ls")
+def files_list(
+    job_db_id: job_db_id_arg,
+    job_index: job_index_arg = None,
+):
+    """
+    List of files in the run_dir of the selected Job.
+    """
+    db_id, job_id = get_job_db_ids(job_db_id, job_index)
+
+    cm = get_config_manager()
+
+    with loading_spinner(processing=False) as progress:
+        progress.add_task(description="Retrieving info...", total=None)
+        jc = get_job_controller()
+
+        job_info = jc.get_job_info(
+            job_id=job_id,
+            job_index=job_index,
+            db_id=db_id,
+        )
+
+    if not job_info:
+        exit_with_error_msg("No data matching the request")
+
+    remote_dir = job_info.run_dir
+
+    if not remote_dir:
+        exit_with_warning_msg("The remote folder has not been created yet")
+
+    remote_files = None
+    with loading_spinner(processing=False) as progress:
+        progress.add_task(description="Retrieving information...", total=None)
+        worker = cm.get_worker(job_info.worker)
+        host = worker.get_host()
+
+        try:
+            host.connect()
+            try:
+                remote_files = host.listdir(remote_dir)
+            except Exception as e:
+                raise RuntimeError(
+                    f"Error while fetching the list of files from {str(remote_dir)}: {getattr(e, 'message', str(e))}"
+                ) from e
+        finally:
+            try:
+                host.close()
+            except Exception:
+                pass
+
+    out_console.print(f"List of files in {remote_dir}:")
+    for fn in remote_files:
+        out_console.print(fn)
+
+
+@app_job_files.command(name="get")
+def files_get(
+    job_db_id: job_db_id_arg,
+    filenames: Annotated[
+        list[str],
+        typer.Argument(
+            help="A list of file names to be retrieved from the job run dir",
+            metavar="FILE_NAMES",
+        ),
+    ],
+    job_index: job_index_opt = None,
+    path: Annotated[
+        Optional[str],
+        typer.Option(
+            "--path",
+            "-p",
+            help="If defined, the files will be copied to this path. Otherwise in the local folder.",
+        ),
+    ] = None,
+):
+    db_id, job_id = get_job_db_ids(job_db_id, job_index)
+
+    cm = get_config_manager()
+
+    if not path:
+        path = "."
+    save_path = Path(path)
+    if not save_path.is_dir():
+        raise typer.BadParameter("The path is not an existing directory")
+
+    with loading_spinner(processing=False) as progress:
+        progress.add_task(description="Retrieving info...", total=None)
+        jc = get_job_controller()
+
+        job_info = jc.get_job_info(
+            job_id=job_id,
+            job_index=job_index,
+            db_id=db_id,
+        )
+
+    if not job_info:
+        exit_with_error_msg("No data matching the request")
+
+    remote_dir = job_info.run_dir
+
+    if not remote_dir:
+        exit_with_warning_msg("The remote folder has not been created yet")
+
+    with loading_spinner(processing=False) as progress:
+        task_id = progress.add_task(description="Retrieving files...", total=None)
+        worker = cm.get_worker(job_info.worker)
+        host = worker.get_host()
+
+        try:
+            host.connect()
+            for file_name in filenames:
+                progress.update(task_id, description=f"Retrieving {file_name}")
+                host.get(str(Path(remote_dir) / file_name), str(save_path / file_name))
+        except Exception as e:
+            raise RuntimeError(
+                f"Error while fetching file {file_name} from {str(remote_dir)}: {getattr(e, 'message', str(e))}"
+            ) from e
+        finally:
+            try:
+                host.close()
+            except Exception:
+                pass

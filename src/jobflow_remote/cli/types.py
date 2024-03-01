@@ -213,6 +213,15 @@ job_index_arg = Annotated[
     ),
 ]
 
+job_index_opt = Annotated[
+    Optional[int],
+    typer.Option(
+        "--index",
+        "-i",
+        help="The index of the job. If not defined the job with the largest index is selected",
+    ),
+]
+
 
 flow_db_id_arg = Annotated[
     str,

@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import jobflow
+from jobflow.core.flow import get_flow
 from qtoolkit.core.data_objects import QResources
 
 from jobflow_remote.config.base import ConfigError, ExecutionConfig
 from jobflow_remote.config.manager import ConfigManager
+from jobflow_remote.remote.data import check_additional_stores
 
 
 def submit_flow(
@@ -60,6 +62,17 @@ def submit_flow(
         config_manager.get_exec_config(
             exec_config_name=exec_config, project_name=project
         )
+
+    flow = get_flow(flow, allow_external_references=allow_external_references)
+
+    # check that all the additional stores are properly defined
+    jobstore = proj_obj.get_jobstore()
+    for job, _ in flow.iterflow():
+        missing_store = check_additional_stores(job, jobstore)
+        if missing_store:
+            raise ConfigError(
+                f"Additional store {missing_store!r} is not configured for this project."
+            )
 
     jc = proj_obj.get_job_controller()
 
