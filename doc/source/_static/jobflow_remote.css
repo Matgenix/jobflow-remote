@@ -160,3 +160,11 @@ html[data-theme=dark] h3 {
     background-color: var(--matgenix-dark-color) !important;
     border-color: var(--matgenix-dark-color) !important;
 }
+
+.red {
+  color: red;
+}
+
+.darkorange {
+  color: DarkOrange;
+}

@@ -121,7 +121,24 @@ following example
 
 After being submitted to the database the ``value`` Job will be executed
 on the ``firstw`` worker, while the ``add`` Job will be executed on the
-``secondw`` worker.
+``secondw`` worker. On the other hand, since ``resources`` is not set
+explicitly when ``set_run_config`` is called the same ``resource`` dictionary
+is applied to **all** the Jobs in the Flow.
+
+.. note::
+
+    If the values in a Job should not be overridden by those passed in
+    ``submit_flow``, but no specific value is required, empty objects
+    need to be passed. An empty ``dict`` or an empty ``QResources()`` to
+    set an empty ``resources`` and an empty ``ExecutionConfig()`` to set
+    and empty ``exec_config``
+
+.. warning::
+
+    If ``set_run_config`` is used to set a worker with ``scheduler_type: shell``
+    always set ``resources`` to an empty dictionary (or ``QResources``) as well.
+    Otherwise the ``resources`` value passed to ``submit_flow`` will be used and
+    it will likely be incompatible, with the ``shell`` worker.
 
 In addition, since ``set_run_config`` makes use of jobflow's ``update_config``
 method, these updates will also automatically be applied to any new Job
