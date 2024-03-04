@@ -14,7 +14,6 @@ from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from jobflow.utils import suuid
 from monty.json import MontyDecoder
 from monty.os import makedirs_p
 from qtoolkit.core.data_objects import QState, SubmissionStatus
@@ -41,6 +40,7 @@ from jobflow_remote.remote.data import (
 )
 from jobflow_remote.remote.host import BaseHost
 from jobflow_remote.remote.queue import ERR_FNAME, OUT_FNAME, QueueManager, set_name_out
+from jobflow_remote.utils.data import suuid
 from jobflow_remote.utils.log import initialize_runner_logger
 from jobflow_remote.utils.schedule import SafeScheduler
 
