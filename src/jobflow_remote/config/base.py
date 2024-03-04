@@ -540,9 +540,14 @@ class Project(BaseModel):
     )
     jobstore: dict = Field(
         default_factory=lambda: dict(DEFAULT_JOBSTORE),
-        description="The JobStore used for the input. Can contain the monty "
-        "serialized dictionary or the Store int the Jobflow format",
+        description="The JobStore used for the output. Can contain the monty "
+        "serialized dictionary or the Store in the Jobflow format",
         validate_default=True,
+    )
+    remote_jobstore: Optional[dict] = Field(
+        None,
+        description="The JobStore used for the data transfer between the Runner"
+        "and the workers. Can be a string with the standard values",
     )
     metadata: Optional[dict] = Field(
         None, description="A dictionary with metadata associated to the project"

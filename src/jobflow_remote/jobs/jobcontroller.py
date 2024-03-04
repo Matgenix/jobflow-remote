@@ -2820,7 +2820,9 @@ class JobController:
                     self.update_flow_state(host_flow_id)
                     return True
 
-                remote_store = get_remote_store(store, local_path)
+                remote_store = get_remote_store(
+                    store, local_path, self.project.remote_jobstore
+                )
 
                 update_store(store, remote_store, job_doc["db_id"])
 

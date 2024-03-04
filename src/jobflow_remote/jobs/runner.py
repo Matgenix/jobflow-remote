@@ -576,7 +576,7 @@ class Runner:
         # serializer could undergo refactoring and this could break deserialization
         # of older FWs. It is set in the FireTask at runtime.
         remote_store = get_remote_store(
-            store=store, launch_dir=remote_path, add_orjson_serializer=False
+            store=store, work_dir=remote_path, config_dict=self.project.remote_jobstore
         )
 
         created = host.mkdir(remote_path)
@@ -745,7 +745,11 @@ class Runner:
             makedirs_p(local_path)
 
             fnames = [OUT_FILENAME]
-            fnames.extend(get_remote_store_filenames(store))
+            fnames.extend(
+                get_remote_store_filenames(
+                    store, config_dict=self.project.remote_jobstore
+                )
+            )
 
             for fname in fnames:
                 # in principle fabric should work by just passing the

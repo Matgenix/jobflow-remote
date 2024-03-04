@@ -18,11 +18,7 @@ from monty.shutil import decompress_file
 
 from jobflow_remote.jobs.batch import LocalBatchManager
 from jobflow_remote.jobs.data import IN_FILENAME, OUT_FILENAME
-from jobflow_remote.remote.data import (
-    default_orjson_serializer,
-    get_job_path,
-    get_remote_store_filenames,
-)
+from jobflow_remote.remote.data import get_job_path, get_store_file_paths
 from jobflow_remote.utils.log import initialize_remote_run_log
 
 logger = logging.getLogger(__name__)
@@ -43,14 +39,6 @@ def run_remote_job(run_dir: str | Path = "."):
             job: Job = in_data["job"]
             store = in_data["store"]
 
-            # needs to be set here again since it does not get properly serialized.
-            # it is possible to serialize the default function before serializing, but
-            # avoided that to avoid that any refactoring of the
-            # default_orjson_serializer breaks the deserialization of old Fireworks
-            store.docs_store.serialization_default = default_orjson_serializer
-            for additional_store in store.additional_stores.values():
-                additional_store.serialization_default = default_orjson_serializer
-
             store.connect()
 
             initialize_logger()
@@ -58,8 +46,15 @@ def run_remote_job(run_dir: str | Path = "."):
                 response = job.run(store=store)
             finally:
                 # some jobs may have compressed the FW files while being executed,
-                # try to decompress them if that is the case.
+                # try to decompress them if that is the case and files need to be
+                # decompressed.
                 decompress_files(store)
+
+            # Close the store explicitly, as minimal stores may require it.
+            try:
+                store.close()
+            except Exception:
+                logger.error("Error while closing the store", exc_info=True)
 
             # The output of the response has already been stored in the store.
             response.output = None
@@ -161,7 +156,7 @@ def run_batch_jobs(
 
 def decompress_files(store: JobStore):
     file_names = [OUT_FILENAME]
-    file_names.extend(get_remote_store_filenames(store))
+    file_names.extend(os.path.basename(p) for p in get_store_file_paths(store))
 
     for fn in file_names:
         # If the file is already present do not decompress it, even if

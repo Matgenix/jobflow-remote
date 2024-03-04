@@ -7,17 +7,18 @@ import logging
 import os
 from collections.abc import Iterator
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 import orjson
 from jobflow.core.job import Job
 from jobflow.core.store import JobStore
 from maggma.core import Sort, Store
+from maggma.stores import JSONStore
 from maggma.utils import to_dt
 from monty.io import zopen
 
 # from maggma.stores.mongolike import JSONStore
-from monty.json import jsanitize
+from monty.json import MontyDecoder, jsanitize
 
 from jobflow_remote.jobs.data import RemoteError
 from jobflow_remote.utils.data import uuid_to_path
@@ -58,22 +59,21 @@ def default_orjson_serializer(obj: Any) -> Any:
 
 
 def get_remote_store(
-    store: JobStore, launch_dir: str | Path, add_orjson_serializer: bool = True
+    store: JobStore, work_dir: str | Path, config_dict: dict | None
 ) -> JobStore:
-    serialization_default = None
-    if add_orjson_serializer:
-        serialization_default = default_orjson_serializer
 
-    docs_store = MinimalJSONStore(
-        os.path.join(launch_dir, "remote_job_data.json.gz"),
-        serialization_default=serialization_default,
+    docs_store = get_single_store(
+        config_dict=config_dict, file_name="remote_job_data", dir_path=work_dir
     )
+
     additional_stores = {}
     for k in store.additional_stores.keys():
-        additional_stores[k] = MinimalJSONStore(
-            os.path.join(launch_dir, f"additional_store_{k}.json.gz"),
-            serialization_default=serialization_default,
+        additional_stores[k] = get_single_store(
+            config_dict=config_dict,
+            file_name=f"additional_store_{k}",
+            dir_path=work_dir,
         )
+
     remote_store = JobStore(
         docs_store=docs_store,
         additional_stores=additional_stores,
@@ -84,12 +84,84 @@ def get_remote_store(
     return remote_store
 
 
-def get_remote_store_filenames(store: JobStore) -> list[str]:
-    filenames = ["remote_job_data.json.gz"]
+default_remote_store = {"store": "maggma_json", "zip": False}
+
+
+def get_single_store(
+    config_dict: dict | None, file_name: str, dir_path: str | Path
+) -> Store:
+    config_dict = config_dict or default_remote_store
+
+    store_type = config_dict.get("store", default_remote_store["store"])
+    total_file_name = get_single_store_file_name(config_dict, file_name)
+    file_path = os.path.join(dir_path, total_file_name)
+    if store_type == "maggma_json":
+        return StdJSONStore(file_path)
+    elif store_type == "orjson":
+        return MinimalORJSONStore(file_path)
+    elif store_type == "msgspec_json":
+        return MinimalMsgspecJSONStore(file_path)
+    elif store_type == "msgpack":
+        return MinimalMsgpackStore(file_path)
+    elif isinstance(store_type, dict):
+        store_type = dict(store_type)
+        store_type["path"] = file_path
+        store = MontyDecoder().process_decoded(store_type)
+        if not isinstance(store, Store):
+            raise ValueError(
+                f"Could not instantiate a proper store from remote config dict {store_type}"
+            )
+    else:
+        raise ValueError(f"remote store type not supported: {store_type}")
+
+
+def get_single_store_file_name(config_dict: dict | None, file_name: str) -> str:
+    config_dict = config_dict or default_remote_store
+    store_type = config_dict.get("store", default_remote_store["store"])
+
+    if isinstance(store_type, str) and "json" in store_type:
+        ext = "json"
+    elif isinstance(store_type, str) and "msgpack" in store_type:
+        ext = "msgpack"
+    else:
+        ext = config_dict.get("extension")  # type: ignore
+    if not ext:
+        raise ValueError(
+            f"Could not determine extension for remote store config dict: {config_dict}"
+        )
+    total_file_name = f"{file_name}.{ext}"
+    if config_dict.get("zip", False):
+        total_file_name += ".gz"
+    return total_file_name
+
+
+def get_remote_store_filenames(store: JobStore, config_dict: dict | None) -> list[str]:
+    filenames = [
+        get_single_store_file_name(config_dict=config_dict, file_name="remote_job_data")
+    ]
     for k in store.additional_stores.keys():
-        filenames.append(f"additional_store_{k}.json.gz")
+        filenames.append(
+            get_single_store_file_name(
+                config_dict=config_dict, file_name=f"additional_store_{k}"
+            )
+        )
 
     return filenames
+
+
+def get_store_file_paths(store: JobStore) -> list[str]:
+    def get_single_path(base_store: Store):
+        paths = getattr(base_store, "paths", None)
+        if paths:
+            return paths[0]
+        path = getattr(base_store, "path", None)
+        if not path:
+            raise RuntimeError(f"Could not determine the path for {base_store}")
+        return path
+
+    store_paths = [get_single_path(store.docs_store)]
+    store_paths.extend(get_single_path(s) for s in store.additional_stores.values())
+    return store_paths
 
 
 def update_store(store: JobStore, remote_store: JobStore, db_id: int):
@@ -221,6 +293,21 @@ def check_additional_stores(job: dict | Job, store: JobStore) -> list[str]:
     return missing_stores
 
 
+class StdJSONStore(JSONStore):
+    """
+    Simple subclass of the JSONStore defining the serialization_default
+    that cannot be dumped to json
+    """
+
+    def __init__(self, paths, **kwargs):
+        super().__init__(
+            paths=paths,
+            serialization_default=default_orjson_serializer,
+            read_only=False,
+            **kwargs,
+        )
+
+
 class MinimalFileStore(Store):
     """
     A Minimal Store for access to a single file.
@@ -231,12 +318,8 @@ class MinimalFileStore(Store):
     def _collection(self):
         raise NotImplementedError
 
-    @property
-    def name(self) -> str:
-        return f"json://{self.path}"
-
     def close(self):
-        pass
+        self.update_file()
 
     def count(self, criteria: dict | None = None) -> int:
         return len(self.data)
@@ -273,8 +356,6 @@ class MinimalFileStore(Store):
     def __init__(
         self,
         path: str,
-        serialization_option: int | None = None,
-        serialization_default: Callable[[Any], Any] | None = None,
         **kwargs,
     ):
         """
@@ -287,8 +368,6 @@ class MinimalFileStore(Store):
         self.kwargs = kwargs
 
         self.default_sort = None
-        self.serialization_option = serialization_option
-        self.serialization_default = serialization_default
         self.data: list[dict] = []
 
         super().__init__(**kwargs)
@@ -321,8 +400,6 @@ class MinimalFileStore(Store):
             docs = [docs]
 
         self.data.extend(docs)
-
-        self.update_file()
 
     def update_file(self):
         raise NotImplementedError
@@ -358,29 +435,11 @@ class MinimalFileStore(Store):
         return all(getattr(self, f) == getattr(other, f) for f in fields)
 
 
-class MinimalJSONStore(MinimalFileStore):
+class MinimalORJSONStore(MinimalFileStore):
 
-    def __init__(
-        self,
-        path: str,
-        serialization_option: int | None = None,
-        serialization_default: Callable[[Any], Any] | None = None,
-        **kwargs,
-    ):
-        """
-        Args:
-            path: paths for json files to turn into a Store
-            serialization_option:
-                option that will be passed to the orjson.dump when saving to the
-                json file.
-            serialization_default:
-                default that will be passed to the orjson.dump when saving to the
-                json file.
-        """
-        self.serialization_option = serialization_option
-        self.serialization_default = serialization_default
-
-        super().__init__(path=path, **kwargs)
+    @property
+    def name(self) -> str:
+        return f"json://{self.path}"
 
     def update_file(self):
         """
@@ -391,8 +450,7 @@ class MinimalJSONStore(MinimalFileStore):
                 d.pop("_id", None)
             bytesdata = orjson.dumps(
                 self.data,
-                option=self.serialization_option,
-                default=self.serialization_default,
+                default=default_orjson_serializer,
             )
             f.write(bytesdata)
 
@@ -403,7 +461,54 @@ class MinimalJSONStore(MinimalFileStore):
         """
         with zopen(self.path, "rb") as f:
             data = f.read()
+            if not data:
+                return []
             objects = orjson.loads(data)
+            objects = [objects] if not isinstance(objects, list) else objects
+            # datetime objects deserialize to str. Try to convert the last_updated
+            # field back to datetime.
+            # # TODO - there may still be problems caused if a JSONStore is init'ed from
+            # documents that don't contain a last_updated field
+            # See Store.last_updated in store.py.
+            for obj in objects:
+                if obj.get(self.last_updated_field):
+                    obj[self.last_updated_field] = to_dt(obj[self.last_updated_field])
+
+        return objects
+
+
+class MinimalMsgspecJSONStore(MinimalFileStore):
+
+    @property
+    def name(self) -> str:
+        return f"json://{self.path}"
+
+    def update_file(self):
+        """
+        Updates the json file when a write-like operation is performed.
+        """
+        import msgspec
+
+        with zopen(self.path, "wb") as f:
+            for d in self.data:
+                d.pop("_id", None)
+            bytesdata = msgspec.json.encode(
+                self.data,
+            )
+            f.write(bytesdata)
+
+    def read_file(self) -> list:
+        """
+        Helper method to read the contents of a JSON file and generate
+        a list of docs.
+        """
+        import msgspec
+
+        with zopen(self.path, "rb") as f:
+            data = f.read()
+            if not data:
+                return []
+            objects = msgspec.json.decode(data)
             objects = [objects] if not isinstance(objects, list) else objects
             # datetime objects deserialize to str. Try to convert the last_updated
             # field back to datetime.
@@ -430,6 +535,10 @@ def encode_datetime(obj):
 
 
 class MinimalMsgpackStore(MinimalFileStore):
+
+    @property
+    def name(self) -> str:
+        return f"msgpack://{self.path}"
 
     def update_file(self):
         """
