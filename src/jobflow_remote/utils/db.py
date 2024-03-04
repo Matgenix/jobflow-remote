@@ -9,10 +9,9 @@ from collections.abc import Iterable, Mapping
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
-from jobflow.utils import suuid
 from pymongo import ReturnDocument
 
-from jobflow_remote.utils.data import deep_merge_dict
+from jobflow_remote.utils.data import deep_merge_dict, suuid
 
 if TYPE_CHECKING:
     from pymongo.collection import Collection
