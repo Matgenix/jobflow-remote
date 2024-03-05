@@ -282,12 +282,6 @@ class Runner:
                     self.update_batch_jobs
                 )
 
-        if complete:
-            self.advance_state(states)
-            scheduler.every(self.runner_options.delay_advance_status).seconds.do(
-                self.advance_state, states=states
-            )
-
         try:
             ticks_remaining: int | bool = True
             if ticks is not None:
