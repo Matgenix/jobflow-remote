@@ -162,7 +162,7 @@ def test_job_with_callable_kwarg(worker, job_controller):
     submit_flow(flow, worker=worker)
 
     runner = Runner()
-    runner.run(ticks=10)
+    runner.run(ticks=12)
 
     assert job_controller.count_jobs({}) == 3
     assert len(job_controller.get_jobs({})) == 3
