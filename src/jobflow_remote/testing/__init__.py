@@ -61,9 +61,7 @@ def add_big_undefined_store(a: float, b: float):
     import pathlib
 
     result = a + b
-    with open("file.txt", "w") as f:
-        f.writelines([f"{result}"] * int(1e5))
-    return Response({"data": pathlib.Path("file.txt"), "result": a + b})
+    return Response({"data": [result] * 5_000, "result": result})
 
 
 @job
