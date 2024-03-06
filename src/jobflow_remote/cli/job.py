@@ -50,6 +50,7 @@ from jobflow_remote.cli.utils import (
     get_job_db_ids,
     get_job_ids_indexes,
     get_start_date,
+    hide_progress,
     loading_spinner,
     out_console,
     print_success_msg,
@@ -534,7 +535,11 @@ def queue_out(
         host = worker.get_host()
 
         try:
-            host.connect()
+            if worker.get_host().interactive_login:
+                with hide_progress(progress):
+                    host.connect()
+            else:
+                host.connect()
             try:
                 out_bytes = io.BytesIO()
                 host.get(out_path, out_bytes)
