@@ -58,8 +58,6 @@ def add_big(a: float, b: float):
 def add_big_undefined_store(a: float, b: float):
     """Adds two numbers together and writes the answer to an artificially large file
     which is attempted to be stored in a undefined store."""
-    import pathlib
-
     result = a + b
     return Response({"data": [result] * 5_000, "result": result})
 

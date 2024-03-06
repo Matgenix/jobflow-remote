@@ -22,7 +22,7 @@ def mock_fabric_run(monkeypatch):
     )
 
 
-def _get_free_port(upper_bound=50_000):
+def _get_free_port(upper_bound=90_000):
     """Returns a random free port, with an upper bound.
 
     The upper bound is required as Docker does not have
@@ -250,14 +250,6 @@ def write_tmp_settings(
     project_json = project.model_dump_json(indent=2)
     with open(tmp_dir / f"{random_project_name}.json", "w") as f:
         f.write(project_json)
-
-    # In some cases it seems that the SETTINGS have already been imported
-    # and thus not taking the new configurations into account.
-    # Regenerate the JobflowRemoteSettings after setting paths and project
-    import jobflow_remote
-    from jobflow_remote.config.settings import JobflowRemoteSettings
-
-    jobflow_remote.SETTINGS = JobflowRemoteSettings()
 
     yield
     shutil.rmtree(tmp_dir)

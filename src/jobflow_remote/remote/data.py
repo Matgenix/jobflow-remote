@@ -174,20 +174,20 @@ def resolve_job_dict_args(job_dict: dict, store: JobStore) -> dict:
     job_dict["function_args"] = resolved_args
     job_dict["function_kwargs"] = resolved_kwargs
 
-    missing_store = check_additional_stores(job_dict, store)
-    if missing_store:
+    missing_stores = check_additional_stores(job_dict, store)
+    if missing_stores:
         raise RemoteError(
-            f"Additional store {missing_store!r} is not configured for this project.",
+            f"Additional stores {missing_stores!r} are not configured for this project.",
             no_retry=True,
         )
 
     return job_dict
 
 
-def check_additional_stores(job: dict | Job, store: JobStore) -> str | None:
+def check_additional_stores(job: dict | Job, store: JobStore) -> list[str]:
     """
     Check if all the required additional stores have been defined in
-    the output JobStore. If any is missing return the name of the missing Store.
+    the output JobStore. If some are missing return the names of the missing Stores.
 
     Parameters
     ----------
@@ -198,7 +198,8 @@ def check_additional_stores(job: dict | Job, store: JobStore) -> str | None:
 
     Returns
     -------
-        The name of a missing additional store or None if all are correctly defined.
+        The list of names of the missing additional stores.
+        An empty list if no store is missing.
     """
     if isinstance(job, dict):
         additional_store_names = set(job.keys()) - JOB_INIT_ARGS
@@ -206,10 +207,11 @@ def check_additional_stores(job: dict | Job, store: JobStore) -> str | None:
         # TODO expose the _kwargs attribute in jobflow through an
         # "additional_stores" property
         additional_store_names = set(job._kwargs.keys())
+    missing_stores = []
     for store_name in additional_store_names:
         # Exclude MSON fields
         if store_name.startswith("@"):
             continue
         if store_name not in store.additional_stores:
-            return store_name
-    return None
+            missing_stores.append(store_name)
+    return missing_stores

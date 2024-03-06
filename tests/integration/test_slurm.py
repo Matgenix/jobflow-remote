@@ -2,8 +2,6 @@ import os
 
 import pytest
 
-from jobflow_remote.testing import create_detour
-
 pytestmark = pytest.mark.skipif(
     not os.environ.get("CI"),
     reason="Only run integration tests in CI, unless forced with 'CI' env var",
@@ -283,7 +281,7 @@ def test_undefined_additional_stores(worker, job_controller):
     from jobflow_remote.config import ConfigError
     from jobflow_remote.jobs.runner import Runner
     from jobflow_remote.jobs.state import JobState
-    from jobflow_remote.testing import add_big_undefined_store
+    from jobflow_remote.testing import add_big_undefined_store, create_detour
 
     # If the Job is passed directly it fails during the submission
     job = add_big_undefined_store(100, 100)
