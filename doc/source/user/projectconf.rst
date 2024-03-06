@@ -103,6 +103,8 @@ configurations. Those can better be set with the :ref:`projectconf execconfig`.
     If a single worker is defined it will be used as default in the submission
     of new Flows.
 
+.. _projectconf jobstore:
+
 JobStore
 --------
 
@@ -118,6 +120,8 @@ in this project.
 
     The ``JobStore`` should be defined in jobflow-remote's configuration file.
     The content of the standard jobflow configuration file will be ignored.
+
+.. _projectconf queuestore:
 
 Queue Store
 -----------
@@ -179,6 +183,39 @@ environments to work on different topics. For this reason jobflow-remote will
 consider as potential projects configuration all the YAML, JSON and TOML files
 in the ``~/.jfremote`` folder. There is no additional procedure required to
 add or remove project, aside from creating/deleting a project configuration file.
+
+.. warning::
+
+    Different projects are meant to use different Queue Stores. Sharing the
+    same collections for two projects is not a supported option.
+
+To define the :ref:`projectconf queuestore` for multiple projects two options
+are available:
+
+* each project has its own database, with standard collection names
+* a single database is used and each project is assigned a set of collections.
+  For example, a configuration for one of the projects could be:
+
+  .. code-block:: yaml
+
+    queue:
+      store:
+        type: MongoStore
+        database: DB_NAME
+        collection_name: jobs_project1
+        ...
+      flows_collection: flows_project1
+      auxiliary_collection: jf_auxiliary_project1
+
+  And the same for a second project with different collection names.
+
+There is no constrain for the database and collection used for the output
+:ref:`projectconf jobstore`. Even though it may make sense to separate the
+sets of outputs, it is possible to share the same collection among multiple
+project. In that case the output documents will have duplicated ``db_id``,
+as each project has its own counter. If this may be an issue it is possible
+to set different ``db_id_prefix`` values in the ``queue`` configuration for
+the different projects.
 
 If more than one project is present and a specific one is not selected, the
 code will always stop asking for a project to be specified. Python functions
