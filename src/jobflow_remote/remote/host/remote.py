@@ -70,30 +70,61 @@ class RemoteHost(BaseHost):
             if not config:
                 config = Config()
                 config.authentication.strategy_class = InteractiveAuthStrategy
-            self._connection = fabric.Connection(
+
+            self._connection = self._get_single_connection(
                 host=self.host,
                 user=self.user,
                 port=self.port,
                 config=config,
                 gateway=self.gateway,
-                forward_agent=self.forward_agent,
-                connect_timeout=self.connect_timeout,
                 connect_kwargs=connect_kwargs,
-                inline_ssh_env=self.inline_ssh_env,
             )
 
         else:
-            self._connection = fabric.Connection(
+            self._connection = self._get_single_connection(
                 host=self.host,
                 user=self.user,
                 port=self.port,
                 config=self.config,
                 gateway=self.gateway,
-                forward_agent=self.forward_agent,
-                connect_timeout=self.connect_timeout,
                 connect_kwargs=self.connect_kwargs,
-                inline_ssh_env=self.inline_ssh_env,
             )
+
+    def _get_single_connection(
+        self,
+        host,
+        user,
+        port,
+        config,
+        gateway,
+        connect_kwargs,
+    ):
+        """
+        Helper method to generate a fabric Connection given standard parameters.
+        """
+        from jobflow_remote.config.base import ConnectionData
+
+        if isinstance(gateway, ConnectionData):
+            gateway = self._get_single_connection(
+                host=gateway.host,
+                user=gateway.user,
+                port=gateway.port,
+                config=None,
+                gateway=gateway.gateway,
+                connect_kwargs=gateway.get_connect_kwargs(),
+            )
+
+        return fabric.Connection(
+            host=host,
+            user=user,
+            port=port,
+            config=config,
+            gateway=gateway,
+            forward_agent=self.forward_agent,
+            connect_timeout=self.connect_timeout,
+            connect_kwargs=connect_kwargs,
+            inline_ssh_env=self.inline_ssh_env,
+        )
 
     def __eq__(self, other):
         if not isinstance(other, RemoteHost):
@@ -150,7 +181,7 @@ class RemoteHost(BaseHost):
         else:
             remote_command = command
 
-        with self.connection.cd(workdir):
+        with self.connection.cd(str(workdir)):
             out = self._execute_remote_func(
                 self.connection.run,
                 remote_command,
@@ -189,14 +220,24 @@ class RemoteHost(BaseHost):
     def connect(self):
         self.connection.open()
         if self.keepalive:
-            self.connection.transport.set_keepalive(self.keepalive)
+            # create all the nested connections for all the gateways.
+            connection = self.connection
+            while connection:
+                if isinstance(connection, fabric.Connection):
+                    connection.transport.set_keepalive(self.keepalive)
+                    connection = connection.gateway
 
     def close(self) -> bool:
-        try:
-            self.connection.close()
-        except Exception:
-            return False
-        return True
+        connection = self.connection
+        all_closed = True
+        while connection:
+            try:
+                if isinstance(connection, fabric.Connection):
+                    connection.close()
+            except Exception:
+                all_closed = False
+            connection = connection.gateway
+        return all_closed
 
     @property
     def is_connected(self) -> bool:
@@ -313,6 +354,10 @@ def inter_handler(title, instructions, prompt_list):
         if pr[1]:
             in_value = input(pr[0])
         else:
+            # If executed inside the runner, this raises a warning about
+            # the password being prompted. The supervisor foreground
+            # option keep the control of the terminal.
+            # Catching the warning does not seem to work.
             in_value = getpass.getpass(pr[0])
         resp.append(in_value)
 
