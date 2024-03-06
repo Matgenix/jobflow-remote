@@ -731,7 +731,7 @@ def resources(
         hours=hours,
         verbosity=verbosity,
         raise_on_error=raise_on_error,
-        resources=resources_value,
+        resources=resources,
         update=not replace,
     )
 
