@@ -915,7 +915,7 @@ class JobController:
         """
         job_id = doc["uuid"]
         job_index = doc["index"]
-        modified_jobs = []
+        modified_jobs: list[int] = []
 
         flow_filter = {"jobs": job_id}
         with self.lock_flow(
@@ -1546,6 +1546,9 @@ class JobController:
             flow_lock_kwargs=flow_lock_kwargs,
         ) as (job_lock, flow_lock):
             job_doc = job_lock.locked_document
+            if job_doc is None:
+                raise RuntimeError("No job document found in lock")
+
             job_state = JobState(job_doc["state"])
             if job_state in [JobState.SUBMITTED.value, JobState.RUNNING.value]:
                 # try cancelling the job submitted to the remote queue
@@ -1559,6 +1562,8 @@ class JobController:
             job_id = job_doc["uuid"]
             job_index = job_doc["index"]
             updated_states = {job_id: {job_index: JobState.USER_STOPPED}}
+            if flow_lock.locked_document is None:
+                raise RuntimeError("No document found in flow lock")
             self.update_flow_state(
                 flow_uuid=flow_lock.locked_document["uuid"],
                 updated_states=updated_states,
@@ -1566,7 +1571,11 @@ class JobController:
             job_lock.update_on_release = {
                 "$set": {"state": JobState.USER_STOPPED.value}
             }
-            return [job_lock.locked_document["db_id"]]
+            return_doc = job_lock.locked_document
+            if return_doc is None:
+                raise RuntimeError("No document found in final job lock")
+
+            return [return_doc["db_id"]]
 
     def pause_job(
         self,
@@ -1612,15 +1621,24 @@ class JobController:
             flow_lock_kwargs=flow_lock_kwargs,
         ) as (job_lock, flow_lock):
             job_doc = job_lock.locked_document
+            if job_doc is None:
+                raise RuntimeError("No job document found in lock")
             job_id = job_doc["uuid"]
             job_index = job_doc["index"]
             updated_states = {job_id: {job_index: JobState.PAUSED}}
+            flow_doc = flow_lock.locked_document
+            if flow_doc is None:
+                raise RuntimeError("No flow document found in lock")
             self.update_flow_state(
-                flow_uuid=flow_lock.locked_document["uuid"],
+                flow_uuid=flow_doc["uuid"],
                 updated_states=updated_states,
             )
             job_lock.update_on_release = {"$set": {"state": JobState.PAUSED.value}}
-            return [job_lock.locked_document["db_id"]]
+            return_doc = job_lock.locked_document
+            if return_doc is None:
+                raise RuntimeError("No document found in final job lock")
+
+            return [return_doc["db_id"]]
 
     def play_jobs(
         self,
@@ -1745,6 +1763,8 @@ class JobController:
             flow_lock_kwargs=flow_lock_kwargs,
         ) as (job_lock, flow_lock):
             job_doc = job_lock.locked_document
+            if job_doc is None:
+                raise RuntimeError("No job document found in lock")
             job_id = job_doc["uuid"]
             job_index = job_doc["index"]
             on_missing = job_doc["job"]["config"]["on_missing_references"]
@@ -1836,7 +1856,7 @@ class JobController:
         list
             List of db_ids of the updated Jobs.
         """
-        set_dict = {}
+        set_dict: dict[str, Any] = {}
         if worker:
             if worker not in self.project.workers:
                 raise ValueError(f"worker {worker} is not present in the project")
@@ -1851,7 +1871,7 @@ class JobController:
                     f"exec_config {exec_config} is not present in the project"
                 )
             elif isinstance(exec_config, ExecutionConfig):
-                exec_config = exec_config.dict()
+                exec_config = exec_config.model_dump()
 
             if update and isinstance(exec_config, dict):
                 for k, v in exec_config.items():

@@ -65,6 +65,9 @@ def generate_dummy_worker(
         )
         return RemoteWorker(**d)
 
+    else:
+        raise ValueError(f"Unknown/unhandled host type: {host_type}")
+
 
 def generate_dummy_jobstore() -> dict:
     jobstore_dict = {

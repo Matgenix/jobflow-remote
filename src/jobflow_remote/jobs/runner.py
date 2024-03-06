@@ -391,6 +391,9 @@ class Runner:
             The MongoLock with the locked Job document.
         """
         doc = lock.locked_document
+        if doc is None:
+            raise RuntimeError("No document found in the lock.")
+
         db_id = doc["db_id"]
         logger.debug(f"upload db_id: {db_id}")
 
@@ -449,6 +452,9 @@ class Runner:
             The MongoLock with the locked Job document.
         """
         doc = lock.locked_document
+        if doc is None:
+            raise RuntimeError("No document found in the lock.")
+
         logger.debug(f"submit db_id: {doc['db_id']}")
 
         job_dict = doc["job"]
