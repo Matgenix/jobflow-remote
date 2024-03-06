@@ -77,7 +77,9 @@ name_opt = Annotated[
     typer.Option(
         "--name",
         "-n",
-        help="The name. Default is an exact match, but all conventions from python fnmatch can be used (e.g. *test*)",
+        help="The name. Default is an exact match, but all conventions from "
+        "python fnmatch can be used (e.g. *test*). Using * wildcard may require"
+        "enclosing the search string in quotation marks.",
     ),
 ]
 
