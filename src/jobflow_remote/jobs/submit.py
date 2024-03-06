@@ -68,10 +68,10 @@ def submit_flow(
     # check that all the additional stores are properly defined
     jobstore = proj_obj.get_jobstore()
     for job, _ in flow.iterflow():
-        missing_store = check_additional_stores(job, jobstore)
-        if missing_store:
+        missing_stores = check_additional_stores(job, jobstore)
+        if missing_stores:
             raise ConfigError(
-                f"Additional store {missing_store!r} is not configured for this project."
+                f"Additional stores {missing_stores!r} are not configured for this project."
             )
 
     jc = proj_obj.get_job_controller()

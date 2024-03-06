@@ -312,7 +312,7 @@ will expect that some other process is working on the locked Job.
 Locked Jobs can be identified in the job list using the ``-v`` or ``-vv`` option::
 
     jf job list -v
-    
+
 which will give the following output, including the ``Locked`` column:
 
                                                                                       Jobs info
