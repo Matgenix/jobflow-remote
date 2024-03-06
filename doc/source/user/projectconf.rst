@@ -209,10 +209,10 @@ are available:
 
   And the same for a second project with different collection names.
 
-There is no constrain for the database and collection used for the output
+There is no constraint for the database and collection used for the output
 :ref:`projectconf jobstore`. Even though it may make sense to separate the
 sets of outputs, it is possible to share the same collection among multiple
-project. In that case the output documents will have duplicated ``db_id``,
+projects. In that case the output documents will have duplicated ``db_id``,
 as each project has its own counter. If this may be an issue it is possible
 to set different ``db_id_prefix`` values in the ``queue`` configuration for
 the different projects.

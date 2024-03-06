@@ -22,7 +22,7 @@ of the error. In jobflow-remote the errors can fall mainly into two
 categories:
 
 * **Remote errors**: errors happening while the Runner deals with a Job.
-  These include for example errors copying the file to and from a worker,
+  These include, for example, errors copying the file to and from a worker,
   or interacting with the queue manager.
 * **Job errors**: errors during the execution of a Job on the worker.
   E.g. failures of the code being executed or bad inputs provided by the user.
@@ -43,8 +43,8 @@ Remote errors
 =============
 
 If a problem arises during the processing of the Job, the runner will typically retry
-multiple times before setting the Job as errored. This is because it is expected that
-some of these failures will be temporary. For example a minor network issue preventing
+multiple times before setting the Job to the error state. This is because it is expected that
+some of these failures will be temporary or transient. For example, a minor network issue preventing
 the output files to be downloaded or an overload of the worker's queueing system that
 may not respond in time. By default the code will retry 3 times at increasing time
 intervals. After that the Job state will be set to ``REMOTE_ERROR``.
@@ -146,7 +146,7 @@ the Job can be brought back to the ``previous_state`` (``CHECKED_OUT`` in this c
 with the command ``jf job retry 1``.
 
 If for any reason the Job needs to be restarted from scratch, i.e. brought back to
-the ``READY`` state, this can be achieved running::
+the ``READY`` state, this can be achieved by running::
 
     jf job rerun 1
 
@@ -159,7 +159,7 @@ the ``READY`` state, this can be achieved running::
 
 .. warning::
     It is impossible to provide an exhaustive list of potential issues that could lead to
-    a ``REMOTE_ERROR`` state. So except some well defined cases the error messages will be
+    a ``REMOTE_ERROR`` state. So except in some well defined cases, the error messages will be
     mainly given by the stack trace of the error.
 
 .. _joberrors:
@@ -167,22 +167,24 @@ the ``READY`` state, this can be achieved running::
 Job errors
 ==========
 
-Error may of course arises also during the execution of a Job in the worker. In this case
-the runner will not be able to tell it right away. It will need to first download the
-output of the Job and eventually extract the error from the it. In this case the Job will
+Errors may of course also arise during the execution of a Job in the worker. In this case
+the runner will not be able to tell right away that an error has occurred. It will need to first download the
+output of the Job and extract the error from it. In this case the Job will
 first reach the ``DOWNLOADED`` state, and then will either become ``COMPLETED`` or
 ``FAILED``, depending whether the Job completed successfully or not.
 
-The kind of errors that can lead could be
+The kind of errors that can lead to this could be:
+
 * issues from the code executed by the Job
 * bad input parameters
 * unsuccessful calculation in the Job
 * insufficient resources allocated in the worker
 * a bug in the Job's code or in jobflow-remote
+
 but the possible issues would strictly depend on the Jobs being executed.
 
-As for the :ref:`remoteerrors`, the Jobs in these state can be identified from the Job's
-list with the CLI
+As for the :ref:`remoteerrors`, the Jobs in this state can be identified from the Job
+list with the CLI (``jf job list``):
 
 .. parsed-literal::
 
@@ -224,7 +226,7 @@ And the details of the error can be obtained with the ``jf job info 5`` command:
     ╰────────────────────────────────────────────────────────────────────────────────────────────────────────╯
 
 In this case an ad-hoc failing job was executed and the ``error`` contains the stack trace of the
-python error. In most cases however, a failure related to the Job execution may lead to an error
+Python error. In most cases however, a failure related to the Job execution may lead to an error
 message that would not reveal the true nature of the problem. In that case the best option would be
 to investigate the output files in the produced by the Job in the ``run_dir`` folder.
 The folder should always contain a ``queue.out`` and a ``queue.out`` file, that contain the
@@ -235,11 +237,11 @@ worker's folder::
 
     jf job queue-out 5
 
- If the content of these files does not help identifying the issue and the Job produces output
+If the content of these files does not help identifying the issue and the Job produces output
 files, those should also be checked for errors.
 
 The actions required to solve the issue will depend on the nature of the error itself. If this
-was simply related to a temporary issue (e.g. a failure of the cluster), simply rerunning the
+resulted from a temporary issue (e.g. a failure of the cluster), simply rerunning the
 job with::
 
     jf job rerun 5
@@ -271,7 +273,7 @@ and resubmit it with the correct inputs.
 Rerun constraints
 =================
 
-In general rerunning a simple ``FAILED`` Job should not pose any issue. However,
+In general, rerunning a simple ``FAILED`` Job should not pose any issue. However,
 jobflow has a specific feature that allows Jobs to switch to the ``READY`` state
 even if some of the parents have failed (see the ``OnMissing`` options for the Job
 configuration). In such a case rerunning a the ``FAILED`` parent Job may be lead
@@ -280,23 +282,23 @@ to inconsistencies in the queue database.
 Jobflow-remote tries to avoid such inconsistencies by limiting the options to
 rerun a Job. In particular
 
-* if a Job is ``FAILED`` and all its children are in the ``READY`` and ``WAITING``
+* if a Job ``FAILED`` and all its children are in the ``READY`` and ``WAITING``
   state, the Job can always be rerun
 * if any of the children (or further descendant) Jobs have a Job index larger than
-  one, the ``FAILED`` Job can never be rerun, as there is no way to handle the state
+  ``1``, the ``FAILED`` Job can never be rerun, as there is no way to handle the state
   of the children in a meaningful way.
 * in all the other cases it would be possible to rerun the ``FAILED`` Job, using the
   the ``--force`` option in the ``jf job rerun`` command. The user should be aware
   that this may lead to inconsistencies if dynamical generation of Jobs is involved.
-  Children Jobs will be rerun and set in ``READY`` or ``WAITING`` state.
-  In this case the Runner should be preferably stopped in order to minimize the risk of
+  Child Jobs will be rerun and set in ``READY`` or ``WAITING`` state.
+  In this case, the Runner should be preferably stopped beforehand in order to minimize the risk of
   inconsistencies.
 
 
 Runner errors and Locked jobs
 =============================
 
-Even if less likely, also the Runner may have issues during its execution. Aside
+Even if less likely, the Runner itself may also have issues during its execution. Aside
 from bugs, the process could also be stopped abruptly due to issues on the machine
 that is hosting it or for having required too much resources (e.g. too much memory).
 
@@ -309,8 +311,9 @@ will expect that some other process is working on the locked Job.
 
 Locked Jobs can be identified in the job list using the ``-v`` or ``-vv`` option::
 
-    $ jf job list -v
-
+    jf job list -v
+    
+which will give the following output, including the ``Locked`` column:
 
                                                                                       Jobs info
     ┏━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━┓
@@ -320,7 +323,7 @@ Locked Jobs can be identified in the job list using the ``-v`` or ``-vv`` option
     │ 8     │ job 2     │ WAITING  │ fcb75bca-d6f3-45c0-8980-79dec4ad0737  (1) │ worker1     │ 2024-02-28 11:46   │          │          │                  │            │        │
     └───────┴───────────┴──────────┴───────────────────────────────────────────┴─────────────┴────────────────────┴──────────┴──────────┴──────────────────┴────────────┴────────┘
 
-Alternatively the list of locked Jobs can be obtained with the ``jf job list -l`` command.
+Alternatively, the list of locked Jobs can be obtained with the ``jf job list -l`` command.
 
 .. warning::
 
@@ -348,12 +351,12 @@ At this point the Runner will repeat the action.
 .. warning::
     Any action that could have been previously performed will be repeated.
 
-Alternatively it is also possible to entirely rerun the Job passing the ``--break-lock``
+Alternatively, it is also possible to entirely rerun the Job passing the ``--break-lock``
 option::
 
     jf job rerun --break-lock 5
 
-The runner should be preferably stopped before performing this commands.
+The runner should be preferably stopped before performing this command.
 
 Runner logs
 ===========
@@ -362,7 +365,7 @@ In addition to the error messages, if the source of an error could not be determ
 it may be worth trying to inspect the log files produced by the runner.
 
 Each project has its own folder (by default as a subfolder of ``~/.jfremote``) and the
-logs could be found in ``~/.jfremote/PROJECT_NAME/runner/log``. The ``runner.log`` file
+logs can be found in the ``~/.jfremote/PROJECT_NAME/log`` directory. The ``runner.log`` file
 contain the log message produced by the python ``Runner`` object. This is more likely
 to contain information concerning errors related to the code. The ``supervisord.log``
 is instead the log produced by supervisord, that manages the daemon processes.
