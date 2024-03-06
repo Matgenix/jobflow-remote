@@ -234,7 +234,7 @@ class JobController:
             query["$or"] = or_list
 
         if flow_ids:
-            query["hosts"] = {"$in": flow_ids}
+            query["job.hosts"] = {"$in": flow_ids}
 
         if state:
             query["state"] = state.value
@@ -253,7 +253,7 @@ class JobController:
             # Add the beginning of the line, so that it will match the string
             # exactly if no wildcard is given. Otherwise will match substrings.
             mongo_regex = "^" + fnmatch.translate(name).replace("\\\\", "\\")
-            query["name"] = {"$regex": mongo_regex}
+            query["job.name"] = {"$regex": mongo_regex}
 
         if metadata:
             metadata_dict = {f"job.metadata.{k}": v for k, v in metadata.items()}
@@ -265,7 +265,7 @@ class JobController:
         self,
         job_ids: str | list[str] | None = None,
         db_ids: str | list[str] | None = None,
-        flow_ids: str | None = None,
+        flow_ids: str | list[str] | None = None,
         state: FlowState | None = None,
         start_date: datetime | None = None,
         end_date: datetime | None = None,
@@ -308,6 +308,8 @@ class JobController:
             job_ids = [job_ids]
         if db_ids is not None and not isinstance(db_ids, (list, tuple)):
             db_ids = [db_ids]
+        if flow_ids is not None and not isinstance(flow_ids, (list, tuple)):
+            flow_ids = [flow_ids]
 
         query: dict = {}
 
@@ -1961,7 +1963,7 @@ class JobController:
         self,
         job_ids: str | list[str] | None = None,
         db_ids: str | list[str] | None = None,
-        flow_ids: str | None = None,
+        flow_ids: str | list[str] | None = None,
         state: FlowState | None = None,
         start_date: datetime | None = None,
         end_date: datetime | None = None,
@@ -1971,7 +1973,7 @@ class JobController:
         full: bool = False,
     ) -> list[FlowInfo]:
         """
-        Query for Flows based on standard parameters and return a list of JobFlows.
+        Query for Flows based on standard parameters and return a list of FlowInfo.
 
         Parameters
         ----------
@@ -2005,7 +2007,7 @@ class JobController:
         Returns
         -------
         list
-            A list of JobFlows.
+            A list of FlowInfo.
         """
         query = self._build_query_flow(
             job_ids=job_ids,
@@ -2170,7 +2172,7 @@ class JobController:
         self,
         job_ids: str | list[str] | None = None,
         db_ids: str | list[str] | None = None,
-        flow_ids: str | None = None,
+        flow_ids: str | list[str] | None = None,
         state: FlowState | None = None,
         start_date: datetime | None = None,
         end_date: datetime | None = None,
@@ -2380,7 +2382,43 @@ class JobController:
         end_date: datetime | None = None,
         name: str | None = None,
         metadata: dict | None = None,
-    ):
+    ) -> int:
+        """
+        Count Jobs based on filters.
+
+        Parameters
+        ----------
+        query
+            A generic query. Will override all the other parameters.
+        job_ids
+            One or more tuples, each containing the (uuid, index) pair of the
+            Jobs to retrieve.
+        db_ids
+            One or more db_ids of the Jobs to retrieve.
+        flow_ids
+            One or more Flow uuids to which the Jobs to retrieve belong.
+        state
+            The state of the Jobs.
+        locked
+            If True only locked Jobs will be selected.
+        start_date
+            Filter Jobs that were updated_on after this date.
+            Should be in the machine local time zone. It will be converted to UTC.
+        end_date
+            Filter Jobs that were updated_on before this date.
+            Should be in the machine local time zone. It will be converted to UTC.
+        name
+            Pattern matching the name of Job. Default is an exact match, but all
+            conventions from python fnmatch can be used (e.g. *test*)
+        metadata
+            A dictionary of the values of the metadata to match. Should be an
+            exact match for all the values provided.
+
+        Returns
+        -------
+        int
+            Number of Jobs matching the criteria.
+        """
         if query is None:
             query = self._build_query_job(
                 job_ids=job_ids,
@@ -2400,12 +2438,42 @@ class JobController:
         query: dict | None = None,
         job_ids: str | list[str] | None = None,
         db_ids: str | list[str] | None = None,
-        flow_ids: str | None = None,
+        flow_ids: str | list[str] | None = None,
         state: FlowState | None = None,
         start_date: datetime | None = None,
         end_date: datetime | None = None,
         name: str | None = None,
-    ):
+    ) -> int:
+        """
+        Count flows based on filter parameters.
+
+        Parameters
+        ----------
+        query
+            A generic query. Will override all the other parameters.
+        job_ids
+            One or more strings with uuids of Jobs belonging to the Flow.
+        db_ids
+            One or more db_ids of Jobs belonging to the Flow.
+        flow_ids
+            One or more Flow uuids.
+        state
+            The state of the Flows.
+        start_date
+            Filter Flows that were updated_on after this date.
+            Should be in the machine local time zone. It will be converted to UTC.
+        end_date
+            Filter Flows that were updated_on before this date.
+            Should be in the machine local time zone. It will be converted to UTC.
+        name
+            Pattern matching the name of Flow. Default is an exact match, but all
+            conventions from python fnmatch can be used (e.g. *test*)
+
+        Returns
+        -------
+        int
+            Number of Flows matching the criteria.
+        """
         if not query:
             query = self._build_query_flow(
                 job_ids=job_ids,
