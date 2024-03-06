@@ -149,7 +149,7 @@ def convert_utc_time(datetime_value: datetime) -> datetime:
 
 
 # TODO imported this from jobflow remote for backward compatibility.
-# remote this in favor of suid in the next release
+# remove this in favor of suid in the next release
 def suuid() -> str:
     """
     Generate a string UUID (universally unique identifier).
