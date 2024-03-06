@@ -302,6 +302,13 @@ class DictType(dict):
     pass
 
 
+# Similarly, Python 3.10 union types are not supported,
+# e.g., `str | None` vs `Optional[str]`
+# pyupgraade really likes enforcing this rule (PEP 604)
+# but will leave things in if they are explicit type aliases
+OptionalStr = Optional[str]
+
+
 class DictTypeParser(click.ParamType):
     name = "DictType"
 
