@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import io
 from pathlib import Path
 from typing import Annotated
@@ -708,10 +706,10 @@ def resources(
     Set the resources for the selected Jobs. Only READY or WAITING Jobs.
     """
 
-    resources: dict | QResources = str_to_dict(resources_value)
+    resources = str_to_dict(resources_value)  # type: ignore
 
     if qresources:
-        resources = QResources(**resources)
+        resources = QResources(**resources)  # type: ignore[assignment]
 
     jc = get_job_controller()
     execute_multi_jobs_cmd(

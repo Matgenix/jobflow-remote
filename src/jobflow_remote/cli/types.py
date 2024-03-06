@@ -307,6 +307,7 @@ class DictType(dict):
 # pyupgraade really likes enforcing this rule (PEP 604)
 # but will leave things in if they are explicit type aliases
 OptionalStr = Optional[str]
+OptionalDictType = Optional[DictType]
 
 
 class DictTypeParser(click.ParamType):
@@ -323,7 +324,7 @@ class DictTypeParser(click.ParamType):
 
 
 query_opt = Annotated[
-    Optional[DictType],
+    OptionalDictType,
     typer.Option(
         "--query",
         "-q",
