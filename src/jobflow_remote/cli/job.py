@@ -15,6 +15,7 @@ from jobflow_remote.cli.formatting import format_job_info, get_job_info_table
 from jobflow_remote.cli.jf import app
 from jobflow_remote.cli.jfr_typer import JFRTyper
 from jobflow_remote.cli.types import (
+    OptionalStr,
     break_lock_opt,
     days_opt,
     db_ids_opt,
@@ -793,7 +794,7 @@ def output(
     job_db_id: job_db_id_arg,
     job_index: job_index_arg = None,
     file_path: Annotated[
-        str | None,
+        OptionalStr,
         typer.Option(
             "--path",
             "-p",
