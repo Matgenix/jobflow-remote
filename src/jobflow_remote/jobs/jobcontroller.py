@@ -256,7 +256,7 @@ class JobController:
             query["name"] = {"$regex": mongo_regex}
 
         if metadata:
-            metadata_dict = {f"metadata.{k}": v for k, v in metadata.items()}
+            metadata_dict = {f"job.metadata.{k}": v for k, v in metadata.items()}
             query.update(metadata_dict)
 
         return query
