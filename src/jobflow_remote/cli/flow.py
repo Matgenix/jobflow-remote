@@ -59,7 +59,7 @@ def flows_list(
     hours: hours_opt = None,
     verbosity: verbosity_opt = 0,
     max_results: max_results_opt = 100,
-    sort: sort_opt = SortOption.UPDATED_ON,
+    sort: sort_opt = SortOption.UPDATED_ON.value,  # type: ignore[assignment]
     reverse_sort: reverse_sort_flag_opt = False,
 ):
     """
