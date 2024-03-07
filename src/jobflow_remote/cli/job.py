@@ -706,10 +706,10 @@ def resources(
     Set the resources for the selected Jobs. Only READY or WAITING Jobs.
     """
 
-    resources = str_to_dict(resources_value)  # type: ignore
+    resources = str_to_dict(resources_value)
 
     if qresources:
-        resources = QResources(**resources)  # type: ignore[assignment]
+        resources = QResources(**resources)
 
     jc = get_job_controller()
     execute_multi_jobs_cmd(
