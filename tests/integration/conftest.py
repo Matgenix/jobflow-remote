@@ -22,7 +22,7 @@ def mock_fabric_run(monkeypatch):
     )
 
 
-def _get_free_port(upper_bound=90_000):
+def _get_free_port(upper_bound=50_000):
     """Returns a random free port, with an upper bound.
 
     The upper bound is required as Docker does not have
