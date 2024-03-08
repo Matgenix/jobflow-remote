@@ -91,13 +91,13 @@ class RemoteHost(BaseHost):
             )
 
     def _get_single_connection(
-            self,
-            host,
-            user,
-            port,
-            config,
-            gateway,
-            connect_kwargs,
+        self,
+        host,
+        user,
+        port,
+        config,
+        gateway,
+        connect_kwargs,
     ):
         """
         Helper method to generate a fabric Connection given standard parameters.
