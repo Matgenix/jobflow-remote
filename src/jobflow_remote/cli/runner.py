@@ -27,7 +27,7 @@ app.add_typer(app_runner)
 
 @app_runner.command()
 def run(
-    log_level: log_level_opt = LogLevel.INFO.value,  # type: ignore[assignment]
+    log_level: log_level_opt = LogLevel.INFO,
     set_pid: Annotated[
         bool,
         typer.Option(
@@ -108,7 +108,7 @@ def start(
             help="Use a single process for the runner",
         ),
     ] = False,
-    log_level: log_level_opt = LogLevel.INFO.value,  # type: ignore[assignment]
+    log_level: log_level_opt = LogLevel.INFO,
 ):
     """
     Start the Runner as a daemon

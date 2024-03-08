@@ -89,13 +89,13 @@ def complete_profiling():
     stats.print_stats()
 
 
-class SortOption(Enum):
+class SortOption(str, Enum):
     CREATED_ON = "created_on"
     UPDATED_ON = "updated_on"
     DB_ID = "db_id"
 
 
-class SerializeFileFormat(Enum):
+class SerializeFileFormat(str, Enum):
     JSON = "json"
     YAML = "yaml"
     TOML = "toml"

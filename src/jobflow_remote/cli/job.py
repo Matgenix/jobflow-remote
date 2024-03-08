@@ -78,7 +78,7 @@ def jobs_list(
     hours: hours_opt = None,
     verbosity: verbosity_opt = 0,
     max_results: max_results_opt = 100,
-    sort: sort_opt = SortOption.UPDATED_ON.value,
+    sort: sort_opt = SortOption.UPDATED_ON,
     reverse_sort: reverse_sort_flag_opt = False,
     locked: locked_opt = False,
     custom_query: query_opt = None,
