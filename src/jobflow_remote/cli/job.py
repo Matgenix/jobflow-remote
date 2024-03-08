@@ -78,7 +78,7 @@ def jobs_list(
     hours: hours_opt = None,
     verbosity: verbosity_opt = 0,
     max_results: max_results_opt = 100,
-    sort: sort_opt = SortOption.UPDATED_ON.value,  # type: ignore[assignment]
+    sort: sort_opt = SortOption.UPDATED_ON.value,
     reverse_sort: reverse_sort_flag_opt = False,
     locked: locked_opt = False,
     custom_query: query_opt = None,
@@ -930,7 +930,7 @@ def files_get(
     ],
     job_index: job_index_opt = None,
     path: Annotated[
-        Optional[str],
+        OptionalStr,
         typer.Option(
             "--path",
             "-p",
