@@ -67,10 +67,6 @@ class RemoteHost(BaseHost):
             if "auth_timeout" not in connect_kwargs:
                 connect_kwargs["auth_timeout"] = 120
             config = self.config
-            if not config:
-                config = Config()
-                config.authentication.strategy_class = InteractiveAuthStrategy
-
             self._connection = self._get_single_connection(
                 host=self.host,
                 user=self.user,
@@ -79,6 +75,23 @@ class RemoteHost(BaseHost):
                 gateway=self.gateway,
                 connect_kwargs=connect_kwargs,
             )
+
+            # if the authentication is ssh-key + OTP paramiko already
+            # handles it. Don't use the alternative strategy.
+            if not self._connection.connect_kwargs.get("key_filename"):
+
+                if not config:
+                    config = Config()
+                    config.authentication.strategy_class = InteractiveAuthStrategy
+
+                self._connection = self._get_single_connection(
+                    host=self.host,
+                    user=self.user,
+                    port=self.port,
+                    config=config,
+                    gateway=self.gateway,
+                    connect_kwargs=connect_kwargs,
+                )
 
         else:
             self._connection = self._get_single_connection(
@@ -387,17 +400,17 @@ class InteractiveAuthStrategy(OpenSSHAuthStrategy):
         # get_pubkeys from OpenSSHAuthStrategy
         # With the current implementation exceptions may be raised in case if a key
         # in ~/.ssh cannot be parsed.
-        # TODO For the moment just skip the public keys altogether. The only
-        # solution would be to import the get_pubkeys code here. Preferably wait
-        # for improvements in fabric.
-        try:
-            yield from self.get_pubkeys()
-        except Exception as e:
-            logger.warning(
-                "Error while trying the authentication with all the public keys "
-                f"available: {getattr(e, 'message', str(e))}. This may be due to the "
-                "format of one of the keys. Authentication will proceed with "
-                "interactive prompts"
-            )
+        # In addition other error ("Oops, unhandled type 3 ('unimplemented')")
+        # can lead to the procedure being stuck. Don't try the keys at the moment
+        # InteractiveAuthStrategy works for password only
+        # try:
+        #     yield from self.get_pubkeys()
+        # except Exception as e:
+        #     logger.warning(
+        #         "Error while trying the authentication with all the public keys "
+        #         f"available: {getattr(e, 'message', str(e))}. This may be due to the "
+        #         "format of one of the keys. Authentication will proceed with "
+        #         "interactive prompts"
+        #     )
 
         yield Interactive(username=self.username)
