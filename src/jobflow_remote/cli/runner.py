@@ -121,8 +121,6 @@ def start(
         ),
     ] = False,
     log_level: log_level_opt = LogLevel.INFO,
-<<<<<<< HEAD
-=======
     connect_interactive: Annotated[
         bool,
         typer.Option(
@@ -132,7 +130,6 @@ def start(
             "connection for interactive remote host. Requires --single.",
         ),
     ] = False,
->>>>>>> 41173ee (Allow interactive authentication for workers)
 ):
     """
     Start the Runner as a daemon
