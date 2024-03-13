@@ -15,7 +15,7 @@ def test_project_init(random_project_name):
     assert len(cm.projects) == 1
     assert cm.projects[random_project_name]
     project = cm.get_project()
-    assert len(project.workers) == 2
+    assert len(project.workers) == 4
 
 
 def test_paramiko_ssh_connection(job_controller, slurm_ssh_port):

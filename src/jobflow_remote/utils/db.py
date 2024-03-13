@@ -141,11 +141,12 @@ class MongoLock:
         self.unavailable_document = None
         self.lock_id = lock_id or suuid()
         self.kwargs = kwargs
-        self.update_on_release: dict = {}
+        self.update_on_release: dict | list = {}
         self.sleep = sleep
         self.max_wait = max_wait
         self.projection = projection
         self.get_locked_doc = get_locked_doc
+        self.release_with_pipeline: bool = False
 
     @classmethod
     def get_lock_time(cls, d: dict):
@@ -248,7 +249,10 @@ class MongoLock:
         update = {"$set": {self.LOCK_KEY: None, self.LOCK_TIME_KEY: None}}
         # TODO maybe set on release only if no exception was raised?
         if self.update_on_release:
-            update = deep_merge_dict(update, self.update_on_release)
+            if isinstance(self.update_on_release, list):
+                update = [update] + self.update_on_release
+            else:
+                update = deep_merge_dict(update, self.update_on_release)
         logger.debug(f"release lock with update: {update}")
         # TODO if failed to release the lock maybe retry before failing
         result = self.collection.update_one(

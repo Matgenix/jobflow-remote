@@ -959,7 +959,7 @@ class JobController:
             for dep_id, dep_index in descendants:
                 if max(flow_doc.ids_mapping[dep_id]) > dep_index:
                     raise ValueError(
-                        f"Job {job_id} has a child job ({dep_id}) which is not the last index ({dep_index}. "
+                        f"Job {job_id} has a child job ({dep_id}) which is not the last index ({dep_index}). "
                         "Rerunning the Job will lead to inconsistencies and is not allowed."
                     )
 
@@ -1078,6 +1078,7 @@ class JobController:
         wait: int | None = None,
         break_lock: bool = False,
         acceptable_states: list[JobState] | None = None,
+        use_pipeline: bool = False,
     ) -> list[int]:
         """
         Helper to set multiple values in a JobDoc while locking the Job.
@@ -1088,7 +1089,7 @@ class JobController:
         ----------
         values
             Dictionary with the values to be set. Will be passed to a pymongo
-            `find_one_and_update` method.
+            `update_one` method.
         db_id
             The db_id of the Job.
         job_id
@@ -1105,6 +1106,8 @@ class JobController:
         acceptable_states
             List of JobState for which the Job values can be changed.
             If None all states are acceptable.
+        use_pipeline
+            if True a pipeline will be used in the update of the document
         Returns
         -------
         list
@@ -1135,7 +1138,9 @@ class JobController:
                     )
                 values = dict(values)
                 # values["updated_on"] = datetime.utcnow()
-                lock.update_on_release = {"$set": values}
+                lock.update_on_release = (
+                    [{"$set": values}] if use_pipeline else {"$set": values}
+                )
                 return [doc["db_id"]]
 
         return []
@@ -1256,7 +1261,7 @@ class JobController:
         """
         return self._many_jobs_action(
             method=self.retry_job,
-            action_description="rerunning",
+            action_description="retrying",
             job_ids=job_ids,
             db_ids=db_ids,
             flow_ids=flow_ids,
@@ -1876,17 +1881,31 @@ class JobController:
                 exec_config = exec_config.model_dump()
 
             if update and isinstance(exec_config, dict):
-                for k, v in exec_config.items():
-                    set_dict[f"exec_config.{k}"] = v
+                # if the content is a string replace even if it is an update,
+                # merging is meaningless
+                cond = {
+                    "$cond": {
+                        "if": {"$eq": [{"$type": "$exec_config"}, "string"]},
+                        "then": exec_config,
+                        "else": {"$mergeObjects": ["$exec_config", exec_config]},
+                    }
+                }
+                print(cond)
+                set_dict["exec_config"] = cond
+
             else:
                 set_dict["exec_config"] = exec_config
 
         if resources:
             if isinstance(resources, QResources):
                 resources = resources.as_dict()
+                # if passing a QResources it is pointless to update
+                # all the keywords will be overwritten and if the previous
+                # value was a generic dictionary the merged dictionary will fail
+                # almost surely lead to failures
+                update = False
             if update:
-                for k, v in resources.items():
-                    set_dict[f"resources.{k}"] = v
+                set_dict["resources"] = {"$mergeObjects": ["$resources", resources]}
             else:
                 set_dict["resources"] = resources
 
@@ -1904,6 +1923,7 @@ class JobController:
             raise_on_error=raise_on_error,
             values=set_dict,
             acceptable_states=[JobState.READY, JobState.WAITING],
+            use_pipeline=update,
         )
 
     def get_flow_job_aggreg(
@@ -1968,6 +1988,7 @@ class JobController:
         start_date: datetime | None = None,
         end_date: datetime | None = None,
         name: str | None = None,
+        locked: bool = False,
         sort: list[tuple] | None = None,
         limit: int = 0,
         full: bool = False,
@@ -1994,6 +2015,8 @@ class JobController:
         name
             Pattern matching the name of Flow. Default is an exact match, but all
             conventions from python fnmatch can be used (e.g. *test*)
+        locked
+            If True only locked Flows will be selected.
         sort
             A list of (key, direction) pairs specifying the sort order for this
             query. Follows pymongo conventions.
@@ -2017,6 +2040,7 @@ class JobController:
             start_date=start_date,
             end_date=end_date,
             name=name,
+            locked=locked,
         )
 
         # Only use the full aggregation if more job details are needed.
@@ -2105,7 +2129,7 @@ class JobController:
         self.flows.delete_one({"uuid": flow_id})
         return True
 
-    def remove_lock_job(
+    def unlock_jobs(
         self,
         job_ids: tuple[str, int] | list[tuple[str, int]] | None = None,
         db_ids: str | list[str] | None = None,
@@ -2168,7 +2192,7 @@ class JobController:
         )
         return result.modified_count
 
-    def remove_lock_flow(
+    def unlock_flows(
         self,
         job_ids: str | list[str] | None = None,
         db_ids: str | list[str] | None = None,

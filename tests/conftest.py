@@ -1,3 +1,7 @@
+import random
+import time
+import warnings
+
 import pytest
 
 
@@ -61,3 +65,42 @@ def tmp_dir():
 @pytest.fixture(scope="session")
 def debug_mode():
     return False
+
+
+def _get_random_name(length=6):
+    return "".join(random.choice("abcdef") for _ in range(length))
+
+
+@pytest.fixture(scope="session")
+def random_project_name():
+    return _get_random_name()
+
+
+@pytest.fixture(scope="function")
+def daemon_manager(random_project_name):
+    from jobflow_remote.jobs.daemon import DaemonError, DaemonManager, DaemonStatus
+
+    dm = DaemonManager.from_project_name(random_project_name)
+    yield dm
+    # kill the processes and shut down the daemon (otherwise will remain in the STOPPED state)
+    dm.kill(raise_on_error=True)
+    time.sleep(0.5)
+    dm.shut_down(raise_on_error=True)
+    for i in range(10):
+        time.sleep(1)
+        try:
+            if dm.check_status() == DaemonStatus.SHUT_DOWN:
+                break
+        except DaemonError:
+            pass
+    else:
+        warnings.warn("daemon manager did not shut down within the expected time")
+
+
+@pytest.fixture(scope="function")
+def runner():
+    from jobflow_remote.jobs.runner import Runner
+
+    runner = Runner()
+    yield runner
+    runner.cleanup()

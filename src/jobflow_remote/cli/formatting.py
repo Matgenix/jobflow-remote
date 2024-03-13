@@ -167,7 +167,7 @@ def format_flow_info(flow_info: FlowInfo):
     table.title_style = "bold"
     table.add_column("DB id")
     table.add_column("Name")
-    table.add_column("State [Remote]")
+    table.add_column("State")
     table.add_column("Job id  (Index)")
     table.add_column("Worker")
 

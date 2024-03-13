@@ -9,6 +9,8 @@ from jobflow_remote.cli.jfr_typer import JFRTyper
 from jobflow_remote.cli.types import (
     db_ids_opt,
     end_date_opt,
+    flow_ids_opt,
+    flow_state_opt,
     force_opt,
     job_ids_indexes_opt,
     job_state_opt,
@@ -158,17 +160,76 @@ def unlock(
         if not confirmed:
             raise typer.Exit(0)
 
+    with loading_spinner(False) as progress:
+        progress.add_task(description="Unlocking jobs...", total=None)
+
+        num_unlocked = jc.unlock_jobs(
+            job_ids=job_id,
+            db_ids=db_id,
+            state=state,
+            start_date=start_date,
+            end_date=end_date,
+        )
+
+    out_console.print(f"{num_unlocked} jobs were unlocked")
+
+
+@app_admin.command()
+def unlock_flow(
+    job_id: job_ids_indexes_opt = None,
+    db_id: db_ids_opt = None,
+    flow_id: flow_ids_opt = None,
+    state: flow_state_opt = None,
+    start_date: start_date_opt = None,
+    end_date: end_date_opt = None,
+    force: force_opt = False,
+):
+    """
+    Forcibly removes the lock from the documents of the selected jobs.
+    WARNING: can lead to inconsistencies if the processes is actually running
+    """
+
+    job_ids_indexes = get_job_ids_indexes(job_id)
+
+    jc = get_job_controller()
+
+    if not force:
         with loading_spinner(False) as progress:
             progress.add_task(
                 description="Checking the number of locked documents...", total=None
             )
 
-            num_unlocked = jc.remove_lock_job(
-                job_ids=job_id,
+            flows_info = jc.get_flows_info(
+                job_ids=job_ids_indexes,
                 db_ids=db_id,
+                flow_ids=flow_id,
                 state=state,
                 start_date=start_date,
+                locked=True,
                 end_date=end_date,
             )
 
-        out_console.print(f"{num_unlocked} jobs were unlocked")
+        if not flows_info:
+            exit_with_error_msg("No data matching the request")
+
+        text = Text.from_markup(
+            f"[red]This operation will [bold]remove the lock[/bold] for (roughly) [bold]{len(flows_info)} Flow(s)[/bold]. Proceed anyway?[/red]"
+        )
+        confirmed = Confirm.ask(text, default=False)
+
+        if not confirmed:
+            raise typer.Exit(0)
+
+    with loading_spinner(False) as progress:
+        progress.add_task(description="Unlocking flows...", total=None)
+
+        num_unlocked = jc.unlock_flows(
+            job_ids=job_id,
+            db_ids=db_id,
+            flow_ids=flow_id,
+            state=state,
+            start_date=start_date,
+            end_date=end_date,
+        )
+
+    out_console.print(f"{num_unlocked} flows were unlocked")

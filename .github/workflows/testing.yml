@@ -35,6 +35,12 @@ jobs:
         run: pre-commit run --all-files --show-diff-on-failure
 
   test:
+    services:
+      local_mongodb:
+        image: mongo:4.4
+        ports:
+          - 27017:27017
+
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
