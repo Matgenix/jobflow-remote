@@ -228,7 +228,7 @@ def set_state(
         )
 
     if not succeeded:
-        exit_with_error_msg("Could not reset the remote attempts")
+        exit_with_error_msg("Could not change the job state")
 
     print_success_msg()
 
@@ -675,7 +675,7 @@ def exec_config(
         hours=hours,
         verbosity=verbosity,
         raise_on_error=raise_on_error,
-        exec_config_value=exec_config_value,
+        exec_config=exec_config_value,
     )
 
 

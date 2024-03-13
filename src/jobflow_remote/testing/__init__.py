@@ -63,6 +63,17 @@ def add_big_undefined_store(a: float, b: float):
 
 
 @job
+def add_sleep(a, b):
+    """
+    Adds two numbers together and sleeps for "b" seconds
+    """
+    import time
+
+    time.sleep(b)
+    return a + b
+
+
+@job
 def create_detour(detour_job: Job):
     """
     Create a detour based on the passed Job.
@@ -70,3 +81,26 @@ def create_detour(detour_job: Job):
     from jobflow import Flow
 
     return Response(detour=Flow(detour_job))
+
+
+@job
+def self_replace(n: int):
+    """
+    Create a replace Job with the same job n times.
+    """
+    from jobflow import Flow
+
+    if n > 0:
+        return Response(replace=self_replace(n - 1))
+
+    return n
+
+
+@job
+def ignore_input(a: int):
+    """
+    Can receive an input, but ignores it.
+
+    Allows to test flows with failed parents
+    """
+    return 1

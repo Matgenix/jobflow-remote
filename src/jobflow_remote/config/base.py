@@ -37,12 +37,12 @@ class RunnerOptions(BaseModel):
     delay_refresh_limited: int = Field(
         600,
         description="Delay between subsequent refresh from the DB of the number of submitted "
-        "and running jobs (seconds). Only use if a worker with max_jobs is present",
+        "and running jobs (seconds). Only used if a worker with max_jobs is present",
     )
     delay_update_batch: int = Field(
         60,
         description="Delay between subsequent refresh from the DB of the number of submitted "
-        "and running jobs (seconds). Only use if a worker with max_jobs is present",
+        "and running jobs (seconds). Only used if a batch worker is present",
     )
     lock_timeout: Optional[int] = Field(
         86400,

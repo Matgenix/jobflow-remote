@@ -22,7 +22,7 @@ def mock_fabric_run(monkeypatch):
     )
 
 
-def _get_free_port(upper_bound=50_000):
+def _get_free_port(upper_bound=90_000):
     """Returns a random free port, with an upper bound.
 
     The upper bound is required as Docker does not have
@@ -157,11 +157,6 @@ def mongo_container(docker_client, db_port):
 
 
 @pytest.fixture(scope="session")
-def random_project_name():
-    return _get_random_name()
-
-
-@pytest.fixture(scope="session")
 def store_database_name():
     return _get_random_name()
 
@@ -237,6 +232,31 @@ def write_tmp_settings(
                 resources={"partition": "debug", "ntasks": 1, "time": "00:01:00"},
                 connect_kwargs={"allow_agent": False, "look_for_keys": False},
             ),
+            "test_batch_remote_worker": dict(
+                type="remote",
+                host="localhost",
+                port=slurm_ssh_port,
+                scheduler_type="slurm",
+                work_dir="/home/jobflow/jfr",
+                user="jobflow",
+                password="jobflow",
+                pre_run="source /home/jobflow/.venv/bin/activate",
+                resources={"partition": "debug", "ntasks": 1, "time": "00:01:00"},
+                connect_kwargs={"allow_agent": False, "look_for_keys": False},
+                batch={
+                    "jobs_handle_dir": "/home/jobflow/jfr/batch_handle",
+                    "work_dir": "/home/jobflow/jfr/batch_work",
+                    "max_wait": 10,
+                },
+                max_jobs=1,
+            ),
+            "test_max_jobs_worker": dict(
+                type="local",
+                scheduler_type="shell",
+                work_dir=str(workdir),
+                resources={},
+                max_jobs=2,
+            ),
         },
         exec_config={"test": {"export": {"TESTING_ENV_VAR": random_project_name}}},
         runner=dict(
@@ -265,16 +285,3 @@ def job_controller(random_project_name):
     jc = JobController.from_project_name(random_project_name)
     assert jc.reset()
     yield jc
-
-
-@pytest.fixture(scope="session")
-def daemon_manager(random_project_name):
-    from jobflow_remote.jobs.daemon import DaemonManager
-
-    yield DaemonManager.from_project_name(random_project_name)
-
-
-@pytest.fixture(scope="session")
-def runner(daemon_manager):
-    yield daemon_manager.start(raise_on_error=True)
-    daemon_manager.stop(raise_on_error=True)

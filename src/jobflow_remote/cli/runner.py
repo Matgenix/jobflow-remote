@@ -91,7 +91,10 @@ def run(
     if not (transfer or complete or queue or checkout):
         transfer = complete = queue = checkout = True
 
-    runner.run(transfer=transfer, complete=complete, queue=queue, checkout=checkout)
+    try:
+        runner.run(transfer=transfer, complete=complete, queue=queue, checkout=checkout)
+    finally:
+        runner.cleanup()
 
 
 @app_runner.command()
@@ -261,6 +264,7 @@ def status():
         DaemonStatus.STOPPING: "gold1",
         DaemonStatus.SHUT_DOWN: "red",
         DaemonStatus.PARTIALLY_RUNNING: "gold1",
+        DaemonStatus.STARTING: "gold1",
         DaemonStatus.RUNNING: "green",
     }[current_status]
     text = Text()

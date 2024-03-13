@@ -69,6 +69,9 @@ def cleanup_job_controller():
     global _shared_job_controller
     if _shared_job_controller is not None:
         _shared_job_controller.close()
+        # set to None again, in case it needs to be used again in the same
+        # execution (e.g., in tests)
+        _shared_job_controller = None
 
 
 def start_profiling():

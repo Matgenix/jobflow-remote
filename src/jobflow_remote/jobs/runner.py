@@ -295,23 +295,170 @@ class Runner:
                     self.update_batch_jobs
                 )
 
-        try:
-            ticks_remaining: int | bool = True
+        ticks_remaining: int | bool = True
+        if ticks is not None:
+            ticks_remaining = ticks
+
+        while ticks_remaining:
+            if self.stop_signal:
+                logger.info("stopping due to sigterm")
+                break
+            scheduler.run_pending()
+            time.sleep(1)
+
             if ticks is not None:
-                ticks_remaining = ticks
+                ticks_remaining -= 1
 
-            while ticks_remaining:
-                if self.stop_signal:
-                    logger.info("stopping due to sigterm")
-                    break
-                scheduler.run_pending()
-                time.sleep(1)
+    def run_all_jobs(
+        self,
+        max_seconds: int | None = None,
+    ):
+        """
+        Use the runner to run all the jobs in the DB.
+        Mainly used for testing
+        """
+        states = [
+            JobState.CHECKED_OUT.value,
+            JobState.TERMINATED.value,
+            JobState.DOWNLOADED.value,
+            JobState.UPLOADED.value,
+        ]
 
-                if ticks is not None:
-                    ticks_remaining -= 1
+        scheduler = SafeScheduler(seconds_after_failure=120)
 
-        finally:
-            self.cleanup()
+        t0 = time.time()
+        # run a first call for each case, since schedule will wait for the delay
+        # to make the first execution.
+        self.checkout()
+        scheduler.every(self.runner_options.delay_checkout).seconds.do(self.checkout)
+
+        self.advance_state(states)
+        scheduler.every(self.runner_options.delay_advance_status).seconds.do(
+            self.advance_state, states=states
+        )
+
+        self.check_run_status()
+        scheduler.every(self.runner_options.delay_check_run_status).seconds.do(
+            self.check_run_status
+        )
+
+        # Limited workers will only affect the process interacting with the queue
+        # manager. When a job is submitted or terminated the count in the
+        # limited_workers can be directly updated, since by construction only one
+        # process will take care of the queue state.
+        # The refresh can be run on a relatively high delay since it should only
+        # account for actions from the user (e.g. rerun, cancel), that can alter
+        # the number of submitted/running jobs.
+        if self.limited_workers:
+            self.refresh_num_current_jobs()
+            scheduler.every(self.runner_options.delay_refresh_limited).seconds.do(
+                self.refresh_num_current_jobs
+            )
+        if self.batch_workers:
+            self.update_batch_jobs()
+            scheduler.every(self.runner_options.delay_update_batch).seconds.do(
+                self.update_batch_jobs
+            )
+
+        running_states = [
+            JobState.READY.value,
+            JobState.CHECKED_OUT.value,
+            JobState.TERMINATED.value,
+            JobState.DOWNLOADED.value,
+            JobState.UPLOADED.value,
+            JobState.SUBMITTED.value,
+            JobState.RUNNING.value,
+            JobState.BATCH_RUNNING.value,
+            JobState.BATCH_SUBMITTED.value,
+        ]
+        query = {"state": {"$in": running_states}}
+        jobs_available = True
+        while jobs_available:
+            scheduler.run_pending()
+            time.sleep(0.2)
+            jobs_available = self.job_controller.count_jobs(query=query)
+            if max_seconds and time.time() - t0 > max_seconds:
+                raise RuntimeError(
+                    "Could execute all the jobs within the selected amount of time"
+                )
+
+    def run_one_job(
+        self,
+        db_id: str | None = None,
+        job_id: tuple[str, str] | None = None,
+        max_seconds: int | None = None,
+        raise_at_timeout: bool = True,
+    ) -> bool:
+        """
+        Use the runner to run a single Job until it reaches a terminal state.
+        The job should be in the READY state and there should be no
+        Mainly used for testing
+        """
+
+        states = [
+            JobState.CHECKED_OUT.value,
+            JobState.TERMINATED.value,
+            JobState.DOWNLOADED.value,
+            JobState.UPLOADED.value,
+        ]
+
+        scheduler = SafeScheduler(seconds_after_failure=120)
+
+        t0 = time.time()
+        query = {}
+        if db_id:
+            query["db_id"] = db_id
+        if job_id:
+            query["uuid"] = job_id[0]
+            query["index"] = job_id[1]
+        job_data = self.job_controller.checkout_job(query=query)
+        if not job_data:
+            if not db_id and not job_id:
+                return None
+            elif not db_id:
+                job_data = job_id
+            else:
+                j_info = self.job_controller.get_job_info(db_id=db_id)
+                job_data = [j_info.uuid, j_info.index]
+
+        filter = {"uuid": job_data[0], "index": job_data[1]}
+        self.advance_state(states)
+        scheduler.every(self.runner_options.delay_advance_status).seconds.do(
+            self.advance_state,
+            states=states,
+            filter=filter,
+        )
+
+        self.check_run_status()
+        scheduler.every(self.runner_options.delay_check_run_status).seconds.do(
+            self.check_run_status, filter=filter
+        )
+
+        running_states = [
+            JobState.READY.value,
+            JobState.CHECKED_OUT.value,
+            JobState.TERMINATED.value,
+            JobState.DOWNLOADED.value,
+            JobState.UPLOADED.value,
+            JobState.SUBMITTED.value,
+            JobState.RUNNING.value,
+        ]
+
+        while True:
+            scheduler.run_pending()
+            time.sleep(0.2)
+            job_info = self.job_controller.get_job_info(
+                job_id=job_data[0], job_index=job_data[1]
+            )
+            if job_info.state.value not in running_states:
+                return True
+            if max_seconds and time.time() - t0 > max_seconds:
+                if raise_at_timeout:
+                    raise RuntimeError(
+                        "Could execute the job within the selected amount of time"
+                    )
+                else:
+                    return False
 
     def _get_limited_worker_query(self, states: list[str]) -> dict | None:
         """
@@ -349,7 +496,7 @@ class Runner:
 
         return None
 
-    def advance_state(self, states: list[str]):
+    def advance_state(self, states: list[str], filter: dict | None = None):
         """
         Acquire the lock and advance the state of a single job.
 
@@ -373,6 +520,8 @@ class Runner:
                     return
             else:
                 query = {"state": {"$in": states}}
+            if filter:
+                query.update(filter)
 
             with self.job_controller.lock_job_for_update(
                 query=query,
@@ -651,7 +800,7 @@ class Runner:
             err_msg = "the parsed output does not contain the required information to complete the job"
             raise RemoteError(err_msg, True)
 
-    def check_run_status(self):
+    def check_run_status(self, filter: dict | None = None):
         """
         Check the status of all the jobs submitted to a queue.
 
@@ -661,12 +810,14 @@ class Runner:
         """
         logger.debug("check_run_status")
         # check for jobs that could have changed state
-        workers_ids_docs = defaultdict(dict)
+        workers_ids_docs: dict = defaultdict(dict)
         db_filter = {
             "state": {"$in": [JobState.SUBMITTED.value, JobState.RUNNING.value]},
             "lock_id": None,
             "remote.retry_time_limit": {"$not": {"$gt": datetime.utcnow()}},
         }
+        if filter:
+            db_filter.update(filter)
         projection = [
             "db_id",
             "uuid",

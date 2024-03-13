@@ -118,6 +118,7 @@ class DaemonStatus(Enum):
     STOPPED = "STOPPED"
     STOPPING = "STOPPING"
     PARTIALLY_RUNNING = "PARTIALLY_RUNNING"
+    STARTING = "STARTING"
     RUNNING = "RUNNING"
 
 
@@ -224,7 +225,7 @@ class DaemonManager:
                 logger.warning(
                     f"Process with pid {pid} is not running but daemon files are present. Cleaning them up."
                 )
-            self.clean_files()
+                self.clean_files()
 
         return running
 
@@ -258,7 +259,10 @@ class DaemonManager:
             )
 
         if all(pi.get("state") in RUNNING_STATES for pi in proc_info):
-            return DaemonStatus.RUNNING
+            if any(pi.get("state") == ProcessStates.STARTING for pi in proc_info):
+                return DaemonStatus.STARTING
+            else:
+                return DaemonStatus.RUNNING
 
         if any(pi.get("state") in RUNNING_STATES for pi in proc_info):
             return DaemonStatus.PARTIALLY_RUNNING
@@ -483,12 +487,31 @@ class DaemonManager:
         return None
 
     def kill(self, raise_on_error: bool = False) -> bool:
-        status = self.check_status()
-        if status == DaemonStatus.SHUT_DOWN:
-            logger.info("supervisord is not running. No process is running")
-            return True
+        # If the daemon is shutting down supervisord may not be able to identify
+        # the state. Try proceeding in that case, since we really want to kill
+        # the process
+        status = None
+        try:
+            status = self.check_status()
+            if status == DaemonStatus.SHUT_DOWN:
+                logger.info("supervisord is not running. No process is running")
+                return True
+            if status == DaemonStatus.STOPPED:
+                logger.info("Processes are already stopped.")
+                return True
+        except DaemonError as e:
+            msg = (
+                f"Error while determining the state of the runner: {getattr(e, 'message', str(e))}."
+                f"Proceeding with the kill command."
+            )
+            logger.warning(msg)
 
-        if status in (DaemonStatus.RUNNING, DaemonStatus.STOPPING):
+        if status in (
+            None,
+            DaemonStatus.RUNNING,
+            DaemonStatus.STOPPING,
+            DaemonStatus.PARTIALLY_RUNNING,
+        ):
             interface = self.get_interface()
             result = interface.supervisor.signalAllProcesses(9)
             error = self._verify_call_result(result, "kill", raise_on_error)
