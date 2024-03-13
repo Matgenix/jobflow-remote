@@ -372,7 +372,7 @@ class Runner:
             JobState.BATCH_SUBMITTED.value,
         ]
         query = {"state": {"$in": running_states}}
-        jobs_available = True
+        jobs_available = 1
         while jobs_available:
             scheduler.run_pending()
             time.sleep(0.2)
@@ -385,7 +385,7 @@ class Runner:
     def run_one_job(
         self,
         db_id: str | None = None,
-        job_id: tuple[str, str] | None = None,
+        job_id: tuple[str, int] | None = None,
         max_seconds: int | None = None,
         raise_at_timeout: bool = True,
     ) -> bool:
@@ -405,7 +405,7 @@ class Runner:
         scheduler = SafeScheduler(seconds_after_failure=120)
 
         t0 = time.time()
-        query = {}
+        query: dict = {}
         if db_id:
             query["db_id"] = db_id
         if job_id:
@@ -414,12 +414,12 @@ class Runner:
         job_data = self.job_controller.checkout_job(query=query)
         if not job_data:
             if not db_id and not job_id:
-                return None
+                return False
             elif not db_id:
                 job_data = job_id
             else:
                 j_info = self.job_controller.get_job_info(db_id=db_id)
-                job_data = [j_info.uuid, j_info.index]
+                job_data = (j_info.uuid, j_info.index)
 
         filter = {"uuid": job_data[0], "index": job_data[1]}
         self.advance_state(states)
