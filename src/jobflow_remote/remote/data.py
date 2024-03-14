@@ -39,7 +39,6 @@ def get_remote_in_file(job, remote_store):
         {"job": job, "store": remote_store},
         strict=True,
         allow_bson=True,
-        enum_values=True,
     )
     return io.BytesIO(orjson.dumps(d, default=default_orjson_serializer))
 
