@@ -38,10 +38,24 @@ procedure should not expose any sensitive information, you should consider if it
 against the security policies of the computing center you are working with.
 
 In order to deal with this kind of configuration, first set up the worker that
-requires an OTP in the standard way, as shown in the : ref:`projectconf worker` section.
+requires an OTP in the standard way, as shown in the :ref:`projectconf worker` section.
 Then, set the option ``interactive_login: true`` in the worker configuration.
 This will signal to the system that interaction from the user is required during the
 opening of the connection.
+
+In addition to the ``interactive_login`` option, there are two different use cases
+that should be handled separately by the user in the configuration:
+
+#. The connection requires **ssh key+OTP**: the ssh key **should be defined explicitly**
+   either in the ``~/.ssh/config`` file that defines the connection to the host, or
+   in the configuration of the worker (using the ``key_filename`` option).
+#. The connection requires **password+OTP**: no ssh key should be present in the
+   configuration files.
+
+.. warning::
+
+    The rest of the procedure is independent of which option is being used, but it
+    is crucial to properly define the options for the ssh key, depending on the use case.
 
 When starting the runner, the daemon should also be told that the user needs to
 input some information during the connection. The runner should thus be started with::
