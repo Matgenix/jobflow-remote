@@ -129,8 +129,8 @@ def test_kill_one_process(job_controller, daemon_manager, caplog):
     assert daemon_manager.start(raise_on_error=True, single=False)
     _wait_daemon_started(daemon_manager)
 
-    processes_info = daemon_manager.get_processes_info()
-    run_jobflow_queue_pid = processes_info["run_jobflow_queue"]["pid"]
+    procs_info = daemon_manager.get_processes_info()
+    run_jobflow_queue_pid = procs_info["runner_daemon_queue:run_jobflow_queue"]["pid"]
 
     # directly kill the supervisord process
     os.kill(run_jobflow_queue_pid, signal.SIGKILL)
