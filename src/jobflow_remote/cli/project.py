@@ -15,6 +15,7 @@ from jobflow_remote.cli.utils import (
     exit_with_error_msg,
     exit_with_warning_msg,
     get_config_manager,
+    hide_progress,
     loading_spinner,
     out_console,
     print_success_msg,
@@ -189,8 +190,12 @@ def check(
         task_id = progress.add_task("Checking")
         for worker_name in workers_to_test:
             progress.update(task_id, description=f"Checking worker {worker_name}")
-            worker = project.workers[worker_name]
-            err = check_worker(worker)
+            worker_to_test = project.workers[worker_name]
+            if worker_to_test.get_host().interactive_login:
+                with hide_progress(progress):
+                    err = check_worker(worker_to_test)
+            else:
+                err = check_worker(worker_to_test)
             header = tick
             if err:
                 errors.append((f"Worker {worker_name}", err))
