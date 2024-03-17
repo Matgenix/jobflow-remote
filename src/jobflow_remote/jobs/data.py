@@ -59,7 +59,7 @@ def get_initial_job_doc_dict(
     worker = job.config.manager_config.get("worker") or worker
 
     job_doc = JobDoc(
-        job=jsanitize(job, strict=True, enum_values=True),
+        job=jsanitize(job, strict=True),
         uuid=job.uuid,
         index=job.index,
         db_id=db_id,
@@ -314,7 +314,6 @@ class FlowDoc(BaseModel):
             self.model_dump(mode="python"),
             strict=True,
             allow_bson=True,
-            enum_values=True,
         )
         return d
 
