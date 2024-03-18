@@ -15,10 +15,10 @@ def test_project_init(random_project_name):
     assert len(cm.projects) == 1
     assert cm.projects[random_project_name]
     project = cm.get_project()
-    assert len(project.workers) == 2
+    assert len(project.workers) == 3
 
 
-def test_paramiko_ssh_connection(job_controller, slurm_ssh_port):
+def test_paramiko_ssh_connection(slurm_ssh_port):
     from paramiko import SSHClient
     from paramiko.client import WarningPolicy
 
@@ -27,6 +27,22 @@ def test_paramiko_ssh_connection(job_controller, slurm_ssh_port):
     client.connect(
         "localhost",
         port=slurm_ssh_port,
+        username="jobflow",
+        password="jobflow",
+        look_for_keys=False,
+        allow_agent=False,
+    )
+
+
+def test_paramiko_ssh_mfa_connection(slurm_ssh_mfa_port):
+    from paramiko import SSHClient
+    from paramiko.client import WarningPolicy
+
+    client = SSHClient()
+    client.set_missing_host_key_policy(WarningPolicy)
+    client.connect(
+        "localhost",
+        port=slurm_ssh_mfa_port,
         username="jobflow",
         password="jobflow",
         look_for_keys=False,
@@ -43,6 +59,7 @@ def test_project_check(job_controller, capsys):
     expected = [
         "✓ Worker test_local_worker",
         "✓ Worker test_remote_worker",
+        "✓ Worker test_remote_worker_mfa",
         "✓ Jobstore",
         "✓ Queue store",
     ]
@@ -52,7 +69,7 @@ def test_project_check(job_controller, capsys):
 
 @pytest.mark.parametrize(
     "worker",
-    ["test_local_worker", "test_remote_worker"],
+    ["test_local_worker", "test_remote_worker", "test_remote_worker_mfa"],
 )
 def test_submit_flow(worker, job_controller):
     from jobflow import Flow
@@ -90,7 +107,7 @@ def test_submit_flow(worker, job_controller):
 
 @pytest.mark.parametrize(
     "worker",
-    ["test_local_worker", "test_remote_worker"],
+    ["test_local_worker", "test_remote_worker", "test_remote_worker_mfa"],
 )
 def test_submit_flow_with_dependencies(worker, job_controller):
     from jobflow import Flow
@@ -136,7 +153,7 @@ def test_submit_flow_with_dependencies(worker, job_controller):
 
 @pytest.mark.parametrize(
     "worker",
-    ["test_local_worker", "test_remote_worker"],
+    ["test_local_worker", "test_remote_worker", "test_remote_worker_mfa"],
 )
 def test_job_with_callable_kwarg(worker, job_controller):
     """Test whether a callable can be successfully provided as a keyword
@@ -180,7 +197,7 @@ def test_job_with_callable_kwarg(worker, job_controller):
 
 @pytest.mark.parametrize(
     "worker",
-    ["test_local_worker", "test_remote_worker"],
+    ["test_local_worker", "test_remote_worker", "test_remote_worker_mfa"],
 )
 def test_expected_failure(worker, job_controller):
     from jobflow import Flow
@@ -209,7 +226,7 @@ def test_expected_failure(worker, job_controller):
 
 @pytest.mark.parametrize(
     "worker",
-    ["test_local_worker", "test_remote_worker"],
+    ["test_local_worker", "test_remote_worker", "test_remote_worker_mfa"],
 )
 def test_exec_config(worker, job_controller, random_project_name):
     """Tests that an environment variable set in the exec config
