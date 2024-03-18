@@ -91,7 +91,7 @@ class ConfigManager:
 
         projects_data: dict[str, ProjectData] = {}
         for ext in self.projects_ext:
-            for filepath in glob.glob(str(self.projects_folder / f"*.{ext}")):
+            for filepath in self.projects_folder.glob(str(f"*.{ext}")):
                 try:
                     if ext in ["json", "yaml"]:
                         d = loadfn(filepath)

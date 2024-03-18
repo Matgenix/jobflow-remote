@@ -168,7 +168,7 @@ def check(
     """
     check_incompatible_opt({"jobstore": jobstore, "queue": queue, "worker": worker})
 
-    cm = ConfigManager(warn=True)
+    cm = get_config_manager()
     project = cm.get_project()
 
     check_all = all(not v for v in (jobstore, worker, queue))
