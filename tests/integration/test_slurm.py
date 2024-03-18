@@ -35,19 +35,15 @@ def test_paramiko_ssh_connection(job_controller, slurm_ssh_port):
 
 
 def test_project_check(job_controller, capsys):
-    from jobflow_remote.cli.project import check
+    from jobflow_remote.testing.cli import run_check_cli
 
-    check(print_errors=True)
-    captured = capsys.readouterr()
-    assert not captured.err
     expected = [
         "✓ Worker test_local_worker",
         "✓ Worker test_remote_worker",
         "✓ Jobstore",
         "✓ Queue store",
     ]
-    for line in expected:
-        assert line in captured.out
+    run_check_cli(["project", "check"], required_out=expected)
 
 
 @pytest.mark.parametrize(
