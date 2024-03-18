@@ -7,7 +7,6 @@ from jobflow_remote.cli.jfr_typer import JFRTyper
 from jobflow_remote.cli.utils import (
     cleanup_job_controller,
     complete_profiling,
-    exit_with_error_msg,
     get_config_manager,
     initialize_config_manager,
     out_console,
@@ -87,11 +86,6 @@ def main(
     initialize_config_manager()
     cm = get_config_manager()
     if project:
-        if project not in cm.projects_data:
-            exit_with_error_msg(
-                f"Project {project} is not defined in {SETTINGS.projects_folder}"
-            )
-
         SETTINGS.project = project
 
     try:
