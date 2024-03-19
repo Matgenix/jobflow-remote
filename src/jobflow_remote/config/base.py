@@ -111,6 +111,13 @@ class LogLevel(str, Enum):
 
 
 class BatchConfig(BaseModel):
+    """
+    Configuration for execution of batch jobs.
+
+    Allows to execute multiple Jobs in a single process executed on the
+    worker (e.g. SLURM job).
+    """
+
     jobs_handle_dir: Path = Field(
         description="Absolute path to a folder that will be used to store information to share with the jobs being executed"
     )
@@ -524,7 +531,7 @@ class Project(BaseModel):
     )
     queue: QueueConfig = Field(
         description="The configuration of the Store used to store the states of"
-        "the Jobs and the Flows",
+        " the Jobs and the Flows",
     )
     exec_config: dict[str, ExecutionConfig] = Field(
         default_factory=dict,
