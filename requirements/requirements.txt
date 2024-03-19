@@ -2,7 +2,7 @@ jobflow==0.1.17
 pydantic==2.6.1
 fabric==3.2.2
 tomlkit==0.12.3
-qtoolkit==0.1.3
+qtoolkit==0.1.4
 typer==0.9.0
 rich==13.7.0
 psutil==5.9.8
