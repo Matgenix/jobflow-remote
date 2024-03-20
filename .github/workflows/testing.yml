@@ -2,40 +2,55 @@ name: testing
 
 on:
   push:
+    branches:
+    - develop
 
   pull_request:
-    branches: [main]
+
+# Cancel running workflows when additional changes are pushed
+# https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#example-using-a-fallback-value
+concurrency:
+  group: ${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
 
 jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v4
+      - uses: actions/setup-python@v5
         with:
-          python-version: '3.8'
+          python-version: '3.9'
           cache: pip
           cache-dependency-path: pyproject.toml
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install .[strict,tests,dev]
+          pip install -r requirements/requirements.txt
+          pip install .[dev]
 
       - name: Lint
         run: pre-commit run --all-files --show-diff-on-failure
 
   test:
+    services:
+      local_mongodb:
+        image: mongo:4.4
+        ports:
+          - 27017:27017
+
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
-        python-version: ['3.8', '3.9', '3.10', '3.11']
+        python-version: ['3.9', '3.10', '3.11']
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
@@ -44,27 +59,48 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-            pip install .[strict,tests,docs]
+          pip install -r requirements/requirements.txt
+          pip install .[tests]
 
-      - name: Test
-        run: pytest --cov=jobflow_remote --cov-report=xml
+      - name: Unit tests
+        run: pytest --cov=jobflow_remote --cov-report=xml --cov-config pyproject.toml --ignore tests/integration
+
+      - name: Integration tests
+        run: pytest --cov=jobflow_remote --cov-append --cov-report=xml --cov-config pyproject.toml tests/integration
+
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v4
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
   docs:
+    name: Build documentation
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        submodules: true
+        fetch-depth: 0
 
-      - uses: actions/setup-python@v4
-        with:
-          python-version: '3.11'
-          cache: pip
-          cache-dependency-path: pyproject.toml
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
 
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install .[strict,docs]
+    - name: Install docs dependencies
+      run: |
+        python -m pip install -U pip
+        pip install -U setuptools wheel
+        # Required to generate rst files from markdown
+        sudo apt install pandoc
+        pip install -r requirements/requirements.txt
+        pip install .[docs]
 
-      - name: Build
-        run: jupyter-book build docs --path-output docs_build
+    - name: Build Sphinx docs
+      working-directory: doc
+      run: |
+        # cannot use sphinx build directly as the makefile handles generation
+        # of some rst files
+        make html

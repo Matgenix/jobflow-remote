@@ -15,4 +15,3 @@ repository_namespace: Matgenix
 repository_provider: https://github.com/
 short_description: jobflow-remote is a python package to run jobflow workflows on
     remote resources
-

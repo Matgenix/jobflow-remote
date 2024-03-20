@@ -1,0 +1,4 @@
+getting_started.svg: https://www.svgrepo.com/svg/393367/rocket (PD Licence)
+user_guide.svg: https://www.svgrepo.com/svg/75531/user-guide (CC0 Licence)
+api.svg: https://www.svgrepo.com/svg/157898/gears-configuration-tool (CC0 Licence)
+contributor.svg: https://www.svgrepo.com/svg/57189/code-programing-symbol (CC0 Licence)

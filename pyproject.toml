@@ -1,10 +1,10 @@
 [build-system]
-requires = ["setuptools >= 42", "versioningit ~= 1.0", "wheel"]
+requires = ["setuptools >= 42", "versioningit  ~=  1.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "jobflow_remote"
-description = "jobflow-remote is a python package to run jobflow workflows on remote resources"
+name = "jobflow-remote"
+description = "Jobflow Remote is a Python package to run jobflow workflows on remote resources"
 readme = "README.md"
 keywords = []
 license = { text = "modified BSD" }
@@ -12,7 +12,6 @@ authors = [{ name = "Guido Petretto", email = "guido.petretto@matgenix.com" }]
 dynamic = ["version"]
 classifiers = [
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
@@ -24,29 +23,48 @@ classifiers = [
     "Topic :: Other/Nonlisted Topic",
     "Topic :: Scientific/Engineering",
 ]
-requires-python = ">=3.8"
-dependencies =[]
+requires-python = ">=3.9"
+dependencies =[
+    "jobflow >= 0.1.14",
+    "pydantic ~= 2.4",
+    "fabric ~= 3.2",
+    "tomlkit ~= 0.12",
+    "qtoolkit ~= 0.1, >= 0.1.4",
+    "typer ~= 0.9",
+    "rich ~= 13.7",
+    "psutil ~= 5.9",
+    "supervisor ~= 4.2",
+    "ruamel.yaml ~= 0.17",
+    "schedule ~= 1.2",
+    "flufl.lock ~= 8.0"
+]
 
 [project.optional-dependencies]
 dev = [
     "pre-commit>=3.0.0",
 ]
 tests = [
-    "pytest==7.2.1",
-    "pytest-cov==4.0.0",
-    ]
-maintain = [
-    "git-changelog>=0.6",
+    "pytest ~= 8.0",
+    "pytest-cov ~= 4.0",
+    "docker ~= 7.0",
 ]
-strict = []
+docs = [
+    "sphinx",
+    "sphinx_design",
+    "pydata-sphinx-theme",
+    "sphinx-copybutton",
+    "autodoc_pydantic>=2.0.0",
+    "sphinxcontrib-mermaid"
+]
 
 [project.scripts]
+jf = "jobflow_remote.cli.jf:app"
 
 [project.urls]
-homepage = "https://Matgenix.github.io/jobflow_remote/"
-repository = "https://github.com/Matgenix/jobflow_remote"
-documentation = "https://Matgenix.github.io/jobflow_remote/"
-changelog = "https://github.com/Matgenix/jobflow_remote/CHANGELOG.md"
+homepage = "https://Matgenix.github.io/jobflow-remote/"
+repository = "https://github.com/Matgenix/jobflow-remote"
+documentation = "https://Matgenix.github.io/jobflow-remote/"
+changelog = "https://matgenix.github.io/jobflow-remote/changelog"
 
 [tool.setuptools.package-data]
 jobflow_remote = ["py.typed"]
@@ -63,13 +81,25 @@ max-line-length = 88
 max-doc-length = 88
 select = "C, E, F, W, B"
 extend-ignore = "E203, W503, E501, F401, RST21"
-min-python-version = "3.8.0"
+min-python-version = "3.9.0"
 docstring-convention = "numpy"
 rst-roles = "class, func, ref, obj"
 
 [tool.mypy]
 ignore_missing_imports = true
-no_strict_optional = true
+strict_optional = false
+plugins = "pydantic.mypy"
+follow_imports = "skip"
+warn_redundant_casts = true
+warn_unused_ignores = true
+check_untyped_defs = false
+no_implicit_reexport = true
+disallow_untyped_defs = false
+
+[tool.pydantic-mypy]
+init_forbid_extra = true
+init_typed = true
+warn_required_dynamic_aliases = true
 
 [tool.pytest.ini_options]
 filterwarnings = [
