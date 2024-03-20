@@ -1,5 +1,24 @@
 # Changelog
 
+## [v0.1.1](https://github.com/Matgenix/jobflow-remote/tree/v0.1.1) (2024-03-19)
+
+[Full Changelog](https://github.com/Matgenix/jobflow-remote/compare/v0.1.0...v0.1.1)
+
+**Closed issues:**
+
+- Two projects, job submission [\#89](https://github.com/Matgenix/jobflow-remote/issues/89)
+- Add guard for missing `additional_store` before executing job [\#76](https://github.com/Matgenix/jobflow-remote/issues/76)
+- PyPI release checklist [\#53](https://github.com/Matgenix/jobflow-remote/issues/53)
+
+**Merged pull requests:**
+
+- Tests and updates [\#92](https://github.com/Matgenix/jobflow-remote/pull/92) ([gpetretto](https://github.com/gpetretto))
+- Add options for remote JobStore [\#88](https://github.com/Matgenix/jobflow-remote/pull/88) ([gpetretto](https://github.com/gpetretto))
+- Updates [\#87](https://github.com/Matgenix/jobflow-remote/pull/87) ([gpetretto](https://github.com/gpetretto))
+- Interactive login for MFA [\#83](https://github.com/Matgenix/jobflow-remote/pull/83) ([gpetretto](https://github.com/gpetretto))
+- Add testing and runtime checks for additional stores [\#59](https://github.com/Matgenix/jobflow-remote/pull/59) ([ml-evs](https://github.com/ml-evs))
+- Remove errant `__init__.py` that prevents mypy from working [\#54](https://github.com/Matgenix/jobflow-remote/pull/54) ([ml-evs](https://github.com/ml-evs))
+
 ## [v0.1.0](https://github.com/Matgenix/jobflow-remote/tree/v0.1.0) (2024-02-05)
 
 [Full Changelog](https://github.com/Matgenix/jobflow-remote/compare/5cdc90eea80bada88c0b565fcc0bc4c70574f5ec...v0.1.0)
