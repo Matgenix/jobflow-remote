@@ -2556,6 +2556,8 @@ class JobController:
                     worker=worker,
                     exec_config=exec_config,
                     resources=resources,
+                    project=self.project,
+                    profiles=self.project.profiles,
                 )
             )
 
@@ -2652,6 +2654,8 @@ class JobController:
                     worker=worker,
                     exec_config=exec_config,
                     resources=resources,
+                    project=self.project,
+                    profiles=self.project.profiles,
                 )
             )
             flow_updates["$set"][f"parents.{job.uuid}.{job.index}"] = parents

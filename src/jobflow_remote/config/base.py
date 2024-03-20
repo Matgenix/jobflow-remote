@@ -492,6 +492,21 @@ class QueueConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class ProfileOptions(BaseModel):
+    """
+    Options for a single profile
+    """
+
+    worker: Optional[str] = Field(None, description="The name of a defined worker")
+    exec_config: Optional[str] = Field(
+        None, description="The name of a defined execution configuration"
+    )
+    resources: Optional[dict] = Field(
+        None,
+        description="A dictionary defining the resources requested to the scheduler",
+    )
+
+
 class Project(BaseModel):
     """
     The configurations of a Project.
@@ -548,6 +563,9 @@ class Project(BaseModel):
         None,
         description="The JobStore used for the data transfer between the Runner"
         "and the workers. Can be a string with the standard values",
+    )
+    profiles: Optional[dict[str, ProfileOptions]] = Field(
+        None, description="A dictionary with options associated to jobflow profiles"
     )
     metadata: Optional[dict] = Field(
         None, description="A dictionary with metadata associated to the project"
@@ -637,6 +655,21 @@ class Project(BaseModel):
                     f"error while converting jobstore to JobStore. Error: {traceback.format_exc()}"
                 ) from e
         return jobstore
+
+    @field_validator("profiles")
+    def check_profiles(cls, profiles: dict, values):
+        if profiles:
+            for prof_name, d in profiles.items():
+
+                if d.worker and d.worker not in values.data["workers"]:
+                    raise ValueError(
+                        f"The worker {d.worker} used for profile {prof_name} is not defined"
+                    )
+                if d.exec_config and d.exec_config not in values.data["exec_config"]:
+                    raise ValueError(
+                        f"The execution configuration {d.exec_config} used for profile {prof_name} is not defined"
+                    )
+        return profiles
 
     model_config = ConfigDict(extra="forbid")
 

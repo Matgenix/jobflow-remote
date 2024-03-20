@@ -9,7 +9,7 @@ from monty.json import jsanitize
 from pydantic import BaseModel, Field
 from qtoolkit.core.data_objects import QResources, QState
 
-from jobflow_remote.config.base import ExecutionConfig
+from jobflow_remote.config.base import ExecutionConfig, ProfileOptions, Project
 from jobflow_remote.jobs.state import FlowState, JobState
 
 IN_FILENAME = "jfremote_in.json"
@@ -23,6 +23,8 @@ def get_initial_job_doc_dict(
     worker: str,
     exec_config: Optional[ExecutionConfig],
     resources: Optional[Union[dict, QResources]],
+    project: Project,
+    profiles: Optional[dict[str, ProfileOptions]] = None,
 ) -> dict:
     """
     Generate an instance of JobDoc for initial insertion in the DB.
@@ -48,11 +50,28 @@ def get_initial_job_doc_dict(
     """
     from monty.json import jsanitize
 
+    job_profiles = job.profiles or []
+    profile_config = None
+    for profile_name in job_profiles:
+        if profile_name in profiles:
+            profile_config = profiles[profile_name]
+            break
+
+    # If a profile is defined, override the specific values passed.
+    # The profile does not override values specifically set on a Job
+    if profile_config:
+        if profile_config.worker is not None:
+            worker = profile_config.worker
+        if profile_config.exec_config is not None:
+            exec_config = Project.exec_config[profile_config.exec_config]
+        if profile_config.resources is not None:
+            resources = profile_config.resources
     # take the resources either from the job, if they are defined
     # (they can be defined dynamically by the update_config) or the
     # defined value
     # Since  the resources can be dictionaries also allow to be an empty
     # dictionary.
+
     config_resources = job.config.manager_config.get("resources")
     job_resources = config_resources if config_resources is not None else resources
     job_exec_config = job.config.manager_config.get("exec_config") or exec_config
