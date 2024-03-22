@@ -688,7 +688,7 @@ def resources(
             "comma separated key=value pairs or a string with the JSON "
             "representation of a dictionary "
             '(e.g \'{"key1.key2": 1, "key3": "test"}\')',
-            metavar="EXEC_CONFIG",
+            metavar="RESOURCES",
         ),
     ],
     replace: Annotated[

@@ -315,7 +315,8 @@ Locked Jobs can be identified in the job list using the ``-v`` or ``-vv`` option
 
 which will give the following output, including the ``Locked`` column:
 
-                                                                                      Jobs info
+.. parsed-literal::
+
     ┏━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━┓
     ┃ DB id ┃ Name      ┃ State    ┃ Job id  (Index)                           ┃ Worker      ┃ Last updated [CET] ┃ Queue id ┃ Run time ┃ Retry time [CET] ┃ Prev state ┃ Locked ┃
     ┡━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━┩
