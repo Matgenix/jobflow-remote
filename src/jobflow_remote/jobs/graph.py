@@ -38,9 +38,11 @@ def get_graph_elements(flow: FlowInfo):
     ids_mapping = flow.ids_mapping
 
     nodes = {}
+    hosts = {}
     for job_prop in flow.iter_job_prop():
         db_id = job_prop["db_id"]
         nodes[db_id] = job_prop
+        hosts[job_prop["db_id"]] = job_prop["hosts"]
 
     # edges based on parents
     edges = []
@@ -49,28 +51,32 @@ def get_graph_elements(flow: FlowInfo):
             for parent_node in ids_mapping[parent_uuid].values():
                 edges.append((parent_node, child_node))
 
-    # group of nodes based on hosts
-    # from collections import defaultdict
-    # groups = defaultdict(list)
-    hosts = {}
-    # for job_prop in flow.iter_job_prop():
-    #     for host in job_prop["hosts"]:
-    #         groups[host].append(job_prop["db_id"])
-    for job_prop in flow.iter_job_prop():
-        hosts[job_prop["db_id"]] = job_prop["hosts"]
+    # connections between replacements
+    replace_edges = []
+    for _, d in flow.ids_mapping.items():
+        # skip index 1
+        for job_index in sorted(d.keys())[1:]:
+            job_db_id = d[job_index]
+            previous_index_db_id = d[job_index - 1]
+            # likely never entering here, because if a single job is used as a
+            # "replace" it still goes through a get_flow in jobflow in prepare_replace.
+            if hosts[job_db_id][0] == hosts[previous_index_db_id][0]:
+                replace_edges.append((previous_index_db_id, job_db_id))
+            else:
+                replace_edges.append((previous_index_db_id, hosts[job_db_id][0]))
 
-    return nodes, edges, hosts
+    return nodes, edges, hosts, replace_edges
 
 
 def plot_dash(flow: FlowInfo):
-    nodes, edges, hosts = get_graph_elements(flow)
+    nodes, edges, hosts, replace_edges = get_graph_elements(flow)
 
     import dash_cytoscape as cyto
     from dash import Dash, Input, Output, callback, html
 
     app = Dash(f"{flow.name} - {flow.flow_id}")
 
-    elements = []
+    elements: list[dict] = []
 
     # parent elements
     hosts_hierarchy = {}
@@ -102,6 +108,14 @@ def plot_dash(flow: FlowInfo):
     for edge in edges:
         elements.append({"data": {"source": str(edge[0]), "target": str(edge[1])}})
 
+    for edge in replace_edges:
+        elements.append(
+            {
+                "data": {"source": str(edge[0]), "target": str(edge[1])},
+                "classes": "dashed",
+            }
+        )
+
     stylesheet: list[dict] = [
         {
             "selector": f'[state = "{state}"]',
@@ -126,6 +140,15 @@ def plot_dash(flow: FlowInfo):
                 "background-opacity": 0.2,
                 "background-color": "#2B65EC",
                 "border-color": "#2B65EC",
+            },
+        }
+    )
+
+    stylesheet.append(
+        {
+            "selector": ".dashed",
+            "style": {
+                "line-style": "dashed",
             },
         }
     )
@@ -155,7 +178,7 @@ def plot_dash(flow: FlowInfo):
 
 
 def get_mermaid(flow: FlowInfo, show_subflows: bool = True):
-    nodes, edges, hosts = get_graph_elements(flow)
+    nodes, edges, hosts, replace_edges = get_graph_elements(flow)
     from monty.collections import tree
 
     hosts_hierarchy = tree()
@@ -182,6 +205,11 @@ def get_mermaid(flow: FlowInfo, show_subflows: bool = True):
         )
         lines.append(line)
 
+    # add replace edges
+    for parent_db_id, child_id in replace_edges:
+        line = f"    {parent_db_id} -.-> {child_id}"
+        lines.append(line)
+
     subgraph_styles = []
 
     # add subgraphs
@@ -196,7 +224,7 @@ def get_mermaid(flow: FlowInfo, show_subflows: bool = True):
             if subhosts:
                 if indent_level > 0 and show_subflows:
                     # don't  put any title
-                    lines.append(f"{prefix}subgraph {ref_id}['']")
+                    lines.append(f"{prefix}subgraph {ref_id}[ ]")
                     subgraph_styles.append(
                         f"    style {ref_id} fill:#2B65EC,opacity:0.2"
                     )
