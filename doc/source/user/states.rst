@@ -159,7 +159,6 @@ to intermediate or final error states.
         DOWNLOADED --> COMPLETED
         DOWNLOADED --> FAILED
 
-        READY --> REMOTE_ERROR
         CHECKED_OUT --> REMOTE_ERROR
         UPLOADED --> REMOTE_ERROR
         SUBMITTED --> REMOTE_ERROR

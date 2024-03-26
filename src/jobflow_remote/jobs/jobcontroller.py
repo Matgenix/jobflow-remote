@@ -2704,7 +2704,10 @@ class JobController:
 
         if flow_uuid is not None:
             # if flow uuid provided, only include job ids in that flow
-            job_uuids = self.get_flow_info_by_flow_uuid(flow_uuid, ["jobs"])["jobs"]
+            flow_out = self.get_flow_info_by_flow_uuid(flow_uuid, ["jobs"])
+            if not flow_out:
+                return None
+            job_uuids = flow_out["jobs"]
             query["uuid"] = {"$in": job_uuids}
 
         if sort is None:
