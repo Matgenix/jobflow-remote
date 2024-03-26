@@ -928,8 +928,12 @@ class Runner:
         logger.debug("checkout jobs")
         n_checked_out = 0
         while True:
-            reserved = self.job_controller.checkout_job()
-            if not reserved:
+            try:
+                reserved = self.job_controller.checkout_job()
+                if not reserved:
+                    break
+            except Exception:
+                logger.error("Error while checking out jobs", exc_info=True)
                 break
 
             n_checked_out += 1
