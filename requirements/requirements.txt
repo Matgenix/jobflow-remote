@@ -3,7 +3,7 @@ pydantic==2.6.4
 fabric==3.2.2
 tomlkit==0.12.4
 qtoolkit==0.1.4
-typer==0.9.0
+typer==0.11.0
 rich==13.7.1
 psutil==5.9.8
 supervisor==4.2.5
