@@ -884,7 +884,7 @@ class Runner:
                     # reset the step attempts if succeeding in case there was
                     # an error earlier. Setting the state to the same as the
                     # current triggers the update that cleans the state
-                    next_state = JobState(remote_doc["state"])
+                    next_state = JobState(doc["state"])
 
                 # the document needs to be updated only in case of error or if a
                 # next state has been set.
