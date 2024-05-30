@@ -842,7 +842,7 @@ class Runner:
 
             qjobs_dict = {}
             try:
-                ids_list = list(ids_docs.keys())
+                ids_list = list(ids_docs)
                 queue = self.get_queue_manager(worker_name)
                 qjobs = queue.get_jobs_list(ids_list)
                 qjobs_dict = {qjob.job_id: qjob for qjob in qjobs}
@@ -986,7 +986,7 @@ class Runner:
             # Check the processes that should be running on the remote queue
             # and update the state in the DB if something changed
             batch_processes_data = self.job_controller.get_batch_processes(worker_name)
-            processes = list(batch_processes_data.keys())
+            processes = list(batch_processes_data)
             queue_manager = self.get_queue_manager(worker_name)
             if processes:
                 qjobs = queue_manager.get_jobs_list(processes)

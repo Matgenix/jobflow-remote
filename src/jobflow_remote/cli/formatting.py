@@ -195,7 +195,7 @@ def get_exec_config_table(exec_config: dict[str, ExecutionConfig], verbosity: in
         table.add_column("export")
         table.add_column("pre_run")
         table.add_column("post_run")
-    for name in sorted(exec_config.keys()):
+    for name in sorted(exec_config):
         row = [Text(name, style="bold")]
         if verbosity > 0:
             ec = exec_config[name]
@@ -229,7 +229,7 @@ def get_worker_table(workers: dict[str, WorkerBase], verbosity: int = 0):
     elif verbosity > 1:
         table.add_column("details")
 
-    for name in sorted(workers.keys()):
+    for name in sorted(workers):
         row = [Text(name, style="bold")]
         worker = workers[name]
         if verbosity > 0:

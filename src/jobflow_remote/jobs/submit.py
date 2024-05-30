@@ -54,7 +54,7 @@ def submit_flow(
     if worker is None:
         if not proj_obj.workers:
             raise ConfigError("No workers configured for this project.")
-        worker = next(iter(proj_obj.workers.keys()))
+        worker = next(iter(proj_obj.workers))
 
     # try to load the worker and exec_config to check that the values are well defined
     config_manager.get_worker(worker_name=worker, project_name=project)

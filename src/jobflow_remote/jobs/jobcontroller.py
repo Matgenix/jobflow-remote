@@ -2047,10 +2047,10 @@ class JobController:
         # The single flow document is enough for basic information
         if full:
             # TODO reduce the projection to the bare minimum to reduce the amount of
-            # fecthed data?
+            # fetched data?
             projection = {f"jobs_list.{f}": 1 for f in projection_job_info}
             projection["jobs_list.job.hosts"] = 1
-            for k in FlowDoc.model_fields.keys():
+            for k in FlowDoc.model_fields:
                 projection[k] = 1
 
             data = self.get_flow_job_aggreg(

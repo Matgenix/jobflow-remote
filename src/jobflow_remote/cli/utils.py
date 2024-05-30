@@ -151,7 +151,7 @@ def check_at_least_one_opt(d: dict):
             not_none.append(k)
 
     if len(not_none) > 1:
-        options_list = ", ".join(d.keys())
+        options_list = ", ".join(d)
         exit_with_error_msg(
             f"At least one of the options {options_list} should be defined"
         )
@@ -164,7 +164,7 @@ def check_only_one_opt(d: dict):
             not_none.append(k)
 
     if len(not_none) != 1:
-        options_list = ", ".join(d.keys())
+        options_list = ", ".join(d)
         exit_with_error_msg(
             f"One and only one of the options {options_list} should be defined"
         )
