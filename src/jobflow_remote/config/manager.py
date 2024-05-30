@@ -131,9 +131,11 @@ class ConfigManager:
         project_name = project_name or SETTINGS.project
         if not project_name:
             if len(self.projects_data) == 1:
-                project_name = next(iter(self.projects_data.keys()))
+                project_name = next(iter(self.projects_data))
             else:
-                raise ProjectUndefined("A project name should be defined")
+                raise ProjectUndefined(
+                    f"A project name should be defined, known projects: {list(self.projects_data)}"
+                )
 
         return project_name
 
