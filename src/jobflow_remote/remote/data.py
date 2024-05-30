@@ -427,7 +427,7 @@ class MinimalFileStore(Store):
         Args:
             other: other JSONStore to compare with
         """
-        if not isinstance(other, self.__class__):
+        if not isinstance(other, type(self)):
             return False
 
         fields = ["path", "last_updated_field"]
