@@ -68,7 +68,7 @@ def list_projects(
     for pn in sorted(full_project_list):
         out_console.print(f" - {pn}", style="green" if pn == project_name else None)
 
-    not_parsed_projects = set(full_project_list).difference(cm.projects_data.keys())
+    not_parsed_projects = set(full_project_list).difference(cm.projects_data)
     if not_parsed_projects:
         out_console.print(
             "The following project names exist in files in the project folder, "
@@ -175,7 +175,7 @@ def check(
 
     workers_to_test: Iterable[str] = []
     if check_all:
-        workers_to_test = project.workers.keys()
+        workers_to_test = project.workers
     elif worker:
         if worker not in project.workers:
             exit_with_error_msg(

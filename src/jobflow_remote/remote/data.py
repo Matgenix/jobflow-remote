@@ -23,7 +23,7 @@ from monty.json import MontyDecoder, jsanitize
 from jobflow_remote.jobs.data import RemoteError
 from jobflow_remote.utils.data import uuid_to_path
 
-JOB_INIT_ARGS = {k for k in inspect.signature(Job).parameters.keys() if k != "kwargs"}
+JOB_INIT_ARGS = {k for k in inspect.signature(Job).parameters if k != "kwargs"}
 """A set of the arguments of the Job constructor which
 can be used to detect additional custom arguments
 """
@@ -61,13 +61,12 @@ def default_orjson_serializer(obj: Any) -> Any:
 def get_remote_store(
     store: JobStore, work_dir: str | Path, config_dict: dict | None
 ) -> JobStore:
-
     docs_store = get_single_store(
         config_dict=config_dict, file_name="remote_job_data", dir_path=work_dir
     )
 
     additional_stores = {}
-    for k in store.additional_stores.keys():
+    for k in store.additional_stores:
         additional_stores[k] = get_single_store(
             config_dict=config_dict,
             file_name=f"additional_store_{k}",
@@ -139,7 +138,7 @@ def get_remote_store_filenames(store: JobStore, config_dict: dict | None) -> lis
     filenames = [
         get_single_store_file_name(config_dict=config_dict, file_name="remote_job_data")
     ]
-    for k in store.additional_stores.keys():
+    for k in store.additional_stores:
         filenames.append(
             get_single_store_file_name(
                 config_dict=config_dict, file_name=f"additional_store_{k}"
@@ -169,8 +168,8 @@ def update_store(store: JobStore, remote_store: JobStore, db_id: int):
         store.connect()
         remote_store.connect()
 
-        additional_stores = set(store.additional_stores.keys())
-        additional_remote_stores = set(remote_store.additional_stores.keys())
+        additional_stores = set(store.additional_stores)
+        additional_remote_stores = set(remote_store.additional_stores)
 
         # This checks that the additional stores in the two stores match correctly.
         # It should not happen if not because of a bug, so the check could maybe be
@@ -278,11 +277,11 @@ def check_additional_stores(job: dict | Job, store: JobStore) -> list[str]:
         An empty list if no store is missing.
     """
     if isinstance(job, dict):
-        additional_store_names = set(job.keys()) - JOB_INIT_ARGS
+        additional_store_names = set(job) - JOB_INIT_ARGS
     else:
         # TODO expose the _kwargs attribute in jobflow through an
         # "additional_stores" property
-        additional_store_names = set(job._kwargs.keys())
+        additional_store_names = set(job._kwargs)
     missing_stores = []
     for store_name in additional_store_names:
         # Exclude MSON fields
@@ -436,7 +435,6 @@ class MinimalFileStore(Store):
 
 
 class MinimalORJSONStore(MinimalFileStore):
-
     @property
     def name(self) -> str:
         return f"json://{self.path}"
@@ -478,7 +476,6 @@ class MinimalORJSONStore(MinimalFileStore):
 
 
 class MinimalMsgspecJSONStore(MinimalFileStore):
-
     @property
     def name(self) -> str:
         return f"json://{self.path}"
@@ -535,7 +532,6 @@ def encode_datetime(obj):
 
 
 class MinimalMsgpackStore(MinimalFileStore):
-
     @property
     def name(self) -> str:
         return f"msgpack://{self.path}"
