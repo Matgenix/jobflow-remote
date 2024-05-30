@@ -10,7 +10,7 @@ def test_list_projects(job_controller, random_project_name, monkeypatch, tmp_dir
 
     # change project directory and test options there
     with monkeypatch.context() as m:
-        print(tmp_dir, tmp_dir.__class__)
+        print(tmp_dir, type(tmp_dir))
         m.setattr(SETTINGS, "projects_folder", os.getcwd())
         run_check_cli(["project", "list"], required_out="No project available in")
 
@@ -41,7 +41,7 @@ def test_generate(job_controller, random_project_name, monkeypatch, tmp_dir):
 
     # change project directory and test options there
     with monkeypatch.context() as m:
-        print(tmp_dir, tmp_dir.__class__)
+        print(tmp_dir, type(tmp_dir))
         m.setattr(SETTINGS, "projects_folder", os.getcwd())
         run_check_cli(
             ["project", "generate", "test_proj_1"],
@@ -81,7 +81,7 @@ def test_remove(job_controller, random_project_name, monkeypatch, tmp_dir):
 
     # change project directory and test options there
     with monkeypatch.context() as m:
-        print(tmp_dir, tmp_dir.__class__)
+        print(tmp_dir, type(tmp_dir))
         m.setattr(SETTINGS, "projects_folder", os.getcwd())
         cm = ConfigManager()
         run_check_cli(

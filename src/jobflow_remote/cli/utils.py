@@ -260,7 +260,7 @@ def cli_error_handler(func):
                 raise  # Reraise exceptions to print the full stacktrace
             else:
                 exit_with_error_msg(
-                    f"An Error occurred during the command execution: {e.__class__.__name__} {getattr(e, 'message', str(e))}"
+                    f"An Error occurred during the command execution: {type(e).__name__} {getattr(e, 'message', str(e))}"
                 )
 
     return wrapper

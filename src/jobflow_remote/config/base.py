@@ -485,7 +485,7 @@ class QueueConfig(BaseModel):
             if not isinstance(deserialized_store, MongoStore):
                 raise ValueError(
                     "The queue store should be a subclass of a "
-                    f"MongoStore: {deserialized_store.__class__} instead"
+                    f"MongoStore: {type(deserialized_store)} instead"
                 )
         return store
 
