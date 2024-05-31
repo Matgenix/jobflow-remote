@@ -100,7 +100,6 @@ def remove_lock(
     Forcibly removes the lock from the documents of the selected jobs.
     WARNING: can lead to inconsistencies if the processes is actually running
     """
-
     out_console.print(
         "remove-lock command has been DEPRECATED. Use unlock instead.",
         style="bold yellow",
@@ -129,7 +128,6 @@ def unlock(
     Forcibly removes the lock from the documents of the selected jobs.
     WARNING: can lead to inconsistencies if the processes is actually running
     """
-
     job_ids_indexes = get_job_ids_indexes(job_id)
 
     jc = get_job_controller()
@@ -188,7 +186,6 @@ def unlock_flow(
     Forcibly removes the lock from the documents of the selected jobs.
     WARNING: can lead to inconsistencies if the processes is actually running
     """
-
     job_ids_indexes = get_job_ids_indexes(job_id)
 
     jc = get_job_controller()

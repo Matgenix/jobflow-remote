@@ -25,7 +25,6 @@ def mongoclient():
     the CI or by developers with an accessible local DB). Otherwise, generate
     one with pymongo_inmemory, that should be installed.
     """
-
     import pymongo
 
     mc = pymongo.MongoClient(host="localhost", port=27017)
@@ -72,7 +71,6 @@ def write_tmp_settings(
     mongoclient,
 ):
     """Collects the various sub-configs and writes them to a temporary file in a temporary directory."""
-
     tmp_dir: Path = Path(tempfile.mkdtemp())
 
     os.environ["JFREMOTE_PROJECTS_FOLDER"] = str(tmp_dir.resolve())
@@ -163,7 +161,7 @@ def job_controller(random_project_name):
 
     jc = JobController.from_project_name(random_project_name)
     assert jc.reset()
-    yield jc
+    return jc
 
 
 @pytest.fixture(scope="function")
@@ -180,7 +178,7 @@ def one_job(random_project_name):
     flow = Flow([j])
     submit_flow(flow, worker="test_local_worker")
 
-    yield flow
+    return flow
 
 
 @pytest.fixture(scope="function")
@@ -215,4 +213,4 @@ def four_jobs(random_project_name):
 
     flows = [flow, flow2]
 
-    yield flows
+    return flows

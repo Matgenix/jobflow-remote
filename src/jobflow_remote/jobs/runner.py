@@ -187,6 +187,7 @@ class Runner:
         ----------
         worker_name
             The name of the worker.
+
         Returns
         -------
             An instance of the Host associated to the worker.
@@ -204,6 +205,7 @@ class Runner:
         ----------
         worker_name
             The name of the worker.
+
         Returns
         -------
              An instance of the QueueManager associated to the worker.
@@ -394,7 +396,6 @@ class Runner:
         The job should be in the READY state and there should be no
         Mainly used for testing
         """
-
         states = [
             JobState.CHECKED_OUT.value,
             JobState.TERMINATED.value,
@@ -469,6 +470,7 @@ class Runner:
         ----------
         states
             The states to be used in the query.
+
         Returns
         -------
             A dictionary with the query.
@@ -693,10 +695,10 @@ class Runner:
             )
 
             if submit_result.status == SubmissionStatus.FAILED:
-                err_msg = f"submission failed. {repr(submit_result)}"
+                err_msg = f"submission failed. {submit_result!r}"
                 raise RemoteError(err_msg, False)
             elif submit_result.status == SubmissionStatus.JOB_ID_UNKNOWN:
-                err_msg = f"submission succeeded but ID not known. Job may be running but status cannot be checked. {repr(submit_result)}"
+                err_msg = f"submission succeeded but ID not known. Job may be running but status cannot be checked. {submit_result!r}"
                 raise RemoteError(err_msg, True)
             elif submit_result.status == SubmissionStatus.SUCCESSFUL:
                 lock.update_on_release = {
@@ -1075,10 +1077,10 @@ class Runner:
                 )
 
                 if submit_result.status == SubmissionStatus.FAILED:
-                    logger.error(f"submission failed. {repr(submit_result)}")
+                    logger.error(f"submission failed. {submit_result!r}")
                 elif submit_result.status == SubmissionStatus.JOB_ID_UNKNOWN:
                     logger.error(
-                        f"submission succeeded but ID not known. Job may be running but status cannot be checked. {repr(submit_result)}"
+                        f"submission succeeded but ID not known. Job may be running but status cannot be checked. {submit_result!r}"
                     )
 
                 elif submit_result.status == SubmissionStatus.SUCCESSFUL:

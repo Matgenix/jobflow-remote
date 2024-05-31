@@ -41,6 +41,7 @@ def get_initial_job_doc_dict(
         The ExecutionConfig used for execution.
     resources
         The resources used to run the Job.
+
     Returns
     -------
     JobDoc
@@ -83,6 +84,7 @@ def get_initial_flow_doc_dict(flow: Flow, job_dicts: list[dict]) -> dict:
         The Flow used to generate the FlowDoc.
     job_dicts
         The dictionaries of the Jobs composing the Flow.
+
     Returns
     -------
     dict
@@ -187,6 +189,7 @@ class JobInfo(BaseModel):
         ----------
         d
             The dictionary with the queried data.
+
         Returns
         -------
         JobInfo

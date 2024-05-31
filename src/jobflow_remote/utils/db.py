@@ -41,7 +41,6 @@ class MongoLock:
 
     Examples
     --------
-
     Trying to acquire the lock on a document based on the state
     >>> with MongoLock(collection, {"state": "READY"}) as lock:
     ...     print(lock.locked_document["state"])

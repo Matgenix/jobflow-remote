@@ -120,7 +120,8 @@ def generate_dummy_queue() -> dict:
 def _check_workdir(worker: WorkerBase, host: BaseHost) -> str | None:
     """Check that the configured workdir exists or is writable on the worker.
 
-    Parameters:
+    Parameters
+    ----------
         worker: The worker configuration.
         host: A connected host.
 

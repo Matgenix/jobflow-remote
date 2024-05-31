@@ -212,7 +212,6 @@ def test_exec_config(worker, job_controller, random_project_name):
     is available to the job.
 
     """
-
     from jobflow_remote import submit_flow
     from jobflow_remote.jobs.runner import Runner
     from jobflow_remote.testing import check_env_var

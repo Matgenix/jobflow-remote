@@ -110,7 +110,6 @@ def generate(
     """
     Generate a project configuration file with dummy elements to be edited manually
     """
-
     cm = ConfigManager(exclude_unset=not full)
     if name in cm.projects_data:
         exit_with_error_msg(f"Project with name {name} already exists")
@@ -118,14 +117,12 @@ def generate(
     filepath = cm.projects_folder / f"{name}.{file_format.value}"
     if filepath.exists():
         exit_with_error_msg(
-            f"Project with name {name} does not exist, but file {str(filepath)} does and will not be overwritten"
+            f"Project with name {name} does not exist, but file {filepath!s} does and will not be overwritten"
         )
 
     project = generate_dummy_project(name=name, full=full)
     cm.create_project(project, ext=file_format.value)
-    print_success_msg(
-        f"Configuration file for project {name} created in {str(filepath)}"
-    )
+    print_success_msg(f"Configuration file for project {name} created in {filepath!s}")
 
 
 @app_project.command()

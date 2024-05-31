@@ -113,6 +113,7 @@ class JobController:
         ----------
         project_name
             The name of the project. If None the default project will be used.
+
         Returns
         -------
         JobController
@@ -132,6 +133,7 @@ class JobController:
         project
             The project used to generate the JobController. If None the default
             project will be used.
+
         Returns
         -------
         JobController
@@ -208,6 +210,7 @@ class JobController:
         metadata
             A dictionary of the values of the metadata to match. Should be an
             exact match for all the values provided.
+
         Returns
         -------
         dict
@@ -442,6 +445,7 @@ class JobController:
             A dictionary representing the filter.
         kwargs
             All arguments passed to pymongo's Collection.find() method.
+
         Returns
         -------
         list
@@ -540,6 +544,7 @@ class JobController:
         job_index
             The index of the Job. If None the Job the sorting will be
             added to get the highest index.
+
         Returns
         -------
         dict, list
@@ -659,6 +664,7 @@ class JobController:
             Otherwise, just log the error and proceed.
         method_kwargs
             Kwargs passed to the method called on each Job
+
         Returns
         -------
         list
@@ -909,6 +915,7 @@ class JobController:
             Forcibly break the lock on locked documents.
         force
             Bypass the limitation that only Jobs in a certain state can be rerun.
+
         Returns
         -------
         dict, list
@@ -1108,6 +1115,7 @@ class JobController:
             If None all states are acceptable.
         use_pipeline
             if True a pipeline will be used in the update of the document
+
         Returns
         -------
         list
@@ -1177,6 +1185,7 @@ class JobController:
             Raise an error if lock is not released.
         break_lock
             Forcibly break the lock on locked documents.
+
         Returns
         -------
         list
@@ -1949,6 +1958,7 @@ class JobController:
             query. Follows pymongo conventions.
         limit
             Maximum number of entries to retrieve. 0 means no limit.
+
         Returns
         -------
         list
@@ -2263,6 +2273,7 @@ class JobController:
         max_limit
             Maximum number of Flows present in the DB. If number is larger
             the database will not be reset. Set 0 for not limit.
+
         Returns
         -------
         bool
@@ -2591,7 +2602,7 @@ class JobController:
             Recursively deserialize a Flow dictionary, avoiding the deserialization
             of all the elements that may require external packages.
             """
-            if in_dict.get("@class", None) == "Flow":
+            if in_dict.get("@class") == "Flow":
                 jobs = [deserialize_partial_flow(d) for d in in_dict.get("jobs")]
                 flow_init = {
                     k: v
@@ -2982,6 +2993,7 @@ class JobController:
         ----------
         job_uuid
             The uuid of the Job.
+
         Returns
         -------
             The number of modified Jobs.
@@ -3002,6 +3014,7 @@ class JobController:
             The uuid of Job to identify the Flow. Incompatible with flow_uuid.
         flow_uuid
             The Flow uuid. Incompatible with job_uuid.
+
         Returns
         -------
             The number of modified Jobs.
@@ -3037,6 +3050,7 @@ class JobController:
         ----------
         flow_uuids
             A list of Flow uuids.
+
         Returns
         -------
             A list of uuids of Jobs belong to the selected Flows.
@@ -3070,6 +3084,7 @@ class JobController:
             Sorting passed to the aggregation.
         limit
             The maximum number of results returned.
+
         Returns
         -------
             A list of dictionaries with the result of the query.
@@ -3146,6 +3161,7 @@ class JobController:
         ----------
         lock_kwargs
             Kwargs passed to the MongoLock context manager.
+
         Returns
         -------
         MongoLock
@@ -3165,6 +3181,7 @@ class JobController:
         ----------
         lock_kwargs
             Kwargs passed to the MongoLock context manager.
+
         Returns
         -------
         MongoLock
@@ -3312,6 +3329,7 @@ class JobController:
             Kwargs passed to MongoLock for the Job lock.
         flow_lock_kwargs
             Kwargs passed to MongoLock for the Flow lock.
+
         Returns
         -------
         MongoLock, MongoLock
@@ -3414,6 +3432,7 @@ class JobController:
         ----------
         worker
             The worker name.
+
         Returns
         -------
         dict
@@ -3443,6 +3462,7 @@ class JobController:
             A unique ID to identify the processes.
         worker
             The worker where the process is being executed.
+
         Returns
         -------
         dict
@@ -3464,6 +3484,7 @@ class JobController:
             The ID of the processes obtained from the QueueManager.
         worker
             The worker where the process was being executed.
+
         Returns
         -------
         dict
@@ -3484,6 +3505,7 @@ def get_flow_leafs(job_docs: list[dict]) -> list[dict]:
     ----------
     job_docs
         The list of serialized JobDocs in the Flow
+
     Returns
     -------
     list

@@ -88,7 +88,6 @@ class ConfigManager:
         dict
             Dictionary with project name as key and ProjectData as value.
         """
-
         projects_data: dict[str, ProjectData] = {}
         for ext in self.projects_ext:
             for filepath in self.projects_folder.glob(str(f"*.{ext}")):
@@ -121,6 +120,7 @@ class ConfigManager:
         ----------
         project_name
             The name of the project or None to use the value from the settings
+
         Returns
         -------
         str
@@ -147,6 +147,7 @@ class ConfigManager:
         ----------
         project_name
             The name of the project or None to use the value from the settings
+
         Returns
         -------
         ProjectData
@@ -170,6 +171,7 @@ class ConfigManager:
         ----------
         project_name
             The name of the project or None to use the value from the settings
+
         Returns
         -------
         Project
@@ -220,7 +222,7 @@ class ConfigManager:
         filepath = self.projects_folder / f"{project.name}.{ext}"
         if filepath.exists():
             raise ConfigError(
-                f"Project with name {project.name} does not exist, but file {str(filepath)} does"
+                f"Project with name {project.name} does not exist, but file {filepath!s} does"
             )
         project_data = ProjectData(filepath, project, ext)
         self.dump_project(project_data)
@@ -352,6 +354,7 @@ class ConfigManager:
         project_name
             Name of the project from which the Worker should be retrieved, or None to
             use the one from the settings.
+
         Returns
         -------
         WorkerBase
@@ -456,6 +459,7 @@ class ConfigManager:
         project_name
             Name of the project from which the ExecutionConfig should be retrieved,
             or None to use the one from the settings.
+
         Returns
         -------
         ExecutionConfig

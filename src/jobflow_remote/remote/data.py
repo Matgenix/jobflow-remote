@@ -361,7 +361,6 @@ class MinimalFileStore(Store):
         Args:
             path: paths for json files to turn into a Store
         """
-
         self.path = path
 
         self.kwargs = kwargs
@@ -375,7 +374,6 @@ class MinimalFileStore(Store):
         """
         Loads the files into the collection in memory.
         """
-
         # create the .json file if it does not exist
         if not Path(self.path).exists():
             self.update_file()

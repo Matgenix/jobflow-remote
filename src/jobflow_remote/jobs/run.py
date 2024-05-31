@@ -26,7 +26,6 @@ logger = logging.getLogger(__name__)
 
 def run_remote_job(run_dir: str | Path = "."):
     """Run the job"""
-
     initialize_remote_run_log()
 
     start_time = datetime.datetime.utcnow()
