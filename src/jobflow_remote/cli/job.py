@@ -83,12 +83,21 @@ def jobs_list(
     reverse_sort: reverse_sort_flag_opt = False,
     locked: locked_opt = False,
     custom_query: query_opt = None,
+    error: Annotated[
+        bool,
+        typer.Option(
+            "--error",
+            "-e",
+            help="Select the jobs in FAILED and REMOTE_ERROR state. Incompatible with the --state option",
+        ),
+    ] = False,
 ):
     """
     Get the list of Jobs in the database
     """
     check_incompatible_opt({"start_date": start_date, "days": days, "hours": hours})
     check_incompatible_opt({"end_date": end_date, "days": days, "hours": hours})
+    check_incompatible_opt({"state": state, "error": error})
     metadata_dict = str_to_dict(metadata)
 
     job_ids_indexes = get_job_ids_indexes(job_id)
@@ -98,6 +107,10 @@ def jobs_list(
     start_date = get_start_date(start_date, days, hours)
 
     db_sort: list[tuple[str, int]] = [(sort.value, 1 if reverse_sort else -1)]
+    print(error)
+
+    if error:
+        state = [JobState.REMOTE_ERROR, JobState.FAILED]
 
     with loading_spinner():
         if custom_query:
@@ -111,7 +124,7 @@ def jobs_list(
                 job_ids=job_ids_indexes,
                 db_ids=db_id,
                 flow_ids=flow_id,
-                state=state,
+                states=state,
                 start_date=start_date,
                 locked=locked,
                 end_date=end_date,
@@ -285,7 +298,7 @@ def rerun(
         job_ids=job_id,
         db_ids=db_id,
         flow_ids=flow_id,
-        state=state,
+        states=state,
         start_date=start_date,
         end_date=end_date,
         name=name,
@@ -337,7 +350,7 @@ def retry(
         job_ids=job_id,
         db_ids=db_id,
         flow_ids=flow_id,
-        state=state,
+        states=state,
         start_date=start_date,
         end_date=end_date,
         name=name,
@@ -383,7 +396,7 @@ def pause(
         job_ids=job_id,
         db_ids=db_id,
         flow_ids=flow_id,
-        state=state,
+        states=state,
         start_date=start_date,
         end_date=end_date,
         name=name,
@@ -428,7 +441,7 @@ def play(
         job_ids=job_id,
         db_ids=db_id,
         flow_ids=flow_id,
-        state=state,
+        states=state,
         start_date=start_date,
         end_date=end_date,
         name=name,
@@ -478,7 +491,7 @@ def stop(
         job_ids=job_id,
         db_ids=db_id,
         flow_ids=flow_id,
-        state=state,
+        states=state,
         start_date=start_date,
         end_date=end_date,
         name=name,
@@ -606,7 +619,8 @@ def worker(
     raise_on_error: raise_on_error_opt = False,
 ):
     """
-    Set the worker for the selected Jobs. Only READY or WAITING Jobs.
+    Set the worker for the selected Jobs.
+    Only Jobs not in an evolving state (e.g. CHECKED_OUT, UPLOADED, ...).
     """
 
     jc = get_job_controller()
@@ -618,7 +632,7 @@ def worker(
         job_ids=job_id,
         db_ids=db_id,
         flow_ids=flow_id,
-        state=state,
+        states=state,
         start_date=start_date,
         end_date=end_date,
         name=name,
@@ -654,7 +668,8 @@ def exec_config(
     raise_on_error: raise_on_error_opt = False,
 ):
     """
-    Set the exec_config for the selected Jobs. Only READY or WAITING Jobs.
+    Set the exec_config for the selected Jobs.
+    Only Jobs not in an evolving state (e.g. CHECKED_OUT, UPLOADED, ...).
     """
 
     jc = get_job_controller()
@@ -666,7 +681,7 @@ def exec_config(
         job_ids=job_id,
         db_ids=db_id,
         flow_ids=flow_id,
-        state=state,
+        states=state,
         start_date=start_date,
         end_date=end_date,
         name=name,
@@ -723,7 +738,8 @@ def resources(
     raise_on_error: raise_on_error_opt = False,
 ):
     """
-    Set the resources for the selected Jobs. Only READY or WAITING Jobs.
+    Set the resources for the selected Jobs.
+    Only Jobs not in an evolving state (e.g. CHECKED_OUT, UPLOADED, ...)
     """
 
     resources = str_to_dict(resources_value)
@@ -740,7 +756,7 @@ def resources(
         job_ids=job_id,
         db_ids=db_id,
         flow_ids=flow_id,
-        state=state,
+        states=state,
         start_date=start_date,
         end_date=end_date,
         name=name,
@@ -794,7 +810,7 @@ def job_dump(
             job_ids=job_ids_indexes,
             db_ids=db_id,
             flow_ids=flow_id,
-            state=state,
+            states=state,
             start_date=start_date,
             end_date=end_date,
             name=name,
