@@ -180,14 +180,16 @@ class WorkerBase(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     @field_validator("scheduler_type")
-    def check_scheduler_type(self, scheduler_type: str) -> str:
+    @classmethod
+    def check_scheduler_type(cls, scheduler_type: str) -> str:
         """Validator to set the default of scheduler_type."""
         if scheduler_type not in scheduler_mapping:
             raise ValueError(f"Unknown scheduler type {scheduler_type}")
         return scheduler_type
 
     @field_validator("work_dir")
-    def check_work_dir(self, v) -> Path:
+    @classmethod
+    def check_work_dir(cls, v) -> Path:
         if not v.is_absolute():
             raise ValueError("`work_dir` must be an absolute path")
         return v
@@ -461,7 +463,8 @@ class QueueConfig(BaseModel):
     )
 
     @field_validator("store")
-    def check_store(self, store: dict) -> dict:
+    @classmethod
+    def check_store(cls, store: dict) -> dict:
         """Check that the queue configuration could be converted to a Store."""
         if store:
             try:
@@ -569,7 +572,8 @@ class Project(BaseModel):
         return JobController.from_project(self)
 
     @field_validator("base_dir")
-    def check_base_dir(self, base_dir: str, info: ValidationInfo) -> str:
+    @classmethod
+    def check_base_dir(cls, base_dir: str, info: ValidationInfo) -> str:
         """Validator to set the default of base_dir based on the project name."""
         if not base_dir:
             from jobflow_remote import SETTINGS
@@ -578,28 +582,32 @@ class Project(BaseModel):
         return base_dir
 
     @field_validator("tmp_dir")
-    def check_tmp_dir(self, tmp_dir: str, info: ValidationInfo) -> str:
+    @classmethod
+    def check_tmp_dir(cls, tmp_dir: str, info: ValidationInfo) -> str:
         """Validator to set the default of tmp_dir based on the base_dir."""
         if not tmp_dir:
             return str(Path(info.data["base_dir"], "tmp"))
         return tmp_dir
 
     @field_validator("log_dir")
-    def check_log_dir(self, log_dir: str, info: ValidationInfo) -> str:
+    @classmethod
+    def check_log_dir(cls, log_dir: str, info: ValidationInfo) -> str:
         """Validator to set the default of log_dir based on the base_dir."""
         if not log_dir:
             return str(Path(info.data["base_dir"], "log"))
         return log_dir
 
     @field_validator("daemon_dir")
-    def check_daemon_dir(self, daemon_dir: str, info: ValidationInfo) -> str:
+    @classmethod
+    def check_daemon_dir(cls, daemon_dir: str, info: ValidationInfo) -> str:
         """Validator to set the default of daemon_dir based on the base_dir."""
         if not daemon_dir:
             return str(Path(info.data["base_dir"], "daemon"))
         return daemon_dir
 
     @field_validator("jobstore")
-    def check_jobstore(self, jobstore: dict) -> dict:
+    @classmethod
+    def check_jobstore(cls, jobstore: dict) -> dict:
         """Check that the jobstore configuration could be converted to a JobStore."""
         if jobstore:
             try:

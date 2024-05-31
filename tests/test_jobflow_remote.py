@@ -1,7 +1,7 @@
 def test_version() -> None:
     from jobflow_remote import __version__
 
-    assert __version__.startswith("0.")
+    assert __version__.startswith("0."), f"unexpected {__version__=}"
 
 
 def test_imports() -> None:

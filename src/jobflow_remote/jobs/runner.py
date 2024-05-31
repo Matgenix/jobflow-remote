@@ -695,13 +695,13 @@ class Runner:
 
             if submit_result.status == SubmissionStatus.FAILED:
                 err_msg = f"submission failed. {submit_result!r}"
-                raise RemoteError(err_msg, False)
+                raise RemoteError(err_msg, no_retry=False)
             if submit_result.status == SubmissionStatus.JOB_ID_UNKNOWN:
                 err_msg = (
                     "submission succeeded but ID not known. Job may be running "
                     f"but status cannot be checked. {submit_result!r}"
                 )
-                raise RemoteError(err_msg, True)
+                raise RemoteError(err_msg, no_retry=True)
             if submit_result.status == SubmissionStatus.SUCCESSFUL:
                 lock.update_on_release = {
                     "$set": {
@@ -713,7 +713,7 @@ class Runner:
                     self.limited_workers[worker_name]["current"] += 1
             else:
                 raise RemoteError(
-                    f"unhandled submission status {submit_result.status}", True
+                    f"unhandled submission status {submit_result.status}", no_retry=True
                 )
 
     def download(self, lock) -> None:
@@ -761,11 +761,11 @@ class Runner:
                 remote_file_path = str(Path(remote_path, fname))
                 try:
                     host.get(remote_file_path, str(Path(local_path, fname)))
-                except FileNotFoundError:
+                except FileNotFoundError as exc:
                     # if files are missing it should not retry
                     err_msg = f"file {remote_file_path} for job {job_dict['uuid']} does not exist"
                     logger.exception(err_msg)
-                    raise RemoteError(err_msg, True)
+                    raise RemoteError(err_msg, no_retry=True) from exc
 
         lock.update_on_release = {"$set": {"state": JobState.DOWNLOADED.value}}
 
@@ -795,10 +795,10 @@ class Runner:
             store = self.jobstore
             completed = self.job_controller.complete_job(doc, local_path, store)
 
-        except json.JSONDecodeError:
+        except json.JSONDecodeError as exc:
             # if an empty file is copied this error can appear, do not retry
             err_msg = traceback.format_exc()
-            raise RemoteError(err_msg, True)
+            raise RemoteError(err_msg, no_retry=True) from exc
 
         # remove local folder with downloaded files if successfully completed
         if completed and self.runner_options.delete_tmp_folder and not worker.is_local:
@@ -806,7 +806,7 @@ class Runner:
 
         if not completed:
             err_msg = "the parsed output does not contain the required information to complete the job"
-            raise RemoteError(err_msg, True)
+            raise RemoteError(err_msg, no_retry=True)
 
     def check_run_status(self, filter: dict | None = None) -> None:  # noqa: A002
         """
@@ -906,7 +906,7 @@ class Runner:
                     ) as lock:
                         if lock.locked_document:
                             if error:
-                                raise RemoteError(error, False)
+                                raise RemoteError(error, no_retry=False)
                             set_output = {
                                 "$set": {
                                     "remote.queue_state": (
@@ -995,7 +995,7 @@ class Runner:
             processes = list(batch_processes_data)
             queue_manager = self.get_queue_manager(worker_name)
             if processes:
-                qjobs = queue_manager.get_jobs_list(processes)  # type: ignore[arg-type]
+                qjobs = queue_manager.get_jobs_list(processes)
                 running_processes = {qjob.job_id for qjob in qjobs}
                 stopped_processes = set(processes) - running_processes
                 for pid in stopped_processes:
@@ -1091,9 +1091,7 @@ class Runner:
                         submit_result.job_id, process_running_uuid, worker_name
                     )
                 else:
-                    logger.error(
-                        f"unhandled submission status {submit_result.status}", True
-                    )
+                    logger.error(f"unhandled submission status {submit_result.status}")
 
             # check for jobs that have terminated in the batch runner and
             # update the DB state accordingly
