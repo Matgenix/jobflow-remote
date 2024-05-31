@@ -2796,7 +2796,7 @@ class JobController:
                 out = loadfn(out_path, cls=None)
                 decoder = MontyDecoder()
                 doc_update = {"start_time": decoder.process_decoded(out["start_time"])}
-                # update the time of the JobDoc, will be used in the checkin
+                # update the time of the JobDoc, will be used in the checking
                 end_time = decoder.process_decoded(out.get("end_time"))
                 if end_time:
                     doc_update["end_time"] = end_time

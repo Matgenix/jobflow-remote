@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 
 
 class ProjectData(NamedTuple):
-    filepath: str
+    filepath: str | Path
     project: Project
     ext: str
 

@@ -3,7 +3,7 @@ default_language_version:
 exclude: ^(.github/|tests/test_data/abinit/)
 repos:
 - repo: https://github.com/charliermarsh/ruff-pre-commit
-  rev: v0.4.5
+  rev: v0.4.6
   hooks:
   - id: ruff
     args: [--fix]
@@ -39,7 +39,7 @@ repos:
     - types-paramiko
     - pydantic~=2.0
 - repo: https://github.com/codespell-project/codespell
-  rev: v2.2.6
+  rev: v2.3.0
   hooks:
   - id: codespell
     stages: [commit, commit-msg]
