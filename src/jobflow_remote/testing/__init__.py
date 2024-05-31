@@ -88,8 +88,6 @@ def self_replace(n: int):
     """
     Create a replace Job with the same job n times.
     """
-    from jobflow import Flow
-
     if n > 0:
         return Response(replace=self_replace(n - 1))
 

@@ -14,10 +14,10 @@
 import os
 import sys
 
-# sys.path.insert(0, os.path.abspath('.'))
 sys.path.insert(
     0, os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 )
+import jobflow_remote
 
 # -- Project information -----------------------------------------------------
 
@@ -25,8 +25,6 @@ project = "Jobflow Remote"
 copyright = "2023, Matgenix SRL"
 author = "Guido Petretto, Matthew Evans, David Waroquiers"
 
-
-import jobflow_remote
 
 # The short X.Y version
 version = jobflow_remote.__version__

@@ -79,7 +79,6 @@ class RemoteHost(BaseHost):
             # if the authentication is ssh-key + OTP paramiko already
             # handles it. Don't use the alternative strategy.
             if not self._connection.connect_kwargs.get("key_filename"):
-
                 if not config:
                     config = Config()
                     config.authentication.strategy_class = InteractiveAuthStrategy

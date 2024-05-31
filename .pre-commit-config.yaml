@@ -1,46 +1,27 @@
 default_language_version:
-  python: python3.9
-#exclude: '^src/{{ package_name }}/some/directory/'
+  python: python3
+exclude: ^(.github/|tests/test_data/abinit/)
 repos:
+- repo: https://github.com/charliermarsh/ruff-pre-commit
+  rev: v0.4.5
+  hooks:
+  - id: ruff
+    args: [--fix]
+  - id: ruff-format
 - repo: https://github.com/pre-commit/pre-commit-hooks
-  rev: v4.5.0
+  rev: v4.6.0
   hooks:
   - id: check-yaml
   - id: fix-encoding-pragma
     args: [--remove]
   - id: end-of-file-fixer
   - id: trailing-whitespace
-- repo: https://github.com/myint/autoflake
-  rev: v2.2.1
-  hooks:
-  - id: autoflake
-- repo: https://github.com/psf/black
-  rev: 24.1.1
-  hooks:
-  - id: black
 - repo: https://github.com/asottile/blacken-docs
   rev: 1.16.0
   hooks:
   - id: blacken-docs
     additional_dependencies: [black]
     exclude: README.md
-- repo: https://github.com/pycqa/isort
-  rev: 5.13.2
-  hooks:
-  - id: isort
-- repo: https://github.com/pycqa/flake8
-  rev: 6.1.0
-  hooks:
-  - id: flake8
-    entry: pflake8
-    files: ^src/
-    additional_dependencies:
-    - pyproject-flake8
-    - flake8-bugbear
-    - flake8-typing-imports
-    - flake8-docstrings
-    - flake8-rst-docstrings
-    - flake8-rst
 - repo: https://github.com/pre-commit/pygrep-hooks
   rev: v1.10.0
   hooks:
@@ -49,13 +30,12 @@ repos:
   - id: rst-directive-colons
   - id: rst-inline-touching-normal
 - repo: https://github.com/pre-commit/mirrors-mypy
-  rev: v1.8.0
+  rev: v1.10.0
   hooks:
   - id: mypy
     files: ^src/
     additional_dependencies:
     - tokenize-rt==4.1.0
-    - types-pkg_resources==0.1.2
     - types-paramiko
     - pydantic~=2.0
 - repo: https://github.com/codespell-project/codespell
@@ -63,9 +43,5 @@ repos:
   hooks:
   - id: codespell
     stages: [commit, commit-msg]
-    args: [--ignore-words-list, 'titel,statics,ba,nd,te,nin', --skip, '*.svg']
-- repo: https://github.com/asottile/pyupgrade
-  rev: v3.15.0
-  hooks:
-    - id: pyupgrade
-      args: [--py39-plus]
+    args: [--ignore-words-list, 'titel,statics,ba,nd,te']
+    types_or: [python, rst, markdown]

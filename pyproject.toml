@@ -1,7 +1,3 @@
-[build-system]
-requires = ["setuptools >= 42", "versioningit  ~=  1.0", "wheel"]
-build-backend = "setuptools.build_meta"
-
 [project]
 name = "jobflow-remote"
 description = "Jobflow Remote is a Python package to run jobflow workflows on remote resources"
@@ -11,50 +7,44 @@ license = { text = "modified BSD" }
 authors = [{ name = "Guido Petretto", email = "guido.petretto@matgenix.com" }]
 dynamic = ["version"]
 classifiers = [
-    "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
     "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Information Technology",
     "Intended Audience :: Science/Research",
     "Intended Audience :: System Administrators",
-    "Intended Audience :: Information Technology",
     "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.9",
     "Topic :: Other/Nonlisted Topic",
     "Topic :: Scientific/Engineering",
 ]
 requires-python = ">=3.9"
-dependencies =[
-    "jobflow >= 0.1.14",
-    "pydantic ~= 2.4",
+dependencies = [
     "fabric ~= 3.2",
-    "tomlkit ~= 0.12",
-    "qtoolkit ~= 0.1, >= 0.1.4",
-    "typer ~= 0.9",
-    "rich ~= 13.7",
+    "flufl.lock ~= 8.0",
+    "jobflow >= 0.1.14",
     "psutil ~= 5.9",
-    "supervisor ~= 4.2",
+    "pydantic ~= 2.4",
+    "qtoolkit ~= 0.1, >= 0.1.4",
+    "rich ~= 13.7",
     "ruamel.yaml ~= 0.17",
     "schedule ~= 1.2",
-    "flufl.lock ~= 8.0"
+    "supervisor ~= 4.2",
+    "tomlkit ~= 0.12",
+    "typer ~= 0.9",
 ]
 
 [project.optional-dependencies]
-dev = [
-    "pre-commit>=3.0.0",
-]
-tests = [
-    "pytest ~= 8.0",
-    "pytest-cov ~= 4.0",
-    "docker ~= 7.0",
-]
+dev = ["pre-commit>=3.0.0"]
+tests = ["docker ~= 7.0", "pytest ~= 8.0", "pytest-cov ~= 4.0"]
 docs = [
-    "sphinx",
-    "sphinx_design",
-    "pydata-sphinx-theme",
-    "sphinx-copybutton",
     "autodoc_pydantic>=2.0.0",
-    "sphinxcontrib-mermaid"
+    "pydata-sphinx-theme",
+    "sphinx",
+    "sphinx-copybutton",
+    "sphinx_design",
+    "sphinxcontrib-mermaid",
 ]
 
 [project.scripts]
@@ -69,21 +59,13 @@ changelog = "https://matgenix.github.io/jobflow-remote/changelog"
 [tool.setuptools.package-data]
 jobflow_remote = ["py.typed"]
 
+[build-system]
+requires = ["setuptools >= 42", "versioningit  ~=  1.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [tool.versioningit.vcs]
 method = "git"
 default-tag = "0.0.1"
-
-[tool.isort]
-profile = "black"
-
-[tool.flake8]
-max-line-length = 88
-max-doc-length = 88
-select = "C, E, F, W, B"
-extend-ignore = "E203, W503, E501, F401, RST21"
-min-python-version = "3.9.0"
-docstring-convention = "numpy"
-rst-roles = "class, func, ref, obj"
 
 [tool.mypy]
 ignore_missing_imports = true
@@ -104,9 +86,9 @@ warn_required_dynamic_aliases = true
 [tool.pytest.ini_options]
 filterwarnings = [
     "ignore:.*POTCAR.*:UserWarning",
-    "ignore:.*magmom.*:UserWarning",
-    "ignore:.*is not gzipped.*:UserWarning",
     "ignore:.*input structure.*:UserWarning",
+    "ignore:.*is not gzipped.*:UserWarning",
+    "ignore:.*magmom.*:UserWarning",
     "ignore::DeprecationWarning",
 ]
 
@@ -122,14 +104,7 @@ source = ["src/"]
 skip_covered = true
 show_missing = true
 exclude_lines = [
+    '^\s*@overload( |$)',
     '^\s*assert False(,|$)',
     'if typing.TYPE_CHECKING:',
-    '^\s*@overload( |$)',
 ]
-
-[tool.autoflake]
-in-place = true
-remove-all-unused-imports = true
-remove-unused-variables = true
-ignore-init-module-imports = true
-expand-star-imports = true

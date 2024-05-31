@@ -1,5 +1,4 @@
 def test_jobs_list(job_controller, four_jobs):
-
     from jobflow_remote.jobs.state import JobState
     from jobflow_remote.testing.cli import run_check_cli
 
@@ -32,7 +31,6 @@ def test_jobs_list(job_controller, four_jobs):
 
 
 def test_job_info(job_controller, four_jobs):
-
     from jobflow_remote.testing.cli import run_check_cli
 
     outputs = ["name = 'add1'", "state = 'READY'"]
@@ -54,7 +52,6 @@ def test_job_info(job_controller, four_jobs):
 
 
 def test_set_state(job_controller, four_jobs):
-
     from jobflow_remote.jobs.state import JobState
     from jobflow_remote.testing.cli import run_check_cli
 
@@ -70,7 +67,6 @@ def test_set_state(job_controller, four_jobs):
 
 
 def test_rerun(job_controller, four_jobs):
-
     from jobflow_remote.jobs.state import JobState
     from jobflow_remote.testing.cli import run_check_cli
 
@@ -86,7 +82,6 @@ def test_rerun(job_controller, four_jobs):
 
 
 def test_retry(job_controller, four_jobs):
-
     from jobflow_remote.jobs.state import JobState
     from jobflow_remote.testing.cli import run_check_cli
 
@@ -102,7 +97,6 @@ def test_retry(job_controller, four_jobs):
 
 
 def test_play_pause(job_controller, four_jobs):
-
     from jobflow_remote.jobs.state import JobState
     from jobflow_remote.testing.cli import run_check_cli
 
@@ -122,7 +116,6 @@ def test_play_pause(job_controller, four_jobs):
 
 
 def test_stop(job_controller, four_jobs):
-
     from jobflow_remote.jobs.state import JobState
     from jobflow_remote.testing.cli import run_check_cli
 
@@ -135,7 +128,6 @@ def test_stop(job_controller, four_jobs):
 
 
 def test_queue_out(job_controller, one_job):
-
     from jobflow_remote.jobs.runner import Runner
     from jobflow_remote.testing.cli import run_check_cli
 
@@ -157,7 +149,6 @@ def test_queue_out(job_controller, one_job):
 
 
 def test_set_worker(job_controller, one_job):
-
     from jobflow_remote.testing.cli import run_check_cli
 
     run_check_cli(
@@ -169,7 +160,6 @@ def test_set_worker(job_controller, one_job):
 
 
 def test_set_exec_config(job_controller, one_job):
-
     from jobflow_remote.testing.cli import run_check_cli
 
     run_check_cli(
@@ -181,7 +171,6 @@ def test_set_exec_config(job_controller, one_job):
 
 
 def test_set_resources(job_controller, one_job):
-
     from jobflow_remote.testing.cli import run_check_cli
 
     run_check_cli(
@@ -193,7 +182,6 @@ def test_set_resources(job_controller, one_job):
 
 
 def test_job_dump(job_controller, one_job, tmp_dir):
-
     import os
 
     from jobflow_remote.testing.cli import run_check_cli
@@ -203,7 +191,6 @@ def test_job_dump(job_controller, one_job, tmp_dir):
 
 
 def test_output(job_controller, one_job):
-
     from jobflow_remote.jobs.runner import Runner
     from jobflow_remote.testing.cli import run_check_cli
 
@@ -216,7 +203,6 @@ def test_output(job_controller, one_job):
 
 
 def test_files_list(job_controller, one_job):
-
     from jobflow_remote.jobs.runner import Runner
     from jobflow_remote.testing.cli import run_check_cli
 
@@ -238,7 +224,6 @@ def test_files_list(job_controller, one_job):
 
 
 def test_files_get(job_controller, one_job, tmp_dir):
-
     import os
 
     from jobflow_remote.jobs.runner import Runner
