@@ -25,8 +25,6 @@ def get_graph(flow: FlowInfo, label: str = "name") -> DiGraph:
         job_prop["job_name"] = job_prop.pop("name")
         graph.add_node(db_id, **job_prop)
 
-    print(flow.parents)
-
     # Add edges based on parents
     for child_node, parents in zip(flow.db_ids, flow.parents):
         for parent_uuid in parents:

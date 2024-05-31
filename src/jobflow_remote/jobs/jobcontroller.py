@@ -5,6 +5,7 @@ import fnmatch
 import logging
 import traceback
 import warnings
+from collections import defaultdict
 from contextlib import ExitStack
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -974,6 +975,7 @@ class JobController:
                 JobState.PAUSED.value,
             ]
             # Update the state of the descendants
+            updated_states: dict[str, dict[int, JobState]] = defaultdict(dict)
             with ExitStack() as stack:
                 # first acquire the lock on all the descendants and
                 # check their state if needed. Break immediately if
@@ -1022,17 +1024,21 @@ class JobController:
                 # Here all the descendants are locked and could be set to WAITING.
                 # Set the new state for all of them.
                 for child_lock in children_locks:
-                    if child_lock.locked_document["state"] != JobState.WAITING.value:
-                        modified_jobs.append(child_lock.locked_document["db_id"])
+                    child_doc = child_lock.locked_document
+                    if child_doc["state"] != JobState.WAITING.value:
+                        modified_jobs.append(child_doc["db_id"])
                     child_doc_update = get_reset_job_base_dict()
                     child_doc_update["state"] = JobState.WAITING.value
                     child_lock.update_on_release = {"$set": child_doc_update}
+                    updated_states[child_doc["uuid"]][
+                        child_doc["index"]
+                    ] = JobState.WAITING
 
             # if everything is fine here, update the state of the flow
             # before releasing its lock and set the update for the original job
             # pass explicitly the new state of the job, since it is not updated
             # in the DB. The Job is the last lock to be released.
-            updated_states = {job_id: {job_index: JobState.READY}}
+            updated_states[job_id][job_index] = JobState.READY
             self.update_flow_state(
                 flow_uuid=flow_doc.uuid, updated_states=updated_states
             )
@@ -1813,7 +1819,7 @@ class JobController:
         job_ids: tuple[str, int] | list[tuple[str, int]] | None = None,
         db_ids: str | list[str] | None = None,
         flow_ids: str | list[str] | None = None,
-        states: JobState | None = None,
+        states: JobState | list[JobState] | None = None,
         start_date: datetime | None = None,
         end_date: datetime | None = None,
         name: str | None = None,
@@ -1894,7 +1900,6 @@ class JobController:
                         "else": {"$mergeObjects": ["$exec_config", exec_config]},
                     }
                 }
-                print(cond)
                 set_dict["exec_config"] = cond
 
             else:
@@ -2147,7 +2152,7 @@ class JobController:
         job_ids: tuple[str, int] | list[tuple[str, int]] | None = None,
         db_ids: str | list[str] | None = None,
         flow_ids: str | list[str] | None = None,
-        states: JobState | None = None,
+        states: JobState | list[JobState] | None = None,
         start_date: datetime | None = None,
         end_date: datetime | None = None,
         name: str | None = None,
@@ -2413,7 +2418,7 @@ class JobController:
         job_ids: tuple[str, int] | list[tuple[str, int]] | None = None,
         db_ids: str | list[str] | None = None,
         flow_ids: str | list[str] | None = None,
-        states: JobState | None = None,
+        states: JobState | list[JobState] | None = None,
         locked: bool = False,
         start_date: datetime | None = None,
         end_date: datetime | None = None,
@@ -3139,17 +3144,33 @@ class JobController:
             flow_uuid=flow_uuid, projection=projection
         )
 
+        # update the full list of states and those of the leafs according
+        # to the updated_states passed
         jobs_states = [
             updated_states.get(j["uuid"], {}).get(j["index"], JobState(j["state"]))
             for j in flow_jobs
         ]
         leafs = get_flow_leafs(flow_jobs)
-        leaf_states = [JobState(j["state"]) for j in leafs]
+        leaf_states = [
+            updated_states.get(j["uuid"], {}).get(j["index"], JobState(j["state"]))
+            for j in leafs
+        ]
         flow_state = FlowState.from_jobs_states(
             jobs_states=jobs_states, leaf_states=leaf_states
         )
-        set_state = {"$set": {"state": flow_state.value}}
-        self.flows.find_one_and_update({"uuid": flow_uuid}, set_state)
+
+        # update flow state. If it is changed update the updated_on
+        updated_cond = {
+            "$cond": {
+                "if": {"$eq": ["$state", flow_state.value]},
+                "then": "$updated_on",
+                "else": datetime.utcnow(),
+            }
+        }
+        self.flows.find_one_and_update(
+            {"uuid": flow_uuid},
+            [{"$set": {"state": flow_state.value, "updated_on": updated_cond}}],
+        )
 
     @contextlib.contextmanager
     def lock_job(self, **lock_kwargs) -> Generator[MongoLock, None, None]:

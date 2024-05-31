@@ -300,4 +300,7 @@ def test_undefined_additional_stores(worker, job_controller):
 
     # The job should fail, as the additional store is not defined
     assert job_controller.count_jobs(states=JobState.COMPLETED) == 1
-    assert job_controller.count_jobs(states=JobState.REMOTE_ERROR) == 1
+    assert (
+        job_controller.count_jobs(states=[JobState.COMPLETED, JobState.REMOTE_ERROR])
+        == 2
+    )
