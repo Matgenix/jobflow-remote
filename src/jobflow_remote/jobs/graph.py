@@ -25,6 +25,8 @@ def get_graph(flow: FlowInfo, label: str = "name") -> DiGraph:
         job_prop["job_name"] = job_prop.pop("name")
         graph.add_node(db_id, **job_prop)
 
+    print(flow.parents)
+
     # Add edges based on parents
     for child_node, parents in zip(flow.db_ids, flow.parents):
         for parent_uuid in parents:
@@ -207,7 +209,7 @@ def get_mermaid(flow: FlowInfo, show_subflows: bool = True):
 
     # add replace edges
     for parent_db_id, child_id in replace_edges:
-        line = f"    {parent_db_id} -.-> {child_id}"
+        line = f"    {parent_db_id}({nodes[parent_db_id]['name']}) -.-> {child_id}"
         lines.append(line)
 
     subgraph_styles = []

@@ -40,7 +40,7 @@ def test_start_stop(job_controller, single, daemon_manager):
     flow = Flow([j])
     submit_flow(flow, worker="test_local_worker")
 
-    assert job_controller.count_jobs(state=JobState.READY) == 1
+    assert job_controller.count_jobs(states=JobState.READY) == 1
 
     assert daemon_manager.check_status() == DaemonStatus.SHUT_DOWN
     assert daemon_manager.start(raise_on_error=True, single=single)
@@ -54,7 +54,7 @@ def test_start_stop(job_controller, single, daemon_manager):
         if all(ji.state in finished_states for ji in jobs_info):
             break
 
-    assert job_controller.count_jobs(state=JobState.COMPLETED) == 1
+    assert job_controller.count_jobs(states=JobState.COMPLETED) == 1
 
     processes_info = daemon_manager.get_processes_info()
     expected_nprocs = 2 if single else 5

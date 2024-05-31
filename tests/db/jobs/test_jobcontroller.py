@@ -26,10 +26,10 @@ def test_submit_flow(job_controller, runner):
     output_2 = job_controller.jobstore.get_output(uuid=job_2["uuid"])
     assert output_2 == 11
     assert (
-        job_controller.count_jobs(state=JobState.COMPLETED) == 2
+        job_controller.count_jobs(states=JobState.COMPLETED) == 2
     ), f"Jobs not marked as completed, full job info:\n{job_controller.get_jobs({})}"
     assert (
-        job_controller.count_flows(state=FlowState.COMPLETED) == 1
+        job_controller.count_flows(states=FlowState.COMPLETED) == 1
     ), f"Flows not marked as completed, full flow info:\n{job_controller.get_flows({})}"
 
 
@@ -67,8 +67,8 @@ def test_queries(job_controller, runner):
 
     assert runner.run_one_job(max_seconds=10)
 
-    assert job_controller.count_jobs(state=JobState.COMPLETED) == 1
-    assert job_controller.count_jobs(state=JobState.READY) == 2
+    assert job_controller.count_jobs(states=JobState.COMPLETED) == 1
+    assert job_controller.count_jobs(states=JobState.READY) == 2
     assert job_controller.count_jobs(db_ids="1") == 1
     assert job_controller.count_jobs(job_ids=(add_first.uuid, 1)) == 1
     jobs_start_date = job_controller.get_jobs_info(start_date=date_create)
@@ -96,8 +96,8 @@ def test_queries(job_controller, runner):
         == 2
     )
 
-    assert job_controller.count_flows(state=FlowState.READY) == 1
-    assert job_controller.count_flows(state=FlowState.RUNNING) == 1
+    assert job_controller.count_flows(states=FlowState.READY) == 1
+    assert job_controller.count_flows(states=FlowState.RUNNING) == 1
     assert job_controller.count_flows(job_ids=add_first.uuid) == 1
     assert job_controller.count_flows(db_ids="1") == 1
     assert job_controller.count_flows(flow_ids=flow.uuid) == 1
@@ -159,7 +159,7 @@ def test_rerun_completed(job_controller, runner):
 
     # run all the jobs
     runner.run_all_jobs(max_seconds=20)
-    assert job_controller.count_jobs(state=JobState.COMPLETED) == 3
+    assert job_controller.count_jobs(states=JobState.COMPLETED) == 3
     with pytest.raises(ValueError, match="Job in state COMPLETED cannot be rerun"):
         job_controller.rerun_job(job_id=j3.uuid, job_index=j3.index)
 
@@ -247,7 +247,7 @@ def test_rerun_failed(job_controller, runner):
         j3_info.db_id,
     }
 
-    assert job_controller.count_jobs(state=JobState.READY) == 1
+    assert job_controller.count_jobs(states=JobState.READY) == 1
 
     # run the first job again and the job with OnMissing.None
     assert runner.run_one_job(max_seconds=10, job_id=[j1.uuid, j1.index])
@@ -265,7 +265,7 @@ def test_rerun_failed(job_controller, runner):
         job_controller.rerun_job(job_id=j1.uuid, job_index=j1.index, force=True)
     ) == {j1_info.db_id, j3_info.db_id, j4_info.db_id}
 
-    assert job_controller.count_jobs(state=JobState.READY) == 1
+    assert job_controller.count_jobs(states=JobState.READY) == 1
 
     # run again the jobs with j4. This generates a replace
     assert runner.run_one_job(max_seconds=10, job_id=[j1.uuid, j1.index])
