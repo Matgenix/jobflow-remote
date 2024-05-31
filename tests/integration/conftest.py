@@ -53,13 +53,13 @@ def _get_random_name(length=6):
 @pytest.fixture(scope="session")
 def slurm_ssh_port():
     """The exposed local port for SSH connections to the Slurm container."""
-    yield _get_free_port()
+    return _get_free_port()
 
 
 @pytest.fixture(scope="session")
 def db_port():
     """The exposed local port for connections to the MongoDB stores."""
-    yield _get_free_port()
+    return _get_free_port()
 
 
 @pytest.fixture(scope="session")
@@ -75,18 +75,19 @@ def build_and_launch_container(
 ):
     """Builds and/or launches a container, returning the container object.
 
-    Parameters:
+    Parameters
+    ----------
         docker_client: The local docker client.
         dockerfile: An optional location of a dockerfile to build.
         image_name: Either the tag to attach to the built image, or an image
             name to pull from the web (may require authenticated docker client).
         ports: A port specification to use for the launched container.
 
-    Yields:
+    Yields
+    ------
         The launched container object, then stops the container after use.
 
     """
-
     if dockerfile is not None:
         print(f" * Building {image_name}")
         _, logs = docker_client.images.build(
@@ -169,7 +170,6 @@ def write_tmp_settings(
     db_port,
 ):
     """Collects the various sub-configs and writes them to a temporary file in a temporary directory."""
-
     tmp_dir: Path = Path(tempfile.mkdtemp())
 
     os.environ["JFREMOTE_PROJECTS_FOLDER"] = str(tmp_dir.resolve())
@@ -284,4 +284,4 @@ def job_controller(random_project_name):
 
     jc = JobController.from_project_name(random_project_name)
     assert jc.reset()
-    yield jc
+    return jc

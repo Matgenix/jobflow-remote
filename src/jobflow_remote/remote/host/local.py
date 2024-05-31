@@ -52,7 +52,7 @@ class LocalHost(BaseHost):
         timeout = timeout or self.timeout_execute
         with cd(workdir):
             proc = subprocess.run(
-                command, capture_output=True, shell=True, timeout=timeout
+                command, capture_output=True, shell=True, timeout=timeout, check=False
             )
         return proc.stdout.decode(), proc.stderr.decode(), proc.returncode
 

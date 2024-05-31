@@ -185,7 +185,6 @@ def job_info(
     """
     Detail information on a specific job
     """
-
     db_id, job_id = get_job_db_ids(job_db_id, job_index)
 
     if with_error:
@@ -226,7 +225,6 @@ def set_state(
     Sets the state of a Job to an arbitrary value.
     WARNING: No checks. This can lead to inconsistencies in the DB. Use with care
     """
-
     db_id, job_id = get_job_db_ids(job_db_id, job_index)
 
     with loading_spinner():
@@ -384,7 +382,6 @@ def pause(
     """
     Pause a Job. Only READY and WAITING Jobs can be paused. The operation is reversible.
     """
-
     jc = get_job_controller()
 
     execute_multi_jobs_cmd(
@@ -429,7 +426,6 @@ def play(
     """
     Resume a Job that was previously PAUSED.
     """
-
     jc = get_job_controller()
 
     execute_multi_jobs_cmd(
@@ -512,7 +508,6 @@ def queue_out(
     """
     Print the content of the output files produced by the queue manager.
     """
-
     db_id, job_id = get_job_db_ids(job_db_id, job_index)
 
     cm = get_config_manager()
@@ -572,20 +567,20 @@ def queue_out(
 
     if out_error:
         out_console.print(
-            f"Error while fetching queue output from {str(out_path)}: {out_error}",
+            f"Error while fetching queue output from {out_path!s}: {out_error}",
             style="red",
         )
     else:
-        out_console.print(f"Queue output from {str(out_path)}:\n")
+        out_console.print(f"Queue output from {out_path!s}:\n")
         out_console.print(out)
 
     if err_error:
         out_console.print(
-            f"Error while fetching queue error from {str(err_path)}: {err_error}",
+            f"Error while fetching queue error from {err_path!s}: {err_error}",
             style="red",
         )
     else:
-        out_console.print(f"Queue error from {str(err_path)}:\n")
+        out_console.print(f"Queue error from {err_path!s}:\n")
         out_console.print(err)
 
 
@@ -621,7 +616,6 @@ def worker(
     Set the worker for the selected Jobs.
     Only Jobs not in an evolving state (e.g. CHECKED_OUT, UPLOADED, ...).
     """
-
     jc = get_job_controller()
     execute_multi_jobs_cmd(
         single_cmd=jc.set_job_run_properties,
@@ -670,7 +664,6 @@ def exec_config(
     Set the exec_config for the selected Jobs.
     Only Jobs not in an evolving state (e.g. CHECKED_OUT, UPLOADED, ...).
     """
-
     jc = get_job_controller()
     execute_multi_jobs_cmd(
         single_cmd=jc.set_job_run_properties,
@@ -740,7 +733,6 @@ def resources(
     Set the resources for the selected Jobs.
     Only Jobs not in an evolving state (e.g. CHECKED_OUT, UPLOADED, ...)
     """
-
     resources = str_to_dict(resources_value)
 
     if qresources:
@@ -793,7 +785,6 @@ def job_dump(
     """
     Dump to json the documents of the selected Jobs from the DB. For debugging.
     """
-
     check_incompatible_opt({"start_date": start_date, "days": days, "hours": hours})
     check_incompatible_opt({"end_date": end_date, "days": days, "hours": hours})
     metadata_dict = str_to_dict(metadata)
@@ -846,7 +837,6 @@ def output(
     """
     Detail information on a specific job
     """
-
     db_id, job_id = get_job_db_ids(job_db_id, job_index)
 
     with loading_spinner():
@@ -925,7 +915,7 @@ def files_list(
                 remote_files = host.listdir(remote_dir)
             except Exception as e:
                 raise RuntimeError(
-                    f"Error while fetching the list of files from {str(remote_dir)}: {getattr(e, 'message', str(e))}"
+                    f"Error while fetching the list of files from {remote_dir!s}: {getattr(e, 'message', str(e))}"
                 ) from e
         finally:
             try:
@@ -998,7 +988,7 @@ def files_get(
                 host.get(str(Path(remote_dir) / file_name), str(save_path / file_name))
         except Exception as e:
             raise RuntimeError(
-                f"Error while fetching file {file_name} from {str(remote_dir)}: {getattr(e, 'message', str(e))}"
+                f"Error while fetching file {file_name} from {remote_dir!s}: {getattr(e, 'message', str(e))}"
             ) from e
         finally:
             try:

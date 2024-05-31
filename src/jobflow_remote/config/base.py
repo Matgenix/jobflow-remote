@@ -74,6 +74,7 @@ class RunnerOptions(BaseModel):
         ----------
         step_attempts
             The number of attempts advancing a remote state.
+
         Returns
         -------
             The delay in seconds.
@@ -104,7 +105,7 @@ class LogLevel(str, Enum):
         """
         return {
             LogLevel.ERROR: logging.ERROR,
-            LogLevel.WARN: logging.WARN,
+            LogLevel.WARN: logging.WARNING,
             LogLevel.INFO: logging.INFO,
             LogLevel.DEBUG: logging.DEBUG,
         }[self]

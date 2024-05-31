@@ -10,5 +10,3 @@ def test_imports():
 
     """
     from jobflow_remote import SETTINGS  # noqa
-
-    ...

@@ -57,7 +57,8 @@ def add_big(a: float, b: float):
 @job(undefined_store="data")
 def add_big_undefined_store(a: float, b: float):
     """Adds two numbers together and writes the answer to an artificially large file
-    which is attempted to be stored in a undefined store."""
+    which is attempted to be stored in a undefined store.
+    """
     result = a + b
     return Response({"data": [result] * 5_000, "result": result})
 

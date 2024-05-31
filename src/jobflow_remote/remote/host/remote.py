@@ -336,7 +336,6 @@ class RemoteHost(BaseHost):
         -------
         True if the connection is open.
         """
-
         if not self.is_connected:
             # Note: raising here instead of reconnecting demonstrated to be a
             # problem for how the queue managers are handled in the Runner.
@@ -353,7 +352,6 @@ def inter_handler(title, instructions, prompt_list):
     Handler function for interactive prompts from the server.
     Used by Interactive AuthSource.
     """
-
     if title:
         print(title.strip())
     if instructions:

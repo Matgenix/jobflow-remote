@@ -175,7 +175,7 @@ class DaemonManager:
 
     def get_interface(self):
         env = {
-            "SUPERVISOR_SERVER_URL": f"unix://{str(self.sock_filepath)}",
+            "SUPERVISOR_SERVER_URL": f"unix://{self.sock_filepath!s}",
             "SUPERVISOR_USERNAME": "",
             "SUPERVISOR_PASSWORD": "",
         }
@@ -369,10 +369,11 @@ class DaemonManager:
             connect_interactive=connect_interactive,
         )
         cp = subprocess.run(
-            f"supervisord -c {str(self.conf_filepath)}",
+            f"supervisord -c {self.conf_filepath!s}",
             shell=True,
             capture_output=True,
             text=True,
+            check=False,
         )
         if cp.returncode != 0:
             return f"Error staring the supervisord process. stdout: {cp.stdout}. stderr: {cp.stderr}"

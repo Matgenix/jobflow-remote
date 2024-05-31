@@ -123,7 +123,6 @@ def convert_store(spec_dict: dict, valid_stores) -> Store:
     Build a store based on the dict spec configuration from JobFlow
     TODO expose the methods from jobflow and don't duplicate the code
     """
-
     _spec_dict = dict(spec_dict)
     store_type = _spec_dict.pop("type")
     for k, v in _spec_dict.items():
@@ -141,6 +140,7 @@ def convert_utc_time(datetime_value: datetime) -> datetime:
     ----------
     datetime_value
         a datetime object in UTC
+
     Returns
     -------
         The datetime in the zone of the current system

@@ -20,7 +20,6 @@ def initialize_runner_logger(
     level
         The log level.
     """
-
     # If the directory it is not present it does not initialize the logger with
     # an unclear error message. Since this is only for the runner logger
     # it should not be a problem to check that the directory exists when the
@@ -78,7 +77,6 @@ def initialize_cli_logger(level: int = logging.WARNING, full_exc_info: bool = Tr
     level
         The log level.
     """
-
     config = {
         "version": 1,
         "disable_existing_loggers": True,
@@ -118,7 +116,6 @@ def initialize_remote_run_log(level: int = logging.INFO):
     level
         The log level.
     """
-
     config = {
         "version": 1,
         "disable_existing_loggers": True,
@@ -154,4 +151,4 @@ class CLIFormatter(logging.Formatter):
         if self.log_exception_trace:
             return super().formatException(ei)
         else:
-            return f"{ei[0].__name__}: {str(ei[1])}"
+            return f"{ei[0].__name__}: {ei[1]!s}"
