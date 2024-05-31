@@ -107,7 +107,6 @@ def jobs_list(
     start_date = get_start_date(start_date, days, hours)
 
     db_sort: list[tuple[str, int]] = [(sort.value, 1 if reverse_sort else -1)]
-    print(error)
 
     if error:
         state = [JobState.REMOTE_ERROR, JobState.FAILED]

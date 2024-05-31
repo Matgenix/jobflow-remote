@@ -1,5 +1,7 @@
 import pytest
 
+from jobflow_remote.jobs.state import FlowState
+
 
 def test_submit_flow(job_controller, runner):
     from jobflow import Flow
@@ -156,6 +158,7 @@ def test_rerun_completed(job_controller, runner):
         job_controller.get_job_info(job_id=j2.uuid, job_index=j2.index).state
         == JobState.WAITING
     )
+    assert job_controller.get_flows_info(job_ids=[j1.uuid])[0].state == FlowState.READY
 
     # run all the jobs
     runner.run_all_jobs(max_seconds=20)
@@ -194,6 +197,10 @@ def test_rerun_completed(job_controller, runner):
     assert (
         job_controller.get_job_info(job_id=j2.uuid, job_index=j2.index).state
         == JobState.COMPLETED
+    )
+
+    assert (
+        job_controller.get_flows_info(job_ids=[j1.uuid])[0].state == FlowState.RUNNING
     )
 
     # can rerun if breaking the lock
@@ -240,12 +247,16 @@ def test_rerun_failed(job_controller, runner):
     assert j3_info.state == JobState.READY
     assert j4_info.state == JobState.WAITING
 
+    assert job_controller.get_flows_info(job_ids=[j1.uuid])[0].state == FlowState.FAILED
+
     # rerun without "force". Since the job is FAILED and the children are
     # WAITING or READY
     assert set(job_controller.rerun_job(job_id=j1.uuid, job_index=j1.index)) == {
         j1_info.db_id,
         j3_info.db_id,
     }
+
+    assert job_controller.get_flows_info(job_ids=[j1.uuid])[0].state == FlowState.READY
 
     assert job_controller.count_jobs(states=JobState.READY) == 1
 
@@ -293,6 +304,8 @@ def test_rerun_failed(job_controller, runner):
         job_controller.get_job_info(job_id=j4.uuid, job_index=2).state == JobState.READY
     )
 
+    assert job_controller.get_flows_info(job_ids=[j1.uuid])[0].state == FlowState.FAILED
+
 
 def test_rerun_remote_error(job_controller, monkeypatch, runner):
     from jobflow import Flow
@@ -321,6 +334,9 @@ def test_rerun_remote_error(job_controller, monkeypatch, runner):
 
     j1_info = job_controller.get_job_info(job_id=j1.uuid, job_index=j1.index)
     assert j1_info.state == JobState.REMOTE_ERROR
+    assert (
+        job_controller.get_flows_info(job_ids=[j1.uuid])[0].state == FlowState.RUNNING
+    )
 
     # can rerun without "force"
     assert job_controller.rerun_job(job_id=j1.uuid, job_index=j1.index, force=True) == [
@@ -330,6 +346,7 @@ def test_rerun_remote_error(job_controller, monkeypatch, runner):
         job_controller.get_job_info(job_id=j1.uuid, job_index=j1.index).state
         == JobState.READY
     )
+    assert job_controller.get_flows_info(job_ids=[j1.uuid])[0].state == FlowState.READY
 
 
 def test_retry(job_controller, monkeypatch, runner):
