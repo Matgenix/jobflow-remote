@@ -47,7 +47,7 @@ class RunnerOptions(BaseModel):
         description="Time to consider the lock on a document expired and can be overridden (seconds)",
     )
     delete_tmp_folder: bool = Field(
-        True,
+        default=True,
         description="Whether to delete the local temporary folder after a job has completed",
     )
     max_step_attempts: int = Field(
@@ -357,10 +357,11 @@ class RemoteWorker(WorkerBase):
         "the command is executed directly",
     )
     login_shell: bool = Field(
-        True, description="Whether to use a login shell when executing the command"
+        default=True,
+        description="Whether to use a login shell when executing the command",
     )
     interactive_login: bool = Field(
-        False,
+        default=False,
         description="Whether the authentication to the host should be interactive",
     )
 
@@ -548,10 +549,9 @@ class Project(BaseModel):
         """
         if not self.jobstore:
             return None
-        elif self.jobstore.get("@class") == "JobStore":
+        if self.jobstore.get("@class") == "JobStore":
             return JobStore.from_dict(self.jobstore)
-        else:
-            return JobStore.from_dict_spec(self.jobstore)
+        return JobStore.from_dict_spec(self.jobstore)
 
     def get_queue_store(self):
         """
@@ -620,5 +620,5 @@ class ConfigError(Exception):
     """A generic Exception related to the configuration."""
 
 
-class ProjectUndefined(ConfigError):
+class ProjectUndefinedError(ConfigError):
     """Exception raised if the Project has not been defined or could not be determined."""

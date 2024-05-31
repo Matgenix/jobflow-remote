@@ -219,12 +219,11 @@ class DaemonManager:
         except psutil.NoSuchProcess:
             running = False
 
-        if not running:
-            if pid is not None:
-                logger.warning(
-                    f"Process with pid {pid} is not running but daemon files are present. Cleaning them up."
-                )
-                self.clean_files()
+        if not running and pid is not None:
+            logger.warning(
+                f"Process with pid {pid} is not running but daemon files are present. Cleaning them up."
+            )
+            self.clean_files()
 
         return running
 
@@ -242,15 +241,15 @@ class DaemonManager:
         interface = self.get_interface()
         try:
             proc_info = interface.supervisor.getAllProcessInfo()
-        except Fault as e:
+        except Fault as exc:
             # catch this exception as it may be raised if the status is queried while
             # the supervisord process is shutting down. The error is quite cryptic, so
             # replace with one that is clearer. Also see a related issue in supervisord:
             # https://github.com/Supervisor/supervisor/issues/48
-            if e.faultString == "SHUTDOWN_STATE":
+            if exc.faultString == "SHUTDOWN_STATE":
                 raise DaemonError(
                     "The daemon is likely shutting down and the actual state cannot be determined"
-                )
+                ) from exc
             raise
         if not proc_info:
             raise DaemonError(
@@ -260,8 +259,7 @@ class DaemonManager:
         if all(pi.get("state") in RUNNING_STATES for pi in proc_info):
             if any(pi.get("state") == ProcessStates.STARTING for pi in proc_info):
                 return DaemonStatus.STARTING
-            else:
-                return DaemonStatus.RUNNING
+            return DaemonStatus.RUNNING
 
         if any(pi.get("state") in RUNNING_STATES for pi in proc_info):
             return DaemonStatus.PARTIALLY_RUNNING
@@ -390,7 +388,7 @@ class DaemonManager:
         failed = [r for r in result if r.get("status") == Faults.SUCCESS]
         if len(failed) == 0:
             return None
-        elif len(failed) != len(result):
+        if len(failed) != len(result):
             msg = "Not all the daemon processes started correctly. Details: \n"
             for f in failed:
                 msg += f"  - {f.get('description')}\n"
@@ -437,9 +435,8 @@ class DaemonManager:
         if error is not None:
             if raise_on_error:
                 raise DaemonError(error)
-            else:
-                logger.error(error)
-                return False
+            logger.error(error)
+            return False
         return True
 
     def stop(self, wait: bool = False, raise_on_error: bool = False) -> bool:
@@ -480,9 +477,8 @@ class DaemonManager:
         if error is not None:
             if raise_on_error:
                 raise DaemonError(error)
-            else:
-                logger.error(error)
-                return error
+            logger.error(error)
+            return error
 
         return None
 

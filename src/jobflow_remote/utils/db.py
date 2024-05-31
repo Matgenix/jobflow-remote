@@ -220,15 +220,14 @@ class MongoLock:
                 if lock_acquired:
                     self.locked_document = result
                     break
+                # if the lock could not be acquired optionally sleep or
+                # exit if waited for enough time.
+                if self.sleep and (time.time() - t0) < self.max_wait:
+                    logger.debug("sleeping")
+                    time.sleep(self.sleep)
                 else:
-                    # if the lock could not be acquired optionally sleep or
-                    # exit if waited for enough time.
-                    if self.sleep and (time.time() - t0) < self.max_wait:
-                        logger.debug("sleeping")
-                        time.sleep(self.sleep)
-                    else:
-                        self.unavailable_document = result
-                        break
+                    self.unavailable_document = result
+                    break
             else:
                 # If no document the conditions could not be met.
                 # Either the requested filter does not find match a document

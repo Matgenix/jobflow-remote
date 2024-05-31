@@ -114,7 +114,8 @@ def test_kill_supervisord(job_controller, daemon_manager, caplog) -> None:
     # the log message is not present.
     # log_msg = caplog.messages
     # assert len(log_msg) > 0
-    # assert f"Process with pid {supervisord_pid} is not running but daemon files are present" in log_msg[-1]
+    # assert f"Process with pid {supervisord_pid} is not running but daemon files are
+    # present" in log_msg[-1]
 
 
 def test_kill_one_process(job_controller, daemon_manager, caplog) -> None:

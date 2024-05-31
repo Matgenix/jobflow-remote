@@ -122,18 +122,15 @@ class QueueManager:
     def get_modules(self, modules: list[str] | None) -> str | None:
         if not modules:
             return None
-        modules_str = []
-        for m in modules:
-            modules_str.append(f"module load {m}")
+        modules_str = [f"module load {m}" for m in modules]
         return "\n".join(modules_str)
 
     def get_run_commands(self, commands) -> str:
         if isinstance(commands, str):
             return commands
-        elif isinstance(commands, list):
+        if isinstance(commands, list):
             return "\n".join(commands)
-        else:
-            raise ValueError("commands should be a str or a list of str.")
+        raise ValueError("commands should be a str or a list of str.")
 
     def get_post_run(self, post_run: str | list[str] | None) -> str:
         if isinstance(post_run, (list, tuple)):

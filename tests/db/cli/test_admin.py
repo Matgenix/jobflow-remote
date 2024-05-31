@@ -27,13 +27,15 @@ def test_unlock(job_controller, one_job) -> None:
 
     j = one_job.jobs[0]
     # catch the warning coming from MongoLock
-    with pytest.warns(UserWarning, match="Could not release lock for document"):
-        with job_controller.lock_job(filter={"uuid": j.uuid}):
-            run_check_cli(
-                ["admin", "unlock", "-did", "1"],
-                required_out="1 jobs were unlocked",
-                cli_input="y",
-            )
+    with (
+        pytest.warns(UserWarning, match="Could not release lock for document"),
+        job_controller.lock_job(filter={"uuid": j.uuid}),
+    ):
+        run_check_cli(
+            ["admin", "unlock", "-did", "1"],
+            required_out="1 jobs were unlocked",
+            cli_input="y",
+        )
 
     with job_controller.lock_job(filter={"uuid": j.uuid}):
         run_check_cli(
@@ -53,13 +55,15 @@ def test_unlock_flow(job_controller, one_job) -> None:
     from jobflow_remote.testing.cli import run_check_cli
 
     # catch the warning coming from MongoLock
-    with pytest.warns(UserWarning, match="Could not release lock for document"):
-        with job_controller.lock_flow(filter={"uuid": one_job.uuid}):
-            run_check_cli(
-                ["admin", "unlock-flow", "-fid", one_job.uuid],
-                required_out="1 flows were unlocked",
-                cli_input="y",
-            )
+    with (
+        pytest.warns(UserWarning, match="Could not release lock for document"),
+        job_controller.lock_flow(filter={"uuid": one_job.uuid}),
+    ):
+        run_check_cli(
+            ["admin", "unlock-flow", "-fid", one_job.uuid],
+            required_out="1 flows were unlocked",
+            cli_input="y",
+        )
 
     with job_controller.lock_flow(filter={"uuid": one_job.uuid}):
         run_check_cli(

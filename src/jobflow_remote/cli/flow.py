@@ -88,12 +88,11 @@ def flows_list(
 
         table = get_flow_info_table(flows_info, verbosity=verbosity)
 
-    if SETTINGS.cli_suggestions:
-        if max_results and len(flows_info) == max_results:
-            out_console.print(
-                f"The number of Flows printed is limited by the maximum selected: {max_results}",
-                style="yellow",
-            )
+    if SETTINGS.cli_suggestions and max_results and len(flows_info) == max_results:
+        out_console.print(
+            f"The number of Flows printed is limited by the maximum selected: {max_results}",
+            style="yellow",
+        )
 
     out_console.print(table)
 
@@ -119,7 +118,7 @@ def delete(
 
     jc = get_job_controller()
 
-    with loading_spinner(False) as progress:
+    with loading_spinner(processing=False) as progress:
         progress.add_task(description="Fetching data...", total=None)
         flows_info = jc.get_flows_info(
             job_ids=job_id,
@@ -144,7 +143,7 @@ def delete(
             raise typer.Exit(0)
 
     to_delete = [fi.flow_id for fi in flows_info]
-    with loading_spinner(False) as progress:
+    with loading_spinner(processing=False) as progress:
         progress.add_task(description="Deleting...", total=None)
 
         jc.delete_flows(flow_ids=to_delete)

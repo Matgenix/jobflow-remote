@@ -177,7 +177,7 @@ def check(
     tick = "[bold green]✓[/] "
     cross = "[bold red]x[/] "
     errors = []
-    with loading_spinner(False) as progress:
+    with loading_spinner(processing=False) as progress:
         task_id = progress.add_task("Checking")
         for worker_name in workers_to_test:
             progress.update(task_id, description=f"Checking worker {worker_name}")
@@ -244,7 +244,7 @@ def remove(
         if not Confirm.ask(msg):
             raise typer.Exit(0)
 
-    with loading_spinner(False) as progress:
+    with loading_spinner(processing=False) as progress:
         progress.add_task("Deleting project")
         cm.remove_project(project_name=name, remove_folders=not keep_folders)
 

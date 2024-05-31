@@ -1,3 +1,5 @@
+# ruff: noqa: PLW0602, PLW0603
+
 from __future__ import annotations
 
 import functools
@@ -17,7 +19,7 @@ from rich.prompt import Confirm
 from rich.text import Text
 
 from jobflow_remote import ConfigManager, JobController
-from jobflow_remote.config.base import ProjectUndefined
+from jobflow_remote.config.base import ProjectUndefinedError
 from jobflow_remote.jobs.daemon import DaemonError, DaemonManager, DaemonStatus
 
 if TYPE_CHECKING:
@@ -112,6 +114,8 @@ class ReprStr(str):
     Used mainly to allow printing of strings with newlines instead of '\n' when
     repr is used in rich.
     """
+
+    __slots__ = ()
 
     def __repr__(self) -> str:
         return self
@@ -249,7 +253,7 @@ def cli_error_handler(func):
             return func(*args, **kwargs)
         except (typer.Exit, typer.Abort, ClickException):
             raise  # Do not capture click or typer exceptions
-        except ProjectUndefined:
+        except ProjectUndefinedError:
             exit_with_error_msg(
                 "The active project could not be determined and it is required to execute this command"
             )
@@ -258,10 +262,9 @@ def cli_error_handler(func):
 
             if SETTINGS.cli_full_exc:
                 raise  # Reraise exceptions to print the full stacktrace
-            else:
-                exit_with_error_msg(
-                    f"An Error occurred during the command execution: {type(e).__name__} {getattr(e, 'message', str(e))}"
-                )
+            exit_with_error_msg(
+                f"An Error occurred during the command execution: {type(e).__name__} {getattr(e, 'message', str(e))}"
+            )
 
     return wrapper
 
@@ -276,8 +279,7 @@ def check_valid_uuid(uuid_str, raise_on_error: bool = True) -> bool:
 
     if raise_on_error:
         raise typer.BadParameter(f"UUID {uuid_str} is in the wrong format.")
-    else:
-        return False
+    return False
 
 
 def str_to_dict(string: str | None) -> dict | None:
@@ -286,14 +288,14 @@ def str_to_dict(string: str | None) -> dict | None:
 
     try:
         dictionary = json.loads(string)
-    except json.JSONDecodeError:
+    except json.JSONDecodeError as exc:
         dictionary = {}
         for chunk in string.split(","):
             split = chunk.split("=")
             if len(split) != 2:
                 raise typer.BadParameter(
                     f"Wrong format for dictionary-like field {string}"
-                )
+                ) from exc
 
             dictionary[split[0]] = split[1]
 
@@ -390,7 +392,7 @@ def execute_multi_jobs_cmd(
 
                 confirmed = Confirm.ask(text, default=False)
                 if not confirmed:
-                    raise typer.Exit(0)
+                    raise typer.Exit(0)  # noqa: TRY301
 
             with loading_spinner():
                 modified_ids = multi_cmd(
@@ -411,14 +413,14 @@ def execute_multi_jobs_cmd(
         else:
             print_success_msg(f"Operation completed: {len(modified_ids)} jobs modified")
     except Exception:
-        logger.error("Error executing the operation", exc_info=True)
+        logger.exception("Error executing the operation")
 
 
 def check_stopped_runner(error: bool = True) -> None:
     cm = get_config_manager()
     dm = DaemonManager.from_project(cm.get_project())
     try:
-        with loading_spinner(False) as progress:
+        with loading_spinner(processing=False) as progress:
             progress.add_task(description="Checking the Daemon status...", total=None)
             current_status = dm.check_status()
 

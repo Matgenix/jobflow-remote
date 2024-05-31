@@ -4,8 +4,12 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timedelta
+from typing import TYPE_CHECKING
 
 from schedule import Scheduler
+
+if TYPE_CHECKING:
+    from jobflow import Job
 
 logger = logging.getLogger(__name__)
 
@@ -33,21 +37,17 @@ class SafeScheduler(Scheduler):
         self.seconds_after_failure = seconds_after_failure
         super().__init__()
 
-    def _run_job(self, job) -> None:
+    def _run_job(self, job: Job) -> None:
         try:
             super()._run_job(job)
         except Exception:
             task_name = job.job_func.__name__
-            logger.error(f"Error while running task {task_name}", exc_info=True)
+            logger.exception(f"Error while running task {task_name}")
             if self.reschedule_on_failure:
-                if self.seconds_after_failure:
-                    logger.warning(
-                        f"Task {task_name} rescheduled in {self.seconds_after_failure} seconds"
-                    )
+                if secs := self.seconds_after_failure:
+                    logger.warning(f"Task {task_name} rescheduled in {secs} seconds")
                     job.last_run = None
-                    job.next_run = datetime.now() + timedelta(
-                        seconds=self.seconds_after_failure
-                    )
+                    job.next_run = datetime.now() + timedelta(seconds=secs)
                 else:
                     logger.warning(f"Task {task_name} rescheduled")
                     job.last_run = datetime.now()

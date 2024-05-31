@@ -148,9 +148,8 @@ class LocalBatchManager:
                     (self.running_dir / f"{selected}_{self.process_id}").touch()
                     return selected
             except (LockError, FileNotFoundError):
-                logger.error(
-                    f"Error while locking file {selected}. Will be ignored",
-                    exc_info=True,
+                logger.exception(
+                    f"Error while locking file {selected}. Will be ignored"
                 )
                 files.remove(selected)
         return None

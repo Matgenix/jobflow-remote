@@ -1,7 +1,7 @@
 def test_version() -> None:
     from jobflow_remote import __version__
 
-    assert __version__.startswith("0.0.1")
+    assert __version__.startswith("0.")
 
 
 def test_imports() -> None:
@@ -9,4 +9,4 @@ def test_imports() -> None:
     the global `SETTINGS`.
 
     """
-    from jobflow_remote import SETTINGS  # noqa
+    from jobflow_remote import SETTINGS  # noqa: F401

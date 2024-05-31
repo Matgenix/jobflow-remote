@@ -6,7 +6,7 @@ def test_flows_list(job_controller, four_jobs) -> None:
 
     run_check_cli(["flow", "list"], required_out=outputs)
 
-    # the output table is squeezed. Hard to check the stdout. Just check that runs correctly
+    # the output table is squeezed. Hard to check stdout. Just check that runs correctly
     run_check_cli(["flow", "list", "-v"])
 
     # trigger the additional information

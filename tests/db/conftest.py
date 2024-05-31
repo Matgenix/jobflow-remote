@@ -36,15 +36,18 @@ def mongoclient():
         yield mc
     except Exception as e:
         warnings.warn(
-            f"Could not connect to a local DB {getattr(e, 'message', str(e))}. Trying with pymongo_inmemory"
+            f"Could not connect to a local DB {getattr(e, 'message', str(e))}. Trying "
+            "with pymongo_inmemory",
+            stacklevel=2,
         )
 
         try:
             import pymongo_inmemory
-        except ImportError:
+        except ImportError as exc:
             raise pytest.skip(
-                "No local DB and pymongo_inmemory. Either start a local mongodb or install pymongo_inmemory"
-            )
+                "No local DB and pymongo_inmemory. Either start a local mongodb or "
+                "install pymongo_inmemory"
+            ) from exc
 
         mc = pymongo_inmemory.MongoClient()
         assert mc.server_info()
@@ -70,17 +73,18 @@ def write_tmp_settings(
     store_database_name,
     mongoclient,
 ):
-    """Collects the various sub-configs and writes them to a temporary file in a temporary directory."""
+    """Collects the various sub-configs and writes them to a temporary file in a
+    temporary directory."""
     tmp_dir: Path = Path(tempfile.mkdtemp())
 
     os.environ["JFREMOTE_PROJECTS_FOLDER"] = str(tmp_dir.resolve())
     workdir = tmp_dir / "jfr"
     workdir.mkdir(exist_ok=True)
     os.environ["JFREMOTE_PROJECT"] = random_project_name
-    # Set the config file to a random path so that we don't accidentally load the default
+    # Set config file to a random path so that we don't accidentally load the default
     os.environ["JFREMOTE_CONFIG_FILE"] = _get_random_name(length=10) + ".json"
-    # This import must come after setting the env vars as jobflow loads the default config
-    # on import
+    # This import must come after setting the env vars as jobflow loads the default
+    # config on import
     from jobflow_remote.config import Project
 
     project = Project(
@@ -154,8 +158,8 @@ def write_tmp_settings(
 
 @pytest.fixture()
 def job_controller(random_project_name):
-    """Yields a jobcontroller instance for the test suite that also sets up the jobstore,
-    resetting it after every test.
+    """Yields a jobcontroller instance for the test suite that also sets up the
+    jobstore, resetting it after every test.
     """
     from jobflow_remote.jobs.jobcontroller import JobController
 

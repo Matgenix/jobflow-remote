@@ -57,7 +57,7 @@ def generate_dummy_worker(
             timeout_execute=60,
         )
         return LocalWorker(**d)
-    elif host_type == "remote":
+    if host_type == "remote":
         d.update(
             type="remote",
             host="remote.host.net",
@@ -66,8 +66,7 @@ def generate_dummy_worker(
         )
         return RemoteWorker(**d)
 
-    else:
-        raise ValueError(f"Unknown/unhandled host type: {host_type}")
+    raise ValueError(f"Unknown/unhandled host type: {host_type}")
 
 
 def generate_dummy_jobstore() -> dict:
@@ -137,7 +136,7 @@ def _check_workdir(worker: WorkerBase, host: BaseHost) -> str | None:
         # it should be less confusing for the user.
         host.mkdir(worker.work_dir)
         host.write_text_file(canary_file, "\n")
-        return None
+        return None  # noqa: TRY300
     except FileNotFoundError as exc:
         raise FileNotFoundError(
             f"Could not write to {canary_file}. Does the folder exist on the remote?\nThe folder should be specified as an absolute path with no shell expansions or environment variables."

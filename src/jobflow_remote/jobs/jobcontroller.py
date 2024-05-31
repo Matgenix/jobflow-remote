@@ -158,16 +158,12 @@ class JobController:
         try:
             self.queue_store.close()
         except Exception:
-            logger.error(
-                "Error while closing the connection to the queue store", exc_info=True
-            )
+            logger.exception("Error while closing the connection to the queue store")
 
         try:
             self.jobstore.close()
         except Exception:
-            logger.error(
-                "Error while closing the connection to the job store", exc_info=True
-            )
+            logger.exception("Error while closing the connection to the job store")
 
     def _build_query_job(
         self,
@@ -366,12 +362,7 @@ class JobController:
             A list of JobInfo matching the criteria.
         """
         data = self.jobs.find(query, projection=projection_job_info, **kwargs)
-
-        jobs_data = []
-        for d in data:
-            jobs_data.append(JobInfo.from_query_output(d))
-
-        return jobs_data
+        return [JobInfo.from_query_output(d) for d in data]
 
     def get_jobs_info(
         self,
@@ -457,11 +448,7 @@ class JobController:
         """
         data = self.jobs.find(query, **kwargs)
 
-        jobs_data = []
-        for d in data:
-            jobs_data.append(JobDoc.model_validate(d))
-
-        return jobs_data
+        return [JobDoc.model_validate(d) for d in data]
 
     def get_jobs_doc(
         self,
@@ -697,9 +684,7 @@ class JobController:
             except Exception:
                 if raise_on_error:
                     raise
-                logger.error(
-                    f"Error while {action_description} for job {db_id}", exc_info=True
-                )
+                logger.exception(f"Error while {action_description} for job {db_id}")
 
         return list(updated_ids)
 
@@ -861,7 +846,7 @@ class JobController:
 
             if job_state in [JobState.READY]:
                 raise ValueError("The Job is in the READY state. No need to rerun.")
-            elif job_state in RESETTABLE_STATES:
+            if job_state in RESETTABLE_STATES:
                 # if in one of the resettable states no need to lock the flow or
                 # update children.
                 doc_update = self._reset_remote(job_doc_dict)
@@ -1357,10 +1342,10 @@ class JobController:
                 previous_state = doc["previous_state"]
                 try:
                     JobState(previous_state)
-                except ValueError:
+                except ValueError as exc:
                     raise ValueError(
                         f"The registered previous state: {previous_state} is not a valid state"
-                    )
+                    ) from exc
                 set_dict = get_reset_job_base_dict()
                 set_dict["state"] = previous_state
 
@@ -1895,7 +1880,7 @@ class JobController:
                 raise ValueError(
                     f"exec_config {exec_config} is not present in the project"
                 )
-            elif isinstance(exec_config, ExecutionConfig):
+            if isinstance(exec_config, ExecutionConfig):
                 exec_config = exec_config.model_dump()
 
             if update and isinstance(exec_config, dict):
@@ -2086,11 +2071,7 @@ class JobController:
         else:
             data = list(self.flows.find(query, sort=sort, limit=limit))
 
-        jobs_data = []
-        for d in data:
-            jobs_data.append(FlowInfo.from_query_dict(d))
-
-        return jobs_data
+        return [FlowInfo.from_query_dict(d) for d in data]
 
     def delete_flows(
         self,
@@ -2669,7 +2650,7 @@ class JobController:
             prefix = self.project.queue.db_id_prefix or ""
             db_id = f"{prefix}{db_id_int}"
             # inherit the parents of the job to which we are appending
-            parents = parents if parents else job_parents
+            parents = parents if parents else job_parents  # noqa: PLW2901
             job_dicts.append(
                 get_initial_job_doc_dict(
                     job,
@@ -2863,7 +2844,7 @@ class JobController:
                 )
                 self.update_flow_state(host_flow_id)
                 return True
-            elif flow_lock.unavailable_document:
+            if flow_lock.unavailable_document:
                 # raising the error if the lock could not be acquired leaves
                 # the caller handle the issue. In general, it should be the
                 # runner, that will retry at a later time.

@@ -56,20 +56,19 @@ def deep_merge_dict(
 def remove_none(obj):
     if isinstance(obj, (list, tuple, set)):
         return type(obj)(remove_none(x) for x in obj if x is not None)
-    elif isinstance(obj, dict):
+    if isinstance(obj, dict):
         return type(obj)(
             (remove_none(k), remove_none(v))
             for k, v in obj.items()
             if k is not None and v is not None
         )
-    else:
-        return obj
+    return obj
 
 
 def check_dict_keywords(obj: Any, keywords: list[str]) -> bool:
     if isinstance(obj, (list, tuple, set)):
         return any(check_dict_keywords(x, keywords) for x in obj)
-    elif isinstance(obj, dict):
+    if isinstance(obj, dict):
         for k, v in obj.items():
             if isinstance(k, str) and any(k.startswith(kw) for kw in keywords):
                 return True
@@ -107,15 +106,14 @@ def store_from_dict(store_dict: dict) -> Store:
                 f"The converted object {store} is not an instance of a maggma Store"
             )
         return store
-    else:
 
-        def all_subclasses(cl):
-            return set(cl.__subclasses__()).union(
-                [s for c in cl.__subclasses__() for s in all_subclasses(c)]
-            )
+    def all_subclasses(cl):
+        return set(cl.__subclasses__()).union(
+            [s for c in cl.__subclasses__() for s in all_subclasses(c)]
+        )
 
-        all_stores = {s.__name__: s for s in all_subclasses(maggma.stores.Store)}
-        return convert_store(store_dict, all_stores)
+    all_stores = {s.__name__: s for s in all_subclasses(maggma.stores.Store)}
+    return convert_store(store_dict, all_stores)
 
 
 def convert_store(spec_dict: dict, valid_stores) -> Store:

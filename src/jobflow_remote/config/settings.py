@@ -21,11 +21,11 @@ class JobflowRemoteSettings(BaseSettings):
     )
     project: Optional[str] = Field(None, description="The name of the project used.")
     cli_full_exc: bool = Field(
-        False,
+        default=False,
         description="If True prints the full stack trace of the exception when raised in the CLI.",
     )
     cli_suggestions: bool = Field(
-        True, description="If True prints some suggestions in the CLI commands."
+        default=True, description="If True prints some suggestions in the CLI commands."
     )
     cli_log_level: LogLevel = Field(
         LogLevel.WARN, description="The level set for logging in the CLI"

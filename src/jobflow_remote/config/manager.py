@@ -5,9 +5,8 @@ import logging
 import os
 import shutil
 import traceback
-from collections import namedtuple
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, NamedTuple
 
 import tomlkit
 from monty.json import jsanitize
@@ -18,7 +17,7 @@ from jobflow_remote.config.base import (
     ConfigError,
     ExecutionConfig,
     Project,
-    ProjectUndefined,
+    ProjectUndefinedError,
     WorkerBase,
 )
 from jobflow_remote.utils.data import deep_merge_dict
@@ -29,9 +28,16 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-ProjectData = namedtuple("ProjectData", ["filepath", "project", "ext"])
 
-WorkerData = namedtuple("WorkerData", ["name", "worker"])
+class ProjectData(NamedTuple):
+    filepath: str
+    project: Project
+    ext: str
+
+
+class WorkerData(NamedTuple):
+    name: str
+    worker: str
 
 
 class ConfigManager:
@@ -42,7 +48,7 @@ class ConfigManager:
     well as methods to update the properties of each project.
     """
 
-    projects_ext = ["json", "yaml", "toml"]
+    projects_ext = ("json", "yaml", "toml")
 
     def __init__(
         self,
@@ -136,7 +142,7 @@ class ConfigManager:
             if len(self.projects_data) == 1:
                 project_name = next(iter(self.projects_data))
             else:
-                raise ProjectUndefined(
+                raise ProjectUndefinedError(
                     f"A project name should be defined, known projects: {list(self.projects_data)}"
                 )
 
@@ -293,6 +299,9 @@ class ConfigManager:
                     if "name" in d:
                         project_names.append(d["name"])
                 except Exception:
+                    logger.warning(
+                        f"File {filepath} could not be parsed as a Project. Error: {traceback.format_exc()}"
+                    )
                     continue
 
         return project_names

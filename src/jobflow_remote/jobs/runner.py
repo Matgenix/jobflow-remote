@@ -138,11 +138,14 @@ class Runner:
 
         if connect_interactive:
             for host_name, host in self.hosts.items():
-                if host.interactive_login and not host.is_connected:
-                    if Confirm.ask(
+                if (
+                    host.interactive_login
+                    and not host.is_connected
+                    and Confirm.ask(
                         f"Do you want to open the connection for the host of the {host_name} worker?"
-                    ):
-                        host.connect()
+                    )
+                ):
+                    host.connect()
 
     @property
     def runner_options(self) -> RunnerOptions:
@@ -414,23 +417,23 @@ class Runner:
         if not job_data:
             if not db_id and not job_id:
                 return False
-            elif not db_id:
+            if not db_id:
                 job_data = job_id
             else:
                 j_info = self.job_controller.get_job_info(db_id=db_id)
                 job_data = (j_info.uuid, j_info.index)
 
-        filter = {"uuid": job_data[0], "index": job_data[1]}
+        filters = {"uuid": job_data[0], "index": job_data[1]}
         self.advance_state(states)
         scheduler.every(self.runner_options.delay_advance_status).seconds.do(
             self.advance_state,
             states=states,
-            filter=filter,
+            filter=filters,
         )
 
         self.check_run_status()
         scheduler.every(self.runner_options.delay_check_run_status).seconds.do(
-            self.check_run_status, filter=filter
+            self.check_run_status, filter=filters
         )
 
         running_states = [
@@ -456,8 +459,7 @@ class Runner:
                     raise RuntimeError(
                         "Could execute the job within the selected amount of time"
                     )
-                else:
-                    return False
+                return False
 
     def _get_limited_worker_query(self, states: list[str]) -> dict | None:
         """
@@ -488,14 +490,14 @@ class Runner:
 
         if states and available_workers:
             return {"$or": [states_query, uploaded_query]}
-        elif states:
+        if states:
             return states_query
-        elif available_workers:
+        if available_workers:
             return uploaded_query
 
         return None
 
-    def advance_state(self, states: list[str], filter: dict | None = None) -> None:
+    def advance_state(self, states: list[str], filter: dict | None = None) -> None:  # noqa: A002
         """
         Acquire the lock and advance the state of a single job.
 
@@ -566,7 +568,7 @@ class Runner:
             try:
                 store.close()
             except Exception:
-                logging.error(f"error while closing the store {store}", exc_info=True)
+                logging.exception(f"error while closing the store {store}")
 
         remote_path = get_job_path(job_dict["uuid"], job_dict["index"], worker.work_dir)
 
@@ -694,10 +696,13 @@ class Runner:
             if submit_result.status == SubmissionStatus.FAILED:
                 err_msg = f"submission failed. {submit_result!r}"
                 raise RemoteError(err_msg, False)
-            elif submit_result.status == SubmissionStatus.JOB_ID_UNKNOWN:
-                err_msg = f"submission succeeded but ID not known. Job may be running but status cannot be checked. {submit_result!r}"
+            if submit_result.status == SubmissionStatus.JOB_ID_UNKNOWN:
+                err_msg = (
+                    "submission succeeded but ID not known. Job may be running "
+                    f"but status cannot be checked. {submit_result!r}"
+                )
                 raise RemoteError(err_msg, True)
-            elif submit_result.status == SubmissionStatus.SUCCESSFUL:
+            if submit_result.status == SubmissionStatus.SUCCESSFUL:
                 lock.update_on_release = {
                     "$set": {
                         "remote.process_id": str(submit_result.job_id),
@@ -803,7 +808,7 @@ class Runner:
             err_msg = "the parsed output does not contain the required information to complete the job"
             raise RemoteError(err_msg, True)
 
-    def check_run_status(self, filter: dict | None = None) -> None:
+    def check_run_status(self, filter: dict | None = None) -> None:  # noqa: A002
         """
         Check the status of all the jobs submitted to a queue.
 

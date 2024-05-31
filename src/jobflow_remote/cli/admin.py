@@ -73,7 +73,7 @@ def reset(
         confirmed = Confirm.ask(text, default=False)
         if not confirmed:
             raise typer.Exit(0)
-    with loading_spinner(False) as progress:
+    with loading_spinner(processing=False) as progress:
         progress.add_task(description="Resetting the DB...", total=None)
         jc = get_job_controller()
         done = jc.reset(reset_output=reset_output, max_limit=max_limit)
@@ -133,7 +133,7 @@ def unlock(
     jc = get_job_controller()
 
     if not force:
-        with loading_spinner(False) as progress:
+        with loading_spinner(processing=False) as progress:
             progress.add_task(
                 description="Checking the number of locked documents...", total=None
             )
@@ -158,7 +158,7 @@ def unlock(
         if not confirmed:
             raise typer.Exit(0)
 
-    with loading_spinner(False) as progress:
+    with loading_spinner(processing=False) as progress:
         progress.add_task(description="Unlocking jobs...", total=None)
 
         num_unlocked = jc.unlock_jobs(
@@ -191,7 +191,7 @@ def unlock_flow(
     jc = get_job_controller()
 
     if not force:
-        with loading_spinner(False) as progress:
+        with loading_spinner(processing=False) as progress:
             progress.add_task(
                 description="Checking the number of locked documents...", total=None
             )
@@ -217,7 +217,7 @@ def unlock_flow(
         if not confirmed:
             raise typer.Exit(0)
 
-    with loading_spinner(False) as progress:
+    with loading_spinner(processing=False) as progress:
         progress.add_task(description="Unlocking flows...", total=None)
 
         num_unlocked = jc.unlock_flows(

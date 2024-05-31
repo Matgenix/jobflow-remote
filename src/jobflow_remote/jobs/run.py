@@ -57,7 +57,7 @@ def run_remote_job(run_dir: str | Path = ".") -> None:
             try:
                 store.close()
             except Exception:
-                logger.error("Error while closing the store", exc_info=True)
+                logger.exception("Error while closing the store")
 
             # The output of the response has already been stored in the store.
             response.output = None
@@ -138,7 +138,7 @@ def run_batch_jobs(
             try:
                 with cd(job_path):
                     result = subprocess.run(
-                        ["bash", "submit.sh"],
+                        ["bash", "submit.sh"],  # noqa: S603, S607
                         check=True,
                         text=True,
                         capture_output=True,
@@ -149,9 +149,8 @@ def run_batch_jobs(
                         )
                 bm.terminate_job(job_id, index)
             except Exception:
-                logger.error(
-                    "Error while running job with id {job_id} and index {index}",
-                    exc_info=True,
+                logger.exception(
+                    "Error while running job with id {job_id} and index {index}"
                 )
             else:
                 logger.info(f"Completed job with id {job_id} and index {index}")

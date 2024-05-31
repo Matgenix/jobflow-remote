@@ -141,7 +141,7 @@ def start(
         exit_with_error_msg("--connect-interactive option requires --single")
     cm = get_config_manager()
     dm = DaemonManager.from_project(cm.get_project())
-    with loading_spinner(False) as progress:
+    with loading_spinner(processing=False) as progress:
         task_id = progress.add_task(description="Starting the daemon...", total=None)
         try:
             dm.start(
@@ -188,7 +188,7 @@ def stop(
     """
     cm = get_config_manager()
     dm = DaemonManager.from_project(cm.get_project())
-    with loading_spinner(False) as progress:
+    with loading_spinner(processing=False) as progress:
         progress.add_task(description="Stopping the daemon...", total=None)
         try:
             dm.stop(wait=wait, raise_on_error=True)
@@ -213,7 +213,7 @@ def kill() -> None:
     """
     cm = get_config_manager()
     dm = DaemonManager.from_project(cm.get_project())
-    with loading_spinner(False) as progress:
+    with loading_spinner(processing=False) as progress:
         progress.add_task(description="Killing the daemon...", total=None)
         try:
             dm.kill(raise_on_error=True)
@@ -231,7 +231,7 @@ def shutdown() -> None:
     """
     cm = get_config_manager()
     dm = DaemonManager.from_project(cm.get_project())
-    with loading_spinner(False) as progress:
+    with loading_spinner(processing=False) as progress:
         progress.add_task(description="Shutting down supervisor...", total=None)
         try:
             dm.shut_down(raise_on_error=True)

@@ -152,5 +152,4 @@ class CLIFormatter(logging.Formatter):
     def formatException(self, ei):
         if self.log_exception_trace:
             return super().formatException(ei)
-        else:
-            return f"{ei[0].__name__}: {ei[1]!s}"
+        return f"{ei[0].__name__}: {ei[1]!s}"

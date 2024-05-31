@@ -93,23 +93,22 @@ def get_single_store(
     file_path = os.path.join(dir_path, total_file_name)
     if store_type == "maggma_json":
         return StdJSONStore(file_path)
-    elif store_type == "orjson":
+    if store_type == "orjson":
         return MinimalORJSONStore(file_path)
-    elif store_type == "msgspec_json":
+    if store_type == "msgspec_json":
         return MinimalMsgspecJSONStore(file_path)
-    elif store_type == "msgpack":
+    if store_type == "msgpack":
         return MinimalMsgpackStore(file_path)
-    elif isinstance(store_type, dict):
+    if isinstance(store_type, dict):
         store_type = dict(store_type)
         store_type["path"] = file_path
         store = MontyDecoder().process_decoded(store_type)
         if not isinstance(store, Store):
-            raise ValueError(
+            raise TypeError(
                 f"Could not instantiate a proper store from remote config dict {store_type}"
             )
         return None
-    else:
-        raise ValueError(f"remote store type not supported: {store_type}")
+    raise ValueError(f"remote store type not supported: {store_type}")
 
 
 def get_single_store_file_name(config_dict: dict | None, file_name: str) -> str:

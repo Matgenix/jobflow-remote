@@ -1,4 +1,3 @@
-# ruff: noqa: F401
 # Import the submodules with a local app to register them to the main app
 import jobflow_remote.cli.admin
 import jobflow_remote.cli.execution

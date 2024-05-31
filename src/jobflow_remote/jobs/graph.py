@@ -45,11 +45,12 @@ def get_graph_elements(flow: FlowInfo):
         hosts[job_prop["db_id"]] = job_prop["hosts"]
 
     # edges based on parents
-    edges = []
-    for child_node, parents in zip(flow.db_ids, flow.parents):
-        for parent_uuid in parents:
-            for parent_node in ids_mapping[parent_uuid].values():
-                edges.append((parent_node, child_node))
+    edges = [
+        (parent_node, child_node)
+        for child_node, parents in zip(flow.db_ids, flow.parents)
+        for parent_uuid in parents
+        for parent_node in ids_mapping[parent_uuid].values()
+    ]
 
     # connections between replacements
     replace_edges = []
@@ -83,7 +84,7 @@ def plot_dash(flow: FlowInfo):
     jobs_inner_hosts = {}
     hosts_set = set()
     for db_id, job_hosts in hosts.items():
-        job_hosts = list(reversed(job_hosts))
+        job_hosts = list(reversed(job_hosts))  # noqa: PLW2901
         if len(job_hosts) < 2:
             continue
         for i, host in enumerate(job_hosts[1:-1], 1):
@@ -92,8 +93,10 @@ def plot_dash(flow: FlowInfo):
         hosts_set.update(job_hosts[1:])
         jobs_inner_hosts[db_id] = job_hosts[-1]
 
-    for host in hosts_set:
-        elements.append({"data": {"id": host, "parent": hosts_hierarchy.get(host)}})
+    elements += [
+        {"data": {"id": host, "parent": hosts_hierarchy.get(host)}}
+        for host in hosts_set
+    ]
 
     for db_id, node_info in nodes.items():
         node_info["id"] = str(db_id)
@@ -105,8 +108,9 @@ def plot_dash(flow: FlowInfo):
             }
         )
 
-    for edge in edges:
-        elements.append({"data": {"source": str(edge[0]), "target": str(edge[1])}})
+    elements += [
+        {"data": {"source": str(edge[0]), "target": str(edge[1])}} for edge in edges
+    ]
 
     for edge in replace_edges:
         elements.append(

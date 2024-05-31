@@ -55,11 +55,11 @@ def tmp_dir():
     import tempfile
 
     old_cwd = os.getcwd()
-    newpath = tempfile.mkdtemp()
-    os.chdir(newpath)
+    new_path = tempfile.mkdtemp()
+    os.chdir(new_path)
     yield
     os.chdir(old_cwd)
-    shutil.rmtree(newpath)
+    shutil.rmtree(new_path)
 
 
 @pytest.fixture(scope="session")
@@ -82,7 +82,7 @@ def daemon_manager(random_project_name):
 
     dm = DaemonManager.from_project_name(random_project_name)
     yield dm
-    # kill the processes and shut down the daemon (otherwise will remain in the STOPPED state)
+    # kill processes and shut down daemon (otherwise will remain in the STOPPED state)
     dm.kill(raise_on_error=True)
     time.sleep(0.5)
     dm.shut_down(raise_on_error=True)
@@ -94,7 +94,9 @@ def daemon_manager(random_project_name):
         except DaemonError:
             pass
     else:
-        warnings.warn("daemon manager did not shut down within the expected time")
+        warnings.warn(
+            "daemon manager did not shut down within the expected time", stacklevel=2
+        )
 
 
 @pytest.fixture()

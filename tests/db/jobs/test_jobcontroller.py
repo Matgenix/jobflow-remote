@@ -173,7 +173,8 @@ def test_rerun_completed(job_controller, runner) -> None:
         job_controller.rerun_job(job_id=j3.uuid, job_index=j3.index, force=True)
     ) == {j3_info.db_id}
 
-    # The remaining tests are to verify that everything is correct with locked jobs as well
+    # The remaining tests are to verify that everything is correct with locked jobs
+    # as well
     with job_controller.lock_job(filter={"uuid": j2.uuid}):
         with pytest.raises(
             JobLockedError,
@@ -209,13 +210,15 @@ def test_rerun_completed(job_controller, runner) -> None:
 
     # can rerun if breaking the lock
     # catch the warning coming from MongoLock
-    with pytest.warns(UserWarning, match="Could not release lock for document"):
-        with job_controller.lock_job(filter={"uuid": j2.uuid}):
-            assert set(
-                job_controller.rerun_job(
-                    job_id=j2.uuid, job_index=j2.index, force=True, break_lock=True
-                )
-            ) == {j2_info.db_id, j3_info.db_id}
+    with (
+        pytest.warns(UserWarning, match="Could not release lock for document"),
+        job_controller.lock_job(filter={"uuid": j2.uuid}),
+    ):
+        assert set(
+            job_controller.rerun_job(
+                job_id=j2.uuid, job_index=j2.index, force=True, break_lock=True
+            )
+        ) == {j2_info.db_id, j3_info.db_id}
 
     assert (
         job_controller.get_job_info(job_id=j2.uuid, job_index=j2.index).state
@@ -438,16 +441,20 @@ def test_stop(job_controller, one_job) -> None:
 def test_unlock_jobs(job_controller, one_job) -> None:
     j = one_job.jobs[0]
     # catch the warning coming from MongoLock
-    with pytest.warns(UserWarning, match="Could not release lock for document"):
-        with job_controller.lock_job(filter={"uuid": j.uuid}):
-            assert job_controller.unlock_jobs(job_ids=(j.uuid, 1)) == 1
+    with (
+        pytest.warns(UserWarning, match="Could not release lock for document"),
+        job_controller.lock_job(filter={"uuid": j.uuid}),
+    ):
+        assert job_controller.unlock_jobs(job_ids=(j.uuid, 1)) == 1
 
 
 def test_unlock_flows(job_controller, one_job) -> None:
     # catch the warning coming from MongoLock
-    with pytest.warns(UserWarning, match="Could not release lock for document"):
-        with job_controller.lock_flow(filter={"uuid": one_job.uuid}):
-            assert job_controller.unlock_flows(flow_ids=one_job.uuid) == 1
+    with (
+        pytest.warns(UserWarning, match="Could not release lock for document"),
+        job_controller.lock_flow(filter={"uuid": one_job.uuid}),
+    ):
+        assert job_controller.unlock_flows(flow_ids=one_job.uuid) == 1
 
 
 def test_set_job_run_properties(job_controller, one_job) -> None:
