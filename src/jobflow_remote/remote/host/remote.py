@@ -214,10 +214,11 @@ class RemoteHost(BaseHost):
                 logger.warning(
                     f"Error creating folder {directory}. stdout: {stdout}, stderr: {stderr}"
                 )
-            return returncode == 0
+            else:
+                return returncode == 0
         except Exception:
             logger.warning(f"Error creating folder {directory}", exc_info=True)
-            return False
+        return False
 
     def write_text_file(self, filepath: str | Path, content: str) -> None:
         """Write content to a file on the host."""
@@ -375,7 +376,7 @@ class Interactive(AuthSource):
         super().__init__(username=username)
 
     def __repr__(self) -> str:
-        return super()._repr(user=self.username)
+        return super()._repr(user=self.username)  # type: ignore[misc]
 
     def authenticate(self, transport):
         return transport.auth_interactive(self.username, inter_handler)
@@ -384,7 +385,7 @@ class Interactive(AuthSource):
 class InteractiveAuthStrategy(OpenSSHAuthStrategy):
     """
     AuthStrategy based on OpenSSHAuthStrategy that tries to use public keys
-    and then switches to an interactive approach forwording the requests
+    and then switches to an interactive approach forwarding the requests
     from the server.
     """
 

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import abc
 import traceback
-from typing import TYPE_CHECKING, NoReturn
+from typing import TYPE_CHECKING
 
 from monty.json import MSONable
 
@@ -19,7 +19,7 @@ class BaseHost(MSONable):
         command: str | list[str],
         workdir: str | Path | None = None,
         timeout: int | None = None,
-    ):
+    ) -> tuple[str, str, int]:
         """Execute the given command on the host.
 
         Parameters

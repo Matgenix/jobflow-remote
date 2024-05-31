@@ -132,17 +132,14 @@ def get_single_store_file_name(config_dict: dict | None, file_name: str) -> str:
 
 
 def get_remote_store_filenames(store: JobStore, config_dict: dict | None) -> list[str]:
-    filenames = [
+    return [
         get_single_store_file_name(config_dict=config_dict, file_name="remote_job_data")
-    ]
-    for k in store.additional_stores:
-        filenames.append(
-            get_single_store_file_name(
-                config_dict=config_dict, file_name=f"additional_store_{k}"
-            )
+    ] + [
+        get_single_store_file_name(
+            config_dict=config_dict, file_name=f"additional_store_{k}"
         )
-
-    return filenames
+        for k in store.additional_stores
+    ]
 
 
 def get_store_file_paths(store: JobStore) -> list[str]:
@@ -203,13 +200,11 @@ def update_store(store: JobStore, remote_store: JobStore, db_id: int) -> None:
         try:
             store.close()
         except Exception:
-            logging.error(f"error while closing the store {store}", exc_info=True)
+            logging.exception(f"error while closing the store {store}")
         try:
             remote_store.close()
         except Exception:
-            logging.error(
-                f"error while closing the remote store {remote_store}", exc_info=True
-            )
+            logging.exception(f"error while closing the remote store {remote_store}")
 
 
 def resolve_job_dict_args(job_dict: dict, store: JobStore) -> dict:

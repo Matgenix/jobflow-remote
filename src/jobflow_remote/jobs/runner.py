@@ -995,7 +995,7 @@ class Runner:
             processes = list(batch_processes_data)
             queue_manager = self.get_queue_manager(worker_name)
             if processes:
-                qjobs = queue_manager.get_jobs_list(processes)
+                qjobs = queue_manager.get_jobs_list(processes)  # type: ignore[arg-type]
                 running_processes = {qjob.job_id for qjob in qjobs}
                 stopped_processes = set(processes) - running_processes
                 for pid in stopped_processes:
@@ -1020,9 +1020,8 @@ class Runner:
                                 delta_retry=self.runner_options.delta_retry,
                             ) as lock:
                                 if lock.locked_document:
-                                    raise RuntimeError(
-                                        f"The batch process that was running the job (process_id: {pid}, uuid: {process_running_uuid} was likely killed before terminating the job execution"
-                                    )
+                                    err_msg = f"The batch process that was running the job (process_id: {pid}, uuid: {process_running_uuid} was likely killed before terminating the job execution"
+                                    raise RuntimeError(err_msg)
 
                 processes = list(running_processes)
 

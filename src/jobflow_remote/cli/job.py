@@ -967,15 +967,16 @@ def files_get(
         worker = cm.get_worker(job_info.worker)
         host = worker.get_host()
 
+        file_name: str
         try:
             host.connect()
             for file_name in filenames:
                 progress.update(task_id, description=f"Retrieving {file_name}")
                 host.get(str(Path(remote_dir) / file_name), str(save_path / file_name))
-        except Exception as e:
+        except Exception as exc:
             raise RuntimeError(
-                f"Error while fetching file {file_name} from {remote_dir!s}: {getattr(e, 'message', str(e))}"
-            ) from e
+                f"Error while fetching file {file_name} from {remote_dir!s}: {getattr(exc, 'message', str(exc))}"
+            ) from exc
         finally:
             try:
                 host.close()

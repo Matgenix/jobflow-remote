@@ -94,7 +94,7 @@ class MongoLock:
     def __init__(
         self,
         collection: Collection,
-        filter: Mapping[str, Any],
+        filter: Mapping[str, Any],  # noqa: A002
         update: Mapping[str, Any] | None = None,
         break_lock: bool = False,
         lock_id: str | None = None,
@@ -162,7 +162,7 @@ class MongoLock:
         """Acquire the lock."""
         # Set the lock expiration time
         now = datetime.utcnow()
-        db_filter = copy.deepcopy(self.filter)
+        db_filter = copy.deepcopy(dict(self.filter))
 
         projection = self.projection
         # if projecting always get the lock as well
@@ -178,7 +178,7 @@ class MongoLock:
         # Prepare the update to be performed when acquiring the lock.
         # A combination of the input update and the setting of the lock.
         lock_set = {self.LOCK_KEY: self.lock_id, self.LOCK_TIME_KEY: now}
-        update = defaultdict(dict)
+        update: dict[str, dict] = defaultdict(dict)
         if self.update:
             update.update(copy.deepcopy(self.update))
 
@@ -200,7 +200,7 @@ class MongoLock:
                         }
                     }
                     update[operation][k] = cond
-            update = [dict(update)]
+            update = [dict(update)]  # type: ignore[assignment]
 
         # Try to acquire the lock by updating the document with a unique identifier
         # and the lock expiration time
@@ -241,11 +241,13 @@ class MongoLock:
         # TODO maybe set on release only if no exception was raised?
         if self.update_on_release:
             if isinstance(self.update_on_release, list):
-                update = [update, *self.update_on_release]
+                update = [update, *self.update_on_release]  # type: ignore[assignment]
             else:
-                update = deep_merge_dict(update, self.update_on_release)
+                update = deep_merge_dict(update, self.update_on_release)  # type: ignore[assignment]
         logger.debug(f"release lock with update: {update}")
         # TODO if failed to release the lock maybe retry before failing
+        if self.locked_document is None:
+            return
         result = self.collection.update_one(
             {"_id": self.locked_document["_id"], self.LOCK_KEY: self.lock_id},
             update,
