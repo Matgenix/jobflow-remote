@@ -181,7 +181,7 @@ def stop(
                 "Wait until the daemon has stopped. NOTE: this may take a while if a large file is being transferred!"
             ),
         ),
-    ] = False
+    ] = False,
 ):
     """
     Send a stop signal to the Runner processes.

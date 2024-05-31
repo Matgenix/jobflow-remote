@@ -1,5 +1,4 @@
 def test_flows_list(job_controller, four_jobs):
-
     from jobflow_remote.testing.cli import run_check_cli
 
     columns = ["DB id", "Name", "State", "Flow id", "Num Jobs", "Last updated"]
@@ -19,7 +18,6 @@ def test_flows_list(job_controller, four_jobs):
 
 
 def test_delete(job_controller, four_jobs):
-
     from jobflow_remote.testing.cli import run_check_cli
 
     run_check_cli(
@@ -40,7 +38,6 @@ def test_delete(job_controller, four_jobs):
 
 
 def test_flow_info(job_controller, four_jobs):
-
     from jobflow_remote.testing.cli import run_check_cli
 
     columns = ["DB id", "Name", "State", "Job id", "(Index)", "Worker"]

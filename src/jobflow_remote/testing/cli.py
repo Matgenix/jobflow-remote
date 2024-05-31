@@ -35,8 +35,8 @@ def run_check_cli(
     )
 
     # note that stderr is not captured separately
-    assert error == (
-        result.exit_code != 0
+    assert (
+        error == (result.exit_code != 0)
     ), f"cli should have {'not ' if not error else ''}failed. exit code: {result.exit_code}. stdout: {result.stdout}"
 
     if required_out:
