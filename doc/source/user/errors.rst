@@ -270,6 +270,44 @@ In most cases this kind of errors will require to delete the old Flow (e.g. ``jf
 and resubmit it with the correct inputs.
 
 
+States diagram
+==============
+
+
+The following diagram summarizes the possible transitions from failed states,
+depending on the usage of the ``rerun`` and ``retry`` commands. Rerunning a Job
+always brings back the Job to the ``READY`` state, while retrying will bring it
+back to its previous state, when the remote error occurred.
+
+.. mermaid::
+
+    flowchart LR
+
+    REMOTE_ERROR --> retry{Retry}
+    retry --> CHECKED_OUT
+    retry --> UPLOADED
+    retry --> SUBMITTED
+    retry --> RUNNING
+    retry --> TERMINATED
+    retry --> DOWNLOADED
+    REMOTE_ERROR --> rerun{Rerun}
+    FAILED --> rerun{Rerun}
+    rerun --> READY
+
+
+    classDef error fill:#E62A2A,color:white
+    classDef running fill:#2a48e6,color:white
+    classDef success fill:#289e21,color:white
+    classDef ready fill:#8be485
+    classDef wait fill:#eae433
+
+    class REMOTE_ERROR,FAILED error
+    class CHECKED_OUT,UPLOADED,SUBMITTED,RUNNING,TERMINATED,DOWNLOADED running
+    class COMPLETED success
+    class READY ready
+    class WAITING wait
+
+
 Rerun constraints
 =================
 
@@ -315,7 +353,8 @@ Locked Jobs can be identified in the job list using the ``-v`` or ``-vv`` option
 
 which will give the following output, including the ``Locked`` column:
 
-                                                                                      Jobs info
+.. parsed-literal::
+
     ┏━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━┓
     ┃ DB id ┃ Name      ┃ State    ┃ Job id  (Index)                           ┃ Worker      ┃ Last updated [CET] ┃ Queue id ┃ Run time ┃ Retry time [CET] ┃ Prev state ┃ Locked ┃
     ┡━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━┩

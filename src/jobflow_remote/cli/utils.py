@@ -151,7 +151,7 @@ def check_at_least_one_opt(d: dict):
             not_none.append(k)
 
     if len(not_none) > 1:
-        options_list = ", ".join(d.keys())
+        options_list = ", ".join(d)
         exit_with_error_msg(
             f"At least one of the options {options_list} should be defined"
         )
@@ -164,7 +164,7 @@ def check_only_one_opt(d: dict):
             not_none.append(k)
 
     if len(not_none) != 1:
-        options_list = ", ".join(d.keys())
+        options_list = ", ".join(d)
         exit_with_error_msg(
             f"One and only one of the options {options_list} should be defined"
         )
@@ -260,7 +260,7 @@ def cli_error_handler(func):
                 raise  # Reraise exceptions to print the full stacktrace
             else:
                 exit_with_error_msg(
-                    f"An Error occurred during the command execution: {e.__class__.__name__} {getattr(e, 'message', str(e))}"
+                    f"An Error occurred during the command execution: {type(e).__name__} {getattr(e, 'message', str(e))}"
                 )
 
     return wrapper
@@ -326,7 +326,7 @@ def execute_multi_jobs_cmd(
     job_ids: list[str] | None = None,
     db_ids: str | list[str] | None = None,
     flow_ids: str | list[str] | None = None,
-    state: JobState | None = None,
+    states: JobState | list[JobState] | None = None,
     start_date: datetime | None = None,
     end_date: datetime | None = None,
     name: str | None = None,
@@ -341,7 +341,7 @@ def execute_multi_jobs_cmd(
         job_ids,
         db_ids,
         flow_ids,
-        state,
+        states,
         start_date,
         end_date,
         name,
@@ -376,7 +376,7 @@ def execute_multi_jobs_cmd(
                     job_ids_indexes,
                     db_ids,
                     flow_ids,
-                    state,
+                    states,
                     start_date,
                     end_date,
                     name,
@@ -397,7 +397,7 @@ def execute_multi_jobs_cmd(
                     job_ids=job_ids_indexes,
                     db_ids=db_ids,
                     flow_ids=flow_ids,
-                    state=state,
+                    states=states,
                     start_date=start_date,
                     end_date=end_date,
                     name=name,

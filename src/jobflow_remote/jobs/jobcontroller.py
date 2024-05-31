@@ -5,6 +5,7 @@ import fnmatch
 import logging
 import traceback
 import warnings
+from collections import defaultdict
 from contextlib import ExitStack
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -172,7 +173,7 @@ class JobController:
         job_ids: tuple[str, int] | list[tuple[str, int]] | None = None,
         db_ids: str | list[str] | None = None,
         flow_ids: str | list[str] | None = None,
-        state: JobState | None = None,
+        states: JobState | list[JobState] | None = None,
         locked: bool = False,
         start_date: datetime | None = None,
         end_date: datetime | None = None,
@@ -192,8 +193,8 @@ class JobController:
             One or more db_ids of the Jobs to retrieve.
         flow_ids
             One or more Flow uuids to which the Jobs to retrieve belong.
-        state
-            The state of the Jobs.
+        states
+            One or more states of the Jobs.
         locked
             If True only locked Jobs will be selected.
         start_date
@@ -221,6 +222,8 @@ class JobController:
             db_ids = [db_ids]
         if flow_ids and not isinstance(flow_ids, (list, tuple)):
             flow_ids = [flow_ids]
+        if isinstance(states, JobState):
+            states = [states]
 
         query: dict = {}
 
@@ -236,8 +239,8 @@ class JobController:
         if flow_ids:
             query["job.hosts"] = {"$in": flow_ids}
 
-        if state:
-            query["state"] = state.value
+        if states:
+            query["state"] = {"$in": [s.value for s in states]}
 
         if start_date:
             start_date_str = start_date.astimezone(timezone.utc)
@@ -266,7 +269,7 @@ class JobController:
         job_ids: str | list[str] | None = None,
         db_ids: str | list[str] | None = None,
         flow_ids: str | list[str] | None = None,
-        state: FlowState | None = None,
+        states: FlowState | list[FlowState] | None = None,
         start_date: datetime | None = None,
         end_date: datetime | None = None,
         name: str | None = None,
@@ -284,8 +287,8 @@ class JobController:
             One or more db_ids of Jobs belonging to the Flow.
         flow_ids
             One or more Flow uuids.
-        state
-            The state of the Flows.
+        states
+            One or more states of the Flows.
         start_date
             Filter Flows that were updated_on after this date.
             Should be in the machine local time zone. It will be converted to UTC.
@@ -310,6 +313,8 @@ class JobController:
             db_ids = [db_ids]
         if flow_ids is not None and not isinstance(flow_ids, (list, tuple)):
             flow_ids = [flow_ids]
+        if isinstance(states, FlowState):
+            states = [states]
 
         query: dict = {}
 
@@ -323,8 +328,8 @@ class JobController:
         if flow_ids:
             query["uuid"] = {"$in": flow_ids}
 
-        if state:
-            query["state"] = state.value
+        if states:
+            query["state"] = {"$in": [s.value for s in states]}
 
         if start_date:
             start_date_str = start_date.astimezone(timezone.utc)
@@ -371,7 +376,7 @@ class JobController:
         job_ids: tuple[str, int] | list[tuple[str, int]] | None = None,
         db_ids: str | list[str] | None = None,
         flow_ids: str | list[str] | None = None,
-        state: JobState | None = None,
+        states: JobState | list[JobState] | None = None,
         start_date: datetime | None = None,
         end_date: datetime | None = None,
         name: str | None = None,
@@ -392,8 +397,8 @@ class JobController:
             One or more db_ids of the Jobs to retrieve.
         flow_ids
             One or more Flow uuids to which the Jobs to retrieve belong.
-        state
-            The state of the Jobs.
+        states
+            One or more states of the Jobs.
         locked
             If True only locked Jobs will be selected.
         start_date
@@ -423,7 +428,7 @@ class JobController:
             job_ids=job_ids,
             db_ids=db_ids,
             flow_ids=flow_ids,
-            state=state,
+            states=states,
             locked=locked,
             start_date=start_date,
             end_date=end_date,
@@ -460,7 +465,7 @@ class JobController:
         job_ids: tuple[str, int] | list[tuple[str, int]] | None = None,
         db_ids: str | list[str] | None = None,
         flow_ids: str | list[str] | None = None,
-        state: JobState | None = None,
+        states: JobState | list[JobState] | None = None,
         start_date: datetime | None = None,
         end_date: datetime | None = None,
         name: str | None = None,
@@ -481,8 +486,8 @@ class JobController:
             One or more db_ids of the Jobs to retrieve.
         flow_ids
             One or more Flow uuids to which the Jobs to retrieve belong.
-        state
-            The state of the Jobs.
+        states
+            One or more states of the Jobs.
         locked
             If True only locked Jobs will be selected.
         start_date
@@ -512,7 +517,7 @@ class JobController:
             job_ids=job_ids,
             db_ids=db_ids,
             flow_ids=flow_ids,
-            state=state,
+            states=states,
             locked=locked,
             start_date=start_date,
             end_date=end_date,
@@ -610,7 +615,7 @@ class JobController:
         job_ids: tuple[str, int] | list[tuple[str, int]] | None = None,
         db_ids: str | list[str] | None = None,
         flow_ids: str | list[str] | None = None,
-        state: JobState | None = None,
+        states: JobState | list[JobState] | None = None,
         start_date: datetime | None = None,
         end_date: datetime | None = None,
         name: str | None = None,
@@ -638,7 +643,7 @@ class JobController:
             One or more db_ids of the Jobs to retrieve.
         flow_ids
             One or more Flow uuids to which the Jobs to retrieve belong.
-        state
+        states
             The state of the Jobs.
         locked
             If True only locked Jobs will be selected.
@@ -668,7 +673,7 @@ class JobController:
             job_ids=job_ids,
             db_ids=db_ids,
             flow_ids=flow_ids,
-            state=state,
+            states=states,
             start_date=start_date,
             end_date=end_date,
             name=name,
@@ -698,7 +703,7 @@ class JobController:
         job_ids: tuple[str, int] | list[tuple[str, int]] | None = None,
         db_ids: str | list[str] | None = None,
         flow_ids: str | list[str] | None = None,
-        state: JobState | None = None,
+        states: JobState | list[JobState] | None = None,
         start_date: datetime | None = None,
         end_date: datetime | None = None,
         name: str | None = None,
@@ -721,8 +726,8 @@ class JobController:
             One or more db_ids of the Jobs to retrieve.
         flow_ids
             One or more Flow uuids to which the Jobs to retrieve belong.
-        state
-            The state of the Jobs.
+        states
+            One or more states of the Jobs.
         start_date
             Filter Jobs that were updated_on after this date.
             Should be in the machine local time zone. It will be converted to UTC.
@@ -760,7 +765,7 @@ class JobController:
             job_ids=job_ids,
             db_ids=db_ids,
             flow_ids=flow_ids,
-            state=state,
+            states=states,
             start_date=start_date,
             end_date=end_date,
             name=name,
@@ -970,6 +975,7 @@ class JobController:
                 JobState.PAUSED.value,
             ]
             # Update the state of the descendants
+            updated_states: dict[str, dict[int, JobState]] = defaultdict(dict)
             with ExitStack() as stack:
                 # first acquire the lock on all the descendants and
                 # check their state if needed. Break immediately if
@@ -1018,17 +1024,21 @@ class JobController:
                 # Here all the descendants are locked and could be set to WAITING.
                 # Set the new state for all of them.
                 for child_lock in children_locks:
-                    if child_lock.locked_document["state"] != JobState.WAITING.value:
-                        modified_jobs.append(child_lock.locked_document["db_id"])
+                    child_doc = child_lock.locked_document
+                    if child_doc["state"] != JobState.WAITING.value:
+                        modified_jobs.append(child_doc["db_id"])
                     child_doc_update = get_reset_job_base_dict()
                     child_doc_update["state"] = JobState.WAITING.value
                     child_lock.update_on_release = {"$set": child_doc_update}
+                    updated_states[child_doc["uuid"]][
+                        child_doc["index"]
+                    ] = JobState.WAITING
 
             # if everything is fine here, update the state of the flow
             # before releasing its lock and set the update for the original job
             # pass explicitly the new state of the job, since it is not updated
             # in the DB. The Job is the last lock to be released.
-            updated_states = {job_id: {job_index: JobState.READY}}
+            updated_states[job_id][job_index] = JobState.READY
             self.update_flow_state(
                 flow_uuid=flow_doc.uuid, updated_states=updated_states
             )
@@ -1206,7 +1216,7 @@ class JobController:
         job_ids: tuple[str, int] | list[tuple[str, int]] | None = None,
         db_ids: str | list[str] | None = None,
         flow_ids: str | list[str] | None = None,
-        state: JobState | None = None,
+        states: JobState | list[JobState] | None = None,
         start_date: datetime | None = None,
         end_date: datetime | None = None,
         name: str | None = None,
@@ -1228,8 +1238,8 @@ class JobController:
             One or more db_ids of the Jobs to retrieve.
         flow_ids
             One or more Flow uuids to which the Jobs to retrieve belong.
-        state
-            The state of the Jobs.
+        states
+            One or more states of the Jobs.
         start_date
             Filter Jobs that were updated_on after this date.
             Should be in the machine local time zone. It will be converted to UTC.
@@ -1265,7 +1275,7 @@ class JobController:
             job_ids=job_ids,
             db_ids=db_ids,
             flow_ids=flow_ids,
-            state=state,
+            states=states,
             start_date=start_date,
             end_date=end_date,
             name=name,
@@ -1363,7 +1373,7 @@ class JobController:
         job_ids: tuple[str, int] | list[tuple[str, int]] | None = None,
         db_ids: str | list[str] | None = None,
         flow_ids: str | list[str] | None = None,
-        state: JobState | None = None,
+        states: JobState | list[JobState] | None = None,
         start_date: datetime | None = None,
         end_date: datetime | None = None,
         name: str | None = None,
@@ -1384,8 +1394,8 @@ class JobController:
             One or more db_ids of the Jobs to retrieve.
         flow_ids
             One or more Flow uuids to which the Jobs to retrieve belong.
-        state
-            The state of the Jobs.
+        states
+            One or more states of the Jobs.
         start_date
             Filter Jobs that were updated_on after this date.
             Should be in the machine local time zone. It will be converted to UTC.
@@ -1417,7 +1427,7 @@ class JobController:
             job_ids=job_ids,
             db_ids=db_ids,
             flow_ids=flow_ids,
-            state=state,
+            states=states,
             start_date=start_date,
             end_date=end_date,
             name=name,
@@ -1431,7 +1441,7 @@ class JobController:
         job_ids: tuple[str, int] | list[tuple[str, int]] | None = None,
         db_ids: str | list[str] | None = None,
         flow_ids: str | list[str] | None = None,
-        state: JobState | None = None,
+        states: JobState | list[JobState] | None = None,
         start_date: datetime | None = None,
         end_date: datetime | None = None,
         name: str | None = None,
@@ -1454,8 +1464,8 @@ class JobController:
             One or more db_ids of the Jobs to retrieve.
         flow_ids
             One or more Flow uuids to which the Jobs to retrieve belong.
-        state
-            The state of the Jobs.
+        states
+            One or more states of the Jobs.
         start_date
             Filter Jobs that were updated_on after this date.
             Should be in the machine local time zone. It will be converted to UTC.
@@ -1491,7 +1501,7 @@ class JobController:
             job_ids=job_ids,
             db_ids=db_ids,
             flow_ids=flow_ids,
-            state=state,
+            states=states,
             start_date=start_date,
             end_date=end_date,
             name=name,
@@ -1652,7 +1662,7 @@ class JobController:
         job_ids: tuple[str, int] | list[tuple[str, int]] | None = None,
         db_ids: str | list[str] | None = None,
         flow_ids: str | list[str] | None = None,
-        state: JobState | None = None,
+        states: JobState | list[JobState] | None = None,
         start_date: datetime | None = None,
         end_date: datetime | None = None,
         name: str | None = None,
@@ -1673,8 +1683,8 @@ class JobController:
             One or more db_ids of the Jobs to retrieve.
         flow_ids
             One or more Flow uuids to which the Jobs to retrieve belong.
-        state
-            The state of the Jobs.
+        states
+            One or more states of the Jobs.
         start_date
             Filter Jobs that were updated_on after this date.
             Should be in the machine local time zone. It will be converted to UTC.
@@ -1710,7 +1720,7 @@ class JobController:
             job_ids=job_ids,
             db_ids=db_ids,
             flow_ids=flow_ids,
-            state=state,
+            states=states,
             start_date=start_date,
             end_date=end_date,
             name=name,
@@ -1809,7 +1819,7 @@ class JobController:
         job_ids: tuple[str, int] | list[tuple[str, int]] | None = None,
         db_ids: str | list[str] | None = None,
         flow_ids: str | list[str] | None = None,
-        state: JobState | None = None,
+        states: JobState | list[JobState] | None = None,
         start_date: datetime | None = None,
         end_date: datetime | None = None,
         name: str | None = None,
@@ -1840,8 +1850,8 @@ class JobController:
             One or more db_ids of the Jobs to retrieve.
         flow_ids
             One or more Flow uuids to which the Jobs to retrieve belong.
-        state
-            The state of the Jobs.
+        states
+            One or more states of the Jobs.
         start_date
             Filter Jobs that were updated_on after this date.
             Should be in the machine local time zone. It will be converted to UTC.
@@ -1890,7 +1900,6 @@ class JobController:
                         "else": {"$mergeObjects": ["$exec_config", exec_config]},
                     }
                 }
-                print(cond)
                 set_dict["exec_config"] = cond
 
             else:
@@ -1909,20 +1918,29 @@ class JobController:
             else:
                 set_dict["resources"] = resources
 
+        acceptable_states = [
+            JobState.READY,
+            JobState.WAITING,
+            JobState.COMPLETED,
+            JobState.FAILED,
+            JobState.PAUSED,
+            JobState.REMOTE_ERROR,
+        ]
+
         return self._many_jobs_action(
             method=self._set_job_properties,
             action_description="setting",
             job_ids=job_ids,
             db_ids=db_ids,
             flow_ids=flow_ids,
-            state=state,
+            states=states,
             start_date=start_date,
             end_date=end_date,
             name=name,
             metadata=metadata,
             raise_on_error=raise_on_error,
             values=set_dict,
-            acceptable_states=[JobState.READY, JobState.WAITING],
+            acceptable_states=acceptable_states,
             use_pipeline=update,
         )
 
@@ -1984,7 +2002,7 @@ class JobController:
         job_ids: str | list[str] | None = None,
         db_ids: str | list[str] | None = None,
         flow_ids: str | list[str] | None = None,
-        state: FlowState | None = None,
+        states: FlowState | list[FlowState] | None = None,
         start_date: datetime | None = None,
         end_date: datetime | None = None,
         name: str | None = None,
@@ -2004,8 +2022,8 @@ class JobController:
             One or more db_ids of Jobs belonging to the Flow.
         flow_ids
             One or more Flow uuids.
-        state
-            The state of the Flows.
+        states
+            One or more states of the Flow.
         start_date
             Filter Flows that were updated_on after this date.
             Should be in the machine local time zone. It will be converted to UTC.
@@ -2036,7 +2054,7 @@ class JobController:
             job_ids=job_ids,
             db_ids=db_ids,
             flow_ids=flow_ids,
-            state=state,
+            states=states,
             start_date=start_date,
             end_date=end_date,
             name=name,
@@ -2047,10 +2065,10 @@ class JobController:
         # The single flow document is enough for basic information
         if full:
             # TODO reduce the projection to the bare minimum to reduce the amount of
-            # fecthed data?
+            # fetched data?
             projection = {f"jobs_list.{f}": 1 for f in projection_job_info}
             projection["jobs_list.job.hosts"] = 1
-            for k in FlowDoc.model_fields.keys():
+            for k in FlowDoc.model_fields:
                 projection[k] = 1
 
             data = self.get_flow_job_aggreg(
@@ -2134,7 +2152,7 @@ class JobController:
         job_ids: tuple[str, int] | list[tuple[str, int]] | None = None,
         db_ids: str | list[str] | None = None,
         flow_ids: str | list[str] | None = None,
-        state: JobState | None = None,
+        states: JobState | list[JobState] | None = None,
         start_date: datetime | None = None,
         end_date: datetime | None = None,
         name: str | None = None,
@@ -2154,8 +2172,8 @@ class JobController:
             One or more db_ids of the Jobs to retrieve.
         flow_ids
             One or more Flow uuids to which the Jobs to retrieve belong.
-        state
-            The state of the Jobs.
+        states
+            One or more states of the Jobs.
         start_date
             Filter Jobs that were updated_on after this date.
             Should be in the machine local time zone. It will be converted to UTC.
@@ -2178,7 +2196,7 @@ class JobController:
             job_ids=job_ids,
             db_ids=db_ids,
             flow_ids=flow_ids,
-            state=state,
+            states=states,
             start_date=start_date,
             end_date=end_date,
             locked=True,
@@ -2197,7 +2215,7 @@ class JobController:
         job_ids: str | list[str] | None = None,
         db_ids: str | list[str] | None = None,
         flow_ids: str | list[str] | None = None,
-        state: FlowState | None = None,
+        states: FlowState | list[FlowState] | None = None,
         start_date: datetime | None = None,
         end_date: datetime | None = None,
         name: str | None = None,
@@ -2215,8 +2233,8 @@ class JobController:
             One or more db_ids of Jobs belonging to the Flow.
         flow_ids
             One or more Flow uuids.
-        state
-            The state of the Flows.
+        states
+            One or more states of the Flows.
         start_date
             Filter Flows that were updated_on after this date.
             Should be in the machine local time zone. It will be converted to UTC.
@@ -2236,7 +2254,7 @@ class JobController:
             job_ids=job_ids,
             db_ids=db_ids,
             flow_ids=flow_ids,
-            state=state,
+            states=states,
             start_date=start_date,
             end_date=end_date,
             locked=True,
@@ -2400,7 +2418,7 @@ class JobController:
         job_ids: tuple[str, int] | list[tuple[str, int]] | None = None,
         db_ids: str | list[str] | None = None,
         flow_ids: str | list[str] | None = None,
-        state: JobState | None = None,
+        states: JobState | list[JobState] | None = None,
         locked: bool = False,
         start_date: datetime | None = None,
         end_date: datetime | None = None,
@@ -2421,8 +2439,8 @@ class JobController:
             One or more db_ids of the Jobs to retrieve.
         flow_ids
             One or more Flow uuids to which the Jobs to retrieve belong.
-        state
-            The state of the Jobs.
+        states
+            One or more states of the Jobs.
         locked
             If True only locked Jobs will be selected.
         start_date
@@ -2448,7 +2466,7 @@ class JobController:
                 job_ids=job_ids,
                 db_ids=db_ids,
                 flow_ids=flow_ids,
-                state=state,
+                states=states,
                 locked=locked,
                 start_date=start_date,
                 end_date=end_date,
@@ -2463,7 +2481,7 @@ class JobController:
         job_ids: str | list[str] | None = None,
         db_ids: str | list[str] | None = None,
         flow_ids: str | list[str] | None = None,
-        state: FlowState | None = None,
+        states: FlowState | list[FlowState] | None = None,
         start_date: datetime | None = None,
         end_date: datetime | None = None,
         name: str | None = None,
@@ -2481,8 +2499,8 @@ class JobController:
             One or more db_ids of Jobs belonging to the Flow.
         flow_ids
             One or more Flow uuids.
-        state
-            The state of the Flows.
+        states
+            One or more states of the Flows.
         start_date
             Filter Flows that were updated_on after this date.
             Should be in the machine local time zone. It will be converted to UTC.
@@ -2503,7 +2521,7 @@ class JobController:
                 job_ids=job_ids,
                 db_ids=db_ids,
                 flow_ids=flow_ids,
-                state=state,
+                states=states,
                 start_date=start_date,
                 end_date=end_date,
                 name=name,
@@ -2704,7 +2722,10 @@ class JobController:
 
         if flow_uuid is not None:
             # if flow uuid provided, only include job ids in that flow
-            job_uuids = self.get_flow_info_by_flow_uuid(flow_uuid, ["jobs"])["jobs"]
+            flow_out = self.get_flow_info_by_flow_uuid(flow_uuid, ["jobs"])
+            if not flow_out:
+                return None
+            job_uuids = flow_out["jobs"]
             query["uuid"] = {"$in": job_uuids}
 
         if sort is None:
@@ -3123,17 +3144,33 @@ class JobController:
             flow_uuid=flow_uuid, projection=projection
         )
 
+        # update the full list of states and those of the leafs according
+        # to the updated_states passed
         jobs_states = [
             updated_states.get(j["uuid"], {}).get(j["index"], JobState(j["state"]))
             for j in flow_jobs
         ]
         leafs = get_flow_leafs(flow_jobs)
-        leaf_states = [JobState(j["state"]) for j in leafs]
+        leaf_states = [
+            updated_states.get(j["uuid"], {}).get(j["index"], JobState(j["state"]))
+            for j in leafs
+        ]
         flow_state = FlowState.from_jobs_states(
             jobs_states=jobs_states, leaf_states=leaf_states
         )
-        set_state = {"$set": {"state": flow_state.value}}
-        self.flows.find_one_and_update({"uuid": flow_uuid}, set_state)
+
+        # update flow state. If it is changed update the updated_on
+        updated_cond = {
+            "$cond": {
+                "if": {"$eq": ["$state", flow_state.value]},
+                "then": "$updated_on",
+                "else": datetime.utcnow(),
+            }
+        }
+        self.flows.find_one_and_update(
+            {"uuid": flow_uuid},
+            [{"$set": {"state": flow_state.value, "updated_on": updated_cond}}],
+        )
 
     @contextlib.contextmanager
     def lock_job(self, **lock_kwargs) -> Generator[MongoLock, None, None]:

@@ -842,7 +842,7 @@ class Runner:
 
             qjobs_dict = {}
             try:
-                ids_list = list(ids_docs.keys())
+                ids_list = list(ids_docs)
                 queue = self.get_queue_manager(worker_name)
                 qjobs = queue.get_jobs_list(ids_list)
                 qjobs_dict = {qjob.job_id: qjob for qjob in qjobs}
@@ -884,7 +884,7 @@ class Runner:
                     # reset the step attempts if succeeding in case there was
                     # an error earlier. Setting the state to the same as the
                     # current triggers the update that cleans the state
-                    next_state = JobState(remote_doc["state"])
+                    next_state = JobState(doc["state"])
 
                 # the document needs to be updated only in case of error or if a
                 # next state has been set.
@@ -928,8 +928,12 @@ class Runner:
         logger.debug("checkout jobs")
         n_checked_out = 0
         while True:
-            reserved = self.job_controller.checkout_job()
-            if not reserved:
+            try:
+                reserved = self.job_controller.checkout_job()
+                if not reserved:
+                    break
+            except Exception:
+                logger.error("Error while checking out jobs", exc_info=True)
                 break
 
             n_checked_out += 1
@@ -986,7 +990,7 @@ class Runner:
             # Check the processes that should be running on the remote queue
             # and update the state in the DB if something changed
             batch_processes_data = self.job_controller.get_batch_processes(worker_name)
-            processes = list(batch_processes_data.keys())
+            processes = list(batch_processes_data)
             queue_manager = self.get_queue_manager(worker_name)
             if processes:
                 qjobs = queue_manager.get_jobs_list(processes)

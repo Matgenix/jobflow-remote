@@ -32,7 +32,7 @@ def test_run_batch(job_controller, monkeypatch):
 
     runner.run_all_jobs(max_seconds=120)
 
-    assert job_controller.count_jobs(state=JobState.COMPLETED) == 6
+    assert job_controller.count_jobs(states=JobState.COMPLETED) == 6
 
 
 def test_max_jobs_worker(job_controller, daemon_manager):

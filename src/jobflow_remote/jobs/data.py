@@ -207,7 +207,7 @@ def _projection_db_info() -> list[str]:
     list
         The list of fields to use in a query.
     """
-    projection = list(JobInfo.model_fields.keys())
+    projection = list(JobInfo.model_fields)
     projection.remove("name")
     projection.append("job.name")
     projection.append("job.metadata")

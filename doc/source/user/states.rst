@@ -116,7 +116,7 @@ Error state. The Job was stopped by another Job as a consequence of a
 This state cannot be modified.
 
 USER_STOPPED
----------
+------------
 
 Error state. A Job stopped by the user. This state cannot be modified.
 
@@ -128,7 +128,7 @@ from the ``SUBMITTED`` state since the ``Runner`` does not have to
 check its state in the queueing system.
 
 BATCH_RUNNING
----------------
+-------------
 
 Running state. A Job that is being executed by a batch worker. Differs
 from the ``RUNNING`` state since the ``Runner`` does not have to
@@ -159,7 +159,6 @@ to intermediate or final error states.
         DOWNLOADED --> COMPLETED
         DOWNLOADED --> FAILED
 
-        READY --> REMOTE_ERROR
         CHECKED_OUT --> REMOTE_ERROR
         UPLOADED --> REMOTE_ERROR
         SUBMITTED --> REMOTE_ERROR

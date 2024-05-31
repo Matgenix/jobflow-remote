@@ -535,7 +535,6 @@ class DaemonManager:
         return True
 
     def wait_start(self, timeout: int = 30):
-
         time_limit = time.time() + timeout
         while True:
             processes_info = self.get_processes_info()
@@ -561,9 +560,7 @@ class DaemonManager:
     ):
         processes_info = self.get_processes_info()
         if processes_names is None:
-            processes_names = [
-                pn for pn in processes_info.keys() if pn != "supervisord"
-            ]
+            processes_names = [pn for pn in processes_info if pn != "supervisord"]
 
         for name in processes_names:
             if name not in processes_info:
@@ -577,7 +574,6 @@ class DaemonManager:
             self.foreground_process(name, print_function)
 
     def foreground_process(self, name, print_function: Callable | None = None):
-
         # This is adapted from supervisor.supervisorctl.DefaultControllerPlugin.do_fg
         a = None
         if print_function is None:

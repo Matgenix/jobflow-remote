@@ -143,7 +143,7 @@ def unlock(
             jobs_info = jc.get_jobs_info(
                 job_ids=job_ids_indexes,
                 db_ids=db_id,
-                state=state,
+                states=state,
                 start_date=start_date,
                 locked=True,
                 end_date=end_date,
@@ -166,7 +166,7 @@ def unlock(
         num_unlocked = jc.unlock_jobs(
             job_ids=job_id,
             db_ids=db_id,
-            state=state,
+            states=state,
             start_date=start_date,
             end_date=end_date,
         )
@@ -203,7 +203,7 @@ def unlock_flow(
                 job_ids=job_ids_indexes,
                 db_ids=db_id,
                 flow_ids=flow_id,
-                state=state,
+                states=state,
                 start_date=start_date,
                 locked=True,
                 end_date=end_date,
@@ -227,7 +227,7 @@ def unlock_flow(
             job_ids=job_id,
             db_ids=db_id,
             flow_ids=flow_id,
-            state=state,
+            states=state,
             start_date=start_date,
             end_date=end_date,
         )
