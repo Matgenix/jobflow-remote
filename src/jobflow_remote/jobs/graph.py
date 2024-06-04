@@ -173,6 +173,7 @@ def plot_dash(flow: FlowInfo):
     def displayTapNodeData(data):
         if data:
             return str(data)
+        return None
 
     app.run(debug=True)
 
@@ -213,11 +214,8 @@ def get_mermaid(flow: FlowInfo, show_subflows: bool = True):
     subgraph_styles = []
 
     # add subgraphs
-    def add_subgraph(nested_hosts_hierarchy, indent_level=0):
-        if show_subflows:
-            prefix = "    " * indent_level
-        else:
-            prefix = "    "
+    def add_subgraph(nested_hosts_hierarchy, indent_level=0) -> None:
+        prefix = "    " * indent_level if show_subflows else "    "
 
         for ref_id in sorted(nested_hosts_hierarchy, key=lambda x: str(x)):
             subhosts = nested_hosts_hierarchy[ref_id]

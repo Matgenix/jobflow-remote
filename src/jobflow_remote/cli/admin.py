@@ -53,7 +53,7 @@ def reset(
         ),
     ] = 25,
     force: force_opt = False,
-):
+) -> None:
     """
     Reset the jobflow database.
     WARNING: deletes all the data. These could not be retrieved anymore.
@@ -94,11 +94,11 @@ def remove_lock(
     start_date: start_date_opt = None,
     end_date: end_date_opt = None,
     force: force_opt = False,
-):
+) -> None:
     """
     DEPRECATED: use unlock instead
     Forcibly removes the lock from the documents of the selected jobs.
-    WARNING: can lead to inconsistencies if the processes is actually running
+    WARNING: can lead to inconsistencies if the processes is actually running.
     """
     out_console.print(
         "remove-lock command has been DEPRECATED. Use unlock instead.",
@@ -123,10 +123,10 @@ def unlock(
     start_date: start_date_opt = None,
     end_date: end_date_opt = None,
     force: force_opt = False,
-):
+) -> None:
     """
     Forcibly removes the lock from the documents of the selected jobs.
-    WARNING: can lead to inconsistencies if the processes is actually running
+    WARNING: can lead to inconsistencies if the processes is actually running.
     """
     job_ids_indexes = get_job_ids_indexes(job_id)
 
@@ -181,10 +181,10 @@ def unlock_flow(
     start_date: start_date_opt = None,
     end_date: end_date_opt = None,
     force: force_opt = False,
-):
+) -> None:
     """
     Forcibly removes the lock from the documents of the selected jobs.
-    WARNING: can lead to inconsistencies if the processes is actually running
+    WARNING: can lead to inconsistencies if the processes is actually running.
     """
     job_ids_indexes = get_job_ids_indexes(job_id)
 

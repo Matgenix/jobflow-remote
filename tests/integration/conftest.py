@@ -16,7 +16,7 @@ from docker.models.containers import Container
 
 
 @pytest.fixture(autouse=True)
-def mock_fabric_run(monkeypatch):
+def mock_fabric_run(monkeypatch) -> None:
     monkeypatch.setattr(
         fabric.Connection, "run", partialmethod(fabric.Connection.run, in_stream=False)
     )
@@ -275,7 +275,7 @@ def write_tmp_settings(
     shutil.rmtree(tmp_dir)
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture()
 def job_controller(random_project_name):
     """Yields a jobcontroller instance for the test suite that also sets up the jobstore,
     resetting it after every test.

@@ -1,5 +1,4 @@
-from collections.abc import Iterable
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 
 import typer
 from rich.prompt import Confirm
@@ -28,6 +27,9 @@ from jobflow_remote.config.helper import (
     generate_dummy_project,
 )
 
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+
 app_project = JFRTyper(
     name="project",
     help="Commands concerning the project definition",
@@ -46,10 +48,8 @@ def list_projects(
             help="Print the warning for the files that could not be parsed",
         ),
     ] = False,
-):
-    """
-    List of available projects
-    """
+) -> None:
+    """List of available projects."""
     cm = ConfigManager(warn=warn)
 
     project_name = None
@@ -86,10 +86,8 @@ def list_projects(
 
 
 @app_project.callback(invoke_without_command=True)
-def current_project(ctx: typer.Context):
-    """
-    Print the list of the project currently selected
-    """
+def current_project(ctx: typer.Context) -> None:
+    """Print the list of the project currently selected."""
     # only run if no other subcommand is executed
     if ctx.invoked_subcommand is None:
         out_console.print("Run 'jf project -h' to get the list of available commands")
@@ -106,10 +104,8 @@ def generate(
             help="Generate a configuration file with all the fields and more elements",
         ),
     ] = False,
-):
-    """
-    Generate a project configuration file with dummy elements to be edited manually
-    """
+) -> None:
+    """Generate a project configuration file with dummy elements to be edited manually."""
     cm = ConfigManager(exclude_unset=not full)
     if name in cm.projects_data:
         exit_with_error_msg(f"Project with name {name} already exists")
@@ -159,10 +155,8 @@ def check(
             help="Print the errors at the end of the checks",
         ),
     ] = False,
-):
-    """
-    Check that the connection to the different elements of the projects are working
-    """
+) -> None:
+    """Check that the connection to the different elements of the projects are working."""
     check_incompatible_opt({"jobstore": jobstore, "queue": queue, "worker": worker})
 
     cm = get_config_manager()
@@ -236,10 +230,8 @@ def remove(
         ),
     ] = False,
     force: force_opt = False,
-):
-    """
-    Remove a project from the projects' folder, including the related folders.
-    """
+) -> None:
+    """Remove a project from the projects' folder, including the related folders."""
     cm = get_config_manager()
 
     if name not in cm.projects_data:
@@ -273,7 +265,7 @@ app_project.add_typer(app_exec_config)
 @app_exec_config.command(name="list")
 def list_exec_config(
     verbosity: verbosity_opt = 0,
-):
+) -> None:
     cm = get_config_manager()
     project = cm.get_project()
     table = get_exec_config_table(project.exec_config, verbosity)
@@ -296,7 +288,7 @@ app_project.add_typer(app_worker)
 @app_worker.command(name="list")
 def list_worker(
     verbosity: verbosity_opt = 0,
-):
+) -> None:
     cm = get_config_manager()
     project = cm.get_project()
     table = get_worker_table(project.workers, verbosity)

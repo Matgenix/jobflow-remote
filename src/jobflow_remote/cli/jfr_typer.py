@@ -7,11 +7,9 @@ from jobflow_remote.cli.utils import cli_error_handler
 
 
 class JFRTyper(typer.Typer):
-    """
-    Subclassing typer to intercept exceptions and print nicer error messages
-    """
+    """Subclassing typer to intercept exceptions and print nicer error messages."""
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs) -> None:
         if "epilog" not in kwargs:
             kwargs["epilog"] = (
                 "Run [bold]'jf -h'[/] to display the [bold]global options[/]"

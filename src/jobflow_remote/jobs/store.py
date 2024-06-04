@@ -1,8 +1,11 @@
 from __future__ import annotations
 
-from jobflow.core.store import JobStore
+from typing import TYPE_CHECKING
 
 from jobflow_remote.config.manager import ConfigManager
+
+if TYPE_CHECKING:
+    from jobflow.core.store import JobStore
 
 
 def get_jobstore(project_name: str | None = None) -> JobStore:

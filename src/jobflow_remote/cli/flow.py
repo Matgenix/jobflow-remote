@@ -61,10 +61,8 @@ def flows_list(
     max_results: max_results_opt = 100,
     sort: sort_opt = SortOption.UPDATED_ON,
     reverse_sort: reverse_sort_flag_opt = False,
-):
-    """
-    Get the list of Jobs in the database
-    """
+) -> None:
+    """Get the list of Jobs in the database."""
     check_incompatible_opt({"start_date": start_date, "days": days, "hours": hours})
     check_incompatible_opt({"end_date": end_date, "days": days, "hours": hours})
 
@@ -112,10 +110,8 @@ def delete(
     days: days_opt = None,
     hours: hours_opt = None,
     force: force_opt = False,
-):
-    """
-    Permanently delete Flows from the database
-    """
+) -> None:
+    """Permanently delete Flows from the database."""
     check_incompatible_opt({"start_date": start_date, "days": days, "hours": hours})
     check_incompatible_opt({"end_date": end_date, "days": days, "hours": hours})
 
@@ -162,10 +158,8 @@ def delete(
 def flow_info(
     flow_db_id: flow_db_id_arg,
     job_id_flag: job_flow_id_flag_opt = False,
-):
-    """
-    Provide detailed information on a Flow
-    """
+) -> None:
+    """Provide detailed information on a Flow."""
     db_id, jf_id = get_job_db_ids(flow_db_id, None)
     db_ids = job_ids = flow_ids = None
     if db_id is not None:
@@ -227,10 +221,8 @@ def graph(
             help="Print the mermaid graph",
         ),
     ] = False,
-):
-    """
-    Provide detailed information on a Flow
-    """
+) -> None:
+    """Provide detailed information on a Flow."""
     db_id, jf_id = get_job_db_ids(flow_db_id, None)
     db_ids = job_ids = flow_ids = None
     if db_id is not None:

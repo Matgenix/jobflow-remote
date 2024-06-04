@@ -4,9 +4,7 @@ from enum import Enum
 
 
 class JobState(Enum):
-    """
-    States of a Job
-    """
+    """States of a Job."""
 
     WAITING = "WAITING"
     READY = "READY"
@@ -74,9 +72,7 @@ RESETTABLE_STATES_V = RUNNING_STATES_V
 
 
 class FlowState(Enum):
-    """
-    States of a Flow.
-    """
+    """States of a Flow."""
 
     WAITING = "WAITING"
     READY = "READY"

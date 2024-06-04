@@ -1,6 +1,4 @@
-"""
-Scheduling tools based on the schedule module
-"""
+"""Scheduling tools based on the schedule module."""
 
 from __future__ import annotations
 
@@ -25,7 +23,7 @@ class SafeScheduler(Scheduler):
 
     def __init__(
         self, reschedule_on_failure: bool = True, seconds_after_failure: int = 0
-    ):
+    ) -> None:
         """
         If reschedule_on_failure is True, jobs will be rescheduled for their
         next run as if they had completed successfully. If False, they'll run
@@ -35,7 +33,7 @@ class SafeScheduler(Scheduler):
         self.seconds_after_failure = seconds_after_failure
         super().__init__()
 
-    def _run_job(self, job):
+    def _run_job(self, job) -> None:
         try:
             super()._run_job(job)
         except Exception:

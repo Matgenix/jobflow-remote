@@ -131,7 +131,7 @@ class DaemonManager:
         daemon_dir: str | Path,
         log_dir: str | Path,
         project: Project,
-    ):
+    ) -> None:
         self.project = project
         self.daemon_dir = Path(daemon_dir).absolute()
         self.log_dir = Path(log_dir).absolute()
@@ -169,7 +169,7 @@ class DaemonManager:
             raise DaemonError(msg)
         return path
 
-    def clean_files(self):
+    def clean_files(self) -> None:
         self.pid_filepath.unlink(missing_ok=True)
         self.sock_filepath.unlink(missing_ok=True)
 
@@ -179,8 +179,7 @@ class DaemonManager:
             "SUPERVISOR_USERNAME": "",
             "SUPERVISOR_PASSWORD": "",
         }
-        interface = childutils.getRPCInterface(env)
-        return interface
+        return childutils.getRPCInterface(env)
 
     def get_supervisord_pid(self) -> int | None:
         pid_fp = self.pid_filepath
@@ -319,7 +318,7 @@ class DaemonManager:
         log_level: str = "info",
         nodaemon: bool = False,
         connect_interactive: bool = False,
-    ):
+    ) -> None:
         if single:
             conf = self.conf_template_single.substitute(
                 sock_file=str(self.sock_filepath),
@@ -535,7 +534,7 @@ class DaemonManager:
             return False
         return True
 
-    def wait_start(self, timeout: int = 30):
+    def wait_start(self, timeout: int = 30) -> None:
         time_limit = time.time() + timeout
         while True:
             processes_info = self.get_processes_info()
@@ -558,7 +557,7 @@ class DaemonManager:
         self,
         processes_names: list | None = None,
         print_function: Callable | None = None,
-    ):
+    ) -> None:
         processes_info = self.get_processes_info()
         if processes_names is None:
             processes_names = [pn for pn in processes_info if pn != "supervisord"]
@@ -574,7 +573,7 @@ class DaemonManager:
                 )
             self.foreground_process(name, print_function)
 
-    def foreground_process(self, name, print_function: Callable | None = None):
+    def foreground_process(self, name, print_function: Callable | None = None) -> None:
         # This is adapted from supervisor.supervisorctl.DefaultControllerPlugin.do_fg
         a = None
         if print_function is None:
@@ -623,5 +622,4 @@ class DaemonManager:
         options = ClientOptions()
         args = ["-c", self.conf_filepath]
         options.realize(args, doc="")
-        ctl = Controller(options)
-        return ctl
+        return Controller(options)

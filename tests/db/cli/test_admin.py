@@ -1,7 +1,7 @@
 import pytest
 
 
-def test_reset(job_controller, four_jobs):
+def test_reset(job_controller, four_jobs) -> None:
     from jobflow_remote.testing.cli import run_check_cli
 
     run_check_cli(
@@ -22,7 +22,7 @@ def test_reset(job_controller, four_jobs):
     assert job_controller.count_jobs() == 0
 
 
-def test_unlock(job_controller, one_job):
+def test_unlock(job_controller, one_job) -> None:
     from jobflow_remote.testing.cli import run_check_cli
 
     j = one_job.jobs[0]
@@ -49,7 +49,7 @@ def test_unlock(job_controller, one_job):
     )
 
 
-def test_unlock_flow(job_controller, one_job):
+def test_unlock_flow(job_controller, one_job) -> None:
     from jobflow_remote.testing.cli import run_check_cli
 
     # catch the warning coming from MongoLock

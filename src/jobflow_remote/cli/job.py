@@ -181,10 +181,8 @@ def job_info(
         ),
     ] = False,
     verbosity: verbosity_opt = 0,
-):
-    """
-    Detail information on a specific job
-    """
+) -> None:
+    """Detail information on a specific job."""
     db_id, job_id = get_job_db_ids(job_db_id, job_index)
 
     if with_error:
@@ -220,10 +218,10 @@ def set_state(
     state: job_state_arg,
     job_db_id: job_db_id_arg,
     job_index: job_index_arg = None,
-):
+) -> None:
     """
     Sets the state of a Job to an arbitrary value.
-    WARNING: No checks. This can lead to inconsistencies in the DB. Use with care
+    WARNING: No checks. This can lead to inconsistencies in the DB. Use with care.
     """
     db_id, job_id = get_job_db_ids(job_db_id, job_index)
 
@@ -273,7 +271,7 @@ def rerun(
         ),
     ] = False,
     raise_on_error: raise_on_error_opt = False,
-):
+) -> None:
     """
     Rerun a Job. By default, this is limited to jobs that failed and children did
     not start or jobs that are running. The rerun Job is set to READY and children
@@ -328,7 +326,7 @@ def retry(
     wait: wait_lock_opt = None,
     break_lock: break_lock_opt = False,
     raise_on_error: raise_on_error_opt = False,
-):
+) -> None:
     """
     Retry to perform the operation that failed for a job in a REMOTE_ERROR state
     or reset the number of attempts at remote action, in order to allow the
@@ -378,10 +376,8 @@ def pause(
     verbosity: verbosity_opt = 0,
     wait: wait_lock_opt = None,
     raise_on_error: raise_on_error_opt = False,
-):
-    """
-    Pause a Job. Only READY and WAITING Jobs can be paused. The operation is reversible.
-    """
+) -> None:
+    """Pause a Job. Only READY and WAITING Jobs can be paused. The operation is reversible."""
     jc = get_job_controller()
 
     execute_multi_jobs_cmd(
@@ -422,10 +418,8 @@ def play(
     verbosity: verbosity_opt = 0,
     wait: wait_lock_opt = None,
     raise_on_error: raise_on_error_opt = False,
-):
-    """
-    Resume a Job that was previously PAUSED.
-    """
+) -> None:
+    """Resume a Job that was previously PAUSED."""
     jc = get_job_controller()
 
     execute_multi_jobs_cmd(
@@ -467,7 +461,7 @@ def stop(
     wait: wait_lock_opt = None,
     break_lock: break_lock_opt = False,
     raise_on_error: raise_on_error_opt = False,
-):
+) -> None:
     """
     Stop a Job. Only Jobs that did not complete or had an error can be stopped.
     The operation is irreversible.
@@ -504,10 +498,8 @@ def stop(
 def queue_out(
     job_db_id: job_db_id_arg,
     job_index: job_index_arg = None,
-):
-    """
-    Print the content of the output files produced by the queue manager.
-    """
+) -> None:
+    """Print the content of the output files produced by the queue manager."""
     db_id, job_id = get_job_db_ids(job_db_id, job_index)
 
     cm = get_config_manager()
@@ -781,10 +773,8 @@ def job_dump(
             help="Path to where the file should be dumped",
         ),
     ] = "jobs_dump.json",
-):
-    """
-    Dump to json the documents of the selected Jobs from the DB. For debugging.
-    """
+) -> None:
+    """Dump to json the documents of the selected Jobs from the DB. For debugging."""
     check_incompatible_opt({"start_date": start_date, "days": days, "hours": hours})
     check_incompatible_opt({"end_date": end_date, "days": days, "hours": hours})
     metadata_dict = str_to_dict(metadata)
@@ -833,10 +823,8 @@ def output(
             help="If enabled all the data from additional stores are also loaded ",
         ),
     ] = False,
-):
-    """
-    Detail information on a specific job
-    """
+) -> None:
+    """Detail information on a specific job."""
     db_id, job_id = get_job_db_ids(job_db_id, job_index)
 
     with loading_spinner():
@@ -877,10 +865,8 @@ app_job.add_typer(app_job_files)
 def files_list(
     job_db_id: job_db_id_arg,
     job_index: job_index_arg = None,
-):
-    """
-    List of files in the run_dir of the selected Job.
-    """
+) -> None:
+    """List of files in the run_dir of the selected Job."""
     db_id, job_id = get_job_db_ids(job_db_id, job_index)
 
     cm = get_config_manager()
@@ -947,7 +933,7 @@ def files_get(
             help="If defined, the files will be copied to this path. Otherwise in the local folder.",
         ),
     ] = None,
-):
+) -> None:
     db_id, job_id = get_job_db_ids(job_db_id, job_index)
 
     cm = get_config_manager()

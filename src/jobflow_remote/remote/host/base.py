@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import abc
 import traceback
-from pathlib import Path
+from typing import TYPE_CHECKING, NoReturn
 
 from monty.json import MSONable
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 class BaseHost(MSONable):
@@ -17,7 +20,7 @@ class BaseHost(MSONable):
         workdir: str | Path | None = None,
         timeout: int | None = None,
     ):
-        """Execute the given command on the host
+        """Execute the given command on the host.
 
         Parameters
         ----------
@@ -91,7 +94,7 @@ class BaseHost(MSONable):
     def interactive_login(self) -> bool:
         """
         True if the host requires interactive actions upon login.
-        False by default. Subclasses should override the method to customize the value
+        False by default. Subclasses should override the method to customize the value.
         """
         return False
 

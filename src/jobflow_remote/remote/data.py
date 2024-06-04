@@ -5,9 +5,8 @@ import inspect
 import io
 import logging
 import os
-from collections.abc import Iterator
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any, NoReturn
 
 import orjson
 from jobflow.core.job import Job
@@ -23,6 +22,9 @@ from monty.json import MontyDecoder, jsanitize
 from jobflow_remote.jobs.data import RemoteError
 from jobflow_remote.utils.data import uuid_to_path
 
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
 JOB_INIT_ARGS = {k for k in inspect.signature(Job).parameters if k != "kwargs"}
 """A set of the arguments of the Job constructor which
 can be used to detect additional custom arguments
@@ -32,10 +34,7 @@ can be used to detect additional custom arguments
 def get_job_path(
     job_id: str, index: int | None, base_path: str | Path | None = None
 ) -> str:
-    if base_path:
-        base_path = Path(base_path)
-    else:
-        base_path = Path()
+    base_path = Path(base_path) if base_path else Path()
 
     relative_path = uuid_to_path(job_id, index)
     return str(base_path / relative_path)
@@ -73,14 +72,12 @@ def get_remote_store(
             dir_path=work_dir,
         )
 
-    remote_store = JobStore(
+    return JobStore(
         docs_store=docs_store,
         additional_stores=additional_stores,
         save=store.save,
         load=store.load,
     )
-
-    return remote_store
 
 
 default_remote_store = {"store": "maggma_json", "zip": False}
@@ -110,6 +107,7 @@ def get_single_store(
             raise ValueError(
                 f"Could not instantiate a proper store from remote config dict {store_type}"
             )
+        return None
     else:
         raise ValueError(f"remote store type not supported: {store_type}")
 
@@ -163,7 +161,7 @@ def get_store_file_paths(store: JobStore) -> list[str]:
     return store_paths
 
 
-def update_store(store: JobStore, remote_store: JobStore, db_id: int):
+def update_store(store: JobStore, remote_store: JobStore, db_id: int) -> None:
     try:
         store.connect()
         remote_store.connect()
@@ -295,10 +293,10 @@ def check_additional_stores(job: dict | Job, store: JobStore) -> list[str]:
 class StdJSONStore(JSONStore):
     """
     Simple subclass of the JSONStore defining the serialization_default
-    that cannot be dumped to json
+    that cannot be dumped to json.
     """
 
-    def __init__(self, paths, **kwargs):
+    def __init__(self, paths, **kwargs) -> None:
         super().__init__(
             paths=paths,
             serialization_default=default_orjson_serializer,
@@ -317,7 +315,7 @@ class MinimalFileStore(Store):
     def _collection(self):
         raise NotImplementedError
 
-    def close(self):
+    def close(self) -> None:
         self.update_file()
 
     def count(self, criteria: dict | None = None) -> int:
@@ -356,10 +354,10 @@ class MinimalFileStore(Store):
         self,
         path: str,
         **kwargs,
-    ):
+    ) -> None:
         """
         Args:
-            path: paths for json files to turn into a Store
+            path: paths for json files to turn into a Store.
         """
         self.path = path
 
@@ -370,17 +368,15 @@ class MinimalFileStore(Store):
 
         super().__init__(**kwargs)
 
-    def connect(self, force_reset: bool = False):
-        """
-        Loads the files into the collection in memory.
-        """
+    def connect(self, force_reset: bool = False) -> None:
+        """Loads the files into the collection in memory."""
         # create the .json file if it does not exist
         if not Path(self.path).exists():
             self.update_file()
         else:
             self.data = self.read_file()
 
-    def update(self, docs: list[dict] | dict, key: list | str | None = None):
+    def update(self, docs: list[dict] | dict, key: list | str | None = None) -> None:
         """
         Update documents into the Store.
 
@@ -437,10 +433,8 @@ class MinimalORJSONStore(MinimalFileStore):
     def name(self) -> str:
         return f"json://{self.path}"
 
-    def update_file(self):
-        """
-        Updates the json file when a write-like operation is performed.
-        """
+    def update_file(self) -> None:
+        """Updates the json file when a write-like operation is performed."""
         with zopen(self.path, "wb") as f:
             for d in self.data:
                 d.pop("_id", None)
@@ -478,10 +472,8 @@ class MinimalMsgspecJSONStore(MinimalFileStore):
     def name(self) -> str:
         return f"json://{self.path}"
 
-    def update_file(self):
-        """
-        Updates the json file when a write-like operation is performed.
-        """
+    def update_file(self) -> None:
+        """Updates the json file when a write-like operation is performed."""
         import msgspec
 
         with zopen(self.path, "wb") as f:
@@ -534,10 +526,8 @@ class MinimalMsgpackStore(MinimalFileStore):
     def name(self) -> str:
         return f"msgpack://{self.path}"
 
-    def update_file(self):
-        """
-        Updates the msgpack file when a write-like operation is performed.
-        """
+    def update_file(self) -> None:
+        """Updates the msgpack file when a write-like operation is performed."""
         import msgpack
 
         with zopen(self.path, "wb") as f:

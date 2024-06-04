@@ -41,11 +41,11 @@ def deep_merge_dict(
     for key in d2:
         if key in d1:
             if isinstance(d1[key], Mapping) and isinstance(d2[key], Mapping):
-                deep_merge_dict(d1[key], d2[key], path + [str(key)])
+                deep_merge_dict(d1[key], d2[key], [*path, str(key)])
             elif d1[key] == d2[key]:
                 pass  # same leaf value
             elif raise_on_conflicts:
-                raise ValueError("Conflict at %s" % ".".join(path + [str(key)]))
+                raise ValueError(f"Conflict at {'.'.join([*path, str(key)])}")
             else:
                 d1[key] = d2[key]
         else:
@@ -121,7 +121,7 @@ def store_from_dict(store_dict: dict) -> Store:
 def convert_store(spec_dict: dict, valid_stores) -> Store:
     """
     Build a store based on the dict spec configuration from JobFlow
-    TODO expose the methods from jobflow and don't duplicate the code
+    TODO expose the methods from jobflow and don't duplicate the code.
     """
     _spec_dict = dict(spec_dict)
     store_type = _spec_dict.pop("type")

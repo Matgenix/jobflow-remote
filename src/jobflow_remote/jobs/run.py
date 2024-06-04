@@ -7,11 +7,10 @@ import os
 import subprocess
 import time
 import traceback
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 from jobflow import JobStore, initialize_logger
 from jobflow.core.flow import get_flow
-from jobflow.core.job import Job
 from monty.os import cd
 from monty.serialization import dumpfn, loadfn
 from monty.shutil import decompress_file
@@ -21,11 +20,16 @@ from jobflow_remote.jobs.data import IN_FILENAME, OUT_FILENAME
 from jobflow_remote.remote.data import get_job_path, get_store_file_paths
 from jobflow_remote.utils.log import initialize_remote_run_log
 
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from jobflow.core.job import Job
+
 logger = logging.getLogger(__name__)
 
 
-def run_remote_job(run_dir: str | Path = "."):
-    """Run the job"""
+def run_remote_job(run_dir: str | Path = ".") -> None:
+    """Run the job."""
     initialize_remote_run_log()
 
     start_time = datetime.datetime.utcnow()
@@ -95,7 +99,7 @@ def run_batch_jobs(
     max_time: int | None = None,
     max_wait: int = 60,
     max_jobs: int | None = None,
-):
+) -> None:
     initialize_remote_run_log()
 
     # TODO the ID should be somehow linked to the queue job
@@ -153,7 +157,7 @@ def run_batch_jobs(
                 logger.info(f"Completed job with id {job_id} and index {index}")
 
 
-def decompress_files(store: JobStore):
+def decompress_files(store: JobStore) -> None:
     file_names = [OUT_FILENAME]
     file_names.extend(os.path.basename(p) for p in get_store_file_paths(store))
 

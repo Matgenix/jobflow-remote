@@ -23,10 +23,8 @@ def run(
             help="The path to the folder where the files of the job to run will be executed",
         ),
     ] = ".",
-):
-    """
-    Run the Job in the selected folder based on the
-    """
+) -> None:
+    """Run the Job in the selected folder based on the."""
     run_remote_job(run_dir)
 
 
@@ -78,10 +76,8 @@ def run_batch(
             help=("The maximum number of jobs that will be executed by the batch job"),
         ),
     ] = None,
-):
-    """
-    Run Jobs in batch mode
-    """
+) -> None:
+    """Run Jobs in batch mode."""
     run_batch_jobs(
         base_run_dir,
         files_dir,

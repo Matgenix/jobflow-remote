@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from qtoolkit.core.data_objects import CancelResult, QJob, QResources, SubmissionResult
-from qtoolkit.io.base import BaseSchedulerIO
 from qtoolkit.io.shell import ShellIO
 
-from jobflow_remote.remote.host import BaseHost
+if TYPE_CHECKING:
+    from qtoolkit.io.base import BaseSchedulerIO
+
+    from jobflow_remote.remote.host import BaseHost
 
 OUT_FNAME = "queue.out"
 ERR_FNAME = "queue.err"
@@ -17,7 +20,7 @@ def set_name_out(
     name: str,
     out_fpath: str | Path = OUT_FNAME,
     err_fpath: str | Path = ERR_FNAME,
-):
+) -> None:
     # sanitize the name
     name = name.replace(" ", "_")
     if isinstance(resources, QResources):
@@ -46,7 +49,7 @@ class QueueManager:
         scheduler_io: BaseSchedulerIO,
         host: BaseHost,
         timeout_exec: int | None = None,
-    ):
+    ) -> None:
         self.scheduler_io = scheduler_io
         self.host = host
         self.timeout_exec = timeout_exec
@@ -194,10 +197,7 @@ class QueueManager:
             created = self.host.mkdir(work_dir, recursive=True, exist_ok=True)
             if not created:
                 raise RuntimeError("failed to create directory")
-        if work_dir:
-            script_fpath = Path(work_dir, script_fname)
-        else:
-            script_fpath = Path(script_fname)
+        script_fpath = Path(work_dir, script_fname) if work_dir else Path(script_fname)
         self.host.write_text_file(script_fpath, script_str)
         return script_fpath
 

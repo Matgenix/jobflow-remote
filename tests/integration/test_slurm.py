@@ -8,7 +8,7 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-def test_project_init(random_project_name):
+def test_project_init(random_project_name) -> None:
     from jobflow_remote.config import ConfigManager
 
     cm = ConfigManager()
@@ -18,7 +18,7 @@ def test_project_init(random_project_name):
     assert len(project.workers) == 4
 
 
-def test_paramiko_ssh_connection(job_controller, slurm_ssh_port):
+def test_paramiko_ssh_connection(job_controller, slurm_ssh_port) -> None:
     from paramiko import SSHClient
     from paramiko.client import WarningPolicy
 
@@ -34,7 +34,7 @@ def test_paramiko_ssh_connection(job_controller, slurm_ssh_port):
     )
 
 
-def test_project_check(job_controller, capsys):
+def test_project_check(job_controller, capsys) -> None:
     from jobflow_remote.testing.cli import run_check_cli
 
     expected = [
@@ -50,7 +50,7 @@ def test_project_check(job_controller, capsys):
     "worker",
     ["test_local_worker", "test_remote_worker"],
 )
-def test_submit_flow(worker, job_controller):
+def test_submit_flow(worker, job_controller) -> None:
     from jobflow import Flow
 
     from jobflow_remote import submit_flow
@@ -88,7 +88,7 @@ def test_submit_flow(worker, job_controller):
     "worker",
     ["test_local_worker", "test_remote_worker"],
 )
-def test_submit_flow_with_dependencies(worker, job_controller):
+def test_submit_flow_with_dependencies(worker, job_controller) -> None:
     from jobflow import Flow
 
     from jobflow_remote import submit_flow
@@ -134,7 +134,7 @@ def test_submit_flow_with_dependencies(worker, job_controller):
     "worker",
     ["test_local_worker", "test_remote_worker"],
 )
-def test_job_with_callable_kwarg(worker, job_controller):
+def test_job_with_callable_kwarg(worker, job_controller) -> None:
     """Test whether a callable can be successfully provided as a keyword
     argument to a job.
 
@@ -178,7 +178,7 @@ def test_job_with_callable_kwarg(worker, job_controller):
     "worker",
     ["test_local_worker", "test_remote_worker"],
 )
-def test_expected_failure(worker, job_controller):
+def test_expected_failure(worker, job_controller) -> None:
     from jobflow import Flow
 
     from jobflow_remote import submit_flow
@@ -207,7 +207,7 @@ def test_expected_failure(worker, job_controller):
     "worker",
     ["test_local_worker", "test_remote_worker"],
 )
-def test_exec_config(worker, job_controller, random_project_name):
+def test_exec_config(worker, job_controller, random_project_name) -> None:
     """Tests that an environment variable set in the exec config
     is available to the job.
 
@@ -235,7 +235,7 @@ def test_exec_config(worker, job_controller, random_project_name):
     "worker",
     ["test_local_worker", "test_remote_worker"],
 )
-def test_additional_stores(worker, job_controller):
+def test_additional_stores(worker, job_controller) -> None:
     from jobflow import Flow
 
     from jobflow_remote import submit_flow
@@ -262,14 +262,16 @@ def test_additional_stores(worker, job_controller):
     blob_uuid = job_controller.jobstore.get_output(uuid=doc["job"]["uuid"])["data"][
         "blob_uuid"
     ]
-    assert list(fs.query({"blob_uuid": blob_uuid}))[0]["job_uuid"] == doc["job"]["uuid"]
+    assert (
+        next(iter(fs.query({"blob_uuid": blob_uuid})))["job_uuid"] == doc["job"]["uuid"]
+    )
 
 
 @pytest.mark.parametrize(
     "worker",
     ["test_local_worker", "test_remote_worker"],
 )
-def test_undefined_additional_stores(worker, job_controller):
+def test_undefined_additional_stores(worker, job_controller) -> None:
     from jobflow import Flow
 
     from jobflow_remote import submit_flow

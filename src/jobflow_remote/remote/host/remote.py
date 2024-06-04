@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 class RemoteHost(BaseHost):
     """
     Execute commands on a remote host.
-    For some commands assumes the remote can run unix
+    For some commands assumes the remote can run unix.
     """
 
     def __init__(
@@ -41,7 +41,7 @@ class RemoteHost(BaseHost):
         login_shell=True,
         retry_on_closed_connection=True,
         interactive_login=False,
-    ):
+    ) -> None:
         self.host = host
         self.user = user
         self.port = port
@@ -59,7 +59,7 @@ class RemoteHost(BaseHost):
         self._interactive_login = interactive_login
         self._create_connection()
 
-    def _create_connection(self):
+    def _create_connection(self) -> None:
         if self.interactive_login:
             # if auth_timeout is not explicitly set, use a larger value than
             # the default to avoid the timeout while user get access to the process
@@ -111,9 +111,7 @@ class RemoteHost(BaseHost):
         gateway,
         connect_kwargs,
     ):
-        """
-        Helper method to generate a fabric Connection given standard parameters.
-        """
+        """Helper method to generate a fabric Connection given standard parameters."""
         from jobflow_remote.config.base import ConnectionData
 
         if isinstance(gateway, ConnectionData):
@@ -153,7 +151,7 @@ class RemoteHost(BaseHost):
         workdir: str | Path | None = None,
         timeout: int | None = None,
     ):
-        """Execute the given command on the host
+        """Execute the given command on the host.
 
         Parameters
         ----------
@@ -221,7 +219,7 @@ class RemoteHost(BaseHost):
             logger.warning(f"Error creating folder {directory}", exc_info=True)
             return False
 
-    def write_text_file(self, filepath: str | Path, content: str):
+    def write_text_file(self, filepath: str | Path, content: str) -> None:
         """Write content to a file on the host."""
         self._check_connected()
 
@@ -229,7 +227,7 @@ class RemoteHost(BaseHost):
 
         self._execute_remote_func(self.connection.put, f, str(filepath))
 
-    def connect(self):
+    def connect(self) -> None:
         self.connection.open()
         if self.keepalive:
             # create all the nested connections for all the gateways.
@@ -255,17 +253,17 @@ class RemoteHost(BaseHost):
     def is_connected(self) -> bool:
         return self.connection.is_connected
 
-    def put(self, src, dst):
+    def put(self, src, dst) -> None:
         self._check_connected()
 
         self._execute_remote_func(self.connection.put, src, dst)
 
-    def get(self, src, dst):
+    def get(self, src, dst) -> None:
         self._check_connected()
 
         self._execute_remote_func(self.connection.get, src, dst)
 
-    def copy(self, src, dst):
+    def copy(self, src, dst) -> None:
         cmd = ["cp", str(src), str(dst)]
         self.execute(cmd)
 
@@ -277,12 +275,12 @@ class RemoteHost(BaseHost):
                 msg = getattr(e, "message", str(e))
                 error = e
                 if "Socket is closed" not in msg:
-                    raise e
+                    raise
             except SSHException as e:
                 error = e
                 msg = getattr(e, "message", str(e))
                 if "Server connection dropped" not in msg:
-                    raise e
+                    raise
             except EOFError as e:
                 error = e
         else:
@@ -317,7 +315,7 @@ class RemoteHost(BaseHost):
         except FileNotFoundError:
             return []
 
-    def remove(self, path: str | Path):
+    def remove(self, path: str | Path) -> None:
         self._check_connected()
 
         self._execute_remote_func(self.connection.sftp().remove, str(path))
@@ -325,7 +323,7 @@ class RemoteHost(BaseHost):
     def _check_connected(self) -> bool:
         """
         Helper method to determine if fabric consider the connection open and
-        open it otherwise
+        open it otherwise.
 
         Since many operations requiring connections happen in the runner,
         if the connection drops there are cases where the host may not be
@@ -353,18 +351,15 @@ def inter_handler(title, instructions, prompt_list):
     Used by Interactive AuthSource.
     """
     if title:
-        print(title.strip())
+        pass
     if instructions:
-        print(instructions.strip())
+        pass
 
     resp = []  # Initialize the response container
 
     # Walk the list of prompts that the server sent that we need to answer
     for pr in prompt_list:
-        if pr[1]:
-            in_value = input(pr[0])
-        else:
-            in_value = getpass.getpass(pr[0])
+        in_value = input(pr[0]) if pr[1] else getpass.getpass(pr[0])
         resp.append(in_value)
 
     return tuple(resp)  # Convert the response list to a tuple and return it
@@ -376,10 +371,10 @@ class Interactive(AuthSource):
     from the server.
     """
 
-    def __init__(self, username):
+    def __init__(self, username) -> None:
         super().__init__(username=username)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return super()._repr(user=self.username)
 
     def authenticate(self, transport):

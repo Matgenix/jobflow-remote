@@ -1,9 +1,11 @@
+from typing import NoReturn
+
 import pytest
 
 from jobflow_remote.jobs.state import FlowState
 
 
-def test_submit_flow(job_controller, runner):
+def test_submit_flow(job_controller, runner) -> None:
     from jobflow import Flow
 
     from jobflow_remote import submit_flow
@@ -35,8 +37,8 @@ def test_submit_flow(job_controller, runner):
     ), f"Flows not marked as completed, full flow info:\n{job_controller.get_flows({})}"
 
 
-def test_queries(job_controller, runner):
-    """Test different options to query Jobs and Flows"""
+def test_queries(job_controller, runner) -> None:
+    """Test different options to query Jobs and Flows."""
     import datetime
 
     from jobflow import Flow
@@ -113,7 +115,7 @@ def test_queries(job_controller, runner):
     )
 
 
-def test_rerun_completed(job_controller, runner):
+def test_rerun_completed(job_controller, runner) -> None:
     from jobflow import Flow
 
     from jobflow_remote import submit_flow
@@ -187,12 +189,14 @@ def test_rerun_completed(job_controller, runner):
             job_controller.rerun_job(job_id=j2.uuid, job_index=j2.index, wait=1)
 
     # The rerun fails even if a child is locked
-    with job_controller.lock_job(filter={"uuid": j3.uuid}):
-        with pytest.raises(
+    with (
+        job_controller.lock_job(filter={"uuid": j3.uuid}),
+        pytest.raises(
             JobLockedError,
             match=f"Job with db_id {j3_info.db_id} is locked with lock_id",
-        ):
-            job_controller.rerun_job(job_id=j2.uuid, job_index=j2.index, force=True)
+        ),
+    ):
+        job_controller.rerun_job(job_id=j2.uuid, job_index=j2.index, force=True)
 
     assert (
         job_controller.get_job_info(job_id=j2.uuid, job_index=j2.index).state
@@ -219,7 +223,7 @@ def test_rerun_completed(job_controller, runner):
     )
 
 
-def test_rerun_failed(job_controller, runner):
+def test_rerun_failed(job_controller, runner) -> None:
     from jobflow import Flow, OnMissing
 
     from jobflow_remote import submit_flow
@@ -307,7 +311,7 @@ def test_rerun_failed(job_controller, runner):
     assert job_controller.get_flows_info(job_ids=[j1.uuid])[0].state == FlowState.FAILED
 
 
-def test_rerun_remote_error(job_controller, monkeypatch, runner):
+def test_rerun_remote_error(job_controller, monkeypatch, runner) -> None:
     from jobflow import Flow
 
     from jobflow_remote import submit_flow
@@ -322,7 +326,7 @@ def test_rerun_remote_error(job_controller, monkeypatch, runner):
     submit_flow(flow, worker="test_local_worker")
 
     # patch the upload method of the runner to trigger a remote error
-    def upload_error(self, lock):
+    def upload_error(self, lock) -> NoReturn:
         raise RuntimeError("FAKE ERROR")
 
     with monkeypatch.context() as m:
@@ -349,7 +353,7 @@ def test_rerun_remote_error(job_controller, monkeypatch, runner):
     assert job_controller.get_flows_info(job_ids=[j1.uuid])[0].state == FlowState.READY
 
 
-def test_retry(job_controller, monkeypatch, runner):
+def test_retry(job_controller, monkeypatch, runner) -> None:
     from jobflow import Flow
 
     from jobflow_remote import submit_flow
@@ -366,7 +370,7 @@ def test_retry(job_controller, monkeypatch, runner):
         job_controller.retry_job(job_id=j.uuid, job_index=j.index)
 
     # patch the upload method of the runner to trigger a remote error
-    def upload_error(self, lock):
+    def upload_error(self, lock) -> NoReturn:
         raise RuntimeError("FAKE ERROR")
 
     # Run to get the Job the REMOTE_ERROR state
@@ -402,7 +406,7 @@ def test_retry(job_controller, monkeypatch, runner):
     assert j_info.remote.retry_time_limit is not None
 
 
-def test_pause_play(job_controller):
+def test_pause_play(job_controller) -> None:
     from jobflow import Flow
 
     from jobflow_remote import submit_flow
@@ -422,7 +426,7 @@ def test_pause_play(job_controller):
     assert job_controller.get_flows_info(job_ids=j.uuid)[0].state == FlowState.READY
 
 
-def test_stop(job_controller, one_job):
+def test_stop(job_controller, one_job) -> None:
     from jobflow_remote.jobs.state import FlowState, JobState
 
     j = one_job.jobs[0]
@@ -431,7 +435,7 @@ def test_stop(job_controller, one_job):
     assert job_controller.get_flows_info(job_ids=j.uuid)[0].state == FlowState.STOPPED
 
 
-def test_unlock_jobs(job_controller, one_job):
+def test_unlock_jobs(job_controller, one_job) -> None:
     j = one_job.jobs[0]
     # catch the warning coming from MongoLock
     with pytest.warns(UserWarning, match="Could not release lock for document"):
@@ -439,14 +443,14 @@ def test_unlock_jobs(job_controller, one_job):
             assert job_controller.unlock_jobs(job_ids=(j.uuid, 1)) == 1
 
 
-def test_unlock_flows(job_controller, one_job):
+def test_unlock_flows(job_controller, one_job) -> None:
     # catch the warning coming from MongoLock
     with pytest.warns(UserWarning, match="Could not release lock for document"):
         with job_controller.lock_flow(filter={"uuid": one_job.uuid}):
             assert job_controller.unlock_flows(flow_ids=one_job.uuid) == 1
 
 
-def test_set_job_run_properties(job_controller, one_job):
+def test_set_job_run_properties(job_controller, one_job) -> None:
     from qtoolkit import QResources
     from qtoolkit.core.data_objects import ProcessPlacement
 
@@ -511,7 +515,7 @@ def test_set_job_run_properties(job_controller, one_job):
     assert job_controller.get_job_doc(job_id=one_job[0].uuid).resources == qr
 
 
-def test_reset(job_controller, four_jobs):
+def test_reset(job_controller, four_jobs) -> None:
     assert job_controller.count_jobs() == 4
 
     assert not job_controller.reset(max_limit=1)

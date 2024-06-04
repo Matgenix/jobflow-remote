@@ -73,79 +73,39 @@ target-version = "py39"
 [tool.ruff.lint]
 select = ["ALL"]
 ignore = [
-    "A001",
-    "A002",
-    "ANN",     # TODO fix all ANN errors
-    "ARG",     # TODO fix unused method argument
-    "B007",
-    "B028",
-    "B904",
+    "ANN002",
+    "ANN003",
+    "ANN101",  # missing self type annotation
+    "ANN102",
+    "ANN401",
+    "ARG002",  # unused method argument
     "BLE001",
     "C408",    # Unnecessary (dict/list/tuple) call - remove call
-    "C416",
-    "C419",
     "C901",    # function too complex
     "COM812",  # trailing comma missing
-    "D",
-    "D205",
     "DTZ",     # datetime-tz-now
-    "E501",    # TODO fix line too long
     "EM",      # exception message must not use f-string literal
     "ERA001",  # found commented out code
-    "FA100",   # TODO fix FA errors
     "FBT001",
     "FBT002",
-    "FBT003",
     "FIX002",
     "G004",    # logging uses fstring
-    "G201",
-    "INP001",
     "ISC001",
-    "N802",    # TODO maybe fix these
-    "N805",
-    "N818",
     "PD011",   # pandas-use-of-dot-values
-    "PERF102",
     "PERF203", # try-except-in-loop
-    "PERF401",
-    "PGH003",
-    "PGH004",
     "PLR",     # pylint-refactor
-    "PLW0602",
-    "PLW0603",
-    "PLW2901",
-    "PT003",
     "PT004",   # pytest-missing-fixture-name-underscore
     "PT006",   # pytest-parametrize-names-wrong-type
     "PT013",   # pytest-incorrect-pytest-import
     "PTH",     # prefer Pathlib to os.path
-    "PYI024",
-    "RET",
-    "RET504",
-    "RUF005",
-    "RUF012",
     "RUF013",  # implicit-optional
-    "RUF015",
-    "S106",
-    "S110",
-    "S112",
-    "S311",
     "S324",    # use of insecure hash function
     "S507",    # paramiko auto trust
-    "S602",
-    "S603",
-    "S607",
-    "SIM102",
-    "SIM105",
-    "SIM108",
-    "SIM117",
+    "SIM105",  # contextlib.suppress(Exception) instead of try-except
     "SLF",     # private member accessed outside class
-    "SLOT000",
-    "T201",
-    "TCH",
+    "T201",    # print statement
     "TD",      # TODOs
-    "TRY",     # long message outside exception class
-    "UP031",
+    "TRY003",  # long message outside exception class
 ]
 pydocstyle.convention = "numpy"
 isort.known-first-party = ["jobflow_remote"]
@@ -153,12 +113,6 @@ isort.split-on-trailing-comma = false
 
 [tool.ruff.format]
 docstring-code-format = true
-
-[tool.ruff.lint.per-file-ignores]
-"__init__.py" = ["F401"]
-"**/tests/*" = ["INP001", "S101"]
-"**/testing/*" = ["S101"]
-
 
 [tool.mypy]
 ignore_missing_imports = true

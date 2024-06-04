@@ -2,9 +2,7 @@ from __future__ import annotations
 
 import logging
 import traceback
-
-from jobflow import JobStore
-from maggma.core import Store
+from typing import TYPE_CHECKING
 
 from jobflow_remote.config.base import (
     ExecutionConfig,
@@ -13,7 +11,12 @@ from jobflow_remote.config.base import (
     RemoteWorker,
     WorkerBase,
 )
-from jobflow_remote.remote.host import BaseHost
+
+if TYPE_CHECKING:
+    from jobflow import JobStore
+    from maggma.core import Store
+
+    from jobflow_remote.remote.host import BaseHost
 
 logger = logging.getLogger(__name__)
 
@@ -31,15 +34,13 @@ def generate_dummy_project(name: str, full: bool = False) -> Project:
 
     jobstore = generate_dummy_jobstore()
 
-    p = Project(
+    return Project(
         name=name,
         jobstore=jobstore,
         queue=queue,
         workers=workers,
         exec_config=exec_config,
     )
-
-    return p
 
 
 def generate_dummy_worker(
@@ -70,7 +71,7 @@ def generate_dummy_worker(
 
 
 def generate_dummy_jobstore() -> dict:
-    jobstore_dict = {
+    return {
         "docs_store": {
             "type": "MongoStore",
             "database": "db_name",
@@ -93,20 +94,17 @@ def generate_dummy_jobstore() -> dict:
         },
     }
 
-    return jobstore_dict
-
 
 def generate_dummy_exec_config() -> ExecutionConfig:
-    exec_config = ExecutionConfig(
+    return ExecutionConfig(
         modules=["GCC/10.2.0", "OpenMPI/4.0.5-GCC-10.2.0"],
         export={"PATH": "/path/to/binaries:$PATH"},
         pre_run="conda activate env_name",
     )
-    return exec_config
 
 
 def generate_dummy_queue() -> dict:
-    lp_config = dict(
+    return dict(
         type="MongoStore",
         host="localhost",
         database="db_name",
@@ -114,7 +112,6 @@ def generate_dummy_queue() -> dict:
         password="secret_password",
         collection_name="jobs",
     )
-    return lp_config
 
 
 def _check_workdir(worker: WorkerBase, host: BaseHost) -> str | None:
@@ -187,15 +184,14 @@ def _check_store(store: Store) -> str | None:
         store.connect()
         store.query_one()
     except Exception:
-        exc = traceback.format_exc()
-        return exc
+        return traceback.format_exc()
     finally:
         store.close()
 
     return None
 
 
-def check_queue_store(queue_store: Store):
+def check_queue_store(queue_store: Store) -> str | None:
     err = _check_store(queue_store)
     if err:
         return f"Error while checking queue store:\n{err}"

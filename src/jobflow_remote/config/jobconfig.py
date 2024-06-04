@@ -1,12 +1,14 @@
 from __future__ import annotations
 
-from typing import Callable
-
-from jobflow import Flow, Job, JobStore
-from qtoolkit.core.data_objects import QResources
+from typing import TYPE_CHECKING, Callable
 
 from jobflow_remote.config import ConfigManager
-from jobflow_remote.config.base import ExecutionConfig
+
+if TYPE_CHECKING:
+    from jobflow import Flow, Job, JobStore
+    from qtoolkit.core.data_objects import QResources
+
+    from jobflow_remote.config.base import ExecutionConfig
 
 
 def set_run_config(
@@ -95,6 +97,4 @@ def load_job_store(project: str | None = None) -> JobStore:
     """
     cm = ConfigManager()
     p = cm.get_project(project)
-    job_store = p.get_jobstore()
-
-    return job_store
+    return p.get_jobstore()

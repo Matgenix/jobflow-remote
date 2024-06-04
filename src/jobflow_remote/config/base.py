@@ -17,9 +17,7 @@ DEFAULT_JOBSTORE = {"docs_store": {"type": "MemoryStore"}}
 
 
 class RunnerOptions(BaseModel):
-    """
-    Options to tune the execution of the Runner
-    """
+    """Options to tune the execution of the Runner."""
 
     delay_checkout: int = Field(
         30,
@@ -86,9 +84,7 @@ class RunnerOptions(BaseModel):
 
 
 class LogLevel(str, Enum):
-    """
-    Enumeration of logging level.
-    """
+    """Enumeration of logging level."""
 
     ERROR = "error"
     WARN = "warn"
@@ -141,9 +137,7 @@ class BatchConfig(BaseModel):
 
 
 class WorkerBase(BaseModel):
-    """
-    Base class defining the common field for the different types of Worker.
-    """
+    """Base class defining the common field for the different types of Worker."""
 
     type: str = Field(
         description="The discriminator field to determine the worker type"
@@ -186,16 +180,14 @@ class WorkerBase(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     @field_validator("scheduler_type")
-    def check_scheduler_type(cls, scheduler_type: str) -> str:
-        """
-        Validator to set the default of scheduler_type
-        """
+    def check_scheduler_type(self, scheduler_type: str) -> str:
+        """Validator to set the default of scheduler_type."""
         if scheduler_type not in scheduler_mapping:
             raise ValueError(f"Unknown scheduler type {scheduler_type}")
         return scheduler_type
 
     @field_validator("work_dir")
-    def check_work_dir(cls, v) -> Path:
+    def check_work_dir(self, v) -> Path:
         if not v.is_absolute():
             raise ValueError("`work_dir` must be an absolute path")
         return v
@@ -214,9 +206,7 @@ class WorkerBase(BaseModel):
 
     @abc.abstractmethod
     def get_host(self) -> BaseHost:
-        """
-        Return the Host object used in the Worker.
-        """
+        """Return the Host object used in the Worker."""
 
     @property
     @abc.abstractmethod
@@ -426,9 +416,7 @@ WorkerConfig = Annotated[Union[LocalWorker, RemoteWorker], Field(discriminator="
 
 
 class ExecutionConfig(BaseModel):
-    """
-    Configuration to be set before and after the execution of a Job.
-    """
+    """Configuration to be set before and after the execution of a Job."""
 
     modules: Optional[list[str]] = Field(
         None, description="list of modules to be loaded"
@@ -472,10 +460,8 @@ class QueueConfig(BaseModel):
     )
 
     @field_validator("store")
-    def check_store(cls, store: dict) -> dict:
-        """
-        Check that the queue configuration could be converted to a Store.
-        """
+    def check_store(self, store: dict) -> dict:
+        """Check that the queue configuration could be converted to a Store."""
         if store:
             try:
                 deserialized_store = store_from_dict(store)
@@ -494,9 +480,7 @@ class QueueConfig(BaseModel):
 
 
 class Project(BaseModel):
-    """
-    The configurations of a Project.
-    """
+    """The configurations of a Project."""
 
     name: str = Field(description="The name of the project")
     base_dir: Optional[str] = Field(
@@ -556,7 +540,7 @@ class Project(BaseModel):
 
     def get_jobstore(self) -> Optional[JobStore]:
         """
-        Generate an instance of the JobStore based on the configuration
+        Generate an instance of the JobStore based on the configuration.
 
         Returns
         -------
@@ -585,10 +569,8 @@ class Project(BaseModel):
         return JobController.from_project(self)
 
     @field_validator("base_dir")
-    def check_base_dir(cls, base_dir: str, info: ValidationInfo) -> str:
-        """
-        Validator to set the default of base_dir based on the project name
-        """
+    def check_base_dir(self, base_dir: str, info: ValidationInfo) -> str:
+        """Validator to set the default of base_dir based on the project name."""
         if not base_dir:
             from jobflow_remote import SETTINGS
 
@@ -596,37 +578,29 @@ class Project(BaseModel):
         return base_dir
 
     @field_validator("tmp_dir")
-    def check_tmp_dir(cls, tmp_dir: str, info: ValidationInfo) -> str:
-        """
-        Validator to set the default of tmp_dir based on the base_dir
-        """
+    def check_tmp_dir(self, tmp_dir: str, info: ValidationInfo) -> str:
+        """Validator to set the default of tmp_dir based on the base_dir."""
         if not tmp_dir:
             return str(Path(info.data["base_dir"], "tmp"))
         return tmp_dir
 
     @field_validator("log_dir")
-    def check_log_dir(cls, log_dir: str, info: ValidationInfo) -> str:
-        """
-        Validator to set the default of log_dir based on the base_dir
-        """
+    def check_log_dir(self, log_dir: str, info: ValidationInfo) -> str:
+        """Validator to set the default of log_dir based on the base_dir."""
         if not log_dir:
             return str(Path(info.data["base_dir"], "log"))
         return log_dir
 
     @field_validator("daemon_dir")
-    def check_daemon_dir(cls, daemon_dir: str, info: ValidationInfo) -> str:
-        """
-        Validator to set the default of daemon_dir based on the base_dir
-        """
+    def check_daemon_dir(self, daemon_dir: str, info: ValidationInfo) -> str:
+        """Validator to set the default of daemon_dir based on the base_dir."""
         if not daemon_dir:
             return str(Path(info.data["base_dir"], "daemon"))
         return daemon_dir
 
     @field_validator("jobstore")
-    def check_jobstore(cls, jobstore: dict) -> dict:
-        """
-        Check that the jobstore configuration could be converted to a JobStore.
-        """
+    def check_jobstore(self, jobstore: dict) -> dict:
+        """Check that the jobstore configuration could be converted to a JobStore."""
         if jobstore:
             try:
                 if jobstore.get("@class") == "JobStore":
@@ -643,12 +617,8 @@ class Project(BaseModel):
 
 
 class ConfigError(Exception):
-    """
-    A generic Exception related to the configuration
-    """
+    """A generic Exception related to the configuration."""
 
 
 class ProjectUndefined(ConfigError):
-    """
-    Exception raised if the Project has not been defined or could not be determined.
-    """
+    """Exception raised if the Project has not been defined or could not be determined."""

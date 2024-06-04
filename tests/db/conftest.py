@@ -13,7 +13,7 @@ def _get_random_name(length=6):
 
 
 @pytest.fixture(scope="session")
-def store_database_name():
+def store_database_name() -> str:
     return "jfremote_db_tests__"
 
 
@@ -152,7 +152,7 @@ def write_tmp_settings(
     shutil.rmtree(tmp_dir)
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture()
 def job_controller(random_project_name):
     """Yields a jobcontroller instance for the test suite that also sets up the jobstore,
     resetting it after every test.
@@ -164,11 +164,9 @@ def job_controller(random_project_name):
     return jc
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture()
 def one_job(random_project_name):
-    """
-    Add one flow with one job to the DB
-    """
+    """Add one flow with one job to the DB."""
     from jobflow import Flow
 
     from jobflow_remote import submit_flow
@@ -181,11 +179,9 @@ def one_job(random_project_name):
     return flow
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture()
 def four_jobs(random_project_name):
-    """
-    Add two flows with two jobs each to the DB
-    """
+    """Add two flows with two jobs each to the DB."""
     from jobflow import Flow
 
     from jobflow_remote import submit_flow
@@ -211,6 +207,4 @@ def four_jobs(random_project_name):
     flow2.name = "f2"
     submit_flow(flow2, worker="test_local_worker")
 
-    flows = [flow, flow2]
-
-    return flows
+    return [flow, flow2]

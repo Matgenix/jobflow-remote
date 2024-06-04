@@ -8,7 +8,7 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-def test_run_batch(job_controller, monkeypatch):
+def test_run_batch(job_controller, monkeypatch) -> None:
     from jobflow import Flow
 
     from jobflow_remote import submit_flow
@@ -17,7 +17,7 @@ def test_run_batch(job_controller, monkeypatch):
     from jobflow_remote.testing import add_sleep
 
     job_ids = []
-    for i in range(3):
+    for _ in range(3):
         add_first = add_sleep(2, 1)
         add_second = add_sleep(add_first.output, 1)
 
@@ -35,7 +35,7 @@ def test_run_batch(job_controller, monkeypatch):
     assert job_controller.count_jobs(states=JobState.COMPLETED) == 6
 
 
-def test_max_jobs_worker(job_controller, daemon_manager):
+def test_max_jobs_worker(job_controller, daemon_manager) -> None:
     import time
 
     from jobflow import Flow
@@ -49,7 +49,7 @@ def test_max_jobs_worker(job_controller, daemon_manager):
     daemon_manager.start(raise_on_error=True)
 
     job_ids = []
-    for i in range(4):
+    for _ in range(4):
         j = add_sleep(2, 5)
         job_ids.append((j.uuid, 1))
         flow = Flow([j])
@@ -59,7 +59,7 @@ def test_max_jobs_worker(job_controller, daemon_manager):
     running_states = (JobState.RUNNING, JobState.SUBMITTED)
 
     max_running_jobs = 0
-    for i in range(20):
+    for _ in range(20):
         time.sleep(1)
         jobs_info = job_controller.get_jobs_info(job_ids=job_ids)
         if all(ji.state in finished_states for ji in jobs_info):

@@ -5,7 +5,6 @@ import logging
 import time
 import warnings
 from collections import defaultdict
-from collections.abc import Iterable, Mapping
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
@@ -14,6 +13,8 @@ from pymongo import ReturnDocument
 from jobflow_remote.utils.data import deep_merge_dict, suuid
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable, Mapping
+
     from pymongo.collection import Collection
 
 logger = logging.getLogger(__name__)
@@ -102,7 +103,7 @@ class MongoLock:
         projection: Mapping[str, Any] | Iterable[str] | None = None,
         get_locked_doc: bool = False,
         **kwargs,
-    ):
+    ) -> None:
         """
         Parameters
         ----------
@@ -149,22 +150,16 @@ class MongoLock:
 
     @classmethod
     def get_lock_time(cls, d: dict):
-        """
-        Get the time the document was locked on a dictionary.
-        """
+        """Get the time the document was locked on a dictionary."""
         return d.get(cls.LOCK_TIME_KEY)
 
     @classmethod
     def get_lock_id(cls, d: dict):
-        """
-        Get the lock id on a dictionary.
-        """
+        """Get the lock id on a dictionary."""
         return d.get(cls.LOCK_KEY)
 
-    def acquire(self):
-        """
-        Acquire the lock
-        """
+    def acquire(self) -> None:
+        """Acquire the lock."""
         # Set the lock expiration time
         now = datetime.utcnow()
         db_filter = copy.deepcopy(self.filter)
@@ -240,16 +235,14 @@ class MongoLock:
                 # or those fitting are locked.
                 break
 
-    def release(self, exc_type, exc_val, exc_tb):
-        """
-        Release the lock.
-        """
+    def release(self, exc_type, exc_val, exc_tb) -> None:
+        """Release the lock."""
         # Release the lock by removing the unique identifier and lock expiration time
         update = {"$set": {self.LOCK_KEY: None, self.LOCK_TIME_KEY: None}}
         # TODO maybe set on release only if no exception was raised?
         if self.update_on_release:
             if isinstance(self.update_on_release, list):
-                update = [update] + self.update_on_release
+                update = [update, *self.update_on_release]
             else:
                 update = deep_merge_dict(update, self.update_on_release)
         logger.debug(f"release lock with update: {update}")
@@ -277,15 +270,11 @@ class MongoLock:
 
 
 class LockedDocumentError(Exception):
-    """
-    Exception to signal a problem when locking the document.
-    """
+    """Exception to signal a problem when locking the document."""
 
 
 class JobLockedError(LockedDocumentError):
-    """
-    Exception to signal a problem when locking a Job document.
-    """
+    """Exception to signal a problem when locking a Job document."""
 
     @classmethod
     def from_job_doc(cls, doc: dict, additional_msg: str | None = None):
@@ -299,9 +288,7 @@ class JobLockedError(LockedDocumentError):
 
 
 class FlowLockedError(LockedDocumentError):
-    """
-    Exception to signal a problem when locking a Flow document.
-    """
+    """Exception to signal a problem when locking a Flow document."""
 
     @classmethod
     def from_flow_doc(cls, doc: dict, additional_msg: str | None = None):

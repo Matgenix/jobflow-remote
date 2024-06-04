@@ -1,11 +1,13 @@
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
-from typing import IO, Any
+from typing import IO, TYPE_CHECKING, Any
 
 from typer.testing import CliRunner, Result
 
 from jobflow_remote.cli.jf import app
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping, Sequence
 
 
 def run_check_cli(
