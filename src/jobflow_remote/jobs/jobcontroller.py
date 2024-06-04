@@ -1037,9 +1037,9 @@ class JobController:
                     child_doc_update = get_reset_job_base_dict()
                     child_doc_update["state"] = JobState.WAITING.value
                     child_lock.update_on_release = {"$set": child_doc_update}
-                    updated_states[child_doc["uuid"]][
-                        child_doc["index"]
-                    ] = JobState.WAITING
+                    updated_states[child_doc["uuid"]][child_doc["index"]] = (
+                        JobState.WAITING
+                    )
 
             # if everything is fine here, update the state of the flow
             # before releasing its lock and set the update for the original job
