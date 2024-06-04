@@ -53,21 +53,21 @@ flow_ids_opt = Annotated[
 
 
 job_state_opt = Annotated[
-    Optional[JobState],
+    Optional[list[JobState]],
     typer.Option(
         "--state",
         "-s",
-        help="One of the Job states",
+        help="One or more of the Job states",
     ),
 ]
 
 
 flow_state_opt = Annotated[
-    Optional[FlowState],
+    Optional[list[FlowState]],
     typer.Option(
         "--state",
         "-s",
-        help="One of the Flow states",
+        help="One or more of the Flow states",
     ),
 ]
 

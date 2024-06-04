@@ -77,10 +77,10 @@ def test_submit_flow(worker, job_controller):
     output_2 = job_controller.jobstore.get_output(uuid=job_2["uuid"])
     assert output_2 == 11
     assert (
-        job_controller.count_jobs(state=JobState.COMPLETED) == 2
+        job_controller.count_jobs(states=JobState.COMPLETED) == 2
     ), f"Jobs not marked as completed, full job info:\n{job_controller.get_jobs({})}"
     assert (
-        job_controller.count_flows(state=FlowState.COMPLETED) == 1
+        job_controller.count_flows(states=FlowState.COMPLETED) == 1
     ), f"Flows not marked as completed, full flow info:\n{job_controller.get_flows({})}"
 
 
@@ -123,10 +123,10 @@ def test_submit_flow_with_dependencies(worker, job_controller):
     assert output_4 is None
 
     assert (
-        job_controller.count_jobs(state=JobState.COMPLETED) == 4
+        job_controller.count_jobs(states=JobState.COMPLETED) == 4
     ), f"Jobs not marked as completed, full job info:\n{job_controller.get_jobs({})}"
     assert (
-        job_controller.count_flows(state=FlowState.COMPLETED) == 1
+        job_controller.count_flows(states=FlowState.COMPLETED) == 1
     ), f"Flows not marked as completed, full flow info:\n{job_controller.get_flows({})}"
 
 
@@ -167,10 +167,10 @@ def test_job_with_callable_kwarg(worker, job_controller):
     assert outputs == [-1, 2, 4]
 
     assert (
-        job_controller.count_jobs(state=JobState.COMPLETED) == 3
+        job_controller.count_jobs(states=JobState.COMPLETED) == 3
     ), f"Jobs not marked as completed, full job info:\n{job_controller.get_jobs({})}"
     assert (
-        job_controller.count_flows(state=FlowState.COMPLETED) == 1
+        job_controller.count_flows(states=FlowState.COMPLETED) == 1
     ), f"Flows not marked as completed, full flow info:\n{job_controller.get_flows({})}"
 
 
@@ -199,8 +199,8 @@ def test_expected_failure(worker, job_controller):
     runner = Runner()
     runner.run(ticks=10)
 
-    assert job_controller.count_jobs(state=JobState.FAILED) == 2
-    assert job_controller.count_flows(state=FlowState.FAILED) == 1
+    assert job_controller.count_jobs(states=JobState.FAILED) == 2
+    assert job_controller.count_flows(states=FlowState.FAILED) == 1
 
 
 @pytest.mark.parametrize(
@@ -256,8 +256,8 @@ def test_additional_stores(worker, job_controller):
     doc = job_controller.get_jobs({})[0]
     fs = job_controller.jobstore.additional_stores["big_data"]
     assert fs.count({"job_uuid": doc["job"]["uuid"]}) == 1
-    assert job_controller.count_jobs(state=JobState.COMPLETED) == 1
-    assert job_controller.count_flows(state=FlowState.COMPLETED) == 1
+    assert job_controller.count_jobs(states=JobState.COMPLETED) == 1
+    assert job_controller.count_flows(states=FlowState.COMPLETED) == 1
     assert job_controller.jobstore.get_output(uuid=doc["job"]["uuid"])["result"] == 200
     blob_uuid = job_controller.jobstore.get_output(uuid=doc["job"]["uuid"])["data"][
         "blob_uuid"
@@ -298,5 +298,8 @@ def test_undefined_additional_stores(worker, job_controller):
     assert job_controller.count_jobs({}) == 2
 
     # The job should fail, as the additional store is not defined
-    assert job_controller.count_jobs(state=JobState.COMPLETED) == 1
-    assert job_controller.count_jobs(state=JobState.REMOTE_ERROR) == 1
+    assert job_controller.count_jobs(states=JobState.COMPLETED) == 1
+    assert (
+        job_controller.count_jobs(states=[JobState.COMPLETED, JobState.REMOTE_ERROR])
+        == 2
+    )
