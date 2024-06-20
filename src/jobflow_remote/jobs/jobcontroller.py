@@ -15,6 +15,7 @@ import jobflow
 import pymongo
 from jobflow import JobStore, OnMissing
 from maggma.stores import MongoStore
+from monty.dev import deprecated
 from monty.json import MontyDecoder
 from monty.serialization import loadfn
 from qtoolkit.core.data_objects import CancelStatus, QResources
@@ -1086,7 +1087,67 @@ class JobController:
 
         return job_doc_update
 
+    @deprecated(
+        message="_set_job_properties will be removed. Use the set_job_doc_properties method instead"
+    )
     def _set_job_properties(
+        self,
+        values: dict,
+        db_id: str | None = None,
+        job_id: str | None = None,
+        job_index: int | None = None,
+        wait: int | None = None,
+        break_lock: bool = False,
+        acceptable_states: list[JobState] | None = None,
+        use_pipeline: bool = False,
+    ) -> list[int]:
+        """
+        Helper to set multiple values in a JobDoc while locking the Job.
+        Selected by db_id or uuid+index. Only one among db_id
+        and job_id should be defined.
+
+        Parameters
+        ----------
+        values
+            Dictionary with the values to be set. Will be passed to a pymongo
+            `update_one` method.
+        db_id
+            The db_id of the Job.
+        job_id
+            The uuid of the Job.
+        job_index
+            The index of the Job. If None the Job with the largest index
+            will be selected.
+        wait
+            In case the Flow or Jobs that need to be updated are locked,
+            wait this time (in seconds) for the lock to be released.
+            Raise an error if lock is not released.
+        break_lock
+            Forcibly break the lock on locked documents.
+        acceptable_states
+            List of JobState for which the Job values can be changed.
+            If None all states are acceptable.
+        use_pipeline
+            if True a pipeline will be used in the update of the document
+
+        Returns
+        -------
+        list
+            List of db_ids of updated Jobs. Could be an empty list or a list
+            with a single element.
+        """
+        return self.set_job_doc_properties(
+            values=values,
+            db_id=db_id,
+            job_id=job_id,
+            job_index=job_index,
+            wait=wait,
+            break_lock=break_lock,
+            acceptable_states=acceptable_states,
+            use_pipeline=use_pipeline,
+        )
+
+    def set_job_doc_properties(
         self,
         values: dict,
         db_id: str | None = None,
@@ -1211,7 +1272,7 @@ class JobController:
             "remote.error": None,
             "error": None,
         }
-        return self._set_job_properties(
+        return self.set_job_doc_properties(
             values=values,
             job_id=job_id,
             db_id=db_id,
@@ -1937,7 +1998,7 @@ class JobController:
         ]
 
         return self._many_jobs_action(
-            method=self._set_job_properties,
+            method=self.set_job_doc_properties,
             action_description="setting",
             job_ids=job_ids,
             db_ids=db_ids,
