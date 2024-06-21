@@ -112,6 +112,24 @@ def delete(
     days: days_opt = None,
     hours: hours_opt = None,
     force: force_opt = False,
+    verbosity: Annotated[
+        int,
+        typer.Option(
+            "--verbosity",
+            "-v",
+            help="Print the list of Flows to be deleted when asking for confirmation. "
+            "Multiple -v options increase the details on the flow. (e.g. -vvv)",
+            count=True,
+        ),
+    ] = False,
+    delete_output: Annotated[
+        bool,
+        typer.Option(
+            "--output",
+            "-o",
+            help="Also delete the outputs of the Jobs in the output Store",
+        ),
+    ] = False,
 ):
     """
     Permanently delete Flows from the database
@@ -123,6 +141,10 @@ def delete(
 
     jc = get_job_controller()
 
+    # At variance with flows_list, for the amount of details to be printed,
+    # the verbosity value will be decreased by one: the first is to enable
+    # initial print
+
     with loading_spinner(False) as progress:
         progress.add_task(description="Fetching data...", total=None)
         flows_info = jc.get_flows_info(
@@ -133,15 +155,25 @@ def delete(
             start_date=start_date,
             end_date=end_date,
             name=name,
+            full=verbosity > 1,
         )
 
     if not flows_info:
         exit_with_warning_msg("No flows matching criteria")
 
     if flows_info and not force:
-        text = Text.from_markup(
-            f"[red]This operation will [bold]delete {len(flows_info)} Flow(s)[/bold]. Proceed anyway?[/red]"
-        )
+        if verbosity:
+            preamble = Text.from_markup(
+                f"[red]This operation will [bold]delete the following {len(flows_info)} Flow(s)[/bold][/red]"
+            )
+            out_console.print(preamble)
+            table = get_flow_info_table(flows_info, verbosity=verbosity - 1)
+            out_console.print(table)
+            text = Text.from_markup("[red]Proceed anyway?[/red]")
+        else:
+            text = Text.from_markup(
+                f"[red]This operation will [bold]delete {len(flows_info)} Flow(s)[/bold]. Proceed anyway?[/red]"
+            )
 
         confirmed = Confirm.ask(text, default=False)
         if not confirmed:
@@ -151,7 +183,7 @@ def delete(
     with loading_spinner(False) as progress:
         progress.add_task(description="Deleting...", total=None)
 
-        jc.delete_flows(flow_ids=to_delete)
+        jc.delete_flows(flow_ids=to_delete, delete_output=delete_output)
 
     out_console.print(
         f"Deleted Flow(s) with id: {', '.join(str(i) for i in to_delete)}"
