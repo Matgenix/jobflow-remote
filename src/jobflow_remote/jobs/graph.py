@@ -54,11 +54,11 @@ def get_graph_elements(flow: FlowInfo):
 
     # connections between replacements
     replace_edges = []
-    for _, d in flow.ids_mapping.items():
+    for dct in flow.ids_mapping.values():
         # skip index 1
-        for job_index in sorted(d.keys())[1:]:
-            job_db_id = d[job_index]
-            previous_index_db_id = d[job_index - 1]
+        for job_index in sorted(dct)[1:]:
+            job_db_id = dct[job_index]
+            previous_index_db_id = dct[job_index - 1]
             # likely never entering here, because if a single job is used as a
             # "replace" it still goes through a get_flow in jobflow in prepare_replace.
             if hosts[job_db_id][0] == hosts[previous_index_db_id][0]:

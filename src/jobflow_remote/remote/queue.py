@@ -7,6 +7,8 @@ from qtoolkit.core.data_objects import CancelResult, QJob, QResources, Submissio
 from qtoolkit.io.shell import ShellIO
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from qtoolkit.io.base import BaseSchedulerIO
 
     from jobflow_remote.remote.host import BaseHost
@@ -214,7 +216,7 @@ class QueueManager:
 
     def get_jobs_list(
         self,
-        jobs: list[QJob | int | str] | None = None,
+        jobs: Sequence[QJob | int | str] | None = None,
         user: str | None = None,
         timeout: int | None = None,
     ) -> list[QJob]:

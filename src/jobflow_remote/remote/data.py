@@ -6,7 +6,7 @@ import io
 import logging
 import os
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, NoReturn
+from typing import TYPE_CHECKING, Any
 
 import orjson
 from jobflow.core.job import Job
