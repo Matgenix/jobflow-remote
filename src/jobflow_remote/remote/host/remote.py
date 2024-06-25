@@ -352,9 +352,9 @@ def inter_handler(title, instructions, prompt_list):
     Used by Interactive AuthSource.
     """
     if title:
-        pass
+        print(title.strip())
     if instructions:
-        pass
+        print(instructions.strip())
 
     resp = []  # Initialize the response container
 
