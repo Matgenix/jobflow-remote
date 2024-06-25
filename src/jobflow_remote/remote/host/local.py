@@ -83,11 +83,10 @@ class LocalHost(BaseHost):
         if Path(dst).is_dir():
             if src_base:
                 dst = Path(dst, src_base)
-            else:
-                if is_file_like:
-                    raise ValueError(
-                        "could not determine the file name and dst is a folder"
-                    )
+            elif is_file_like:
+                raise ValueError(
+                    "could not determine the file name and dst is a folder"
+                )
 
         if is_file_like:
             with open(dst, "wb") as f:

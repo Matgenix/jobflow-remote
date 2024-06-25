@@ -21,7 +21,6 @@ def always_fails() -> NoReturn:
 def write_file(n) -> None:
     with open("results.txt", "w") as f:
         f.write(str(n))
-    return
 
 
 @job
