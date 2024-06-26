@@ -541,7 +541,7 @@ def test_set_job_doc_properties(job_controller, one_job):
     assert job_controller.get_job_doc(job_id=one_job[0].uuid).job.metadata == {"x": "y"}
 
 
-def test_reset(job_controller, four_jobs):
+def test_reset(job_controller, two_flows_four_jobs):
     assert job_controller.count_jobs() == 4
 
     assert not job_controller.reset(max_limit=1)
