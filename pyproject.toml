@@ -24,7 +24,7 @@ dependencies = [
     "fabric ~= 3.2",
     "flufl.lock ~= 8.0",
     "jobflow >= 0.1.14",
-    "psutil ~= 5.9",
+    "psutil >= 5.9,< 7.0",
     "pydantic ~= 2.4",
     "qtoolkit ~= 0.1, >= 0.1.4",
     "rich ~= 13.7",
