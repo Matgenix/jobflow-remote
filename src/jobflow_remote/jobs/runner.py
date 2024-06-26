@@ -412,7 +412,6 @@ class Runner:
         if job_id:
             query["uuid"] = job_id[0]
             query["index"] = job_id[1]
-        print(query)
         job_data = self.job_controller.checkout_job(query=query)
         if not job_data:
             if not db_id and not job_id:
