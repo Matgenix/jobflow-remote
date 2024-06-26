@@ -522,7 +522,37 @@ def test_set_job_run_properties(job_controller, one_job) -> None:
     assert job_controller.get_job_doc(job_id=one_job[0].uuid).resources == qr
 
 
-def test_reset(job_controller, four_jobs) -> None:
+def test_set_job_doc_properties(job_controller, one_job) -> None:
+    from jobflow_remote.jobs.state import JobState
+
+    # error missing input
+    with pytest.raises(
+        ValueError, match="One and only one among job_id and db_id should be defined"
+    ):
+        job_controller.set_job_doc_properties(
+            values={"job.metadata.x": "y"}, acceptable_states=[JobState.COMPLETED]
+        )
+
+    # error wrong state
+    with pytest.raises(
+        ValueError, match="Job in state READY. The action cannot be performed"
+    ):
+        job_controller.set_job_doc_properties(
+            values={"job.metadata.x": "y"},
+            job_id=one_job[0].uuid,
+            acceptable_states=[JobState.COMPLETED],
+        )
+
+    job_controller.set_job_doc_properties(
+        values={"job.metadata.x": "y"},
+        job_id=one_job[0].uuid,
+        acceptable_states=[JobState.READY],
+    )
+
+    assert job_controller.get_job_doc(job_id=one_job[0].uuid).job.metadata == {"x": "y"}
+
+
+def test_reset(job_controller, two_flows_four_jobs):
     assert job_controller.count_jobs() == 4
 
     assert not job_controller.reset(max_limit=1)

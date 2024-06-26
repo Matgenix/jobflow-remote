@@ -184,8 +184,8 @@ def one_job(random_project_name):
 
 
 @pytest.fixture()
-def four_jobs(random_project_name):
-    """Add two flows with two jobs each to the DB."""
+def two_flows_four_jobs(random_project_name):
+    """Add two flows with two jobs each to the DB"""
     from jobflow import Flow
 
     from jobflow_remote import submit_flow

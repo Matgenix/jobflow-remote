@@ -1,6 +1,41 @@
 # Changelog
 
-## [v0.1.1](https://github.com/Matgenix/jobflow-remote/tree/v0.1.1) (2024-03-19)
+## [Unreleased](https://github.com/Matgenix/jobflow-remote/tree/HEAD)
+
+[Full Changelog](https://github.com/Matgenix/jobflow-remote/compare/v0.1.2...HEAD)
+
+**Closed issues:**
+
+- Feature request: support psutil 6.0.0 [\#128](https://github.com/Matgenix/jobflow-remote/issues/128)
+
+## [v0.1.2](https://github.com/Matgenix/jobflow-remote/tree/v0.1.2) (2024-06-26)
+
+[Full Changelog](https://github.com/Matgenix/jobflow-remote/compare/v0.1.1...v0.1.2)
+
+**Implemented enhancements:**
+
+- Allow setting resources for FAILED and COMPLETED jobs [\#119](https://github.com/Matgenix/jobflow-remote/issues/119)
+- SUGGESTION: Catchall state for errors [\#111](https://github.com/Matgenix/jobflow-remote/issues/111)
+- Flow information [\#19](https://github.com/Matgenix/jobflow-remote/issues/19)
+
+**Fixed bugs:**
+
+- Flow state stays COMPLETED when a job is rerun [\#118](https://github.com/Matgenix/jobflow-remote/issues/118)
+
+**Closed issues:**
+
+- Feature request: show more information about the flow\(s\) that will be deleted [\#130](https://github.com/Matgenix/jobflow-remote/issues/130)
+- Feature request: optionally delete outputs when doing jf flow delete [\#129](https://github.com/Matgenix/jobflow-remote/issues/129)
+- SUGGESTION: Add an example for querying results from the database [\#115](https://github.com/Matgenix/jobflow-remote/issues/115)
+
+**Merged pull requests:**
+
+- Small updates to JobController and CLI [\#132](https://github.com/Matgenix/jobflow-remote/pull/132) ([gpetretto](https://github.com/gpetretto))
+- Migrate linting from `flake8`, `isort`, `autoflake` to `ruff` [\#122](https://github.com/Matgenix/jobflow-remote/pull/122) ([janosh](https://github.com/janosh))
+- Minor updates [\#121](https://github.com/Matgenix/jobflow-remote/pull/121) ([gpetretto](https://github.com/gpetretto))
+- Better error message on missing project name [\#120](https://github.com/Matgenix/jobflow-remote/pull/120) ([janosh](https://github.com/janosh))
+
+## [v0.1.1](https://github.com/Matgenix/jobflow-remote/tree/v0.1.1) (2024-03-20)
 
 [Full Changelog](https://github.com/Matgenix/jobflow-remote/compare/v0.1.0...v0.1.1)
 

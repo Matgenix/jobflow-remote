@@ -1,4 +1,4 @@
-def test_jobs_list(job_controller, four_jobs) -> None:
+def test_jobs_list(job_controller, two_flows_four_jobs) -> None:
     from jobflow_remote.jobs.state import JobState
     from jobflow_remote.testing.cli import run_check_cli
 
@@ -30,7 +30,7 @@ def test_jobs_list(job_controller, four_jobs) -> None:
     )
 
 
-def test_job_info(job_controller, four_jobs) -> None:
+def test_job_info(job_controller, two_flows_four_jobs) -> None:
     from jobflow_remote.testing.cli import run_check_cli
 
     outputs = ["name = 'add1'", "state = 'READY'"]
@@ -40,7 +40,7 @@ def test_job_info(job_controller, four_jobs) -> None:
 
     outputs += excluded_n
     run_check_cli(
-        ["job", "info", four_jobs[0].jobs[0].uuid, "-n"], required_out=outputs
+        ["job", "info", two_flows_four_jobs[0].jobs[0].uuid, "-n"], required_out=outputs
     )
 
     outputs = ["state = 'READY'", "job = {"]
@@ -51,7 +51,7 @@ def test_job_info(job_controller, four_jobs) -> None:
     )
 
 
-def test_set_state(job_controller, four_jobs) -> None:
+def test_set_state(job_controller, two_flows_four_jobs) -> None:
     from jobflow_remote.jobs.state import JobState
     from jobflow_remote.testing.cli import run_check_cli
 
@@ -66,7 +66,7 @@ def test_set_state(job_controller, four_jobs) -> None:
     )
 
 
-def test_rerun(job_controller, four_jobs) -> None:
+def test_rerun(job_controller, two_flows_four_jobs) -> None:
     from jobflow_remote.jobs.state import JobState
     from jobflow_remote.testing.cli import run_check_cli
 
@@ -81,7 +81,7 @@ def test_rerun(job_controller, four_jobs) -> None:
     run_check_cli(["job", "rerun", "-did", "1"], required_out="Error while rerunning")
 
 
-def test_retry(job_controller, four_jobs) -> None:
+def test_retry(job_controller, two_flows_four_jobs) -> None:
     from jobflow_remote.jobs.state import JobState
     from jobflow_remote.testing.cli import run_check_cli
 
@@ -96,7 +96,7 @@ def test_retry(job_controller, four_jobs) -> None:
     run_check_cli(["job", "retry", "-did", "2"], required_out="Error while retrying")
 
 
-def test_play_pause(job_controller, four_jobs) -> None:
+def test_play_pause(job_controller, two_flows_four_jobs) -> None:
     from jobflow_remote.jobs.state import JobState
     from jobflow_remote.testing.cli import run_check_cli
 
@@ -115,7 +115,7 @@ def test_play_pause(job_controller, four_jobs) -> None:
     run_check_cli(["job", "play", "-did", "1"], required_out="Error while playing")
 
 
-def test_stop(job_controller, four_jobs) -> None:
+def test_stop(job_controller, two_flows_four_jobs) -> None:
     from jobflow_remote.jobs.state import JobState
     from jobflow_remote.testing.cli import run_check_cli
 

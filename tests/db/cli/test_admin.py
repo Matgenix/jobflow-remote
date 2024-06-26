@@ -1,7 +1,7 @@
 import pytest
 
 
-def test_reset(job_controller, four_jobs) -> None:
+def test_reset(job_controller, two_flows_four_jobs) -> None:
     from jobflow_remote.testing.cli import run_check_cli
 
     run_check_cli(
