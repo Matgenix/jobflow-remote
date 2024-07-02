@@ -107,7 +107,7 @@ def get_single_store(
             raise TypeError(
                 f"Could not instantiate a proper store from remote config dict {store_type}"
             )
-        return None
+        return store
     raise ValueError(f"remote store type not supported: {store_type}")
 
 
