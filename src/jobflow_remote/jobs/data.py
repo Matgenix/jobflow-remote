@@ -107,9 +107,7 @@ def get_initial_flow_doc_dict(flow: Flow, job_dicts: list[dict]) -> dict:
 
 
 class RemoteInfo(BaseModel):
-    """
-    Model with data describing the remote state of a Job.
-    """
+    """Model with data describing the remote state of a Job."""
 
     step_attempts: int = 0
     queue_state: Optional[QState] = None
@@ -222,9 +220,7 @@ projection_job_info = _projection_db_info()
 
 
 class JobDoc(BaseModel):
-    """
-    Model for the standard representation of a Job in the queue database.
-    """
+    """Model for the standard representation of a Job in the queue database."""
 
     # TODO consider defining this as a dict and provide a get_job() method to
     # get the real Job. This would avoid (de)serializing jobs if this document
@@ -281,9 +277,7 @@ class JobDoc(BaseModel):
 
 
 class FlowDoc(BaseModel):
-    """
-    Model for the standard representation of a Flow in the queue database.
-    """
+    """Model for the standard representation of a Flow in the queue database."""
 
     uuid: str
     jobs: list[str]
@@ -313,13 +307,12 @@ class FlowDoc(BaseModel):
         dict
             The dict representing the FlowDoc.
         """
-        d = jsanitize(
+        return jsanitize(
             self.model_dump(mode="python"),
             strict=True,
             allow_bson=True,
             enum_values=True,
         )
-        return d
 
     @cached_property
     def int_index_parents(self):
@@ -342,7 +335,7 @@ class FlowDoc(BaseModel):
     def descendants(self, job_uuid: str) -> list[tuple[str, int]]:
         descendants = set()
 
-        def add_descendants(uuid):
+        def add_descendants(uuid) -> None:
             children = self.children.get(uuid)
             if children:
                 descendants.update(children)
@@ -364,11 +357,9 @@ class FlowDoc(BaseModel):
 
 
 class RemoteError(RuntimeError):
-    """
-    An exception signaling errors during the update of the remote states.
-    """
+    """An exception signaling errors during the update of the remote states."""
 
-    def __init__(self, msg, no_retry=False):
+    def __init__(self, msg, no_retry=False) -> None:
         self.msg = msg
         self.no_retry = no_retry
 
@@ -472,9 +463,7 @@ class FlowInfo(BaseModel):
 
 
 class DynamicResponseType(Enum):
-    """
-    Types of dynamic responses in jobflow.
-    """
+    """Types of dynamic responses in jobflow."""
 
     REPLACE = "replace"
     DETOUR = "detour"
@@ -490,7 +479,7 @@ def get_reset_job_base_dict() -> dict:
     dict
         Data to be reset.
     """
-    d = {
+    return {
         "remote.step_attempts": 0,
         "remote.retry_time_limit": None,
         "previous_state": None,
@@ -501,4 +490,3 @@ def get_reset_job_base_dict() -> dict:
         "start_time": None,
         "end_time": None,
     }
-    return d

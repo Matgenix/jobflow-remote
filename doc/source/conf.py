@@ -1,4 +1,4 @@
-#
+# ruff: noqa: INP001
 # Configuration file for the Sphinx documentation builder.
 #
 # This file does only contain a selection of the most common options. For a
@@ -22,7 +22,7 @@ import jobflow_remote
 # -- Project information -----------------------------------------------------
 
 project = "Jobflow Remote"
-copyright = "2023, Matgenix SRL"
+copyright = "2023, Matgenix SRL"  # noqa: A001
 author = "Guido Petretto, Matthew Evans, David Waroquiers"
 
 

@@ -5,7 +5,6 @@ import logging
 import time
 import warnings
 from collections import defaultdict
-from collections.abc import Iterable, Mapping
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
@@ -14,6 +13,8 @@ from pymongo import ReturnDocument
 from jobflow_remote.utils.data import deep_merge_dict, suuid
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable, Mapping
+
     from pymongo.collection import Collection
 
 logger = logging.getLogger(__name__)
@@ -93,7 +94,7 @@ class MongoLock:
     def __init__(
         self,
         collection: Collection,
-        filter: Mapping[str, Any],
+        filter: Mapping[str, Any],  # noqa: A002
         update: Mapping[str, Any] | None = None,
         break_lock: bool = False,
         lock_id: str | None = None,
@@ -102,7 +103,7 @@ class MongoLock:
         projection: Mapping[str, Any] | Iterable[str] | None = None,
         get_locked_doc: bool = False,
         **kwargs,
-    ):
+    ) -> None:
         """
         Parameters
         ----------
@@ -149,25 +150,19 @@ class MongoLock:
 
     @classmethod
     def get_lock_time(cls, d: dict):
-        """
-        Get the time the document was locked on a dictionary.
-        """
+        """Get the time the document was locked on a dictionary."""
         return d.get(cls.LOCK_TIME_KEY)
 
     @classmethod
     def get_lock_id(cls, d: dict):
-        """
-        Get the lock id on a dictionary.
-        """
+        """Get the lock id on a dictionary."""
         return d.get(cls.LOCK_KEY)
 
-    def acquire(self):
-        """
-        Acquire the lock
-        """
+    def acquire(self) -> None:
+        """Acquire the lock."""
         # Set the lock expiration time
         now = datetime.utcnow()
-        db_filter = copy.deepcopy(self.filter)
+        db_filter = copy.deepcopy(dict(self.filter))
 
         projection = self.projection
         # if projecting always get the lock as well
@@ -183,7 +178,7 @@ class MongoLock:
         # Prepare the update to be performed when acquiring the lock.
         # A combination of the input update and the setting of the lock.
         lock_set = {self.LOCK_KEY: self.lock_id, self.LOCK_TIME_KEY: now}
-        update = defaultdict(dict)
+        update: dict[str, dict] = defaultdict(dict)
         if self.update:
             update.update(copy.deepcopy(self.update))
 
@@ -205,7 +200,7 @@ class MongoLock:
                         }
                     }
                     update[operation][k] = cond
-            update = [dict(update)]
+            update = [dict(update)]  # type: ignore[assignment]
 
         # Try to acquire the lock by updating the document with a unique identifier
         # and the lock expiration time
@@ -225,35 +220,34 @@ class MongoLock:
                 if lock_acquired:
                     self.locked_document = result
                     break
+                # if the lock could not be acquired optionally sleep or
+                # exit if waited for enough time.
+                if self.sleep and (time.time() - t0) < self.max_wait:
+                    logger.debug("sleeping")
+                    time.sleep(self.sleep)
                 else:
-                    # if the lock could not be acquired optionally sleep or
-                    # exit if waited for enough time.
-                    if self.sleep and (time.time() - t0) < self.max_wait:
-                        logger.debug("sleeping")
-                        time.sleep(self.sleep)
-                    else:
-                        self.unavailable_document = result
-                        break
+                    self.unavailable_document = result
+                    break
             else:
                 # If no document the conditions could not be met.
                 # Either the requested filter does not find match a document
                 # or those fitting are locked.
                 break
 
-    def release(self, exc_type, exc_val, exc_tb):
-        """
-        Release the lock.
-        """
+    def release(self, exc_type, exc_val, exc_tb) -> None:
+        """Release the lock."""
         # Release the lock by removing the unique identifier and lock expiration time
         update = {"$set": {self.LOCK_KEY: None, self.LOCK_TIME_KEY: None}}
         # TODO maybe set on release only if no exception was raised?
         if self.update_on_release:
             if isinstance(self.update_on_release, list):
-                update = [update] + self.update_on_release
+                update = [update, *self.update_on_release]  # type: ignore[assignment]
             else:
-                update = deep_merge_dict(update, self.update_on_release)
+                update = deep_merge_dict(update, self.update_on_release)  # type: ignore[assignment]
         logger.debug(f"release lock with update: {update}")
         # TODO if failed to release the lock maybe retry before failing
+        if self.locked_document is None:
+            return
         result = self.collection.update_one(
             {"_id": self.locked_document["_id"], self.LOCK_KEY: self.lock_id},
             update,
@@ -277,15 +271,11 @@ class MongoLock:
 
 
 class LockedDocumentError(Exception):
-    """
-    Exception to signal a problem when locking the document.
-    """
+    """Exception to signal a problem when locking the document."""
 
 
 class JobLockedError(LockedDocumentError):
-    """
-    Exception to signal a problem when locking a Job document.
-    """
+    """Exception to signal a problem when locking a Job document."""
 
     @classmethod
     def from_job_doc(cls, doc: dict, additional_msg: str | None = None):
@@ -299,9 +289,7 @@ class JobLockedError(LockedDocumentError):
 
 
 class FlowLockedError(LockedDocumentError):
-    """
-    Exception to signal a problem when locking a Flow document.
-    """
+    """Exception to signal a problem when locking a Flow document."""
 
     @classmethod
     def from_flow_doc(cls, doc: dict, additional_msg: str | None = None):

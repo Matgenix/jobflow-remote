@@ -1,7 +1,7 @@
 import pytest
 
 
-def test_flows_list(job_controller, two_flows_four_jobs):
+def test_flows_list(job_controller, two_flows_four_jobs) -> None:
     from jobflow_remote.testing.cli import run_check_cli
 
     columns = ["DB id", "Name", "State", "Flow id", "Num Jobs", "Last updated"]
@@ -9,7 +9,7 @@ def test_flows_list(job_controller, two_flows_four_jobs):
 
     run_check_cli(["flow", "list"], required_out=outputs)
 
-    # the output table is squeezed. Hard to check the stdout. Just check that runs correctly
+    # the output table is squeezed. Hard to check stdout. Just check that runs correctly
     run_check_cli(["flow", "list", "-v"])
 
     # trigger the additional information
@@ -22,7 +22,7 @@ def test_flows_list(job_controller, two_flows_four_jobs):
     )
 
 
-def test_delete(job_controller, two_flows_four_jobs):
+def test_delete(job_controller, two_flows_four_jobs) -> None:
     from jobflow_remote.jobs.runner import Runner
     from jobflow_remote.jobs.state import JobState
     from jobflow_remote.testing.cli import run_check_cli
@@ -81,7 +81,7 @@ def test_delete(job_controller, two_flows_four_jobs):
         job_controller.jobstore.get_output(job_2_uuid)
 
 
-def test_flow_info(job_controller, two_flows_four_jobs):
+def test_flow_info(job_controller, two_flows_four_jobs) -> None:
     from jobflow_remote.testing.cli import run_check_cli
 
     columns = ["DB id", "Name", "State", "Job id", "(Index)", "Worker"]

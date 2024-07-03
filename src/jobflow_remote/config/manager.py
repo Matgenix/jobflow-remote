@@ -5,12 +5,10 @@ import logging
 import os
 import shutil
 import traceback
-from collections import namedtuple
 from pathlib import Path
+from typing import TYPE_CHECKING, NamedTuple
 
 import tomlkit
-from jobflow import JobStore
-from maggma.stores import MongoStore
 from monty.json import jsanitize
 from monty.os import makedirs_p
 from monty.serialization import dumpfn, loadfn
@@ -19,16 +17,27 @@ from jobflow_remote.config.base import (
     ConfigError,
     ExecutionConfig,
     Project,
-    ProjectUndefined,
+    ProjectUndefinedError,
     WorkerBase,
 )
 from jobflow_remote.utils.data import deep_merge_dict
 
+if TYPE_CHECKING:
+    from jobflow import JobStore
+    from maggma.stores import MongoStore
+
 logger = logging.getLogger(__name__)
 
-ProjectData = namedtuple("ProjectData", ["filepath", "project", "ext"])
 
-WorkerData = namedtuple("WorkerData", ["name", "worker"])
+class ProjectData(NamedTuple):
+    filepath: str | Path
+    project: Project
+    ext: str
+
+
+class WorkerData(NamedTuple):
+    name: str
+    worker: str
 
 
 class ConfigManager:
@@ -39,14 +48,14 @@ class ConfigManager:
     well as methods to update the properties of each project.
     """
 
-    projects_ext = ["json", "yaml", "toml"]
+    projects_ext = ("json", "yaml", "toml")
 
     def __init__(
         self,
         exclude_unset: bool = False,
         exclude_none: bool = False,
         warn: bool = False,
-    ):
+    ) -> None:
         """
 
         Parameters
@@ -133,7 +142,7 @@ class ConfigManager:
             if len(self.projects_data) == 1:
                 project_name = next(iter(self.projects_data))
             else:
-                raise ProjectUndefined(
+                raise ProjectUndefinedError(
                     f"A project name should be defined, known projects: {list(self.projects_data)}"
                 )
 
@@ -179,7 +188,7 @@ class ConfigManager:
         """
         return self.get_project_data(project_name).project
 
-    def dump_project(self, project_data: ProjectData):
+    def dump_project(self, project_data: ProjectData) -> None:
         """
         Dump the project to filepath specified in the ProjectData.
 
@@ -201,7 +210,7 @@ class ConfigManager:
             with open(project_data.filepath, "w") as f:
                 tomlkit.dump(d, f)
 
-    def create_project(self, project: Project, ext="yaml"):
+    def create_project(self, project: Project, ext="yaml") -> None:
         """
         Create a new Project in the project folder by dumping the project to file.
 
@@ -228,7 +237,7 @@ class ConfigManager:
         self.dump_project(project_data)
         self.projects_data[project.name] = project_data
 
-    def remove_project(self, project_name: str, remove_folders: bool = True):
+    def remove_project(self, project_name: str, remove_folders: bool = True) -> None:
         """
         Remove a project from the projects folder.
 
@@ -246,7 +255,7 @@ class ConfigManager:
             shutil.rmtree(project_data.project.base_dir, ignore_errors=True)
         os.remove(project_data.filepath)
 
-    def update_project(self, config: dict, project_name: str):
+    def update_project(self, config: dict, project_name: str) -> None:
         """
         Update the project values.
         The passed dict with values will be recursively merged in the current project.
@@ -290,6 +299,9 @@ class ConfigManager:
                     if "name" in d:
                         project_names.append(d["name"])
                 except Exception:
+                    logger.warning(
+                        f"File {filepath} could not be parsed as a Project. Error: {traceback.format_exc()}"
+                    )
                     continue
 
         return project_names
@@ -300,7 +312,7 @@ class ConfigManager:
         worker: WorkerBase,
         project_name: str | None = None,
         replace: bool = False,
-    ):
+    ) -> None:
         """
         Set a worker in the selected project.
         Can add a new worker or replace an existing one.
@@ -325,7 +337,7 @@ class ConfigManager:
         project_data.project.workers[name] = worker
         self.dump_project(project_data)
 
-    def remove_worker(self, worker_name: str, project_name: str | None = None):
+    def remove_worker(self, worker_name: str, project_name: str | None = None) -> None:
         """
         Remove a worker from the selected project.
 
@@ -365,7 +377,7 @@ class ConfigManager:
             raise ConfigError(f"Worker with name {worker_name} is not defined")
         return project.workers[worker_name]
 
-    def set_queue_db(self, store: MongoStore, project_name: str | None = None):
+    def set_queue_db(self, store: MongoStore, project_name: str | None = None) -> None:
         """
         Set the project specific store used for managing the queue.
 
@@ -382,7 +394,7 @@ class ConfigManager:
 
         self.dump_project(project_data)
 
-    def set_jobstore(self, jobstore: JobStore, project_name: str | None = None):
+    def set_jobstore(self, jobstore: JobStore, project_name: str | None = None) -> None:
         """
         Set the project specific store used for jobflow.
 
@@ -404,7 +416,7 @@ class ConfigManager:
         exec_config: ExecutionConfig,
         project_name: str | None = None,
         replace: bool = False,
-    ):
+    ) -> None:
         """
         Set an ExecutionConfig in the selected project.
         Can add a new ExecutionConfig or replace an existing one.
@@ -430,7 +442,7 @@ class ConfigManager:
 
     def remove_exec_config(
         self, exec_config_name: str, project_name: str | None = None
-    ):
+    ) -> None:
         """
         Remove an ExecutionConfig from the selected project.
 

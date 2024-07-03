@@ -11,7 +11,7 @@ from monty.os import makedirs_p
 
 def initialize_runner_logger(
     log_folder: str | Path, level: int = logging.INFO, runner_id: str | None = None
-):
+) -> None:
     """
     Initialize the runner logger.
 
@@ -68,7 +68,9 @@ def initialize_runner_logger(
     logging.config.dictConfig(config)
 
 
-def initialize_cli_logger(level: int = logging.WARNING, full_exc_info: bool = True):
+def initialize_cli_logger(
+    level: int = logging.WARNING, full_exc_info: bool = True
+) -> None:
     """
     Initialize the logger for the CLI based on rich.
 
@@ -107,7 +109,7 @@ def initialize_cli_logger(level: int = logging.WARNING, full_exc_info: bool = Tr
     logging.config.dictConfig(config)
 
 
-def initialize_remote_run_log(level: int = logging.INFO):
+def initialize_remote_run_log(level: int = logging.INFO) -> None:
     """
     Initialize the logger for the execution of the jobs.
 
@@ -143,12 +145,11 @@ def initialize_remote_run_log(level: int = logging.INFO):
 
 
 class CLIFormatter(logging.Formatter):
-    def __init__(self, log_exception_trace: bool = True, **kwargs):
+    def __init__(self, log_exception_trace: bool = True, **kwargs) -> None:
         super().__init__(**kwargs)
         self.log_exception_trace = log_exception_trace
 
     def formatException(self, ei):
         if self.log_exception_trace:
             return super().formatException(ei)
-        else:
-            return f"{ei[0].__name__}: {ei[1]!s}"
+        return f"{ei[0].__name__}: {ei[1]!s}"

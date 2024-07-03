@@ -24,7 +24,7 @@ app = JFRTyper(
 )
 
 
-def main_result_callback(*args, **kwargs):
+def main_result_callback(*args, **kwargs) -> None:
     """
     Callback executed after the main command is completed.
     Allowing to make cleanup and other final actions.
@@ -65,10 +65,8 @@ def main(
             hidden=True,
         ),
     ] = False,
-):
-    """
-    The controller CLI for jobflow-remote
-    """
+) -> None:
+    """The controller CLI for jobflow-remote."""
     from jobflow_remote import SETTINGS
 
     if full_exc:

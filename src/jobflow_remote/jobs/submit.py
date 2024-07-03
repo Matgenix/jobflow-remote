@@ -1,12 +1,16 @@
 from __future__ import annotations
 
-import jobflow
+from typing import TYPE_CHECKING
+
 from jobflow.core.flow import get_flow
-from qtoolkit.core.data_objects import QResources
 
 from jobflow_remote.config.base import ConfigError, ExecutionConfig
 from jobflow_remote.config.manager import ConfigManager
 from jobflow_remote.remote.data import check_additional_stores
+
+if TYPE_CHECKING:
+    import jobflow
+    from qtoolkit.core.data_objects import QResources
 
 
 def submit_flow(

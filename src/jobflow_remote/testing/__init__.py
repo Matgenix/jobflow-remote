@@ -1,6 +1,6 @@
 """A series of toy workflows that can be used for testing."""
 
-from typing import Callable, Optional, Union
+from typing import Callable, NoReturn, Optional, Union
 
 from jobflow import Job, Response, job
 
@@ -12,16 +12,15 @@ def add(a, b):
 
 
 @job
-def always_fails():
+def always_fails() -> NoReturn:
     """A job that always fails."""
     raise RuntimeError("This job failed.")
 
 
 @job
-def write_file(n):
+def write_file(n) -> None:
     with open("results.txt", "w") as f:
         f.write(str(n))
-    return
 
 
 @job
@@ -65,9 +64,7 @@ def add_big_undefined_store(a: float, b: float):
 
 @job
 def add_sleep(a, b):
-    """
-    Adds two numbers together and sleeps for "b" seconds
-    """
+    """Adds two numbers together and sleeps for "b" seconds."""
     import time
 
     time.sleep(b)
@@ -76,9 +73,7 @@ def add_sleep(a, b):
 
 @job
 def create_detour(detour_job: Job):
-    """
-    Create a detour based on the passed Job.
-    """
+    """Create a detour based on the passed Job."""
     from jobflow import Flow
 
     return Response(detour=Flow(detour_job))
@@ -86,9 +81,7 @@ def create_detour(detour_job: Job):
 
 @job
 def self_replace(n: int):
-    """
-    Create a replace Job with the same job n times.
-    """
+    """Create a replace Job with the same job n times."""
     if n > 0:
         return Response(replace=self_replace(n - 1))
 
@@ -96,7 +89,7 @@ def self_replace(n: int):
 
 
 @job
-def ignore_input(a: int):
+def ignore_input(a: int) -> int:
     """
     Can receive an input, but ignores it.
 

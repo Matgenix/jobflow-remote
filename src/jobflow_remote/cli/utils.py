@@ -1,3 +1,5 @@
+# ruff: noqa: PLW0602, PLW0603
+
 from __future__ import annotations
 
 import functools
@@ -7,7 +9,7 @@ import uuid
 from contextlib import contextmanager
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING, Callable, NoReturn
 
 import typer
 from click import ClickException
@@ -17,12 +19,13 @@ from rich.prompt import Confirm
 from rich.text import Text
 
 from jobflow_remote import ConfigManager, JobController
-from jobflow_remote.config.base import ProjectUndefined
+from jobflow_remote.config.base import ProjectUndefinedError
 from jobflow_remote.jobs.daemon import DaemonError, DaemonManager, DaemonStatus
-from jobflow_remote.jobs.state import JobState
 
 if TYPE_CHECKING:
     from cProfile import Profile
+
+    from jobflow_remote.jobs.state import JobState
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +46,7 @@ _shared_job_controller: JobController | None = None
 _profiler: Profile | None = None
 
 
-def initialize_config_manager(*args, **kwargs):
+def initialize_config_manager(*args, **kwargs) -> None:
     global _shared_config_manager
     _shared_config_manager = ConfigManager(*args, **kwargs)
 
@@ -65,7 +68,7 @@ def get_job_controller():
     return _shared_job_controller
 
 
-def cleanup_job_controller():
+def cleanup_job_controller() -> None:
     global _shared_job_controller
     if _shared_job_controller is not None:
         _shared_job_controller.close()
@@ -74,7 +77,7 @@ def cleanup_job_controller():
         _shared_job_controller = None
 
 
-def start_profiling():
+def start_profiling() -> None:
     global _profiler
     from cProfile import Profile
 
@@ -82,7 +85,7 @@ def start_profiling():
     _profiler.enable()
 
 
-def complete_profiling():
+def complete_profiling() -> None:
     global _profiler
 
     _profiler.disable()
@@ -105,35 +108,37 @@ class SerializeFileFormat(str, Enum):
 
 
 class ReprStr(str):
-    """
+    r"""
     Helper class that overrides the standard __repr__ to return the string itself
     and not its repr().
     Used mainly to allow printing of strings with newlines instead of '\n' when
     repr is used in rich.
     """
 
-    def __repr__(self):
+    __slots__ = ()
+
+    def __repr__(self) -> str:
         return self
 
 
-def exit_with_error_msg(message: str, code: int = 1, **kwargs):
+def exit_with_error_msg(message: str, code: int = 1, **kwargs) -> NoReturn:
     kwargs.setdefault("style", "red")
     err_console.print(message, **kwargs)
     raise typer.Exit(code)
 
 
-def exit_with_warning_msg(message: str, code: int = 0, **kwargs):
+def exit_with_warning_msg(message: str, code: int = 0, **kwargs) -> NoReturn:
     kwargs.setdefault("style", "gold1")
     err_console.print(message, **kwargs)
     raise typer.Exit(code)
 
 
-def print_success_msg(message: str = "operation completed", **kwargs):
+def print_success_msg(message: str = "operation completed", **kwargs) -> None:
     kwargs.setdefault("style", "green")
     out_console.print(message, **kwargs)
 
 
-def check_incompatible_opt(d: dict):
+def check_incompatible_opt(d: dict) -> None:
     not_none = []
     for k, v in d.items():
         if v:
@@ -144,7 +149,7 @@ def check_incompatible_opt(d: dict):
         exit_with_error_msg(f"Options {options_list} are incompatible")
 
 
-def check_at_least_one_opt(d: dict):
+def check_at_least_one_opt(d: dict) -> None:
     not_none = []
     for k, v in d.items():
         if v:
@@ -157,7 +162,7 @@ def check_at_least_one_opt(d: dict):
         )
 
 
-def check_only_one_opt(d: dict):
+def check_only_one_opt(d: dict) -> None:
     not_none = []
     for k, v in d.items():
         if v:
@@ -203,7 +208,6 @@ def hide_progress(progress: Progress):
         yield
     finally:
         # make space for the progress to use so it doesn't overwrite any previous lines
-        print("\n" * (len(progress.tasks) - 2))
         progress.start()
 
 
@@ -249,7 +253,7 @@ def cli_error_handler(func):
             return func(*args, **kwargs)
         except (typer.Exit, typer.Abort, ClickException):
             raise  # Do not capture click or typer exceptions
-        except ProjectUndefined:
+        except ProjectUndefinedError:
             exit_with_error_msg(
                 "The active project could not be determined and it is required to execute this command"
             )
@@ -258,10 +262,9 @@ def cli_error_handler(func):
 
             if SETTINGS.cli_full_exc:
                 raise  # Reraise exceptions to print the full stacktrace
-            else:
-                exit_with_error_msg(
-                    f"An Error occurred during the command execution: {type(e).__name__} {getattr(e, 'message', str(e))}"
-                )
+            exit_with_error_msg(
+                f"An Error occurred during the command execution: {type(e).__name__} {getattr(e, 'message', str(e))}"
+            )
 
     return wrapper
 
@@ -276,8 +279,7 @@ def check_valid_uuid(uuid_str, raise_on_error: bool = True) -> bool:
 
     if raise_on_error:
         raise typer.BadParameter(f"UUID {uuid_str} is in the wrong format.")
-    else:
-        return False
+    return False
 
 
 def str_to_dict(string: str | None) -> dict | None:
@@ -286,14 +288,14 @@ def str_to_dict(string: str | None) -> dict | None:
 
     try:
         dictionary = json.loads(string)
-    except json.JSONDecodeError:
+    except json.JSONDecodeError as exc:
         dictionary = {}
         for chunk in string.split(","):
             split = chunk.split("=")
             if len(split) != 2:
                 raise typer.BadParameter(
                     f"Wrong format for dictionary-like field {string}"
-                )
+                ) from exc
 
             dictionary[split[0]] = split[1]
 
@@ -336,7 +338,7 @@ def execute_multi_jobs_cmd(
     verbosity: int = 0,
     raise_on_error: bool = False,
     **kwargs,
-):
+) -> None:
     query_values = [
         job_ids,
         db_ids,
@@ -390,7 +392,7 @@ def execute_multi_jobs_cmd(
 
                 confirmed = Confirm.ask(text, default=False)
                 if not confirmed:
-                    raise typer.Exit(0)
+                    raise typer.Exit(0)  # noqa: TRY301
 
             with loading_spinner():
                 modified_ids = multi_cmd(
@@ -411,14 +413,14 @@ def execute_multi_jobs_cmd(
         else:
             print_success_msg(f"Operation completed: {len(modified_ids)} jobs modified")
     except Exception:
-        logger.error("Error executing the operation", exc_info=True)
+        logger.exception("Error executing the operation")
 
 
-def check_stopped_runner(error: bool = True):
+def check_stopped_runner(error: bool = True) -> None:
     cm = get_config_manager()
     dm = DaemonManager.from_project(cm.get_project())
     try:
-        with loading_spinner(False) as progress:
+        with loading_spinner(processing=False) as progress:
             progress.add_task(description="Checking the Daemon status...", total=None)
             current_status = dm.check_status()
 

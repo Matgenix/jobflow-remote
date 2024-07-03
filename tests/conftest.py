@@ -15,7 +15,7 @@ def test_dir():
 
 
 @pytest.fixture(scope="session")
-def log_to_stdout():
+def log_to_stdout() -> None:
     import logging
     import sys
 
@@ -49,21 +49,21 @@ def clean_dir(debug_mode):
 
 @pytest.fixture()
 def tmp_dir():
-    """Same as clean_dir but is fresh for every test"""
+    """Same as clean_dir but is fresh for every test."""
     import os
     import shutil
     import tempfile
 
     old_cwd = os.getcwd()
-    newpath = tempfile.mkdtemp()
-    os.chdir(newpath)
+    new_path = tempfile.mkdtemp()
+    os.chdir(new_path)
     yield
     os.chdir(old_cwd)
-    shutil.rmtree(newpath)
+    shutil.rmtree(new_path)
 
 
 @pytest.fixture(scope="session")
-def debug_mode():
+def debug_mode() -> bool:
     return False
 
 
@@ -76,17 +76,17 @@ def random_project_name():
     return _get_random_name()
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture()
 def daemon_manager(random_project_name):
     from jobflow_remote.jobs.daemon import DaemonError, DaemonManager, DaemonStatus
 
     dm = DaemonManager.from_project_name(random_project_name)
     yield dm
-    # kill the processes and shut down the daemon (otherwise will remain in the STOPPED state)
+    # kill processes and shut down daemon (otherwise will remain in the STOPPED state)
     dm.kill(raise_on_error=True)
     time.sleep(0.5)
     dm.shut_down(raise_on_error=True)
-    for i in range(10):
+    for _ in range(10):
         time.sleep(1)
         try:
             if dm.check_status() == DaemonStatus.SHUT_DOWN:
@@ -94,10 +94,12 @@ def daemon_manager(random_project_name):
         except DaemonError:
             pass
     else:
-        warnings.warn("daemon manager did not shut down within the expected time")
+        warnings.warn(
+            "daemon manager did not shut down within the expected time", stacklevel=2
+        )
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture()
 def runner():
     from jobflow_remote.jobs.runner import Runner
 

@@ -1,4 +1,4 @@
-"""The Runner orchestrating the Jobs execution"""
+"""The Runner orchestrating the Jobs execution."""
 
 from __future__ import annotations
 
@@ -39,13 +39,13 @@ from jobflow_remote.remote.data import (
     get_remote_store_filenames,
     resolve_job_dict_args,
 )
-from jobflow_remote.remote.host import BaseHost
 from jobflow_remote.remote.queue import ERR_FNAME, OUT_FNAME, QueueManager, set_name_out
 from jobflow_remote.utils.data import suuid
 from jobflow_remote.utils.log import initialize_runner_logger
 from jobflow_remote.utils.schedule import SafeScheduler
 
 if TYPE_CHECKING:
+    from jobflow_remote.remote.host import BaseHost
     from jobflow_remote.utils.db import MongoLock
 
 logger = logging.getLogger(__name__)
@@ -78,7 +78,7 @@ class Runner:
         log_level: LogLevel | None = None,
         runner_id: str | None = None,
         connect_interactive: bool = False,
-    ):
+    ) -> None:
         """
         Parameters
         ----------
@@ -138,20 +138,21 @@ class Runner:
 
         if connect_interactive:
             for host_name, host in self.hosts.items():
-                if host.interactive_login and not host.is_connected:
-                    if Confirm.ask(
+                if (
+                    host.interactive_login
+                    and not host.is_connected
+                    and Confirm.ask(
                         f"Do you want to open the connection for the host of the {host_name} worker?"
-                    ):
-                        host.connect()
+                    )
+                ):
+                    host.connect()
 
     @property
     def runner_options(self) -> RunnerOptions:
-        """
-        The Runner options defined in the project.
-        """
+        """The Runner options defined in the project."""
         return self.project.runner
 
-    def handle_signal(self, signum, frame):
+    def handle_signal(self, signum, frame) -> None:
         """
         Handle the SIGTERM signal in the Runner.
         Sets a variable that will stop the Runner loop.
@@ -224,7 +225,7 @@ class Runner:
         queue: bool = True,
         checkout: bool = True,
         ticks: int | None = None,
-    ):
+    ) -> None:
         """
         Start the runner.
 
@@ -314,10 +315,10 @@ class Runner:
     def run_all_jobs(
         self,
         max_seconds: int | None = None,
-    ):
+    ) -> None:
         """
         Use the runner to run all the jobs in the DB.
-        Mainly used for testing
+        Mainly used for testing.
         """
         states = [
             JobState.CHECKED_OUT.value,
@@ -394,7 +395,7 @@ class Runner:
         """
         Use the runner to run a single Job until it reaches a terminal state.
         The job should be in the READY state and there should be no
-        Mainly used for testing
+        Mainly used for testing.
         """
         states = [
             JobState.CHECKED_OUT.value,
@@ -416,23 +417,23 @@ class Runner:
         if not job_data:
             if not db_id and not job_id:
                 return False
-            elif not db_id:
+            if not db_id:
                 job_data = job_id
             else:
                 j_info = self.job_controller.get_job_info(db_id=db_id)
                 job_data = (j_info.uuid, j_info.index)
 
-        filter = {"uuid": job_data[0], "index": job_data[1]}
+        filters = {"uuid": job_data[0], "index": job_data[1]}
         self.advance_state(states)
         scheduler.every(self.runner_options.delay_advance_status).seconds.do(
             self.advance_state,
             states=states,
-            filter=filter,
+            filter=filters,
         )
 
         self.check_run_status()
         scheduler.every(self.runner_options.delay_check_run_status).seconds.do(
-            self.check_run_status, filter=filter
+            self.check_run_status, filter=filters
         )
 
         running_states = [
@@ -458,8 +459,7 @@ class Runner:
                     raise RuntimeError(
                         "Could execute the job within the selected amount of time"
                     )
-                else:
-                    return False
+                return False
 
     def _get_limited_worker_query(self, states: list[str]) -> dict | None:
         """
@@ -489,16 +489,15 @@ class Runner:
         }
 
         if states and available_workers:
-            query = {"$or": [states_query, uploaded_query]}
-            return query
-        elif states:
+            return {"$or": [states_query, uploaded_query]}
+        if states:
             return states_query
-        elif available_workers:
+        if available_workers:
             return uploaded_query
 
         return None
 
-    def advance_state(self, states: list[str], filter: dict | None = None):
+    def advance_state(self, states: list[str], filter: dict | None = None) -> None:  # noqa: A002
         """
         Acquire the lock and advance the state of a single job.
 
@@ -538,7 +537,7 @@ class Runner:
 
                 states_methods[state](lock)
 
-    def upload(self, lock: MongoLock):
+    def upload(self, lock: MongoLock) -> None:
         """
         Upload files for a locked Job in the CHECKED_OUT state.
         If successful set the state to UPLOADED.
@@ -569,7 +568,7 @@ class Runner:
             try:
                 store.close()
             except Exception:
-                logging.error(f"error while closing the store {store}", exc_info=True)
+                logging.exception(f"error while closing the store {store}")
 
         remote_path = get_job_path(job_dict["uuid"], job_dict["index"], worker.work_dir)
 
@@ -599,7 +598,7 @@ class Runner:
         }
         lock.update_on_release = set_output
 
-    def submit(self, lock: MongoLock):
+    def submit(self, lock: MongoLock) -> None:
         """
         Submit to the queue for a locked Job in the UPLOADED state.
         If successful set the state to SUBMITTED.
@@ -696,11 +695,14 @@ class Runner:
 
             if submit_result.status == SubmissionStatus.FAILED:
                 err_msg = f"submission failed. {submit_result!r}"
-                raise RemoteError(err_msg, False)
-            elif submit_result.status == SubmissionStatus.JOB_ID_UNKNOWN:
-                err_msg = f"submission succeeded but ID not known. Job may be running but status cannot be checked. {submit_result!r}"
-                raise RemoteError(err_msg, True)
-            elif submit_result.status == SubmissionStatus.SUCCESSFUL:
+                raise RemoteError(err_msg, no_retry=False)
+            if submit_result.status == SubmissionStatus.JOB_ID_UNKNOWN:
+                err_msg = (
+                    "submission succeeded but ID not known. Job may be running "
+                    f"but status cannot be checked. {submit_result!r}"
+                )
+                raise RemoteError(err_msg, no_retry=True)
+            if submit_result.status == SubmissionStatus.SUCCESSFUL:
                 lock.update_on_release = {
                     "$set": {
                         "remote.process_id": str(submit_result.job_id),
@@ -711,10 +713,10 @@ class Runner:
                     self.limited_workers[worker_name]["current"] += 1
             else:
                 raise RemoteError(
-                    f"unhandled submission status {submit_result.status}", True
+                    f"unhandled submission status {submit_result.status}", no_retry=True
                 )
 
-    def download(self, lock):
+    def download(self, lock) -> None:
         """
         Download the final files for a locked Job in the TERMINATED state.
         If successful set the state to DOWNLOADED.
@@ -759,15 +761,15 @@ class Runner:
                 remote_file_path = str(Path(remote_path, fname))
                 try:
                     host.get(remote_file_path, str(Path(local_path, fname)))
-                except FileNotFoundError:
+                except FileNotFoundError as exc:
                     # if files are missing it should not retry
                     err_msg = f"file {remote_file_path} for job {job_dict['uuid']} does not exist"
-                    logger.error(err_msg)
-                    raise RemoteError(err_msg, True)
+                    logger.exception(err_msg)
+                    raise RemoteError(err_msg, no_retry=True) from exc
 
         lock.update_on_release = {"$set": {"state": JobState.DOWNLOADED.value}}
 
-    def complete_job(self, lock):
+    def complete_job(self, lock) -> None:
         """
         Complete a locked Job in the DOWNLOADED state.
         If successful set the state to COMPLETED, otherwise to FAILED.
@@ -793,10 +795,10 @@ class Runner:
             store = self.jobstore
             completed = self.job_controller.complete_job(doc, local_path, store)
 
-        except json.JSONDecodeError:
+        except json.JSONDecodeError as exc:
             # if an empty file is copied this error can appear, do not retry
             err_msg = traceback.format_exc()
-            raise RemoteError(err_msg, True)
+            raise RemoteError(err_msg, no_retry=True) from exc
 
         # remove local folder with downloaded files if successfully completed
         if completed and self.runner_options.delete_tmp_folder and not worker.is_local:
@@ -804,9 +806,9 @@ class Runner:
 
         if not completed:
             err_msg = "the parsed output does not contain the required information to complete the job"
-            raise RemoteError(err_msg, True)
+            raise RemoteError(err_msg, no_retry=True)
 
-    def check_run_status(self, filter: dict | None = None):
+    def check_run_status(self, filter: dict | None = None) -> None:  # noqa: A002
         """
         Check the status of all the jobs submitted to a queue.
 
@@ -904,7 +906,7 @@ class Runner:
                     ) as lock:
                         if lock.locked_document:
                             if error:
-                                raise RemoteError(error, False)
+                                raise RemoteError(error, no_retry=False)
                             set_output = {
                                 "$set": {
                                     "remote.queue_state": (
@@ -923,10 +925,8 @@ class Runner:
                     ):
                         self.limited_workers[doc["worker"]]["current"] -= 1
 
-    def checkout(self):
-        """
-        Checkout READY Jobs.
-        """
+    def checkout(self) -> None:
+        """Checkout READY Jobs."""
         logger.debug("checkout jobs")
         n_checked_out = 0
         while True:
@@ -935,14 +935,14 @@ class Runner:
                 if not reserved:
                     break
             except Exception:
-                logger.error("Error while checking out jobs", exc_info=True)
+                logger.exception("Error while checking out jobs")
                 break
 
             n_checked_out += 1
 
         logger.debug(f"checked out {n_checked_out} jobs")
 
-    def refresh_num_current_jobs(self):
+    def refresh_num_current_jobs(self) -> None:
         """
         Update the number of jobs currently running for worker with limited
         number of Jobs.
@@ -954,7 +954,7 @@ class Runner:
             }
             state["current"] = self.job_controller.count_jobs(query)
 
-    def update_batch_jobs(self):
+    def update_batch_jobs(self) -> None:
         """
         Update the status of batch jobs.
 
@@ -1020,9 +1020,8 @@ class Runner:
                                 delta_retry=self.runner_options.delta_retry,
                             ) as lock:
                                 if lock.locked_document:
-                                    raise RuntimeError(
-                                        f"The batch process that was running the job (process_id: {pid}, uuid: {process_running_uuid} was likely killed before terminating the job execution"
-                                    )
+                                    err_msg = f"The batch process that was running the job (process_id: {pid}, uuid: {process_running_uuid} was likely killed before terminating the job execution"
+                                    raise RuntimeError(err_msg)
 
                 processes = list(running_processes)
 
@@ -1092,9 +1091,7 @@ class Runner:
                         submit_result.job_id, process_running_uuid, worker_name
                     )
                 else:
-                    logger.error(
-                        f"unhandled submission status {submit_result.status}", True
-                    )
+                    logger.error(f"unhandled submission status {submit_result.status}")
 
             # check for jobs that have terminated in the batch runner and
             # update the DB state accordingly
@@ -1131,10 +1128,8 @@ class Runner:
                     [(job_id, job_index, process_running_uuid)]
                 )
 
-    def cleanup(self):
-        """
-        Close all the connections after stopping the Runner.
-        """
+    def cleanup(self) -> None:
+        """Close all the connections after stopping the Runner."""
         for worker_name, host in self.hosts.items():
             try:
                 host.close()

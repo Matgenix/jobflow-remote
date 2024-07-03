@@ -76,7 +76,7 @@ def run(
             help="Activate the connection for interactive remote host",
         ),
     ] = False,
-):
+) -> None:
     """
     Execute the Runner in the foreground.
     Do NOT execute this to start as a daemon.
@@ -133,17 +133,15 @@ def start(
             "connection for interactive remote host. Requires --single.",
         ),
     ] = False,
-):
-    """
-    Start the Runner as a daemon
-    """
+) -> None:
+    """Start the Runner as a daemon."""
     # This is not a strict requirement, but for the moment only allow the single
     # process daemon
     if connect_interactive and not single:
         exit_with_error_msg("--connect-interactive option requires --single")
     cm = get_config_manager()
     dm = DaemonManager.from_project(cm.get_project())
-    with loading_spinner(False) as progress:
+    with loading_spinner(processing=False) as progress:
         task_id = progress.add_task(description="Starting the daemon...", total=None)
         try:
             dm.start(
@@ -182,15 +180,15 @@ def stop(
             ),
         ),
     ] = False,
-):
+) -> None:
     """
     Send a stop signal to the Runner processes.
     Each of the Runner processes will stop when finished the task being executed.
-    By default, return immediately
+    By default, return immediately.
     """
     cm = get_config_manager()
     dm = DaemonManager.from_project(cm.get_project())
-    with loading_spinner(False) as progress:
+    with loading_spinner(processing=False) as progress:
         progress.add_task(description="Stopping the daemon...", total=None)
         try:
             dm.stop(wait=wait, raise_on_error=True)
@@ -208,14 +206,14 @@ def stop(
 
 
 @app_runner.command()
-def kill():
+def kill() -> None:
     """
     Send a kill signal to the Runner processes.
     Return immediately, does not wait for processes to be killed.
     """
     cm = get_config_manager()
     dm = DaemonManager.from_project(cm.get_project())
-    with loading_spinner(False) as progress:
+    with loading_spinner(processing=False) as progress:
         progress.add_task(description="Killing the daemon...", total=None)
         try:
             dm.kill(raise_on_error=True)
@@ -226,14 +224,14 @@ def kill():
 
 
 @app_runner.command()
-def shutdown():
+def shutdown() -> None:
     """
     Shuts down the supervisord process.
     Note that if the daemon is running it will wait for the daemon to stop.
     """
     cm = get_config_manager()
     dm = DaemonManager.from_project(cm.get_project())
-    with loading_spinner(False) as progress:
+    with loading_spinner(processing=False) as progress:
         progress.add_task(description="Shutting down supervisor...", total=None)
         try:
             dm.shut_down(raise_on_error=True)
@@ -244,10 +242,8 @@ def shutdown():
 
 
 @app_runner.command()
-def status():
-    """
-    Fetch the status of the daemon runner
-    """
+def status() -> None:
+    """Fetch the status of the daemon runner."""
     from jobflow_remote import SETTINGS
 
     cm = get_config_manager()
@@ -282,7 +278,7 @@ def status():
 
 
 @app_runner.command()
-def info():
+def info() -> None:
     """
     Fetch the information about the process of the daemon.
     Contain the supervisord process and the processes running the Runner.
@@ -311,10 +307,8 @@ def info():
 
 
 @app_runner.command()
-def foreground():
-    """
-    Connect to the daemon processes in the foreground
-    """
+def foreground() -> None:
+    """Connect to the daemon processes in the foreground."""
     cm = get_config_manager()
     dm = DaemonManager.from_project(cm.get_project())
     procs_info_dict = None

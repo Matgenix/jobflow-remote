@@ -1,4 +1,4 @@
-def test_jobs_list(job_controller, two_flows_four_jobs):
+def test_jobs_list(job_controller, two_flows_four_jobs) -> None:
     from jobflow_remote.jobs.state import JobState
     from jobflow_remote.testing.cli import run_check_cli
 
@@ -8,7 +8,7 @@ def test_jobs_list(job_controller, two_flows_four_jobs):
 
     run_check_cli(["job", "list"], required_out=outputs)
 
-    # the output table is squeezed. Hard to check the stdout. Just check that runs correctly
+    # the output table is squeezed. Hard to check stdout. Just check that runs correctly
     run_check_cli(["job", "list", "-v"])
     run_check_cli(["job", "list", "-vvv"])
 
@@ -30,12 +30,12 @@ def test_jobs_list(job_controller, two_flows_four_jobs):
     )
 
 
-def test_job_info(job_controller, two_flows_four_jobs):
+def test_job_info(job_controller, two_flows_four_jobs) -> None:
     from jobflow_remote.testing.cli import run_check_cli
 
     outputs = ["name = 'add1'", "state = 'READY'"]
     excluded_n = ["run_dir = None", "start_time = None"]
-    excluded = excluded_n + ["job = {"]
+    excluded = [*excluded_n, "job = {"]
     run_check_cli(["job", "info", "1"], required_out=outputs, excluded_out=excluded)
 
     outputs += excluded_n
@@ -51,7 +51,7 @@ def test_job_info(job_controller, two_flows_four_jobs):
     )
 
 
-def test_set_state(job_controller, two_flows_four_jobs):
+def test_set_state(job_controller, two_flows_four_jobs) -> None:
     from jobflow_remote.jobs.state import JobState
     from jobflow_remote.testing.cli import run_check_cli
 
@@ -66,7 +66,7 @@ def test_set_state(job_controller, two_flows_four_jobs):
     )
 
 
-def test_rerun(job_controller, two_flows_four_jobs):
+def test_rerun(job_controller, two_flows_four_jobs) -> None:
     from jobflow_remote.jobs.state import JobState
     from jobflow_remote.testing.cli import run_check_cli
 
@@ -81,7 +81,7 @@ def test_rerun(job_controller, two_flows_four_jobs):
     run_check_cli(["job", "rerun", "-did", "1"], required_out="Error while rerunning")
 
 
-def test_retry(job_controller, two_flows_four_jobs):
+def test_retry(job_controller, two_flows_four_jobs) -> None:
     from jobflow_remote.jobs.state import JobState
     from jobflow_remote.testing.cli import run_check_cli
 
@@ -96,7 +96,7 @@ def test_retry(job_controller, two_flows_four_jobs):
     run_check_cli(["job", "retry", "-did", "2"], required_out="Error while retrying")
 
 
-def test_play_pause(job_controller, two_flows_four_jobs):
+def test_play_pause(job_controller, two_flows_four_jobs) -> None:
     from jobflow_remote.jobs.state import JobState
     from jobflow_remote.testing.cli import run_check_cli
 
@@ -115,7 +115,7 @@ def test_play_pause(job_controller, two_flows_four_jobs):
     run_check_cli(["job", "play", "-did", "1"], required_out="Error while playing")
 
 
-def test_stop(job_controller, two_flows_four_jobs):
+def test_stop(job_controller, two_flows_four_jobs) -> None:
     from jobflow_remote.jobs.state import JobState
     from jobflow_remote.testing.cli import run_check_cli
 
@@ -127,7 +127,7 @@ def test_stop(job_controller, two_flows_four_jobs):
     assert job_controller.get_job_info(db_id="1").state == JobState.USER_STOPPED
 
 
-def test_queue_out(job_controller, one_job):
+def test_queue_out(job_controller, one_job) -> None:
     from jobflow_remote.jobs.runner import Runner
     from jobflow_remote.testing.cli import run_check_cli
 
@@ -148,7 +148,7 @@ def test_queue_out(job_controller, one_job):
     )
 
 
-def test_set_worker(job_controller, one_job):
+def test_set_worker(job_controller, one_job) -> None:
     from jobflow_remote.testing.cli import run_check_cli
 
     run_check_cli(
@@ -159,7 +159,7 @@ def test_set_worker(job_controller, one_job):
     assert job_controller.get_job_info(db_id="1").worker == "test_local_worker_2"
 
 
-def test_set_exec_config(job_controller, one_job):
+def test_set_exec_config(job_controller, one_job) -> None:
     from jobflow_remote.testing.cli import run_check_cli
 
     run_check_cli(
@@ -170,7 +170,7 @@ def test_set_exec_config(job_controller, one_job):
     assert job_controller.get_job_doc(db_id="1").exec_config == "test"
 
 
-def test_set_resources(job_controller, one_job):
+def test_set_resources(job_controller, one_job) -> None:
     from jobflow_remote.testing.cli import run_check_cli
 
     run_check_cli(
@@ -181,7 +181,7 @@ def test_set_resources(job_controller, one_job):
     assert job_controller.get_job_doc(db_id="1").resources == {"ntasks": 1}
 
 
-def test_job_dump(job_controller, one_job, tmp_dir):
+def test_job_dump(job_controller, one_job, tmp_dir) -> None:
     import os
 
     from jobflow_remote.testing.cli import run_check_cli
@@ -190,7 +190,7 @@ def test_job_dump(job_controller, one_job, tmp_dir):
     assert os.path.isfile("jobs_dump.json")
 
 
-def test_output(job_controller, one_job):
+def test_output(job_controller, one_job) -> None:
     from jobflow_remote.jobs.runner import Runner
     from jobflow_remote.testing.cli import run_check_cli
 
@@ -202,7 +202,7 @@ def test_output(job_controller, one_job):
     run_check_cli(["job", "output", "1"], required_out="6")
 
 
-def test_files_list(job_controller, one_job):
+def test_files_list(job_controller, one_job) -> None:
     from jobflow_remote.jobs.runner import Runner
     from jobflow_remote.testing.cli import run_check_cli
 
@@ -223,7 +223,7 @@ def test_files_list(job_controller, one_job):
     )
 
 
-def test_files_get(job_controller, one_job, tmp_dir):
+def test_files_get(job_controller, one_job, tmp_dir) -> None:
     import os
 
     from jobflow_remote.jobs.runner import Runner

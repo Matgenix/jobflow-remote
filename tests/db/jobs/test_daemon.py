@@ -12,7 +12,7 @@ import pytest
 def _wait_daemon_started(daemon_manager, max_wait: int = 10) -> bool:
     from jobflow_remote.jobs.daemon import DaemonStatus
 
-    for i in range(max_wait):
+    for _i in range(max_wait):
         time.sleep(1)
         state = daemon_manager.check_status()
         assert state in (DaemonStatus.STARTING, DaemonStatus.RUNNING)
@@ -27,7 +27,7 @@ def _wait_daemon_started(daemon_manager, max_wait: int = 10) -> bool:
     "single",
     [True, False],
 )
-def test_start_stop(job_controller, single, daemon_manager):
+def test_start_stop(job_controller, single, daemon_manager) -> None:
     from jobflow import Flow
 
     from jobflow_remote import submit_flow
@@ -48,7 +48,7 @@ def test_start_stop(job_controller, single, daemon_manager):
 
     finished_states = (JobState.REMOTE_ERROR, JobState.FAILED, JobState.COMPLETED)
 
-    for i in range(20):
+    for _ in range(20):
         time.sleep(1)
         jobs_info = job_controller.get_jobs_info()
         if all(ji.state in finished_states for ji in jobs_info):
@@ -73,7 +73,7 @@ def test_start_stop(job_controller, single, daemon_manager):
     assert processes_info is None
 
 
-def test_kill(job_controller, daemon_manager):
+def test_kill(job_controller, daemon_manager) -> None:
     from jobflow_remote.jobs.daemon import DaemonStatus
 
     assert daemon_manager.check_status() == DaemonStatus.SHUT_DOWN
@@ -84,14 +84,12 @@ def test_kill(job_controller, daemon_manager):
     assert daemon_manager.start(raise_on_error=True, single=True)
     _wait_daemon_started(daemon_manager)
 
-    print(daemon_manager.get_processes_info())
     assert daemon_manager.kill(raise_on_error=True)
     time.sleep(1)
-    print(daemon_manager.get_processes_info())
     assert daemon_manager.check_status() == DaemonStatus.STOPPED
 
 
-def test_kill_supervisord(job_controller, daemon_manager, caplog):
+def test_kill_supervisord(job_controller, daemon_manager, caplog) -> None:
     import signal
     import time
 
@@ -116,10 +114,11 @@ def test_kill_supervisord(job_controller, daemon_manager, caplog):
     # the log message is not present.
     # log_msg = caplog.messages
     # assert len(log_msg) > 0
-    # assert f"Process with pid {supervisord_pid} is not running but daemon files are present" in log_msg[-1]
+    # assert f"Process with pid {supervisord_pid} is not running but daemon files are
+    # present" in log_msg[-1]
 
 
-def test_kill_one_process(job_controller, daemon_manager, caplog):
+def test_kill_one_process(job_controller, daemon_manager, caplog) -> None:
     import signal
     import time
 

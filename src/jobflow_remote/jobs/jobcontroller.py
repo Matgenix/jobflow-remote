@@ -50,6 +50,8 @@ from jobflow_remote.utils.db import FlowLockedError, JobLockedError, MongoLock
 if TYPE_CHECKING:
     from collections.abc import Generator
 
+    from maggma.stores import MongoStore
+
 
 logger = logging.getLogger(__name__)
 
@@ -73,7 +75,7 @@ class JobController:
         flows_collection: str = "flows",
         auxiliary_collection: str = "jf_auxiliary",
         project: Project | None = None,
-    ):
+    ) -> None:
         """
         Parameters
         ----------
@@ -153,23 +155,17 @@ class JobController:
             project=project,
         )
 
-    def close(self):
-        """
-        Close the connections to all the Stores in JobController.
-        """
+    def close(self) -> None:
+        """Close the connections to all the Stores in JobController."""
         try:
             self.queue_store.close()
         except Exception:
-            logger.error(
-                "Error while closing the connection to the queue store", exc_info=True
-            )
+            logger.exception("Error while closing the connection to the queue store")
 
         try:
             self.jobstore.close()
         except Exception:
-            logger.error(
-                "Error while closing the connection to the job store", exc_info=True
-            )
+            logger.exception("Error while closing the connection to the job store")
 
     def _build_query_job(
         self,
@@ -368,12 +364,7 @@ class JobController:
             A list of JobInfo matching the criteria.
         """
         data = self.jobs.find(query, projection=projection_job_info, **kwargs)
-
-        jobs_data = []
-        for d in data:
-            jobs_data.append(JobInfo.from_query_output(d))
-
-        return jobs_data
+        return [JobInfo.from_query_output(d) for d in data]
 
     def get_jobs_info(
         self,
@@ -459,11 +450,7 @@ class JobController:
         """
         data = self.jobs.find(query, **kwargs)
 
-        jobs_data = []
-        for d in data:
-            jobs_data.append(JobDoc.model_validate(d))
-
-        return jobs_data
+        return [JobDoc.model_validate(d) for d in data]
 
     def get_jobs_doc(
         self,
@@ -699,9 +686,7 @@ class JobController:
             except Exception:
                 if raise_on_error:
                     raise
-                logger.error(
-                    f"Error while {action_description} for job {db_id}", exc_info=True
-                )
+                logger.exception(f"Error while {action_description} for job {db_id}")
 
         return list(updated_ids)
 
@@ -863,7 +848,7 @@ class JobController:
 
             if job_state in [JobState.READY]:
                 raise ValueError("The Job is in the READY state. No need to rerun.")
-            elif job_state in RESETTABLE_STATES:
+            if job_state in RESETTABLE_STATES:
                 # if in one of the resettable states no need to lock the flow or
                 # update children.
                 doc_update = self._reset_remote(job_doc_dict)
@@ -1419,10 +1404,10 @@ class JobController:
                 previous_state = doc["previous_state"]
                 try:
                     JobState(previous_state)
-                except ValueError:
+                except ValueError as exc:
                     raise ValueError(
                         f"The registered previous state: {previous_state} is not a valid state"
-                    )
+                    ) from exc
                 set_dict = get_reset_job_base_dict()
                 set_dict["state"] = previous_state
 
@@ -1623,7 +1608,7 @@ class JobController:
         )
         flow_lock_kwargs = dict(projection=["uuid"])
         with self.lock_job_flow(
-            acceptable_states=[JobState.READY] + RUNNING_STATES,
+            acceptable_states=[JobState.READY, *RUNNING_STATES],
             job_id=job_id,
             db_id=db_id,
             job_index=job_index,
@@ -1957,7 +1942,7 @@ class JobController:
                 raise ValueError(
                     f"exec_config {exec_config} is not present in the project"
                 )
-            elif isinstance(exec_config, ExecutionConfig):
+            if isinstance(exec_config, ExecutionConfig):
                 exec_config = exec_config.model_dump()
 
             if update and isinstance(exec_config, dict):
@@ -2061,7 +2046,7 @@ class JobController:
             pipeline.append({"$project": projection})
 
         if sort:
-            pipeline.append({"$sort": {k: v for (k, v) in sort}})
+            pipeline.append({"$sort": dict(sort)})
 
         if limit:
             pipeline.append({"$limit": limit})
@@ -2148,11 +2133,7 @@ class JobController:
         else:
             data = list(self.flows.find(query, sort=sort, limit=limit))
 
-        jobs_data = []
-        for d in data:
-            jobs_data.append(FlowInfo.from_query_dict(d))
-
-        return jobs_data
+        return [FlowInfo.from_query_dict(d) for d in data]
 
     def delete_flows(
         self,
@@ -2195,7 +2176,7 @@ class JobController:
 
         return deleted
 
-    def delete_flow(self, flow_id: str, delete_output: bool = False):
+    def delete_flow(self, flow_id: str, delete_output: bool = False) -> bool:
         """
         Delete a single Flow based on the uuid.
 
@@ -2384,9 +2365,9 @@ class JobController:
         background: bool = True,
         job_custom_indexes: list[str | list] | None = None,
         flow_custom_indexes: list[str | list] | None = None,
-    ):
+    ) -> None:
         """
-        Build indexes in the database
+        Build indexes in the database.
 
         Parameters
         ----------
@@ -2434,10 +2415,8 @@ class JobController:
             for idx in flow_custom_indexes:
                 self.flows.create_index(idx, background=background)
 
-    def compact(self):
-        """
-        Compact jobs and flows collections in MongoDB.
-        """
+    def compact(self) -> None:
+        """Compact jobs and flows collections in MongoDB."""
         self.db.command({"compact": self.jobs_collection})
         self.db.command({"compact": self.flows_collection})
 
@@ -2671,7 +2650,7 @@ class JobController:
         response_type: DynamicResponseType,
         exec_config: ExecutionConfig | None = None,
         resources: QResources | None = None,
-    ):
+    ) -> None:
         from jobflow import Flow, Job
 
         decoder = MontyDecoder()
@@ -2733,7 +2712,7 @@ class JobController:
             prefix = self.project.queue.db_id_prefix or ""
             db_id = f"{prefix}{db_id_int}"
             # inherit the parents of the job to which we are appending
-            parents = parents if parents else job_parents
+            parents = parents if parents else job_parents  # noqa: PLW2901
             job_dicts.append(
                 get_initial_job_doc_dict(
                     job,
@@ -2879,7 +2858,7 @@ class JobController:
                 out = loadfn(out_path, cls=None)
                 decoder = MontyDecoder()
                 doc_update = {"start_time": decoder.process_decoded(out["start_time"])}
-                # update the time of the JobDoc, will be used in the checkin
+                # update the time of the JobDoc, will be used in the checking
                 end_time = decoder.process_decoded(out.get("end_time"))
                 if end_time:
                     doc_update["end_time"] = end_time
@@ -2927,7 +2906,7 @@ class JobController:
                 )
                 self.update_flow_state(host_flow_id)
                 return True
-            elif flow_lock.unavailable_document:
+            if flow_lock.unavailable_document:
                 # raising the error if the lock could not be acquired leaves
                 # the caller handle the issue. In general, it should be the
                 # runner, that will retry at a later time.
@@ -3041,7 +3020,7 @@ class JobController:
         # (or allowed to fail) and ready them. Assume that none of the children
         # can be in a running state and thus no need to lock them.
         to_ready = []
-        for _, job in jobs_mapping.items():
+        for job in jobs_mapping.values():
             allowed_states = [JobState.COMPLETED.value]
             on_missing_ref = (
                 job.get("job", {}).get("config", {}).get("on_missing_references", None)
@@ -3051,7 +3030,7 @@ class JobController:
                     (JobState.FAILED.value, JobState.USER_STOPPED.value)
                 )
             if job["state"] == JobState.WAITING.value and all(
-                [jobs_mapping[p]["state"] in allowed_states for p in job["parents"]]
+                jobs_mapping[p]["state"] in allowed_states for p in job["parents"]
             ):
                 # Use the db_id to identify the children, since the uuid alone is not
                 # enough in some cases.
@@ -3107,10 +3086,7 @@ class JobController:
         if job_uuid is not None and flow_uuid is not None:
             raise ValueError("Only one of job_uuid and flow_uuid should be set.")
 
-        if job_uuid is not None:
-            criteria = {"jobs": job_uuid}
-        else:
-            criteria = {"uuid": flow_uuid}
+        criteria = {"uuid": flow_uuid} if job_uuid is None else {"jobs": job_uuid}
 
         # get uuids of jobs in the flow
         flow_dict = self.flows.find_one(criteria, projection=["jobs"])
@@ -3189,7 +3165,7 @@ class JobController:
             pipeline.append({"$project": projection})
 
         if sort:
-            pipeline.append({"$sort": {k: v for (k, v) in sort}})
+            pipeline.append({"$sort": dict(sort)})
 
         if limit:
             pipeline.append({"$limit": limit})
@@ -3200,7 +3176,7 @@ class JobController:
         self,
         flow_uuid: str,
         updated_states: dict[str, dict[int, JobState]] | None = None,
-    ):
+    ) -> None:
         """
         Update the state of a Flow in the DB based on the Job's states.
 
@@ -3479,7 +3455,7 @@ class JobController:
 
                 yield job_lock, flow_lock
 
-    def ping_flow_doc(self, uuid: str):
+    def ping_flow_doc(self, uuid: str) -> None:
         """
         Ping a Flow document to update its "updated_on" value.
 
@@ -3492,7 +3468,7 @@ class JobController:
             {"nodes": uuid}, {"$set": {"updated_on": datetime.utcnow()}}
         )
 
-    def _cancel_queue_process(self, job_doc: dict):
+    def _cancel_queue_process(self, job_doc: dict) -> None:
         """
         Cancel the process in the remote queue.
 

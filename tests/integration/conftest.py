@@ -16,7 +16,7 @@ from docker.models.containers import Container
 
 
 @pytest.fixture(autouse=True)
-def mock_fabric_run(monkeypatch):
+def mock_fabric_run(monkeypatch) -> None:
     monkeypatch.setattr(
         fabric.Connection, "run", partialmethod(fabric.Connection.run, in_stream=False)
     )
@@ -135,7 +135,8 @@ def build_and_launch_container(
 
 @pytest.fixture(scope="session", autouse=True)
 def slurm_container(docker_client, slurm_ssh_port):
-    """Build and launch a container running Slurm + SSH, exposed on a random available port."""
+    """Build and launch a container running Slurm + SSH, exposed on a random available
+    port."""
     ports = {"22/tcp": slurm_ssh_port}
     yield from build_and_launch_container(
         docker_client,
@@ -147,7 +148,8 @@ def slurm_container(docker_client, slurm_ssh_port):
 
 @pytest.fixture(scope="session", autouse=True)
 def mongo_container(docker_client, db_port):
-    """Build and launch a container running MongoDB, exposed on a random available port."""
+    """Build and launch a container running MongoDB, exposed on a random available
+    port."""
     ports = {"27017/tcp": db_port}
     yield from build_and_launch_container(
         docker_client,
@@ -169,17 +171,18 @@ def write_tmp_settings(
     slurm_ssh_port,
     db_port,
 ):
-    """Collects the various sub-configs and writes them to a temporary file in a temporary directory."""
+    """Collects the various sub-configs and writes them to a temporary file in a
+    temporary directory."""
     tmp_dir: Path = Path(tempfile.mkdtemp())
 
     os.environ["JFREMOTE_PROJECTS_FOLDER"] = str(tmp_dir.resolve())
     workdir = tmp_dir / "jfr"
     workdir.mkdir(exist_ok=True)
     os.environ["JFREMOTE_PROJECT"] = random_project_name
-    # Set the config file to a random path so that we don't accidentally load the default
+    # Set config file to a random path so that we don't accidentally load the default
     os.environ["JFREMOTE_CONFIG_FILE"] = _get_random_name(length=10) + ".json"
-    # This import must come after setting the env vars as jobflow loads the default config
-    # on import
+    # This import must come after setting the env vars as jobflow loads the default
+    # config on import
     from jobflow_remote.config import Project
 
     project = Project(
@@ -275,10 +278,10 @@ def write_tmp_settings(
     shutil.rmtree(tmp_dir)
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture()
 def job_controller(random_project_name):
-    """Yields a jobcontroller instance for the test suite that also sets up the jobstore,
-    resetting it after every test.
+    """Yields a jobcontroller instance for the test suite that also sets up the
+    jobstore, resetting it after every test.
     """
     from jobflow_remote.jobs.jobcontroller import JobController
 

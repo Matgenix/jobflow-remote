@@ -315,7 +315,7 @@ class DictType(dict):
 
 # Similarly, Python 3.10 union types are not supported,
 # e.g., `str | None` vs `Optional[str]`
-# pyupgraade really likes enforcing this rule (PEP 604)
+# ruff enforces PEP 604
 # but will leave things in if they are explicit type aliases
 OptionalStr = Optional[str]
 OptionalDictType = Optional[DictType]
@@ -327,10 +327,10 @@ class DictTypeParser(click.ParamType):
     def convert(self, value, param, ctx):
         try:
             value = json.loads(value)
-        except Exception as e:
+        except Exception as exc:
             raise typer.BadParameter(
-                f"Error while converting JSON: {getattr(e, 'message', str(e))}"
-            )
+                f"Error while converting JSON: {getattr(exc, 'message', str(exc))}"
+            ) from exc
         return DictType(value)
 
 

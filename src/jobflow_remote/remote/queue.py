@@ -1,12 +1,17 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from qtoolkit.core.data_objects import CancelResult, QJob, QResources, SubmissionResult
-from qtoolkit.io.base import BaseSchedulerIO
 from qtoolkit.io.shell import ShellIO
 
-from jobflow_remote.remote.host import BaseHost
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from qtoolkit.io.base import BaseSchedulerIO
+
+    from jobflow_remote.remote.host import BaseHost
 
 OUT_FNAME = "queue.out"
 ERR_FNAME = "queue.err"
@@ -17,7 +22,7 @@ def set_name_out(
     name: str,
     out_fpath: str | Path = OUT_FNAME,
     err_fpath: str | Path = ERR_FNAME,
-):
+) -> None:
     # sanitize the name
     name = name.replace(" ", "_")
     if isinstance(resources, QResources):
@@ -46,7 +51,7 @@ class QueueManager:
         scheduler_io: BaseSchedulerIO,
         host: BaseHost,
         timeout_exec: int | None = None,
-    ):
+    ) -> None:
         self.scheduler_io = scheduler_io
         self.host = host
         self.timeout_exec = timeout_exec
@@ -119,18 +124,15 @@ class QueueManager:
     def get_modules(self, modules: list[str] | None) -> str | None:
         if not modules:
             return None
-        modules_str = []
-        for m in modules:
-            modules_str.append(f"module load {m}")
+        modules_str = [f"module load {m}" for m in modules]
         return "\n".join(modules_str)
 
     def get_run_commands(self, commands) -> str:
         if isinstance(commands, str):
             return commands
-        elif isinstance(commands, list):
+        if isinstance(commands, list):
             return "\n".join(commands)
-        else:
-            raise ValueError("commands should be a str or a list of str.")
+        raise ValueError("commands should be a str or a list of str.")
 
     def get_post_run(self, post_run: str | list[str] | None) -> str:
         if isinstance(post_run, (list, tuple)):
@@ -194,10 +196,7 @@ class QueueManager:
             created = self.host.mkdir(work_dir, recursive=True, exist_ok=True)
             if not created:
                 raise RuntimeError("failed to create directory")
-        if work_dir:
-            script_fpath = Path(work_dir, script_fname)
-        else:
-            script_fpath = Path(script_fname)
+        script_fpath = Path(work_dir, script_fname) if work_dir else Path(script_fname)
         self.host.write_text_file(script_fpath, script_str)
         return script_fpath
 
@@ -217,7 +216,7 @@ class QueueManager:
 
     def get_jobs_list(
         self,
-        jobs: list[QJob | int | str] | None = None,
+        jobs: Sequence[QJob | int | str] | None = None,
         user: str | None = None,
         timeout: int | None = None,
     ) -> list[QJob]:

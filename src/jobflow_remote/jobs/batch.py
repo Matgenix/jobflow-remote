@@ -4,10 +4,12 @@ import logging
 import os
 import random
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from flufl.lock import Lock, LockError
 
-from jobflow_remote.remote.host import BaseHost
+if TYPE_CHECKING:
+    from jobflow_remote.remote.host import BaseHost
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +35,7 @@ class RemoteBatchManager:
         self,
         host: BaseHost,
         files_dir: str | Path,
-    ):
+    ) -> None:
         """
 
         Parameters
@@ -51,10 +53,8 @@ class RemoteBatchManager:
         self.lock_dir = self.files_dir / LOCK_DIR
         self._init_files_dir()
 
-    def _init_files_dir(self):
-        """
-        Initialize the file directory, creating all the subdiretories.
-        """
+    def _init_files_dir(self) -> None:
+        """Initialize the file directory, creating all the subdiretories."""
         self.host.connect()
         # Note that the check of the creation of the folders on a remote host
         # slows down the start of the runner by a few seconds.
@@ -67,7 +67,7 @@ class RemoteBatchManager:
         self.host.mkdir(self.terminated_dir)
         self.host.mkdir(self.lock_dir)
 
-    def submit_job(self, job_id: str, index: int):
+    def submit_job(self, job_id: str, index: int) -> None:
         """
         Submit a Job by uploading the corresponding file.
 
@@ -114,7 +114,7 @@ class RemoteBatchManager:
             running.append((job_id, index, process_uuid))
         return running
 
-    def delete_terminated(self, ids: list[tuple[str, int, str]]):
+    def delete_terminated(self, ids: list[tuple[str, int, str]]) -> None:
         for job_id, index, process_uuid in ids:
             self.host.remove(self.terminated_dir / f"{job_id}_{index}_{process_uuid}")
 
@@ -127,7 +127,7 @@ class LocalBatchManager:
     Used in the worker to executes the batch Jobs.
     """
 
-    def __init__(self, files_dir: str | Path, process_id: str):
+    def __init__(self, files_dir: str | Path, process_id: str) -> None:
         self.process_id = process_id
         self.files_dir = Path(files_dir)
         self.submitted_dir = self.files_dir / SUBMITTED_DIR
@@ -148,13 +148,12 @@ class LocalBatchManager:
                     (self.running_dir / f"{selected}_{self.process_id}").touch()
                     return selected
             except (LockError, FileNotFoundError):
-                logger.error(
-                    f"Error while locking file {selected}. Will be ignored",
-                    exc_info=True,
+                logger.exception(
+                    f"Error while locking file {selected}. Will be ignored"
                 )
                 files.remove(selected)
         return None
 
-    def terminate_job(self, job_id: str, index: int):
+    def terminate_job(self, job_id: str, index: int) -> None:
         os.remove(self.running_dir / f"{job_id}_{index}_{self.process_id}")
         (self.terminated_dir / f"{job_id}_{index}_{self.process_id}").touch()

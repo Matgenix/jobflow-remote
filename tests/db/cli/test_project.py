@@ -1,4 +1,6 @@
-def test_list_projects(job_controller, random_project_name, monkeypatch, tmp_dir):
+def test_list_projects(
+    job_controller, random_project_name, monkeypatch, tmp_dir
+) -> None:
     import os
 
     from monty.serialization import dumpfn
@@ -10,7 +12,6 @@ def test_list_projects(job_controller, random_project_name, monkeypatch, tmp_dir
 
     # change project directory and test options there
     with monkeypatch.context() as m:
-        print(tmp_dir, type(tmp_dir))
         m.setattr(SETTINGS, "projects_folder", os.getcwd())
         run_check_cli(["project", "list"], required_out="No project available in")
 
@@ -23,7 +24,7 @@ def test_list_projects(job_controller, random_project_name, monkeypatch, tmp_dir
         run_check_cli(["project", "list"], required_out=output)
 
 
-def test_current_project(job_controller, random_project_name):
+def test_current_project(job_controller, random_project_name) -> None:
     from jobflow_remote.testing.cli import run_check_cli
 
     run_check_cli(
@@ -31,7 +32,7 @@ def test_current_project(job_controller, random_project_name):
     )
 
 
-def test_generate(job_controller, random_project_name, monkeypatch, tmp_dir):
+def test_generate(job_controller, random_project_name, monkeypatch, tmp_dir) -> None:
     import os
 
     from jobflow_remote import SETTINGS
@@ -41,7 +42,6 @@ def test_generate(job_controller, random_project_name, monkeypatch, tmp_dir):
 
     # change project directory and test options there
     with monkeypatch.context() as m:
-        print(tmp_dir, type(tmp_dir))
         m.setattr(SETTINGS, "projects_folder", os.getcwd())
         run_check_cli(
             ["project", "generate", "test_proj_1"],
@@ -59,7 +59,7 @@ def test_generate(job_controller, random_project_name, monkeypatch, tmp_dir):
         )
 
 
-def test_check(job_controller):
+def test_check(job_controller) -> None:
     from jobflow_remote.testing.cli import run_check_cli
 
     output = [
@@ -71,7 +71,7 @@ def test_check(job_controller):
     run_check_cli(["project", "check"], required_out=output)
 
 
-def test_remove(job_controller, random_project_name, monkeypatch, tmp_dir):
+def test_remove(job_controller, random_project_name, monkeypatch, tmp_dir) -> None:
     import os
 
     from jobflow_remote import SETTINGS, ConfigManager
@@ -81,7 +81,6 @@ def test_remove(job_controller, random_project_name, monkeypatch, tmp_dir):
 
     # change project directory and test options there
     with monkeypatch.context() as m:
-        print(tmp_dir, type(tmp_dir))
         m.setattr(SETTINGS, "projects_folder", os.getcwd())
         cm = ConfigManager()
         run_check_cli(
@@ -106,14 +105,14 @@ def test_remove(job_controller, random_project_name, monkeypatch, tmp_dir):
         )
 
 
-def test_list_exec_config(job_controller):
+def test_list_exec_config(job_controller) -> None:
     from jobflow_remote.testing.cli import run_check_cli
 
     output = ["Name", "modules", "export", "pre_run", "post_run", "test"]
     run_check_cli(["project", "exec_config", "list", "-v"], required_out=output)
 
 
-def test_list_workers(job_controller):
+def test_list_workers(job_controller) -> None:
     from jobflow_remote.testing.cli import run_check_cli
 
     output = ["Name", "type", "info", "test_local_worker", "test_local_worker_2"]

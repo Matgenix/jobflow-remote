@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import datetime
 import time
+from typing import TYPE_CHECKING
 
 from monty.json import jsanitize
 from rich.scope import render_scope
@@ -9,10 +10,12 @@ from rich.table import Table
 from rich.text import Text
 
 from jobflow_remote.cli.utils import ReprStr, fmt_datetime
-from jobflow_remote.config.base import ExecutionConfig, WorkerBase
-from jobflow_remote.jobs.data import FlowInfo, JobDoc, JobInfo
 from jobflow_remote.jobs.state import JobState
 from jobflow_remote.utils.data import convert_utc_time
+
+if TYPE_CHECKING:
+    from jobflow_remote.config.base import ExecutionConfig, WorkerBase
+    from jobflow_remote.jobs.data import FlowInfo, JobDoc, JobInfo
 
 
 def get_job_info_table(jobs_info: list[JobInfo], verbosity: int):

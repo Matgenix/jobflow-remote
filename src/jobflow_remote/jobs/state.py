@@ -4,9 +4,7 @@ from enum import Enum
 
 
 class JobState(Enum):
-    """
-    States of a Job
-    """
+    """States of a Job."""
 
     WAITING = "WAITING"
     READY = "READY"
@@ -74,9 +72,7 @@ RESETTABLE_STATES_V = RUNNING_STATES_V
 
 
 class FlowState(Enum):
-    """
-    States of a Flow.
-    """
+    """States of a Flow."""
 
     WAITING = "WAITING"
     READY = "READY"
@@ -108,22 +104,21 @@ class FlowState(Enum):
         """
         if all(js == JobState.WAITING for js in jobs_states):
             return cls.WAITING
-        elif all(js in (JobState.WAITING, JobState.READY) for js in jobs_states):
+        if all(js in (JobState.WAITING, JobState.READY) for js in jobs_states):
             return cls.READY
         # only need to check the leaf states to determine if it is completed,
         # in case some intermediate Job failed but children allow missing
         # references.
-        elif all(js == JobState.COMPLETED for js in leaf_states):
+        if all(js == JobState.COMPLETED for js in leaf_states):
             return cls.COMPLETED
         # REMOTE_ERROR state does not lead to a failed Flow. Two main reasons:
         # 1) it might be a temporary problem and not a final failure of the Flow
         # 2) Changing the state of the flow would require locking the Flow
         #    when applying the change in the remote state.
-        elif any(js == JobState.FAILED for js in jobs_states):
+        if any(js == JobState.FAILED for js in jobs_states):
             return cls.FAILED
-        elif any(js in (JobState.STOPPED, JobState.USER_STOPPED) for js in jobs_states):
+        if any(js in (JobState.STOPPED, JobState.USER_STOPPED) for js in jobs_states):
             return cls.STOPPED
-        elif any(js == JobState.PAUSED for js in jobs_states):
+        if any(js == JobState.PAUSED for js in jobs_states):
             return cls.PAUSED
-        else:
-            return cls.RUNNING
+        return cls.RUNNING
