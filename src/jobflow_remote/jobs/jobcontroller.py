@@ -2446,6 +2446,24 @@ class JobController:
             raise ValueError(f"job_index value: {job_index} is not supported")
         return self.jobs.find_one(query, projection=projection, sort=sort)
 
+    def get_job_info_by_pid(self, pid: int | str) -> JobInfo | None:
+        """
+        Retrieve job information by process ID (e.g., Slurm job ID).
+
+        Args:
+            pid (int): The process ID of the job in the queue system.
+
+        Returns:
+            JobInfo | None: Job information if found, None otherwise.
+        """
+        query = {"remote.process_id": str(pid)}
+        jobs_info = self.get_jobs_info_query(query=query, limit=1)
+
+        if jobs_info:
+            return jobs_info[0]
+
+        return None
+
     def get_job_doc(
         self,
         job_id: str | None = None,
