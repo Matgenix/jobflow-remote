@@ -51,6 +51,47 @@ def test_job_info(job_controller, two_flows_four_jobs) -> None:
     )
 
 
+def test_job_info_by_pid(job_controller, two_flows_four_jobs):
+    from jobflow_remote.testing.cli import run_check_cli
+
+    # Set a known process ID for one of the jobs
+    test_pid = 12345
+    job_controller.jobs.update_one(
+        {"db_id": "1"}, {"$set": {"remote.process_id": str(test_pid)}}
+    )
+
+    # Test successful retrieval of job info by process ID
+    outputs = ["name = 'add1'", "state = 'READY'", f"'process_id': '{test_pid}'"]
+    run_check_cli(["job", "info", "--pid", str(test_pid)], required_out=outputs)
+
+    # Test with invalid process ID
+    invalid_pid = 99999
+    run_check_cli(
+        ["job", "info", "--pid", str(invalid_pid)],
+        error=True,
+        required_out="No data matching the request",
+    )
+
+    # Test that we can't use --pid with other job identification options
+    run_check_cli(
+        ["job", "info", "1", "--pid", str(test_pid)],
+        error=True,
+        required_out="Cannot specify both job ID/index and process ID",
+    )
+
+    # Test with verbosity
+    run_check_cli(
+        ["job", "info", "--pid", str(test_pid), "-vvv"],
+        required_out=[f"'step_attempts': 0, 'process_id': '{test_pid}'"],
+    )
+
+    run_check_cli(
+        ["job", "info", "--pidd", str(test_pid)],
+        error=True,
+        required_out="No such option: --pidd Did you mean --pid?",
+    )
+
+
 def test_set_state(job_controller, two_flows_four_jobs) -> None:
     from jobflow_remote.jobs.state import JobState
     from jobflow_remote.testing.cli import run_check_cli
