@@ -162,8 +162,15 @@ def jobs_list(
 
 @app_job.command(name="info")
 def job_info(
-    job_db_id: job_db_id_arg,
+    job_db_id: job_db_id_arg = None,
     job_index: job_index_arg = None,
+    pid: Annotated[
+        int,
+        typer.Option(
+            "--pid",
+            help="The process ID of the job in the queue system (e.g. Slurm job ID)",
+        ),
+    ] = None,
     with_error: Annotated[
         bool,
         typer.Option(
@@ -182,30 +189,28 @@ def job_info(
     ] = False,
     verbosity: verbosity_opt = 0,
 ) -> None:
-    """Detail information on a specific job."""
-    db_id, job_id = get_job_db_ids(job_db_id, job_index)
-
-    if with_error:
-        out_console.print(
-            "The --with-error option is deprecated and not needed anymore to show error messages",
-            style="yellow",
-        )
+    """Detailed information on a specific job."""
+    if pid is not None and (job_db_id is not None or job_index is not None):
+        raise typer.BadParameter("Cannot specify both job ID/index and process ID")
 
     with loading_spinner():
         jc = get_job_controller()
 
-        if verbosity > 0:
-            job_data = jc.get_job_doc(
-                job_id=job_id,
-                job_index=job_index,
-                db_id=db_id,
-            )
+        if job_db_id is not None or job_index is not None:
+            if verbosity > 0:
+                job_data = jc.get_job_doc(
+                    job_id=job_db_id,
+                    job_index=job_index,
+                )
+            else:
+                job_data = jc.get_job_info(
+                    job_id=job_db_id,
+                    job_index=job_index,
+                )
+        elif pid is not None:
+            job_data = jc.get_job_info_by_pid(pid)
         else:
-            job_data = jc.get_job_info(
-                job_id=job_id,
-                job_index=job_index,
-                db_id=db_id,
-            )
+            raise typer.BadParameter("Must specify either job ID/index or process ID")
 
     if not job_data:
         exit_with_error_msg("No data matching the request")
@@ -824,7 +829,7 @@ def output(
         ),
     ] = False,
 ) -> None:
-    """Detail information on a specific job."""
+    """Detailed information on a specific job."""
     db_id, job_id = get_job_db_ids(job_db_id, job_index)
 
     with loading_spinner():
