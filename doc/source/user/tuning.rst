@@ -58,6 +58,13 @@ or to pass an instance of a ``QResources``, a generic object defining resources
 for standard use cases. These will be used to fill in a template and generate
 a suitable submission script.
 
+.. note::
+
+    There are `SLURM <https://matgenix.github.io/qtoolkit/api/qtoolkit.io.slurm.html>`_ 
+    and `PBS <https://matgenix.github.io/qtoolkit/api/qtoolkit.io.pbs.html>`_ 
+    specific keywords that can be passed to ``submit_flow`` to use the 
+    respective queueing system commands.
+
 How to tune
 ===========
 
