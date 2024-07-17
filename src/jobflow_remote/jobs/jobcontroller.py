@@ -3947,6 +3947,26 @@ class JobController:
 
                 yield job_lock, flow_lock
 
+    @contextlib.contextmanager
+    def lock_auxiliary(self, **lock_kwargs) -> Generator[MongoLock, None, None]:
+        """
+        Lock a document in the auxiliary collection.
+
+        See MongoLock context manager for more details about the locking options.
+
+        Parameters
+        ----------
+        lock_kwargs
+            Kwargs passed to the MongoLock context manager.
+
+        Returns
+        -------
+        MongoLock
+            An instance of MongoLock.
+        """
+        with MongoLock(collection=self.auxiliary, **lock_kwargs) as lock:
+            yield lock
+
     def ping_flow_doc(self, uuid: str) -> None:
         """
         Ping a Flow document to update its "updated_on" value.
