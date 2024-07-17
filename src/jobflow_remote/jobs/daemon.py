@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import datetime
 import getpass
 import logging
+import os
+import socket
 import subprocess
 import time
 from enum import Enum
@@ -11,6 +14,7 @@ from typing import Callable
 from xmlrpc.client import Fault
 
 import psutil
+from monty.functools import lazy_property
 from monty.os import makedirs_p
 from supervisor import childutils, states, xmlrpc
 from supervisor.compat import xmlrpclib
@@ -20,6 +24,7 @@ from supervisor.supervisorctl import Controller, fgthread
 from supervisor.xmlrpc import Faults
 
 from jobflow_remote.config import ConfigManager, Project
+from jobflow_remote.jobs.jobcontroller import JobController
 
 logger = logging.getLogger(__name__)
 
@@ -131,10 +136,12 @@ class DaemonManager:
         daemon_dir: str | Path,
         log_dir: str | Path,
         project: Project,
+        job_controller: JobController | None = None,
     ) -> None:
         self.project = project
         self.daemon_dir = Path(daemon_dir).absolute()
         self.log_dir = Path(log_dir).absolute()
+        self._job_controller = job_controller
 
     @classmethod
     def from_project(cls, project: Project):
@@ -168,6 +175,12 @@ class DaemonManager:
             "in the project configuration so that the socket path is shorter"
             raise DaemonError(msg)
         return path
+
+    @lazy_property
+    def job_controller(self):
+        if self._job_controller is None:
+            return JobController.from_project(self.project)
+        return self._job_controller
 
     def clean_files(self) -> None:
         self.pid_filepath.unlink(missing_ok=True)
@@ -405,61 +418,91 @@ class DaemonManager:
         raise_on_error: bool = False,
         connect_interactive: bool = False,
     ) -> bool:
-        status = self.check_status()
-        if status == DaemonStatus.RUNNING:
-            error = "Daemon process is already running"
-        elif status == DaemonStatus.SHUT_DOWN:
-            error = self.start_supervisord(
-                num_procs_transfer=num_procs_transfer,
-                num_procs_complete=num_procs_complete,
-                single=single,
-                log_level=log_level,
-                connect_interactive=connect_interactive,
-            )
-        elif status == DaemonStatus.STOPPED:
-            self.shut_down(raise_on_error=raise_on_error)
-            error = self.start_supervisord(
-                num_procs_transfer=num_procs_transfer,
-                num_procs_complete=num_procs_complete,
-                single=single,
-                log_level=log_level,
-                connect_interactive=connect_interactive,
-            )
-            # else:
-            #     error = self.start_processes()
-        elif status == DaemonStatus.STOPPING:
-            error = "Daemon process are stopping. Cannot start."
-        else:
-            error = f"Daemon status {status} could not be handled"
+        db_filter = {"running_runner": {"$exists": True}}
+        with self.job_controller.lock_auxiliary(filter=db_filter) as lock:
+            if lock is None:
+                # print('Handle case where the document is not present!')
+                pass
+            if lock.is_locked:
+                # print('Handle case where the document is locked')
+                pass
+            doc = lock.locked_document
+            if doc["running_runner"] is not None:
+                # print('Handle case where there is a "registered" running runner in the auxiliary collection')
+                pass
+            status = self.check_status()
+            if status == DaemonStatus.RUNNING:
+                error = "Daemon process is already running"
+            elif status == DaemonStatus.SHUT_DOWN:
+                error = self.start_supervisord(
+                    num_procs_transfer=num_procs_transfer,
+                    num_procs_complete=num_procs_complete,
+                    single=single,
+                    log_level=log_level,
+                    connect_interactive=connect_interactive,
+                )
+            elif status == DaemonStatus.STOPPED:
+                self.shut_down(raise_on_error=raise_on_error)
+                error = self.start_supervisord(
+                    num_procs_transfer=num_procs_transfer,
+                    num_procs_complete=num_procs_complete,
+                    single=single,
+                    log_level=log_level,
+                    connect_interactive=connect_interactive,
+                )
+                # else:
+                #     error = self.start_processes()
+            elif status == DaemonStatus.STOPPING:
+                error = "Daemon process are stopping. Cannot start."
+            else:
+                error = f"Daemon status {status} could not be handled"
 
-        if error is not None:
-            if raise_on_error:
-                raise DaemonError(error)
-            logger.error(error)
-            return False
-        return True
+            started = True
+            if error is not None:
+                if raise_on_error:
+                    raise DaemonError(error)
+                logger.error(error)
+                started = False
+            else:
+                lock.update_on_release = {
+                    "$set": {"running_runner": self._get_runner_info()}
+                }
+        return started
 
     def stop(self, wait: bool = False, raise_on_error: bool = False) -> bool:
-        status = self.check_status()
-        if status in (
-            DaemonStatus.STOPPED,
-            DaemonStatus.STOPPING,
-            DaemonStatus.SHUT_DOWN,
-        ):
-            return True
+        db_filter = {"running_runner": {"$exists": True}}
+        with self.job_controller.lock_auxiliary(filter=db_filter) as lock:
+            if lock is None:
+                # print('Handle case where the document is not present!')
+                pass
+            if lock.is_locked:
+                # print('Handle case where the document is locked')
+                pass
+            status = self.check_status()
+            if status in (
+                DaemonStatus.STOPPED,
+                DaemonStatus.STOPPING,
+                DaemonStatus.SHUT_DOWN,
+            ):
+                stopped = True
+                lock.update_on_release = {"$set": {"running_runner": None}}
 
-        if status in (DaemonStatus.RUNNING, DaemonStatus.PARTIALLY_RUNNING):
-            interface = self.get_interface()
-            if wait:
-                result = interface.supervisor.stopAllProcesses()
+            elif status in (DaemonStatus.RUNNING, DaemonStatus.PARTIALLY_RUNNING):
+                interface = self.get_interface()
+                if wait:
+                    result = interface.supervisor.stopAllProcesses()
+                else:
+                    result = interface.supervisor.signalAllProcesses(15)
+
+                error = self._verify_call_result(result, "stop", raise_on_error)
+
+                stopped = error is None
+                if stopped:
+                    lock.update_on_release = {"$set": {"running_runner": None}}
+
             else:
-                result = interface.supervisor.signalAllProcesses(15)
-
-            error = self._verify_call_result(result, "stop", raise_on_error)
-
-            return error is None
-
-        raise DaemonError(f"Daemon status {status} could not be handled")
+                raise DaemonError(f"Daemon status {status} could not be handled")
+        return stopped
 
     def _verify_call_result(
         self, result, action: str, raise_on_error: bool = False
@@ -613,6 +656,34 @@ class DaemonManager:
             print_function("Exiting foreground")
             if a:
                 a.kill()
+
+    def _get_runner_info(self):
+        try:
+            user = os.getlogin()
+        except OSError:
+            user = os.environ.get("USER", None)
+        mac_address = None
+        found = False
+        for addrs in psutil.net_if_addrs().values():
+            if found:
+                break
+            for addr in addrs:
+                if (
+                    addr.family == psutil.AF_LINK
+                    and addr.address != "00:00:00:00:00:00"
+                ):
+                    mac_address = addr.address
+                    found = True
+                    break
+        return {
+            "processes_info": self.get_processes_info(),
+            "hostname": socket.gethostname(),
+            "mac_address": mac_address,
+            "user": user,
+            "daemon_dir": self.project.daemon_dir,
+            "project_name": self.project.name,
+            "start_time": datetime.datetime.now(),
+        }
 
     def get_controller(self):
         options = ClientOptions()
