@@ -231,6 +231,16 @@ class MongoLock:
             )
         self._delete_on_release = value
 
+    @property
+    def is_locked(self) -> bool:
+        """Return whether the document was locked before trying to acquire the lock.
+
+        Notes
+        -----
+        This method should be used only inside the "with" context.
+        """
+        return self.locked_document is None
+
     @classmethod
     def get_lock_time(cls, d: dict):
         """Get the time the document was locked on a dictionary."""
@@ -379,6 +389,20 @@ class MongoLock:
 
 class LockedDocumentError(Exception):
     """Exception to signal a problem when locking the document."""
+
+
+class RunnersLockedError(LockedDocumentError):
+    """Exception to signal a problem when locking a Runner document."""
+
+    @classmethod
+    def from_runner_doc(cls, doc: dict, additional_msg: str | None = None):
+        lock_id = doc[MongoLock.LOCK_KEY]
+        lock_date = doc[MongoLock.LOCK_TIME_KEY]
+        date_str = lock_date.isoformat(timespec="seconds") if lock_date else None
+        msg = f"Runner document is locked with lock_id {lock_id} since {date_str} UTC."
+        if additional_msg:
+            msg += " " + additional_msg
+        return cls(msg)
 
 
 class JobLockedError(LockedDocumentError):
