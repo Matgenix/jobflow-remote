@@ -205,7 +205,7 @@ def get_exec_config_table(exec_config: dict[str, ExecutionConfig], verbosity: in
             ec = exec_config[name]
             from ruamel.yaml import YAML
 
-            yaml = YAML(typ="full")
+            yaml = YAML()
             if ec.modules:
                 ec_modules_strio = io.StringIO()
                 yaml.dump(ec.modules, ec_modules_strio)
