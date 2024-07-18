@@ -154,3 +154,28 @@ def test_mongo_lock_delete_on_release_with_exception(test_collection):
         raise RuntimeError("Test exception")
 
     assert test_collection.count_documents({"test_id": 1}) == 1
+
+
+class TestMongoLock:
+    def test_context(self, mongoclient):
+        db = mongoclient["mytestdb"]
+        collection = db["mytestcollection"]
+        collection.drop()
+        collection.insert_one({"a": 1})
+        collection.insert_one({"b": 2})
+        with MongoLock(collection=collection, filter={"a": 1}) as lock:
+            assert lock.locked_document is not None
+            lock_id = lock.lock_id
+            assert lock_id == lock.get_lock_id(lock.locked_document)
+            assert lock.is_locked is False
+            with MongoLock(collection=collection, filter={"a": 1}) as lock2:
+                assert lock2.locked_document is None
+                assert lock2.unavailable_document is None
+                assert lock2.is_locked is True
+            with MongoLock(
+                collection=collection, filter={"a": 1}, get_locked_doc=True
+            ) as lock3:
+                assert lock3.locked_document is None
+                assert lock3.unavailable_document is not None
+                assert lock_id == lock3.get_lock_id(lock3.unavailable_document)
+                assert lock3.is_locked is True
