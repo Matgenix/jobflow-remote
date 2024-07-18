@@ -28,7 +28,7 @@ dependencies = [
     "pydantic ~= 2.4",
     "qtoolkit ~= 0.1, >= 0.1.4",
     "rich ~= 13.7",
-    "ruamel.yaml ~= 0.17",
+    "ruamel.yaml >= 0.17",
     "schedule ~= 1.2",
     "supervisor ~= 4.2",
     "tomlkit ~= 0.12",
