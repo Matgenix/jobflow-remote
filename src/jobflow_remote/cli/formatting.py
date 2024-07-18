@@ -206,6 +206,8 @@ def get_exec_config_table(exec_config: dict[str, ExecutionConfig], verbosity: in
             from ruamel.yaml import YAML
 
             yaml = YAML()
+            # The following should already be the case but we keep it to be sure
+            yaml.default_flow_style = False
             if ec.modules:
                 ec_modules_strio = io.StringIO()
                 yaml.dump(ec.modules, ec_modules_strio)
