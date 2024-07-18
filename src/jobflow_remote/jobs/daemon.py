@@ -420,14 +420,11 @@ class DaemonManager:
     ) -> bool:
         db_filter = {"running_runner": {"$exists": True}}
         with self.job_controller.lock_auxiliary(filter=db_filter) as lock:
-            if lock is None:
-                # print('Handle case where the document is not present!')
-                pass
             if lock.is_locked:
                 # print('Handle case where the document is locked')
                 pass
             doc = lock.locked_document
-            if doc["running_runner"] is not None:
+            if doc and doc["running_runner"] is not None:
                 # print('Handle case where there is a "registered" running runner in the auxiliary collection')
                 pass
             status = self.check_status()
