@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime
+import io
 import time
 from typing import TYPE_CHECKING
 
@@ -202,14 +203,21 @@ def get_exec_config_table(exec_config: dict[str, ExecutionConfig], verbosity: in
         row = [Text(name, style="bold")]
         if verbosity > 0:
             ec = exec_config[name]
-            from ruamel import yaml
+            from ruamel.yaml import YAML
 
+            yaml = YAML()
+            # The following should already be the case but we keep it to be sure
+            yaml.default_flow_style = False
             if ec.modules:
-                row.append(yaml.dump(ec.modules, default_flow_style=False))
+                ec_modules_strio = io.StringIO()
+                yaml.dump(ec.modules, ec_modules_strio)
+                row.append(ec_modules_strio.getvalue())
             else:
                 row.append("")
             if ec.export:
-                row.append(yaml.dump(ec.export, default_flow_style=False))
+                ec_export_strio = io.StringIO()
+                yaml.dump(ec.export, ec_export_strio)
+                row.append(ec_export_strio.getvalue())
             else:
                 row.append("")
             if ec.post_run:
