@@ -364,6 +364,18 @@ class RemoteError(RuntimeError):
         self.no_retry = no_retry
 
 
+projection_flow_info_jobs = [
+    "db_id",
+    "uuid",
+    "index",
+    "state",
+    "job.name",
+    "worker",
+    "parents",
+    "job.hosts",
+]
+
+
 class FlowInfo(BaseModel):
     """
     Model with information extracted from a FlowDoc.
