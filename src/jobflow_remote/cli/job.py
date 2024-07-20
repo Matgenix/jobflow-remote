@@ -165,7 +165,7 @@ def job_info(
     job_db_id: job_db_id_arg = None,
     job_index: job_index_arg = None,
     pid: Annotated[
-        int,
+        str,
         typer.Option(
             "--pid",
             help="The process ID of the job in the queue system (e.g. Slurm job ID)",
