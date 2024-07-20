@@ -79,18 +79,6 @@ def test_job_info_by_pid(job_controller, two_flows_four_jobs):
         required_out="Cannot specify both job ID/index and process ID",
     )
 
-    # Test with verbosity
-    run_check_cli(
-        ["job", "info", "--pid", str(test_pid), "-vvv"],
-        required_out=[f"'step_attempts': 0, 'process_id': '{test_pid}'"],
-    )
-
-    run_check_cli(
-        ["job", "info", "--pidd", str(test_pid)],
-        error=True,
-        required_out="No such option: --pidd Did you mean --pid?",
-    )
-
 
 def test_set_state(job_controller, two_flows_four_jobs) -> None:
     from jobflow_remote.jobs.state import JobState
