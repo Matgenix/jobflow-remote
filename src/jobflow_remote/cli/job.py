@@ -191,13 +191,13 @@ def job_info(
     verbosity: verbosity_opt = 0,
 ) -> None:
     """Detailed information on a specific job."""
-    if pid is not None and (job_db_id is not None or job_index is not None):
+    if pid is not None and job_db_id is not None:
         raise typer.BadParameter("Cannot specify both job ID/index and process ID")
 
     with loading_spinner():
         jc = get_job_controller()
 
-        if job_db_id is not None or job_index is not None:
+        if job_db_id is not None:
             if verbosity > 0:
                 job_data = jc.get_job_doc(
                     job_id=job_db_id,
