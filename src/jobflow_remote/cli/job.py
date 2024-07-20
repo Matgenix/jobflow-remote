@@ -168,7 +168,8 @@ def job_info(
         str,
         typer.Option(
             "--pid",
-            help="The process ID of the job in the queue system (e.g. Slurm job ID)",
+            help="The process ID of the job in the queue system (e.g. Slurm job ID)"
+            "The -v flag will be ignored if --pid is used.",
         ),
     ] = None,
     with_error: Annotated[
