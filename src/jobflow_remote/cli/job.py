@@ -198,15 +198,19 @@ def job_info(
         jc = get_job_controller()
 
         if job_db_id is not None:
+            db_id, job_id = get_job_db_ids(job_db_id, job_index)
+
             if verbosity > 0:
                 job_data = jc.get_job_doc(
-                    job_id=job_db_id,
+                    job_id=job_id,
                     job_index=job_index,
+                    db_id=db_id,
                 )
             else:
                 job_data = jc.get_job_info(
-                    job_id=job_db_id,
+                    job_id=job_id,
                     job_index=job_index,
+                    db_id=db_id,
                 )
         elif pid is not None:
             job_data = jc.get_job_info_by_pid(pid)
