@@ -33,6 +33,7 @@ from jobflow_remote.jobs.data import (
     get_initial_flow_doc_dict,
     get_initial_job_doc_dict,
     get_reset_job_base_dict,
+    projection_flow_info_jobs,
     projection_job_info,
 )
 from jobflow_remote.jobs.state import (
@@ -2002,7 +2003,8 @@ class JobController:
     def get_flow_job_aggreg(
         self,
         query: dict | None = None,
-        projection: dict | None = None,
+        projection_flow: dict | None = None,
+        projection_job: dict | None = None,
         sort: list[tuple] | None = None,
         limit: int = 0,
     ) -> list[dict]:
@@ -2015,8 +2017,10 @@ class JobController:
         ----------
         query
             A dictionary representing the filter.
-        projection
-            Projection of the fields passed to the aggregation.
+        projection_flow
+            Projection of the fields for the Flow document passed to the aggregation.
+        projection_job
+            Projection of the fields for the Job document used in the $lookup.
         sort
             A list of (key, direction) pairs specifying the sort order for this
             query. Follows pymongo conventions.
@@ -2042,8 +2046,21 @@ class JobController:
         if query:
             pipeline.append({"$match": query})
 
-        if projection:
-            pipeline.append({"$project": projection})
+        if projection_flow:
+            pipeline.append({"$project": projection_flow})
+
+        if projection_job:
+            # insert the pipeline for the projection of the Job fields
+            # to reduce the impact of the size of the documents.
+            # This can help reducing the size of the fetched documents and
+            # avoid exceeding the maximum size allowed. Adding the projection
+            # in the general pipeline does not have the same effect.
+            pipeline[0]["$lookup"]["pipeline"] = [{"$project": projection_job}]
+            # if the additional projection is set, the keys need to be specified
+            # in that part of the pipeline as well.
+            if projection_flow:
+                for k in projection_job:
+                    pipeline[-1]["$project"][f"jobs_list.{k}"] = 1
 
         if sort:
             pipeline.append({"$sort": dict(sort)})
@@ -2120,15 +2137,15 @@ class JobController:
         # Only use the full aggregation if more job details are needed.
         # The single flow document is enough for basic information
         if full:
-            # TODO reduce the projection to the bare minimum to reduce the amount of
-            # fetched data?
-            projection = {f"jobs_list.{f}": 1 for f in projection_job_info}
-            projection["jobs_list.job.hosts"] = 1
-            for k in FlowDoc.model_fields:
-                projection[k] = 1
+            projection_job = {f: 1 for f in projection_flow_info_jobs}
+            projection_flow = {k: 1 for k in FlowDoc.model_fields}
 
             data = self.get_flow_job_aggreg(
-                query=query, sort=sort, limit=limit, projection=projection
+                query=query,
+                sort=sort,
+                limit=limit,
+                projection_flow=projection_flow,
+                projection_job=projection_job,
             )
         else:
             data = list(self.flows.find(query, sort=sort, limit=limit))
