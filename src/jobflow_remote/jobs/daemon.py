@@ -530,52 +530,65 @@ class DaemonManager:
         return None
 
     def kill(self, raise_on_error: bool = False) -> bool:
-        # If the daemon is shutting down supervisord may not be able to identify
-        # the state. Try proceeding in that case, since we really want to kill
-        # the process
-        status = None
-        try:
-            status = self.check_status()
-            if status == DaemonStatus.SHUT_DOWN:
-                logger.info("supervisord is not running. No process is running")
-                return True
-            if status == DaemonStatus.STOPPED:
-                logger.info("Processes are already stopped.")
-                return True
-        except DaemonError as e:
-            msg = (
-                f"Error while determining the state of the runner: {getattr(e, 'message', str(e))}."
-                f"Proceeding with the kill command."
-            )
-            logger.warning(msg)
+        db_filter = {"running_runner": {"$exists": True}}
+        with self.job_controller.lock_auxiliary(filter=db_filter) as lock:
+            # If the daemon is shutting down supervisord may not be able to identify
+            # the state. Try proceeding in that case, since we really want to kill
+            # the process
+            status = None
+            killed = None
+            try:
+                status = self.check_status()
+                if status == DaemonStatus.SHUT_DOWN:
+                    logger.info("supervisord is not running. No process is running")
+                    killed = True
+                elif status == DaemonStatus.STOPPED:
+                    logger.info("Processes are already stopped.")
+                    killed = True
+            except DaemonError as e:
+                msg = (
+                    f"Error while determining the state of the runner: {getattr(e, 'message', str(e))}."
+                    f"Proceeding with the kill command."
+                )
+                logger.warning(msg)
 
-        if status in (
-            None,
-            DaemonStatus.RUNNING,
-            DaemonStatus.STOPPING,
-            DaemonStatus.PARTIALLY_RUNNING,
-        ):
-            interface = self.get_interface()
-            result = interface.supervisor.signalAllProcesses(9)
-            error = self._verify_call_result(result, "kill", raise_on_error)
+            if status in (
+                None,
+                DaemonStatus.RUNNING,
+                DaemonStatus.STOPPING,
+                DaemonStatus.PARTIALLY_RUNNING,
+            ):
+                interface = self.get_interface()
+                result = interface.supervisor.signalAllProcesses(9)
+                error = self._verify_call_result(result, "kill", raise_on_error)
 
-            return error is None
+                killed = error is None
 
-        raise DaemonError(f"Daemon status {status} could not be handled")
+            if killed is None:
+                raise DaemonError(f"Daemon status {status} could not be handled")
+            if killed:
+                lock.update_on_release = {"$set": {"running_runner": None}}
+        return killed
 
     def shut_down(self, raise_on_error: bool = False) -> bool:
-        status = self.check_status()
-        if status == DaemonStatus.SHUT_DOWN:
-            logger.info("supervisord is already shut down.")
-            return True
-        interface = self.get_interface()
-        try:
-            interface.supervisor.shutdown()
-        except Exception:
-            if raise_on_error:
-                raise
-            return False
-        return True
+        db_filter = {"running_runner": {"$exists": True}}
+        with self.job_controller.lock_auxiliary(filter=db_filter) as lock:
+            status = self.check_status()
+            if status == DaemonStatus.SHUT_DOWN:
+                logger.info("supervisord is already shut down.")
+                shutdown = True
+            else:
+                interface = self.get_interface()
+                try:
+                    interface.supervisor.shutdown()
+                    shutdown = True
+                except Exception:
+                    if raise_on_error:
+                        raise
+                    shutdown = False
+            if shutdown:
+                lock.update_on_release = {"$set": {"running_runner": None}}
+        return shutdown
 
     def wait_start(self, timeout: int = 30) -> None:
         time_limit = time.time() + timeout
@@ -688,7 +701,7 @@ class DaemonManager:
             "project_name": self.project.name,
             "start_time": datetime.datetime.now(),
             "last_pinged": datetime.datetime.now(),
-            "runner_options": self.project.runner,
+            "runner_options": self.project.runner.model_dump(mode="json"),
         }
 
     def get_controller(self):
