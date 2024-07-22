@@ -16,7 +16,7 @@ from click import ClickException
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.prompt import Confirm
-from rich.text import Text
+from rich.text import Text, TextType
 from rich.tree import Tree
 from typer.core import TyperCommand, TyperGroup
 
@@ -145,19 +145,19 @@ class ReprStr(str):
         return self
 
 
-def exit_with_error_msg(message: str, code: int = 1, **kwargs) -> NoReturn:
+def exit_with_error_msg(message: TextType, code: int = 1, **kwargs) -> NoReturn:
     kwargs.setdefault("style", "red")
     err_console.print(message, **kwargs)
     raise typer.Exit(code)
 
 
-def exit_with_warning_msg(message: str, code: int = 0, **kwargs) -> NoReturn:
+def exit_with_warning_msg(message: TextType, code: int = 0, **kwargs) -> NoReturn:
     kwargs.setdefault("style", "gold1")
     err_console.print(message, **kwargs)
     raise typer.Exit(code)
 
 
-def print_success_msg(message: str = "operation completed", **kwargs) -> None:
+def print_success_msg(message: TextType = "operation completed", **kwargs) -> None:
     kwargs.setdefault("style", "green")
     out_console.print(message, **kwargs)
 

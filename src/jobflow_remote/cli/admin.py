@@ -38,6 +38,33 @@ app.add_typer(app_admin)
 
 
 @app_admin.command()
+def upgrade(force: force_opt = False) -> None:
+    """
+    Upgrade the jobflow database.
+    WARNING: can modify all the data. Previous version could not be retrieved anymore.
+    """
+    check_stopped_runner(error=True)
+
+    jc = get_job_controller()
+    if not force:
+        jobflow_check = jc.upgrade_check_jobflow()
+        full_check = jc.upgrade_full_check()
+        if jobflow_check or full_check:
+            text = Text.from_markup(
+                "[bold]Possible issues in upgrade of the database.[/bold]\n"
+                + jobflow_check
+                + full_check
+                + "Carefully check this is ok and use 'jf admin upgrade --force'"
+            )
+            exit_with_error_msg(text)
+    with loading_spinner(processing=False) as progress:
+        progress.add_task(description="Upgrading the DB...", total=None)
+        done = jc.upgrade()
+    not_text = "" if done else "[bold]NOT [/bold]"
+    out_console.print(f"The database was {not_text}upgraded")
+
+
+@app_admin.command()
 def reset(
     validation: Annotated[
         Optional[str],
@@ -206,6 +233,34 @@ def unlock_flow(
         )
 
     out_console.print(f"{num_unlocked} flows were unlocked")
+
+
+@app_admin.command()
+def unlock_runner() -> None:
+    """
+    Forcibly removes the lock from the runner document.
+    WARNING: can lead to inconsistencies if a runner daemon is actually running.
+    """
+    jc = get_job_controller()
+
+    with loading_spinner(processing=False) as progress:
+        progress.add_task(description="Unlocking runner document...", total=None)
+
+        num_unlocked = jc.unlock_runner()
+
+    if num_unlocked == 0:
+        out_console.print(
+            "No runner document... "
+            "Consider upgrading your database using 'jf admin upgrade'"
+        )
+    elif num_unlocked == 1:
+        out_console.print("The runner document has been unlocked")
+    else:
+        out_console.print(
+            f"{num_unlocked} runner documents found and unlocked... "
+            "There should be only one runner document. "
+            "Consider fixing this problem (manually)..."
+        )
 
 
 app_index = JFRTyper(
