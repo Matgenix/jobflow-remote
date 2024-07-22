@@ -25,6 +25,7 @@ from supervisor.xmlrpc import Faults
 
 from jobflow_remote.config import ConfigManager, Project
 from jobflow_remote.jobs.jobcontroller import JobController
+from jobflow_remote.utils.db import RunnersLockedError
 
 logger = logging.getLogger(__name__)
 
@@ -420,11 +421,17 @@ class DaemonManager:
     ) -> bool:
         db_filter = {"running_runner": {"$exists": True}}
         with self.job_controller.lock_auxiliary(filter=db_filter) as lock:
-            if lock.is_locked:
-                # print('Handle case where the document is locked')
-                pass
             doc = lock.locked_document
-            if doc and doc["running_runner"] is not None:
+            if not doc:
+                if lock.unavailable_document:
+                    raise RunnersLockedError.from_runner_doc(lock.unavailable_document)
+                raise ValueError(
+                    "No daemon runner document.\n"
+                    "The auxiliary collection does not contain information about running daemon. "
+                    "Your database was likely set up or reset using an old version of Jobflow Remote. "
+                    'You can upgrade the database using the command "jf admin upgrade".'
+                )
+            if doc["running_runner"] is not None:
                 # print('Handle case where there is a "registered" running runner in the auxiliary collection')
                 pass
             status = self.check_status()
@@ -680,6 +687,8 @@ class DaemonManager:
             "daemon_dir": self.project.daemon_dir,
             "project_name": self.project.name,
             "start_time": datetime.datetime.now(),
+            "last_pinged": datetime.datetime.now(),
+            "runner_options": self.project.runner,
         }
 
     def get_controller(self):
