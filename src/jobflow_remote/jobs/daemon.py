@@ -431,11 +431,23 @@ class DaemonManager:
                     "Your database was likely set up or reset using an old version of Jobflow Remote. "
                     'You can upgrade the database using the command "jf admin upgrade".'
                 )
-            if doc["running_runner"] is not None:
-                # print('Handle case where there is a "registered" running runner in the auxiliary collection')
-                pass
             status = self.check_status()
-            if status == DaemonStatus.RUNNING:
+            if doc["running_runner"] is not None:
+                drr = doc["running_runner"]
+                # TODO: add reasonable skip here
+                #  same hostname, same project, same user then it should be fine ?
+                error = (
+                    "A daemon runner process may be running.\n"
+                    "Here is the information retrieved from the database:\n"
+                    f"- hostname: {drr['hostname']}\n"
+                    f"- project_name: {drr['project_name']}\n"
+                    f"- start_time: {drr['start_time']}\n"
+                    f"- last_pinged: {drr['last_pinged']}\n"
+                    f"- daemon_dir: {drr['daemon_dir']}\n"
+                    f"- user: {drr['user']}"
+                )
+
+            elif status == DaemonStatus.RUNNING:
                 error = "Daemon process is already running"
             elif status == DaemonStatus.SHUT_DOWN:
                 error = self.start_supervisord(
@@ -461,17 +473,15 @@ class DaemonManager:
             else:
                 error = f"Daemon status {status} could not be handled"
 
-            started = True
             if error is not None:
                 if raise_on_error:
                     raise DaemonError(error)
                 logger.error(error)
-                started = False
-            else:
-                lock.update_on_release = {
-                    "$set": {"running_runner": self._get_runner_info()}
-                }
-        return started
+                return False
+            lock.update_on_release = {
+                "$set": {"running_runner": self._get_runner_info()}
+            }
+            return True
 
     def stop(self, wait: bool = False, raise_on_error: bool = False) -> bool:
         db_filter = {"running_runner": {"$exists": True}}

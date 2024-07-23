@@ -153,3 +153,51 @@ def test_kill_one_process(job_controller, daemon_manager) -> None:
     os.kill(run_jobflow_queue_pid, signal.SIGKILL)
     time.sleep(1)
     assert daemon_manager.check_status() == DaemonStatus.PARTIALLY_RUNNING
+
+
+def test_runner_info_auxiliary(job_controller, daemon_manager) -> None:
+    import datetime
+
+    from jobflow_remote.jobs.daemon import DaemonStatus
+
+    assert daemon_manager.check_status() == DaemonStatus.SHUT_DOWN
+    assert job_controller.get_running_runner() is None
+    assert daemon_manager.start(raise_on_error=True, single=False)
+    _wait_daemon_started(daemon_manager)
+    ref_runner_info = daemon_manager._get_runner_info()
+    runner_info = job_controller.get_running_runner()
+    for key in [
+        "hostname",
+        "mac_address",
+        "user",
+        "daemon_dir",
+        "project_name",
+        "runner_options",
+    ]:
+        assert ref_runner_info[key] == runner_info[key]
+    ref_process_pids = sorted(
+        [
+            (process, pdict["pid"])
+            for process, pdict in ref_runner_info["processes_info"].items()
+        ]
+    )
+    process_pids = sorted(
+        [
+            (process, pdict["pid"])
+            for process, pdict in runner_info["processes_info"].items()
+        ]
+    )
+    assert ref_process_pids == process_pids
+    assert isinstance(runner_info["start_time"], datetime.datetime)
+    assert isinstance(runner_info["last_pinged"], datetime.datetime)
+
+
+def test_start_two_runners(daemon_manager) -> None:
+    from jobflow_remote.jobs.daemon import DaemonError, DaemonStatus
+
+    assert daemon_manager.check_status() == DaemonStatus.SHUT_DOWN
+    assert daemon_manager.start(raise_on_error=True, single=False)
+    _wait_daemon_started(daemon_manager)
+
+    with pytest.raises(DaemonError, match=r"A daemon runner process may be running"):
+        assert daemon_manager.start(raise_on_error=True, single=False)
