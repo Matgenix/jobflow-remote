@@ -142,11 +142,11 @@ class MongoLock:
         self.lock_id = lock_id or suuid()
         self.kwargs = kwargs
         self.update_on_release: dict | list = {}
+        self.delete_on_release: bool = False
         self.sleep = sleep
         self.max_wait = max_wait
         self.projection = projection
         self.get_locked_doc = get_locked_doc
-        self.release_with_pipeline: bool = False
 
     @classmethod
     def get_lock_time(cls, d: dict):
@@ -243,21 +243,36 @@ class MongoLock:
             if isinstance(self.update_on_release, list):
                 update = [update, *self.update_on_release]  # type: ignore[assignment]
             else:
-                update = deep_merge_dict(update, self.update_on_release)  # type: ignore[assignment]
+                update = deep_merge_dict(update, self.update_on_release)
         logger.debug(f"release lock with update: {update}")
         # TODO if failed to release the lock maybe retry before failing
         if self.locked_document is None:
             return
-        result = self.collection.update_one(
-            {"_id": self.locked_document["_id"], self.LOCK_KEY: self.lock_id},
-            update,
-            upsert=False,
-        )
 
-        # Check if the lock was successfully released
-        if result.modified_count == 0:
-            msg = f"Could not release lock for document {self.locked_document['_id']}"
-            warnings.warn(msg, stacklevel=2)
+        if self.delete_on_release:
+            if self.update_on_release:
+                raise ValueError(
+                    "delete_on_release and update_on_release cannot be set simultaneously"
+                )
+
+            result = self.collection.delete_one(
+                {"_id": self.locked_document["_id"], self.LOCK_KEY: self.lock_id}
+            )
+            if result.deleted_count == 0:
+                raise RuntimeError("Could not delete the locked document upon release")
+        else:
+            result = self.collection.update_one(
+                {"_id": self.locked_document["_id"], self.LOCK_KEY: self.lock_id},
+                update,
+                upsert=False,
+            )
+
+            # Check if the lock was successfully released
+            if result.modified_count == 0:
+                msg = (
+                    f"Could not release lock for document {self.locked_document['_id']}"
+                )
+                warnings.warn(msg, stacklevel=2)
 
         self.locked_document = None
 

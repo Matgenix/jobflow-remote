@@ -497,6 +497,61 @@ def stop(
 
 
 @app_job.command()
+def delete(
+    job_db_id: job_db_id_arg = None,
+    job_index: job_index_arg = None,
+    job_id: job_ids_indexes_opt = None,
+    db_id: db_ids_opt = None,
+    flow_id: flow_ids_opt = None,
+    state: job_state_opt = None,
+    start_date: start_date_opt = None,
+    end_date: end_date_opt = None,
+    name: name_opt = None,
+    metadata: metadata_opt = None,
+    days: days_opt = None,
+    hours: hours_opt = None,
+    verbosity: verbosity_opt = 0,
+    wait: wait_lock_opt = None,
+    raise_on_error: raise_on_error_opt = False,
+    delete_output: Annotated[
+        bool,
+        typer.Option(
+            "--output",
+            "-o",
+            help="Also delete the outputs of the Jobs in the output Store",
+        ),
+    ] = False,
+) -> None:
+    """
+    Delete Jobs individually. The Flow document will be updated accordingly but
+    no consistency check is performed. The Flow may be left in an inconsistent state.
+    For advanced users only.
+    """
+    jc = get_job_controller()
+
+    execute_multi_jobs_cmd(
+        single_cmd=jc.delete_job,
+        multi_cmd=jc.delete_jobs,
+        job_db_id=job_db_id,
+        job_index=job_index,
+        job_ids=job_id,
+        db_ids=db_id,
+        flow_ids=flow_id,
+        states=state,
+        start_date=start_date,
+        end_date=end_date,
+        name=name,
+        metadata=metadata,
+        days=days,
+        hours=hours,
+        verbosity=verbosity,
+        wait=wait,
+        raise_on_error=raise_on_error,
+        delete_output=delete_output,
+    )
+
+
+@app_job.command()
 def queue_out(
     job_db_id: job_db_id_arg,
     job_index: job_index_arg = None,

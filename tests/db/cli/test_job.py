@@ -274,3 +274,18 @@ def test_files_get(job_controller, one_job, tmp_dir) -> None:
         error=True,
         required_out="No data matching the request",
     )
+
+
+def test_delete(job_controller, two_flows_four_jobs) -> None:
+    from jobflow_remote.testing.cli import run_check_cli
+
+    run_check_cli(
+        ["job", "delete", "-did", "2", "--output"],
+        required_out="Operation completed: 1 jobs modified",
+    )
+    flow_doc = job_controller.get_flow_info_by_job_uuid(two_flows_four_jobs[0][0].uuid)
+
+    assert len(flow_doc["jobs"]) == 1
+    assert len(flow_doc["ids"]) == 1
+    assert len(flow_doc["parents"]) == 1
+    assert len(flow_doc["parents"][two_flows_four_jobs[0][0].uuid]["1"]) == 0
