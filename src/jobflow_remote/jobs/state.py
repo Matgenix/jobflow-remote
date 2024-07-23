@@ -70,6 +70,10 @@ RESETTABLE_STATES = RUNNING_STATES
 
 RESETTABLE_STATES_V = RUNNING_STATES_V
 
+DELETABLE_STATES = [
+    s for s in JobState if s not in [JobState.BATCH_SUBMITTED, JobState.BATCH_RUNNING]
+]
+
 
 class FlowState(Enum):
     """States of a Flow."""

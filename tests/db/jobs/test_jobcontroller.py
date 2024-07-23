@@ -559,3 +559,31 @@ def test_reset(job_controller, two_flows_four_jobs):
     assert job_controller.reset(max_limit=10, reset_output=True)
 
     assert job_controller.count_jobs() == 0
+
+
+def test_delete_job(job_controller, two_flows_four_jobs, runner):
+    runner.run_one_job(job_id=[two_flows_four_jobs[0][0].uuid, 1])
+    flow_doc = job_controller.get_flow_info_by_flow_uuid(two_flows_four_jobs[0].uuid)
+    assert flow_doc["state"] == FlowState.RUNNING.value
+
+    assert len(job_controller.delete_job(job_id=two_flows_four_jobs[0][1].uuid)) == 1
+    assert job_controller.count_jobs() == 3
+    flow_doc = job_controller.get_flow_info_by_flow_uuid(two_flows_four_jobs[0].uuid)
+    assert flow_doc["state"] == FlowState.COMPLETED.value
+    assert len(flow_doc["jobs"]) == 1
+    assert len(flow_doc["ids"]) == 1
+    assert len(flow_doc["parents"]) == 1
+    assert len(flow_doc["parents"][two_flows_four_jobs[0][0].uuid]["1"]) == 0
+
+    assert job_controller.jobstore.get_output(two_flows_four_jobs[0][0].uuid) == 6
+
+    assert (
+        len(
+            job_controller.delete_job(
+                job_id=two_flows_four_jobs[0][0].uuid, delete_output=True
+            )
+        )
+        == 1
+    )
+    with pytest.raises(ValueError, match=".*has no outputs.*"):
+        job_controller.jobstore.get_output(two_flows_four_jobs[0][0].uuid)

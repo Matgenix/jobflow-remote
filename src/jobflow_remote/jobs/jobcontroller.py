@@ -37,6 +37,7 @@ from jobflow_remote.jobs.data import (
     projection_job_info,
 )
 from jobflow_remote.jobs.state import (
+    DELETABLE_STATES,
     PAUSABLE_STATES,
     RESETTABLE_STATES,
     RUNNING_STATES,
@@ -3210,7 +3211,7 @@ class JobController:
     def update_flow_state(
         self,
         flow_uuid: str,
-        updated_states: dict[str, dict[int, JobState]] | None = None,
+        updated_states: dict[str, dict[int, JobState | None]] | None = None,
     ) -> None:
         """
         Update the state of a Flow in the DB based on the Job's states.
@@ -3224,6 +3225,7 @@ class JobController:
         updated_states
             A dictionary with the updated states of Jobs that have not been
             stored in the DB yet. In the form {job_uuid: JobState value}.
+            If the value is None the Job is considered deleted.
         """
         updated_states = updated_states or {}
         projection = ["uuid", "index", "parents", "state"]
@@ -3236,11 +3238,15 @@ class JobController:
         jobs_states = [
             updated_states.get(j["uuid"], {}).get(j["index"], JobState(j["state"]))
             for j in flow_jobs
+            if updated_states.get(j["uuid"], {}).get(j["index"], JobState(j["state"]))
+            is not None
         ]
         leafs = get_flow_leafs(flow_jobs)
         leaf_states = [
             updated_states.get(j["uuid"], {}).get(j["index"], JobState(j["state"]))
             for j in leafs
+            if updated_states.get(j["uuid"], {}).get(j["index"], JobState(j["state"]))
+            is not None
         ]
         flow_state = FlowState.from_jobs_states(
             jobs_states=jobs_states, leaf_states=leaf_states
@@ -3603,6 +3609,190 @@ class JobController:
             {"batch_processes": {"$exists": True}},
             {"$unset": {f"batch_processes.{worker}.{process_id}": ""}},
             upsert=True,
+        )
+
+    def delete_job(
+        self,
+        job_id: str | None = None,
+        db_id: str | None = None,
+        job_index: int | None = None,
+        delete_output: bool = False,
+        wait: int | None = None,
+        break_lock: bool = False,
+    ) -> list[int]:
+        """
+        Delete a single job from the queue store and optionally from the job store.
+        The Flow document will be updated accordingly but no consistency check
+        is performed. The Flow may be left in an inconsistent state.
+        For advanced users only.
+
+        Parameters
+        ----------
+        job_id : Optional[str]
+            The uuid of the job to delete.
+        db_id : Optional[str]
+            The db_id of the job to delete.
+        job_index : Optional[int]
+            The index of the job. If None, the job with the largest index will be selected.
+        delete_output : bool, default False
+            If True, also delete the job output from the JobStore.
+        wait : Optional[int]
+            In case the Flow or Job is locked, wait this time (in seconds) for the lock to be released.
+        break_lock : bool, default False
+            Forcibly break the lock on locked documents.
+
+        Returns
+        -------
+        list
+            List of db_ids of the deleted Jobs.
+        """
+
+        job_lock_kwargs = dict(projection=["uuid", "index", "db_id", "state"])
+        # avoid deleting jobs in batch states. It would require additional
+        # specific handling and it is an unlikely use case.
+        with self.lock_job_flow(
+            job_id=job_id,
+            db_id=db_id,
+            job_index=job_index,
+            acceptable_states=DELETABLE_STATES,
+            wait=wait,
+            break_lock=break_lock,
+            job_lock_kwargs=job_lock_kwargs,
+        ) as (job_lock, flow_lock):
+            job_doc = job_lock.locked_document
+            if job_doc is None:
+                raise RuntimeError("No job document found in lock")
+            if flow_lock.locked_document is None:
+                raise RuntimeError("No document found in flow lock")
+
+            # Update FlowDoc
+            flow_doc = FlowDoc.model_validate(flow_lock.locked_document)
+            job_uuid, job_index = job_doc["uuid"], job_doc["index"]
+
+            # Remove job from ids list
+            flow_doc.ids = [
+                id_tuple
+                for id_tuple in flow_doc.ids
+                if id_tuple[1] != job_uuid or id_tuple[2] != job_index
+            ]
+
+            # Remove job from jobs list if no job with that id remains in the flow
+            if not any(job_uuid == id_tuple[1] for id_tuple in flow_doc.ids):
+                flow_doc.jobs.remove(job_uuid)
+
+            # Remove job from parents
+            flow_doc.parents.pop(job_uuid, None)
+            for parent_dict in flow_doc.parents.values():
+                for index_list in parent_dict.values():
+                    if job_uuid in index_list:
+                        index_list.remove(job_uuid)
+
+            # Update flow state if necessary
+            updated_states = {job_uuid: {job_index: None}}  # None indicates job removal
+            self.update_flow_state(
+                flow_uuid=flow_doc.uuid, updated_states=updated_states
+            )
+
+            # Prepare flow update
+            flow_update = {
+                "$set": {
+                    "jobs": flow_doc.jobs,
+                    "ids": flow_doc.ids,
+                    "parents": flow_doc.parents,
+                }
+            }
+            flow_update["$set"]["updated_on"] = datetime.utcnow()
+
+            # Set flow update to be applied on lock release
+            flow_lock.update_on_release = flow_update
+
+            job_lock.delete_on_release = True
+
+            # Optionally delete from jobstore
+            if delete_output:
+                try:
+                    if delete_output:
+                        self.jobstore.remove_docs({"uuid": job_id, "index": job_index})
+                except Exception:
+                    warnings.warn(
+                        f"Error while delete the output of job {job_id} {job_index}",
+                        stacklevel=2,
+                    )
+
+            return [job_doc["db_id"]]
+
+    def delete_jobs(
+        self,
+        job_ids: tuple[str, int] | list[tuple[str, int]] | None = None,
+        db_ids: str | list[str] | None = None,
+        flow_ids: str | list[str] | None = None,
+        states: JobState | list[JobState] | None = None,
+        start_date: datetime | None = None,
+        end_date: datetime | None = None,
+        name: str | None = None,
+        metadata: dict | None = None,
+        raise_on_error: bool = True,
+        wait: int | None = None,
+        delete_output: bool = False,
+    ) -> list[int]:
+        """
+        Delete selected jobs from the queue store and optionally from the job store.
+        The Flow document will be updated accordingly but no consistency check
+        is performed. The Flow may be left in an inconsistent state.
+        For advanced users only.
+
+        Parameters
+        ----------
+        job_ids
+            One or more tuples, each containing the (uuid, index) pair of the
+            Jobs to retrieve.
+        db_ids
+            One or more db_ids of the Jobs to retrieve.
+        flow_ids
+            One or more Flow uuids to which the Jobs to retrieve belong.
+        states
+            One or more states of the Jobs.
+        start_date
+            Filter Jobs that were updated_on after this date.
+            Should be in the machine local time zone. It will be converted to UTC.
+        end_date
+            Filter Jobs that were updated_on before this date.
+            Should be in the machine local time zone. It will be converted to UTC.
+        name
+            Pattern matching the name of Job. Default is an exact match, but all
+            conventions from python fnmatch can be used (e.g. *test*)
+        metadata
+            A dictionary of the values of the metadata to match. Should be an
+            exact match for all the values provided.
+        raise_on_error
+            If True raise in case of error on one job error and stop the loop.
+            Otherwise, just log the error and proceed.
+        wait
+            In case the Flow or Jobs that need to be deleted are locked,
+            wait this time (in seconds) for the lock to be released.
+            Raise an error if lock is not released.
+        delete_output : bool, default False
+            If True, also delete the Job output from the JobStore.
+
+        Returns
+        -------
+        list
+            List of db_ids of the deleted Jobs.
+        """
+        return self._many_jobs_action(
+            method=self.delete_job,
+            action_description="deleting",
+            job_ids=job_ids,
+            db_ids=db_ids,
+            flow_ids=flow_ids,
+            states=states,
+            start_date=start_date,
+            end_date=end_date,
+            name=name,
+            metadata=metadata,
+            raise_on_error=raise_on_error,
+            wait=wait,
+            delete_output=delete_output,
         )
 
 
