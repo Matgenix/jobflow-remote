@@ -457,7 +457,7 @@ class Runner:
             if max_seconds and time.time() - t0 > max_seconds:
                 if raise_at_timeout:
                     raise RuntimeError(
-                        "Could execute the job within the selected amount of time"
+                        "Could not execute the job within the selected amount of time"
                     )
                 return False
 
