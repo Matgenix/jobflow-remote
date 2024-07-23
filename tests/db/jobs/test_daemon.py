@@ -23,6 +23,24 @@ def _wait_daemon_started(daemon_manager, max_wait: int = 10) -> bool:
     )
 
 
+def _wait_daemon_shutdown(daemon_manager, max_wait: int = 10) -> bool:
+    from jobflow_remote.jobs.daemon import DaemonError, DaemonStatus
+
+    for _i in range(max_wait):
+        time.sleep(1)
+        state = None
+        try:
+            state = daemon_manager.check_status()
+        except DaemonError:
+            pass
+        # TODO: should we check state here such as in _wait_daemon_started ?
+        if state == DaemonStatus.SHUT_DOWN:
+            return True
+    raise RuntimeError(
+        f"The daemon did not start running within the expected time ({max_wait})"
+    )
+
+
 @pytest.mark.parametrize(
     "single",
     [True, False],
@@ -64,9 +82,9 @@ def test_start_stop(job_controller, single, daemon_manager) -> None:
     assert daemon_manager.check_status() == DaemonStatus.STOPPED
 
     assert daemon_manager.start(raise_on_error=True, single=True)
-    time.sleep(0.5)
+    _wait_daemon_started(daemon_manager)
     assert daemon_manager.shut_down(raise_on_error=True)
-    time.sleep(1)
+    _wait_daemon_shutdown(daemon_manager)
     assert daemon_manager.check_status() == DaemonStatus.SHUT_DOWN
 
     processes_info = daemon_manager.get_processes_info()

@@ -488,10 +488,10 @@ class DaemonManager:
                 DaemonStatus.STOPPING,
                 DaemonStatus.SHUT_DOWN,
             ):
-                stopped = True
                 lock.update_on_release = {"$set": {"running_runner": None}}
+                return True
 
-            elif status in (DaemonStatus.RUNNING, DaemonStatus.PARTIALLY_RUNNING):
+            if status in (DaemonStatus.RUNNING, DaemonStatus.PARTIALLY_RUNNING):
                 interface = self.get_interface()
                 if wait:
                     result = interface.supervisor.stopAllProcesses()
@@ -500,13 +500,11 @@ class DaemonManager:
 
                 error = self._verify_call_result(result, "stop", raise_on_error)
 
-                stopped = error is None
-                if stopped:
+                if error is None:
                     lock.update_on_release = {"$set": {"running_runner": None}}
+                return error is None
 
-            else:
-                raise DaemonError(f"Daemon status {status} could not be handled")
-        return stopped
+            raise DaemonError(f"Daemon status {status} could not be handled")
 
     def _verify_call_result(
         self, result, action: str, raise_on_error: bool = False
@@ -536,15 +534,16 @@ class DaemonManager:
             # the state. Try proceeding in that case, since we really want to kill
             # the process
             status = None
-            killed = None
             try:
                 status = self.check_status()
                 if status == DaemonStatus.SHUT_DOWN:
                     logger.info("supervisord is not running. No process is running")
-                    killed = True
-                elif status == DaemonStatus.STOPPED:
+                    lock.update_on_release = {"$set": {"running_runner": None}}
+                    return True
+                if status == DaemonStatus.STOPPED:
                     logger.info("Processes are already stopped.")
-                    killed = True
+                    lock.update_on_release = {"$set": {"running_runner": None}}
+                    return True
             except DaemonError as e:
                 msg = (
                     f"Error while determining the state of the runner: {getattr(e, 'message', str(e))}."
@@ -562,13 +561,11 @@ class DaemonManager:
                 result = interface.supervisor.signalAllProcesses(9)
                 error = self._verify_call_result(result, "kill", raise_on_error)
 
-                killed = error is None
+                if error is None:
+                    lock.update_on_release = {"$set": {"running_runner": None}}
+                return error is None
 
-            if killed is None:
-                raise DaemonError(f"Daemon status {status} could not be handled")
-            if killed:
-                lock.update_on_release = {"$set": {"running_runner": None}}
-        return killed
+        raise DaemonError(f"Daemon status {status} could not be handled")
 
     def shut_down(self, raise_on_error: bool = False) -> bool:
         db_filter = {"running_runner": {"$exists": True}}
@@ -576,19 +573,17 @@ class DaemonManager:
             status = self.check_status()
             if status == DaemonStatus.SHUT_DOWN:
                 logger.info("supervisord is already shut down.")
-                shutdown = True
-            else:
-                interface = self.get_interface()
-                try:
-                    interface.supervisor.shutdown()
-                    shutdown = True
-                except Exception:
-                    if raise_on_error:
-                        raise
-                    shutdown = False
-            if shutdown:
                 lock.update_on_release = {"$set": {"running_runner": None}}
-        return shutdown
+                return True
+            interface = self.get_interface()
+            try:
+                interface.supervisor.shutdown()
+            except Exception:
+                if raise_on_error:
+                    raise
+                return False
+            lock.update_on_release = {"$set": {"running_runner": None}}
+            return True
 
     def wait_start(self, timeout: int = 30) -> None:
         time_limit = time.time() + timeout
