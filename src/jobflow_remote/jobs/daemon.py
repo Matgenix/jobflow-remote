@@ -420,7 +420,9 @@ class DaemonManager:
         connect_interactive: bool = False,
     ) -> bool:
         db_filter = {"running_runner": {"$exists": True}}
-        with self.job_controller.lock_auxiliary(filter=db_filter) as lock:
+        with self.job_controller.lock_auxiliary(
+            filter=db_filter, get_locked_doc=True
+        ) as lock:
             doc = lock.locked_document
             if not doc:
                 if lock.unavailable_document:

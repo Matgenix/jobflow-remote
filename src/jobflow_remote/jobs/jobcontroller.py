@@ -2645,10 +2645,11 @@ class JobController:
             True if the database was upgraded, False otherwise.
         """
         this_version = this_version or jobflow_remote.__version__
-        environment_doc = self.auxiliary.find_one(
-            {"jobflow_remote_version": {"$exists": True}}
-        )
+
         if previous_version is None:
+            environment_doc = self.auxiliary.find_one(
+                {"jobflow_remote_version": {"$exists": True}}
+            )
             if not environment_doc:
                 # Database is from a jobflow remote version <= 0.1.2
                 previous_version = "before_0_1_3"
