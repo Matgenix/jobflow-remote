@@ -99,7 +99,7 @@ def test_unlock_flow(job_controller, one_job) -> None:
     )
 
 
-def test_running_runner(job_controller) -> None:
+def test_unlock_runner(job_controller) -> None:
     from jobflow_remote.testing.cli import run_check_cli
 
     with job_controller.lock_auxiliary(filter={"running_runner": {"$exists": True}}):
