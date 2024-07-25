@@ -230,3 +230,9 @@ def two_flows_four_jobs(random_project_name):
     submit_flow(flow2, worker="test_local_worker")
 
     return [flow, flow2]
+
+
+@pytest.fixture()
+def version_candidate():
+    """Next version candidate. Used for tests of upgrade methods."""
+    return "0.1.3"

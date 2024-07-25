@@ -2538,7 +2538,7 @@ class JobController:
         )
         return result.modified_count
 
-    def unlock_runner(self) -> int:
+    def unlock_runner(self) -> tuple[int, int]:
         """
         Forcibly remove the lock on a locked Runner document.
         This should be used only if a lock is a leftover of a process that is not
@@ -2547,8 +2547,8 @@ class JobController:
 
         Returns
         -------
-        int
-            Number of modified Flows.
+        tuple
+            Number of runner documents and modified runner documents.
         """
         query = {"running_runner": {"$exists": True}}
 
@@ -2556,7 +2556,7 @@ class JobController:
             filter=query,
             update={"$set": {"lock_id": None, "lock_time": None}},
         )
-        return result.modified_count
+        return result.matched_count, result.modified_count
 
     def reset(
         self,
@@ -2660,6 +2660,13 @@ class JobController:
         environment_doc = self.auxiliary.find_one(
             {"jobflow_remote_version": {"$exists": True}}
         )
+        if environment_doc is None:
+            msg = (
+                "No information about jobflow version in the database.\n"
+                "The database is likely from before version 0.1.3 of jobflow-remote.\n"
+            )
+            logger.warning(msg)
+            return msg
         previous_jobflow_version = environment_doc["jobflow_version"]
         current_jobflow_version = jobflow.__version__
         if jobflow.__version__ != previous_jobflow_version:
@@ -2675,6 +2682,13 @@ class JobController:
         environment_doc = self.auxiliary.find_one(
             {"jobflow_remote_version": {"$exists": True}}
         )
+        if environment_doc is None:
+            msg = (
+                "No information about environment (all packages versions) in the database.\n"
+                "The database is likely from before version 0.1.3 of jobflow-remote.\n"
+            )
+            logger.warning(msg)
+            return msg
         previous_package_versions = environment_doc["full_environment"]
         installed_packages = importlib.metadata.distributions()
         package_versions = {
@@ -4661,7 +4675,7 @@ class Upgrader:
             f"Starting upgrade of the database from version {previous_version} to version {this_version}"
         )
         for prev, new in zip(
-            self._versions, self._versions[1 : self._versions.index(this_version)]
+            self._versions, self._versions[1 : self._versions.index(this_version) + 1]
         ):
             logger.info(
                 f"Performing incremental upgrade of the database from version {prev} to version {new}"
@@ -4671,6 +4685,7 @@ class Upgrader:
         logger.info(
             f"Finished upgrade of the database from version {previous_version} to version {this_version}"
         )
+        return True
 
     def _upgrade_to_0_1_3(self):
         self.job_controller.auxiliary.find_one_and_update(
