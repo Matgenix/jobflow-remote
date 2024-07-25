@@ -38,7 +38,16 @@ app.add_typer(app_admin)
 
 
 @app_admin.command()
-def upgrade(force: force_opt = False) -> None:
+def upgrade(
+    force: force_opt = False,
+    test_version_upgrade: Annotated[
+        Optional[str],
+        typer.Option(
+            help="Explicitly sets the target version for upgrade. For testing purposes only",
+            hidden=True,
+        ),
+    ] = None,
+) -> None:
     """
     Upgrade the jobflow database.
     WARNING: can modify all the data. Previous version could not be retrieved anymore.
@@ -59,9 +68,9 @@ def upgrade(force: force_opt = False) -> None:
             exit_with_error_msg(text)
     with loading_spinner(processing=False) as progress:
         progress.add_task(description="Upgrading the DB...", total=None)
-        done = jc.upgrade()
+        done = jc.upgrade(this_version=test_version_upgrade)
     not_text = "" if done else "[bold]NOT [/bold]"
-    out_console.print(f"The database was {not_text}upgraded")
+    out_console.print(f"The database has {not_text}been upgraded")
 
 
 @app_admin.command()
@@ -246,21 +255,24 @@ def unlock_runner() -> None:
     with loading_spinner(processing=False) as progress:
         progress.add_task(description="Unlocking runner document...", total=None)
 
-        num_unlocked = jc.unlock_runner()
+        num_docs, num_unlocked = jc.unlock_runner()
 
-    if num_unlocked == 0:
+    if num_docs == 0:
         out_console.print(
             "No runner document... "
             "Consider upgrading your database using 'jf admin upgrade'"
         )
-    elif num_unlocked == 1:
-        out_console.print("The runner document has been unlocked")
     else:
-        out_console.print(
-            f"{num_unlocked} runner documents found and unlocked... "
-            "There should be only one runner document. "
-            "Consider fixing this problem (manually)..."
-        )
+        if num_docs > 1:
+            out_console.print(
+                f"{num_unlocked} runner documents found...\n"
+                "There should be only one runner document.\n"
+                "Consider fixing this problem (manually)..."
+            )
+        if num_unlocked == 0:
+            out_console.print("The runner document was not locked. Nothing changed.")
+        else:
+            out_console.print("The runner document has been unlocked.")
 
 
 app_index = JFRTyper(
