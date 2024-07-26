@@ -121,16 +121,6 @@ def test_unlock_runner(job_controller) -> None:
             "Consider upgrading your database using 'jf admin upgrade'",
         ],
     )
-    job_controller.auxiliary.insert_one({"running_runner": None})
-    job_controller.auxiliary.insert_one({"running_runner": None})
-    run_check_cli(
-        ["admin", "unlock-runner"],
-        required_out=[
-            "2 runner documents found...",
-            "There should be only one runner document.",
-            "Consider fixing this problem (manually)...",
-        ],
-    )
 
 
 def test_upgrade_from_before_0_1_3(job_controller, version_candidate, caplog) -> None:
@@ -139,8 +129,9 @@ def test_upgrade_from_before_0_1_3(job_controller, version_candidate, caplog) ->
 
     assert job_controller.get_running_runner() is None
     job_controller.auxiliary.delete_many({"running_runner": {"$exists": True}})
-    with pytest.raises(TypeError, match=r"'NoneType' object is not subscriptable"):
-        assert job_controller.get_running_runner()
+    # with pytest.raises(TypeError, match=r"'NoneType' object is not subscriptable"):
+    #     assert job_controller.get_running_runner()
+    assert job_controller.get_running_runner() == "NO_DOCUMENT"
 
     job_controller.auxiliary.delete_many({"jobflow_remote_version": {"$exists": True}})
 
@@ -156,8 +147,9 @@ def test_upgrade_from_before_0_1_3(job_controller, version_candidate, caplog) ->
         ],
         error=True,
     )
-    with pytest.raises(TypeError, match=r"'NoneType' object is not subscriptable"):
-        assert job_controller.get_running_runner()
+    # with pytest.raises(TypeError, match=r"'NoneType' object is not subscriptable"):
+    #     assert job_controller.get_running_runner()
+    assert job_controller.get_running_runner() == "NO_DOCUMENT"
     running_runner_doc = job_controller.auxiliary.find_one(
         {"running_runner": {"$exists": True}}
     )

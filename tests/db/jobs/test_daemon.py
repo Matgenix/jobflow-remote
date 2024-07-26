@@ -192,12 +192,15 @@ def test_runner_info_auxiliary(job_controller, daemon_manager) -> None:
     assert isinstance(runner_info["last_pinged"], datetime.datetime)
 
 
-def test_start_two_runners(daemon_manager) -> None:
+def test_start_two_runners(daemon_manager, mocker) -> None:
     from jobflow_remote.jobs.daemon import DaemonError, DaemonStatus
 
     assert daemon_manager.check_status() == DaemonStatus.SHUT_DOWN
     assert daemon_manager.start(raise_on_error=True, single=False)
     _wait_daemon_started(daemon_manager)
 
+    mocker.patch.object(
+        daemon_manager, "check_status", return_value="FAKE_NOT_RUNNING_LOCALLY"
+    )
     with pytest.raises(DaemonError, match=r"A daemon runner process may be running"):
-        assert daemon_manager.start(raise_on_error=True, single=False)
+        daemon_manager.start(raise_on_error=True, single=False)

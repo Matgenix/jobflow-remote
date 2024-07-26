@@ -14,7 +14,6 @@ from typing import Callable
 from xmlrpc.client import Fault
 
 import psutil
-from monty.functools import lazy_property
 from monty.os import makedirs_p
 from supervisor import childutils, states, xmlrpc
 from supervisor.compat import xmlrpclib
@@ -177,10 +176,10 @@ class DaemonManager:
             raise DaemonError(msg)
         return path
 
-    @lazy_property
+    @property
     def job_controller(self):
         if self._job_controller is None:
-            return JobController.from_project(self.project)
+            self._job_controller = JobController.from_project(self.project)
         return self._job_controller
 
     def clean_files(self) -> None:
@@ -434,7 +433,9 @@ class DaemonManager:
                     'You can upgrade the database using the command "jf admin upgrade".'
                 )
             status = self.check_status()
-            if doc["running_runner"] is not None:
+            if status == DaemonStatus.RUNNING:
+                error = "Daemon process is already running"
+            elif doc["running_runner"] is not None:
                 drr = doc["running_runner"]
                 # TODO: add reasonable skip here
                 #  same hostname, same project, same user then it should be fine ?
@@ -449,8 +450,6 @@ class DaemonManager:
                     f"- user: {drr['user']}"
                 )
 
-            elif status == DaemonStatus.RUNNING:
-                error = "Daemon process is already running"
             elif status == DaemonStatus.SHUT_DOWN:
                 error = self.start_supervisord(
                     num_procs_transfer=num_procs_transfer,
