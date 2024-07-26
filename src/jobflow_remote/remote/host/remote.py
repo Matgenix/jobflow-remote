@@ -5,6 +5,7 @@ import io
 import logging
 import shlex
 import traceback
+import warnings
 from pathlib import Path
 
 import fabric
@@ -320,6 +321,16 @@ class RemoteHost(BaseHost):
         self._check_connected()
 
         self._execute_remote_func(self.connection.sftp().remove, str(path))
+
+    def rmtree(self, path: str | Path, raise_on_error: bool = False) -> bool:
+        stdout, stderr, exit_code = self.execute(f"rm -r {path}")
+        if exit_code != 0:
+            msg = f"Error while deleting folder {path}. stdout: {stdout}, stderr: {stderr}"
+            if raise_on_error:
+                raise RuntimeError(msg)
+            warnings.warn(msg, stacklevel=2)
+            return False
+        return True
 
     def _check_connected(self) -> bool:
         """

@@ -829,7 +829,7 @@ def output(
         bool,
         typer.Option(
             "--load",
-            "-",
+            "-l",
             help="If enabled all the data from additional stores are also loaded ",
         ),
     ] = False,
