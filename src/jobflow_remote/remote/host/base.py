@@ -90,6 +90,10 @@ class BaseHost(MSONable):
     def remove(self, path: str | Path):
         raise NotImplementedError
 
+    @abc.abstractmethod
+    def rmtree(self, path: str | Path, raise_on_error: bool = False) -> bool:
+        raise NotImplementedError
+
     @property
     def interactive_login(self) -> bool:
         """

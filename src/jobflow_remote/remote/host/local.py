@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
+import warnings
 from pathlib import Path
 
 from monty.os import cd
@@ -114,3 +115,15 @@ class LocalHost(BaseHost):
 
     def remove(self, path: str | Path) -> None:
         os.remove(path)
+
+    def rmtree(self, path: str | Path, raise_on_error: bool = False) -> bool:
+        removed = True
+
+        def onerror(func, dir_path, err):
+            nonlocal removed
+            removed = False
+            warnings.warn(f"Error while deleting folder {path}: {err[1]}", stacklevel=2)
+
+        shutil.rmtree(path, onerror=onerror if not raise_on_error else None)
+
+        return removed

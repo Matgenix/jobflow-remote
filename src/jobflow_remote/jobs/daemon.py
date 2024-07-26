@@ -448,7 +448,7 @@ class DaemonManager:
         ):
             return True
 
-        if status == DaemonStatus.RUNNING:
+        if status in (DaemonStatus.RUNNING, DaemonStatus.PARTIALLY_RUNNING):
             interface = self.get_interface()
             if wait:
                 result = interface.supervisor.stopAllProcesses()
