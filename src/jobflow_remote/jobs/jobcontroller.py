@@ -3803,9 +3803,10 @@ class JobController:
 
     def get_running_runner(self):
         """Get the running runner information from the auxiliary collection."""
-        return self.auxiliary.find_one({"running_runner": {"$exists": True}})[
-            "running_runner"
-        ]
+        rr_doc = self.auxiliary.find_one({"running_runner": {"$exists": True}})
+        if rr_doc:
+            return rr_doc["running_runner"]
+        return "NO_DOCUMENT"
 
     def update_flow_state(
         self,

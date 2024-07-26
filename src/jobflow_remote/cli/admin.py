@@ -262,17 +262,10 @@ def unlock_runner() -> None:
             "No runner document... "
             "Consider upgrading your database using 'jf admin upgrade'"
         )
+    elif num_unlocked == 0:
+        out_console.print("The runner document was not locked. Nothing changed.")
     else:
-        if num_docs > 1:
-            out_console.print(
-                f"{num_unlocked} runner documents found...\n"
-                "There should be only one runner document.\n"
-                "Consider fixing this problem (manually)..."
-            )
-        if num_unlocked == 0:
-            out_console.print("The runner document was not locked. Nothing changed.")
-        else:
-            out_console.print("The runner document has been unlocked.")
+        out_console.print("The runner document has been unlocked.")
 
 
 app_index = JFRTyper(
