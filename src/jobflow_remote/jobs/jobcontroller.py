@@ -2618,121 +2618,6 @@ class JobController:
 
         return True
 
-    def upgrade(self, previous_version=None, this_version=None):
-        """
-        Upgrade the database to a new version of Jobflow Remote.
-
-        Notes
-        -----
-        This method will not check whether there is a daemon running.
-        This (currently) only deals with the Queue store (i.e. Jobflow Remote-related),
-        not with the Jobflow Store (i.e. outputs).
-
-        Parameters
-        ----------
-        previous_version : str
-            Previous version of Jobflow Remote. Should be defined automatically
-            from the auxiliary collection. Explicitly setting it is mainly for
-            testing purposes.
-        this_version : str
-            New version of Jobflow Remote. Should be defined automatically
-            from the current environment. Explicitly setting it is mainly for
-            testing purposes.
-
-        Returns
-        -------
-        bool
-            True if the database was upgraded, False otherwise.
-        """
-        this_version = this_version or jobflow_remote.__version__
-
-        if previous_version is None:
-            environment_doc = self.auxiliary.find_one(
-                {"jobflow_remote_version": {"$exists": True}}
-            )
-            if not environment_doc:
-                # Database is from a jobflow remote version <= 0.1.2
-                previous_version = "before_0_1_3"
-            else:
-                previous_version = environment_doc["jobflow_remote_version"]
-        return Upgrader(self).upgrade(previous_version, this_version)
-
-    def upgrade_check_jobflow(self):
-        environment_doc = self.auxiliary.find_one(
-            {"jobflow_remote_version": {"$exists": True}}
-        )
-        if environment_doc is None:
-            msg = (
-                "No information about jobflow version in the database.\n"
-                "The database is likely from before version 0.1.3 of jobflow-remote.\n"
-            )
-            logger.warning(msg)
-            return msg
-        previous_jobflow_version = environment_doc["jobflow_version"]
-        current_jobflow_version = jobflow.__version__
-        if jobflow.__version__ != previous_jobflow_version:
-            msg = (
-                f"The previous jobflow version ({previous_jobflow_version}) "
-                f"is not the same as the current one ({current_jobflow_version}).\n"
-            )
-            logger.warning(msg)
-            return msg
-        return ""
-
-    def upgrade_full_check(self):
-        environment_doc = self.auxiliary.find_one(
-            {"jobflow_remote_version": {"$exists": True}}
-        )
-        if environment_doc is None:
-            msg = (
-                "No information about environment (all packages versions) in the database.\n"
-                "The database is likely from before version 0.1.3 of jobflow-remote.\n"
-            )
-            logger.warning(msg)
-            return msg
-        previous_package_versions = environment_doc["full_environment"]
-        installed_packages = importlib.metadata.distributions()
-        package_versions = {
-            package.metadata["Name"]: package.version for package in installed_packages
-        }
-        missing_packages = set(previous_package_versions.keys()) - set(
-            package_versions.keys()
-        )
-        common_packages = set(previous_package_versions.keys()) & set(
-            package_versions.keys()
-        )
-        different_version_packages = [
-            (package, previous_package_versions[package], package_versions[package])
-            for package in common_packages
-            if previous_package_versions[package] != package_versions[package]
-        ]
-        if missing_packages or different_version_packages:
-            msg = "Packages differ between the previous environment and the current one.\n"
-            if missing_packages:
-                missing_str = "\n- ".join(sorted(missing_packages))
-                msg += (
-                    f"The following {len(missing_packages)} packages "
-                    f"are missing in the current environment:\n "
-                    f"{missing_str}\n"
-                )
-            if different_version_packages:
-                different_str = "\n- ".join(
-                    [
-                        f"{pkg[0]}-{pkg[2]} (previous version: {pkg[1]})"
-                        for pkg in sorted(
-                            different_version_packages, key=lambda x: x[0]
-                        )
-                    ]
-                )
-                msg += (
-                    f"The following {len(missing_packages)} packages "
-                    f"have different versions:\n "
-                    f"{different_str}\n"
-                )
-            logger.warning(msg)
-            return msg
-        return ""
-
     def build_indexes(
         self,
         background: bool = True,
@@ -4620,6 +4505,124 @@ class JobController:
                     mongo_bin_path=mongo_bin_path,
                 )
 
+    def upgrade_check_jobflow(self):
+        environment_doc = self.auxiliary.find_one(
+            {"jobflow_remote_version": {"$exists": True}}
+        )
+        if environment_doc is None:
+            msg = (
+                "No information about jobflow version in the database.\n"
+                "The database is likely from before version 0.1.3 of jobflow-remote.\n"
+            )
+            logger.warning(msg)
+            return msg
+        previous_jobflow_version = environment_doc["jobflow_version"]
+        current_jobflow_version = jobflow.__version__
+        if jobflow.__version__ != previous_jobflow_version:
+            msg = (
+                f"The previous jobflow version ({previous_jobflow_version}) "
+                f"is not the same as the current one ({current_jobflow_version}).\n"
+            )
+            logger.warning(msg)
+            return msg
+        return ""
+
+    def upgrade_full_check(self):
+        environment_doc = self.auxiliary.find_one(
+            {"jobflow_remote_version": {"$exists": True}}
+        )
+        if environment_doc is None:
+            msg = (
+                "No information about environment (all packages versions) in the database.\n"
+                "The database is likely from before version 0.1.3 of jobflow-remote.\n"
+            )
+            logger.warning(msg)
+            return msg
+        previous_package_versions = environment_doc["full_environment"]
+        installed_packages = importlib.metadata.distributions()
+        package_versions = {
+            package.metadata["Name"]: package.version for package in installed_packages
+        }
+        missing_packages = set(previous_package_versions.keys()) - set(
+            package_versions.keys()
+        )
+        common_packages = set(previous_package_versions.keys()) & set(
+            package_versions.keys()
+        )
+        different_version_packages = [
+            (package, previous_package_versions[package], package_versions[package])
+            for package in common_packages
+            if previous_package_versions[package] != package_versions[package]
+        ]
+        if missing_packages or different_version_packages:
+            msg = "Packages differ between the previous environment and the current one.\n"
+            if missing_packages:
+                missing_str = "\n- ".join(sorted(missing_packages))
+                msg += (
+                    f"The following {len(missing_packages)} packages "
+                    f"are missing in the current environment:\n "
+                    f"{missing_str}\n"
+                )
+            if different_version_packages:
+                different_str = "\n- ".join(
+                    [
+                        f"{pkg[0]}-{pkg[2]} (previous version: {pkg[1]})"
+                        for pkg in sorted(
+                            different_version_packages, key=lambda x: x[0]
+                        )
+                    ]
+                )
+                msg += (
+                    f"The following {len(missing_packages)} packages "
+                    f"have different versions:\n "
+                    f"{different_str}\n"
+                )
+            logger.warning(msg)
+            return msg
+        return ""
+
+    def upgrade(self, previous_version, this_version):
+        """Upgrade the database to the new version of Jobflow Remote.
+
+        Parameters
+        ----------
+        previous_version : str
+            Previous version of Jobflow Remote.
+        this_version : str
+            New version of Jobflow Remote.
+        """
+        # TODO: do this with a transaction ?
+        logger.info(
+            f"Starting upgrade of the database from version {previous_version} to version {this_version}"
+        )
+        upgrade_functions = {
+            "0.1.3": self._upgrade_to_0_1_3,
+            # "0.1.4": self._upgrade_0_1_3_to_0_1_4,
+        }
+        _versions = [
+            "before_0_1_3",
+            *sorted(upgrade_functions.keys(), key=Version),
+        ]
+        for prev, new in zip(
+            _versions, _versions[1 : _versions.index(this_version) + 1]
+        ):
+            logger.info(
+                f"Performing incremental upgrade of the database from version {prev} to version {new}"
+            )
+            upgrade_functions[new]()
+        _update_version_information(self.auxiliary)
+        logger.info(
+            f"Finished upgrade of the database from version {previous_version} to version {this_version}"
+        )
+        return True
+
+    def _upgrade_to_0_1_3(self):
+        self.auxiliary.find_one_and_update(
+            filter={"running_runner": {"$exists": True}},
+            update={"$set": {"running_runner": None}},
+            upsert=True,
+        )
+
 
 def get_flow_leafs(job_docs: list[dict]) -> list[dict]:
     """
@@ -4653,48 +4656,45 @@ class Upgrader:
 
     def __init__(self, job_controller: JobController):
         self.job_controller = job_controller
-        self.upgrade_functions = {
-            "0.1.3": self._upgrade_to_0_1_3,
-            # "0.1.4": self._upgrade_0_1_3_to_0_1_4,
-        }
-        self._versions = [
-            "before_0_1_3",
-            *sorted(self.upgrade_functions.keys(), key=Version),
-        ]
 
-    def upgrade(self, previous_version, this_version):
-        """Upgrade the database to the new version of Jobflow Remote.
+    def upgrade(self, previous_version=None, this_version=None):
+        """
+        Upgrade the database to a new version of Jobflow Remote.
+
+        Notes
+        -----
+        This method will not check whether there is a daemon running.
+        This (currently) only deals with the Queue store (i.e. Jobflow Remote-related),
+        not with the Jobflow Store (i.e. outputs).
 
         Parameters
         ----------
         previous_version : str
-            Previous version of Jobflow Remote.
+            Previous version of Jobflow Remote. Should be defined automatically
+            from the auxiliary collection. Explicitly setting it is mainly for
+            testing purposes.
         this_version : str
-            New version of Jobflow Remote.
-        """
-        # TODO: do this with a transaction ?
-        logger.info(
-            f"Starting upgrade of the database from version {previous_version} to version {this_version}"
-        )
-        for prev, new in zip(
-            self._versions, self._versions[1 : self._versions.index(this_version) + 1]
-        ):
-            logger.info(
-                f"Performing incremental upgrade of the database from version {prev} to version {new}"
-            )
-            self.upgrade_functions[new]()
-        _update_version_information(self.job_controller.auxiliary)
-        logger.info(
-            f"Finished upgrade of the database from version {previous_version} to version {this_version}"
-        )
-        return True
+            New version of Jobflow Remote. Should be defined automatically
+            from the current environment. Explicitly setting it is mainly for
+            testing purposes.
 
-    def _upgrade_to_0_1_3(self):
-        self.job_controller.auxiliary.find_one_and_update(
-            filter={"running_runner": {"$exists": True}},
-            update={"$set": {"running_runner": None}},
-            upsert=True,
-        )
+        Returns
+        -------
+        bool
+            True if the database was upgraded, False otherwise.
+        """
+        this_version = this_version or jobflow_remote.__version__
+
+        if previous_version is None:
+            environment_doc = self.job_controller.auxiliary.find_one(
+                {"jobflow_remote_version": {"$exists": True}}
+            )
+            if not environment_doc:
+                # Database is from a jobflow remote version <= 0.1.2
+                previous_version = "before_0_1_3"
+            else:
+                previous_version = environment_doc["jobflow_remote_version"]
+        return self.job_controller.upgrade(previous_version, this_version)
 
 
 def _update_version_information(auxiliary_coll):

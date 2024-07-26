@@ -30,6 +30,7 @@ from jobflow_remote.cli.utils import (
     out_console,
 )
 from jobflow_remote.jobs.data import DbCollection
+from jobflow_remote.jobs.jobcontroller import Upgrader
 
 app_admin = JFRTyper(
     name="admin", help="Commands for administering the database", no_args_is_help=True
@@ -68,7 +69,8 @@ def upgrade(
             exit_with_error_msg(text)
     with loading_spinner(processing=False) as progress:
         progress.add_task(description="Upgrading the DB...", total=None)
-        done = jc.upgrade(this_version=test_version_upgrade)
+        ugprader = Upgrader(jc)
+        done = ugprader.upgrade(this_version=test_version_upgrade)
     not_text = "" if done else "[bold]NOT [/bold]"
     out_console.print(f"The database has {not_text}been upgraded")
 
