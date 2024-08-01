@@ -1,13 +1,11 @@
 from __future__ import annotations
 
+import importlib.metadata
 import json
 import logging
 import traceback
 from typing import TYPE_CHECKING
 
-import jobflow
-
-import jobflow_remote
 from jobflow_remote.config.base import (
     ExecutionConfig,
     LocalWorker,
@@ -235,19 +233,33 @@ def _check_environment(
         exc = traceback.format_exc()
         return f"Error while testing worker:\n {exc}"
 
-    jobflow_version = jobflow.__version__
-    jobflow_remote_version = jobflow_remote.__version__
+    installed_packages = importlib.metadata.distributions()
+    local_package_versions = {
+        package.metadata["Name"]: package.version for package in installed_packages
+    }
     stdout, stderr, errcode = host.execute("pip list --format=json")
     host_package_versions = {
         package_dict["name"]: package_dict["version"]
         for package_dict in json.loads(stdout)
     }
     if full_check:
-        # Check all packages
-        pass
-    if (
-        jobflow_version == host_package_versions["jobflow"]
-        and jobflow_remote_version == host_package_versions["jobflow-remote"]
-    ):
-        return None
-    raise ValueError("Version mismatch")
+        packages_to_check = list(local_package_versions.keys())
+    else:
+        packages_to_check = ["jobflow", "jobflow-remote"]
+    missing = []
+    mismatch = []
+    for package in packages_to_check:
+        if package not in host_package_versions:
+            missing.append((package, local_package_versions[package]))
+            continue
+        if local_package_versions[package] != host_package_versions[package]:
+            mismatch.append(
+                (
+                    package,
+                    local_package_versions[package],
+                    host_package_versions[package],
+                )
+            )
+    if missing or mismatch:
+        raise ValueError("Version mismatch")
+    return None
