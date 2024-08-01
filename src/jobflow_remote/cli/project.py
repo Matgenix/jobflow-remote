@@ -163,6 +163,13 @@ def check(
             help="Print the errors at the end of the checks",
         ),
     ] = False,
+    full: Annotated[
+        bool,
+        typer.Option(
+            "--full",
+            help="Perform a full check",
+        ),
+    ] = False,
 ) -> None:
     """Check that the connection to the different elements of the projects are working."""
     check_incompatible_opt({"jobstore": jobstore, "queue": queue, "worker": worker})
@@ -192,9 +199,9 @@ def check(
             worker_to_test = project.workers[worker_name]
             if worker_to_test.get_host().interactive_login:
                 with hide_progress(progress):
-                    err = check_worker(worker_to_test)
+                    err = check_worker(worker_to_test, full_check=full)
             else:
-                err = check_worker(worker_to_test)
+                err = check_worker(worker_to_test, full_check=full)
             header = tick
             if err:
                 errors.append((f"Worker {worker_name}", err))
