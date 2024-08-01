@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 import traceback
 from typing import TYPE_CHECKING
@@ -236,9 +237,17 @@ def _check_environment(
 
     jobflow_version = jobflow.__version__
     jobflow_remote_version = jobflow_remote.__version__
+    stdout, stderr, errcode = host.execute("pip list --format=json")
+    host_package_versions = {
+        package_dict["name"]: package_dict["version"]
+        for package_dict in json.loads(stdout)
+    }
     if full_check:
         # Check all packages
         pass
-    if jobflow_version == "0.1.18" and jobflow_remote_version == "0.1.2":
+    if (
+        jobflow_version == host_package_versions["jobflow"]
+        and jobflow_remote_version == host_package_versions["jobflow-remote"]
+    ):
         return None
-    return "Not the right version"
+    raise ValueError("Version mismatch")
