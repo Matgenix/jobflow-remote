@@ -4,6 +4,9 @@ import logging
 import traceback
 from typing import TYPE_CHECKING
 
+import jobflow
+
+import jobflow_remote
 from jobflow_remote.config.base import (
     ExecutionConfig,
     LocalWorker,
@@ -150,7 +153,7 @@ def _check_workdir(worker: WorkerBase, host: BaseHost) -> str | None:
         host.execute(f"rm {str(canary_file)!r}")
 
 
-def check_worker(worker: WorkerBase) -> str | None:
+def check_worker(worker: WorkerBase, full_check: bool = False) -> str | None:
     """Check that a connection to the configured worker can be made."""
     host = worker.get_host()
     try:
@@ -165,6 +168,7 @@ def check_worker(worker: WorkerBase) -> str | None:
         qm.get_jobs_list()
 
         _check_workdir(worker=worker, host=host)
+        _check_environment(worker=worker, host=host, full_check=full_check)
 
     except Exception:
         exc = traceback.format_exc()
@@ -206,3 +210,35 @@ def check_jobstore(jobstore: JobStore) -> str | None:
         if err:
             return f"Error while checking additional store {store_name}:\n{err}"
     return None
+
+
+def _check_environment(
+    worker: WorkerBase, host: BaseHost, full_check: bool = False
+) -> str | None:
+    """Check that the worker has a python environment with the same versions of libraries.
+
+    Parameters
+    ----------
+        worker: The worker configuration.
+        host: A connected host.
+        full_check: Whether to check the entire environment and not just jobflow and jobflow-remote.
+
+    """
+    # TODO: not sure about this test here but I based this check function on the _check_worker function
+    #  which does the same.
+    try:
+        host_error = host.test()
+        if host_error:
+            return host_error
+    except Exception:
+        exc = traceback.format_exc()
+        return f"Error while testing worker:\n {exc}"
+
+    jobflow_version = jobflow.__version__
+    jobflow_remote_version = jobflow_remote.__version__
+    if full_check:
+        # Check all packages
+        pass
+    if jobflow_version == "0.1.18" and jobflow_remote_version == "0.1.2":
+        return None
+    return "Not the right version"
