@@ -18,7 +18,7 @@ def test_project_init(random_project_name) -> None:
     assert len(project.workers) == 4
 
 
-def test_paramiko_ssh_connection(job_controller, slurm_ssh_port) -> None:
+def test_paramiko_ssh_connection(job_controller, queue_ssh_port) -> None:
     from paramiko import SSHClient
     from paramiko.client import WarningPolicy
 
@@ -26,7 +26,7 @@ def test_paramiko_ssh_connection(job_controller, slurm_ssh_port) -> None:
     client.set_missing_host_key_policy(WarningPolicy)
     client.connect(
         "localhost",
-        port=slurm_ssh_port,
+        port=queue_ssh_port,
         username="jobflow",
         password="jobflow",
         look_for_keys=False,
@@ -39,7 +39,7 @@ def test_project_check(job_controller, capsys) -> None:
 
     expected = [
         "✓ Worker test_local_worker",
-        "✓ Worker test_remote_worker",
+        "✓ Worker test_remote_slurm_worker",
         "✓ Jobstore",
         "✓ Queue store",
     ]
@@ -48,7 +48,7 @@ def test_project_check(job_controller, capsys) -> None:
 
 @pytest.mark.parametrize(
     "worker",
-    ["test_local_worker", "test_remote_worker"],
+    ["test_local_worker", "test_remote_slurm_worker"],
 )
 def test_submit_flow(worker, job_controller) -> None:
     from jobflow import Flow
@@ -86,7 +86,7 @@ def test_submit_flow(worker, job_controller) -> None:
 
 @pytest.mark.parametrize(
     "worker",
-    ["test_local_worker", "test_remote_worker"],
+    ["test_local_worker", "test_remote_slurm_worker"],
 )
 def test_submit_flow_with_dependencies(worker, job_controller) -> None:
     from jobflow import Flow
@@ -132,7 +132,7 @@ def test_submit_flow_with_dependencies(worker, job_controller) -> None:
 
 @pytest.mark.parametrize(
     "worker",
-    ["test_local_worker", "test_remote_worker"],
+    ["test_local_worker", "test_remote_slurm_worker"],
 )
 def test_job_with_callable_kwarg(worker, job_controller) -> None:
     """Test whether a callable can be successfully provided as a keyword
@@ -176,7 +176,7 @@ def test_job_with_callable_kwarg(worker, job_controller) -> None:
 
 @pytest.mark.parametrize(
     "worker",
-    ["test_local_worker", "test_remote_worker"],
+    ["test_local_worker", "test_remote_slurm_worker"],
 )
 def test_expected_failure(worker, job_controller) -> None:
     from jobflow import Flow
@@ -205,7 +205,7 @@ def test_expected_failure(worker, job_controller) -> None:
 
 @pytest.mark.parametrize(
     "worker",
-    ["test_local_worker", "test_remote_worker"],
+    ["test_local_worker", "test_remote_slurm_worker"],
 )
 def test_exec_config(worker, job_controller, random_project_name) -> None:
     """Tests that an environment variable set in the exec config
@@ -233,7 +233,7 @@ def test_exec_config(worker, job_controller, random_project_name) -> None:
 
 @pytest.mark.parametrize(
     "worker",
-    ["test_local_worker", "test_remote_worker"],
+    ["test_local_worker", "test_remote_slurm_worker"],
 )
 def test_additional_stores(worker, job_controller) -> None:
     from jobflow import Flow
@@ -269,7 +269,7 @@ def test_additional_stores(worker, job_controller) -> None:
 
 @pytest.mark.parametrize(
     "worker",
-    ["test_local_worker", "test_remote_worker"],
+    ["test_local_worker", "test_remote_slurm_worker"],
 )
 def test_undefined_additional_stores(worker, job_controller) -> None:
     from jobflow import Flow
