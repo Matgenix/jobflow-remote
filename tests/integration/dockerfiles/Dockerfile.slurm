@@ -1,7 +1,12 @@
 # syntax=docker/dockerfile:experimental
+ARG QUEUE_SYSTEM=slurm
+FROM ubuntu:22.04 as base
 
-# Using the slurm base image, run an ssh server and install jobflow
-FROM nathanhess/slurm:full AS base
+FROM nathanhess/slurm:full AS slurm
+
+FROM ${QUEUE_SYSTEM} as final
+
+# Run an SSH server and set up Python environment and user for jobflow
 ARG USERNAME=jobflow
 ARG PASSWORD=jobflow
 WORKDIR /opt
