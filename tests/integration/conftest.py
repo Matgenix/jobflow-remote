@@ -140,7 +140,7 @@ def queue_container(docker_client, queue_ssh_port):
     ports = {"22/tcp": queue_ssh_port}
     yield from build_and_launch_container(
         docker_client,
-        Path("./tests/integration/dockerfiles/Dockerfile.slurm"),
+        Path("./tests/integration/dockerfiles/Dockerfile"),
         "jobflow-slurm:latest",
         ports=ports,
     )
