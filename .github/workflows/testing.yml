@@ -34,7 +34,26 @@ jobs:
       - name: Lint
         run: pre-commit run --all-files --show-diff-on-failure
 
+  build-test-bench:
+    name: "Build test bench container"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build test bench container
+        uses: docker/bake-action@v5
+        with:
+          files: tests/integration/dockerfiles/Dockerfile
+          load: true 
+          set: |
+            *.cache-to=type=gha,scope=global,mode=max
+            *.cache-from=type=gha,scope=global
+
   test:
+    needs: [build-test-bench]
     services:
       local_mongodb:
         image: mongo:5.0
@@ -50,11 +69,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: actions/setup-buildx-action@v3
+
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
           cache-dependency-path: pyproject.toml
+
+      - name: Load previously built Docker images
+        uses: docker/bake-action@v5
+        with:
+          files: tests/integration/dockerfiles/Dockerfile
+          load: true
+          set: |
+            *.cache-from=type=gha,scope=global
 
       - name: Install dependencies
         run: |

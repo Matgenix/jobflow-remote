@@ -1,17 +1,27 @@
 # syntax=docker/dockerfile:experimental
 ARG QUEUE_SYSTEM=slurm
+
+# 1) Start from a Ubuntu server
 FROM ubuntu:22.04 as base
+
+# 3) Add desired queue system as a build stage:
+#
+# Each different queue system must provide an `/etc/startup.sh` script, following the example
+# of the prebuilt SLURM image.
+# This script is then edited at the final stage to include starting the SSH server and updating
+# the jobflow user's permissions.
 
 FROM nathanhess/slurm:full AS slurm
 
+
 FROM ${QUEUE_SYSTEM} as final
 
-# Run an SSH server and set up Python environment and user for jobflow
 ARG USERNAME=jobflow
 ARG PASSWORD=jobflow
 WORKDIR /opt
 USER root
 
+# 3) Run an SSH server and set up Python environment and user for jobflow
 # Install OpenSSH server and set it to run on startup
 RUN apt update && apt install -y openssh-server && apt clean && rm -rf /var/lib/apt/lists/*
 RUN sed -i 's/#PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config
@@ -51,7 +61,6 @@ USER ${USERNAME}
 
 # Install jobflow in a local native virtualenv
 WORKDIR /home/${USERNAME}/jobflow-remote
-# RUN git config --global --add safe.directory /home/${USERNAME}/jobflow-remote
 RUN python3 -m venv /home/${USERNAME}/.venv
 RUN /home/${USERNAME}/.venv/bin/pip install -U pip
 RUN /home/${USERNAME}/.venv/bin/pip install --verbose -e .
