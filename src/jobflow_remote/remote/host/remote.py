@@ -334,7 +334,7 @@ class RemoteHost(BaseHost):
         path : str or Path
             The path to the directory tree to be removed.
 
-        raise_on_error : bool, optional
+        raise_on_error : bool
             If set to `False` (default), errors will be ignored, and the method will
             attempt to continue removing remaining files and directories.
             Otherwise, any errors encountered during the removal process
