@@ -37,7 +37,7 @@ jobs:
   test:
     services:
       local_mongodb:
-        image: mongo:4.4
+        image: mongo:5.0
         ports:
           - 27017:27017
 
