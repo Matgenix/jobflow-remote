@@ -221,7 +221,7 @@ def get_job_db_ids(job_db_id: str, job_index: int | None):
 
     if job_index and db_id is not None:
         out_console.print(
-            "The index is defined even if a db_id is passed as an ID. Will be ignored",
+            "The index is defined while a db_id is passed as an ID. Will be ignored",
             style="yellow",
         )
 
