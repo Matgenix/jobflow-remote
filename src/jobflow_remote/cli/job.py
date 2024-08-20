@@ -172,14 +172,6 @@ def job_info(
             "The -v flag will be ignored if --pid is used.",
         ),
     ] = None,
-    with_error: Annotated[
-        bool,
-        typer.Option(
-            "--with-error",
-            "-err",
-            help="DEPRECATED: not needed anymore to fetch errors",
-        ),
-    ] = False,
     show_none: Annotated[
         bool,
         typer.Option(
