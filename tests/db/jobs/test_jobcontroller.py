@@ -587,3 +587,45 @@ def test_delete_job(job_controller, two_flows_four_jobs, runner):
     )
     with pytest.raises(ValueError, match=".*has no outputs.*"):
         job_controller.jobstore.get_output(two_flows_four_jobs[0][0].uuid)
+
+
+def test_delete_job_with_replace(job_controller, runner):
+    from jobflow import Flow
+
+    from jobflow_remote import submit_flow
+    from jobflow_remote.testing import add, self_replace
+
+    # create a job with a replace to check that the job deletion is handled correctly,
+    # although the final state may not be consistent
+    j1 = self_replace(1)
+    j2 = add(j1.output, 2)
+    flow = Flow([j1, j2])
+
+    submit_flow(flow, worker="test_local_worker")
+    runner.run_all_jobs()
+
+    flow_doc = job_controller.get_flow_info_by_flow_uuid(flow.uuid)
+    assert flow_doc["state"] == FlowState.COMPLETED.value
+    assert len(flow_doc["jobs"]) == 2
+    assert len(flow_doc["ids"]) == 3
+    assert flow_doc["parents"][j2.uuid]["1"] == [j1.uuid]
+    assert job_controller.count_jobs() == 3
+
+    assert len(job_controller.delete_job(job_id=j1.uuid, job_index=2)) == 1
+    assert job_controller.count_jobs() == 2
+    flow_doc = job_controller.get_flow_info_by_flow_uuid(flow.uuid)
+    assert flow_doc["state"] == FlowState.COMPLETED.value
+    assert len(flow_doc["jobs"]) == 2
+    assert len(flow_doc["ids"]) == 2
+    assert len(flow_doc["parents"]) == 2
+    assert flow_doc["parents"][j2.uuid]["1"] == [j1.uuid]
+
+    # now delete also the job with index 1 and check again
+    assert len(job_controller.delete_job(job_id=j1.uuid, job_index=1)) == 1
+    assert job_controller.count_jobs() == 1
+    flow_doc = job_controller.get_flow_info_by_flow_uuid(flow.uuid)
+    assert flow_doc["state"] == FlowState.COMPLETED.value
+    assert len(flow_doc["jobs"]) == 1
+    assert len(flow_doc["ids"]) == 1
+    assert len(flow_doc["parents"]) == 1
+    assert flow_doc["parents"][j2.uuid]["1"] == []
