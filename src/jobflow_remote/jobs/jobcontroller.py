@@ -2730,7 +2730,8 @@ class JobController:
         # add new jobs to flow
         flow_dict = dict(flow_dict)
         flow_updates: dict[str, dict[str, Any]] = {
-            "$push": {"jobs": {"$each": new_flow.job_uuids}}
+            "$addToSet": {"jobs": {"$each": new_flow.job_uuids}},
+            "$push": {},
         }
 
         # add new jobs
@@ -3225,7 +3226,9 @@ class JobController:
         updated_states
             A dictionary with the updated states of Jobs that have not been
             stored in the DB yet. In the form {job_uuid: JobState value}.
-            If the value is None the Job is considered deleted.
+            If the value is None the Job is considered deleted and the state
+            of that Job will be ignored while determining the state of the
+            whole Flow.
         """
         updated_states = updated_states or {}
         projection = ["uuid", "index", "parents", "state"]
@@ -3234,7 +3237,8 @@ class JobController:
         )
 
         # update the full list of states and those of the leafs according
-        # to the updated_states passed
+        # to the updated_states passed.
+        # Ignore the Jobs for which the updated_states value is None.
         jobs_states = [
             updated_states.get(j["uuid"], {}).get(j["index"], JobState(j["state"]))
             for j in flow_jobs
@@ -3676,16 +3680,25 @@ class JobController:
                 if id_tuple[1] != job_uuid or id_tuple[2] != job_index
             ]
 
-            # Remove job from jobs list if no job with that id remains in the flow
+            # Remove job from jobs list and as parent of other jobs if no job
+            # with that id remains in the flow
             if not any(job_uuid == id_tuple[1] for id_tuple in flow_doc.ids):
-                flow_doc.jobs.remove(job_uuid)
+                # Here a flow_doc.jobs.remove could be enough. But due to a previous
+                # bug the list of jobs could contain the same uuid more than once.
+                # Make sure to remove all the instances.
+                flow_doc.jobs = [jid for jid in flow_doc.jobs if jid != job_uuid]
+
+                for parent_dict in flow_doc.parents.values():
+                    for index_list in parent_dict.values():
+                        if job_uuid in index_list:
+                            index_list.remove(job_uuid)
 
             # Remove job from parents
-            flow_doc.parents.pop(job_uuid, None)
-            for parent_dict in flow_doc.parents.values():
-                for index_list in parent_dict.values():
-                    if job_uuid in index_list:
-                        index_list.remove(job_uuid)
+            flow_doc.parents[job_uuid].pop(str(job_index), None)
+            # if all the jobs with a given uuid have been removed, also remove
+            # the entry from the parents
+            if not flow_doc.parents[job_uuid]:
+                flow_doc.parents.pop(job_uuid, None)
 
             # Update flow state if necessary
             updated_states = {job_uuid: {job_index: None}}  # None indicates job removal

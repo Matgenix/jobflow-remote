@@ -86,6 +86,13 @@ class MongoLock:
     ...         # Perform some operations based on the job...
     ...         lock.update_on_release = {"$set": {"state": "CHECKED_OUT"}}
 
+    Delete the locked document upon lock release
+
+    >>> with MongoLock(collection, {"state": "READY"}) as lock:
+    ...     if lock.locked_document:
+    ...         # decide if the document should be deleted
+    ...         lock.delete_on_release = True
+
     """
 
     LOCK_KEY = "lock_id"
@@ -141,12 +148,79 @@ class MongoLock:
         self.unavailable_document = None
         self.lock_id = lock_id or suuid()
         self.kwargs = kwargs
-        self.update_on_release: dict | list = {}
-        self.delete_on_release: bool = False
+        self._update_on_release: dict | list = {}
+        self._delete_on_release: bool = False
         self.sleep = sleep
         self.max_wait = max_wait
         self.projection = projection
         self.get_locked_doc = get_locked_doc
+
+    @property
+    def update_on_release(self) -> dict | list:
+        """
+        The update_on_release value.
+
+        Returns:
+            dict | list: The value of update_on_release.
+        """
+        return self._update_on_release
+
+    @update_on_release.setter
+    def update_on_release(self, value: dict | list):
+        """
+        Set the value of update_on_release.
+
+        If set its value will be used to update the document with additional
+        properties upon lock release.
+
+        For example:
+        lock.update_on_release = {"$set": {"state": "CHECKED_OUT"}}
+
+        Cannot be set together with delete_on_release.
+
+        Parameters
+        ----------
+        value : dict | list
+            The value to set for update_on_release.
+        """
+        if self.delete_on_release:
+            raise ValueError(
+                "delete_on_release and update_on_release cannot be set simultaneously"
+            )
+        self._update_on_release = value
+
+    @property
+    def delete_on_release(self) -> bool:
+        """
+        The delete_on_release property.
+
+        Returns:
+            bool: Whether the document will be deleted upon lock release.
+        """
+        return self._delete_on_release
+
+    @delete_on_release.setter
+    def delete_on_release(self, value: bool):
+        """
+        Set the value of delete_on_release.
+
+        If True the document will be deleted upon lock release.
+
+        For example:
+        lock.delete_on_release = True
+
+        Cannot be set together with update_on_release.
+
+        Parameters
+        ----------
+        value : bool
+            The value to set for delete_on_release.
+        """
+        if self.update_on_release:
+            raise ValueError(
+                "delete_on_release and update_on_release cannot be set simultaneously"
+            )
+        self._delete_on_release = value
 
     @classmethod
     def get_lock_time(cls, d: dict):
@@ -236,31 +310,40 @@ class MongoLock:
 
     def release(self, exc_type, exc_val, exc_tb) -> None:
         """Release the lock."""
-        # Release the lock by removing the unique identifier and lock expiration time
-        update = {"$set": {self.LOCK_KEY: None, self.LOCK_TIME_KEY: None}}
-        # TODO maybe set on release only if no exception was raised?
-        if self.update_on_release:
-            if isinstance(self.update_on_release, list):
-                update = [update, *self.update_on_release]  # type: ignore[assignment]
-            else:
-                update = deep_merge_dict(update, self.update_on_release)
-        logger.debug(f"release lock with update: {update}")
+
         # TODO if failed to release the lock maybe retry before failing
         if self.locked_document is None:
             return
 
-        if self.delete_on_release:
-            if self.update_on_release:
-                raise ValueError(
-                    "delete_on_release and update_on_release cannot be set simultaneously"
+        # Release the lock by removing the unique identifier and lock expiration time
+        update: list | dict = {"$set": {self.LOCK_KEY: None, self.LOCK_TIME_KEY: None}}
+        # TODO maybe set on release only if no exception was raised?
+        if self.update_on_release:
+            # if an exception raised inside the context manager do not update the document
+            if exc_type is not None:
+                logger.warning(
+                    f"A {type(exc_type)} exception was raised while the document was locked. "
+                    f"The update_on_release {self.update_on_release} will not be applied."
                 )
+            elif isinstance(self.update_on_release, list):
+                update = [update, *self.update_on_release]
+            else:
+                update = deep_merge_dict(update, self.update_on_release)
+        logger.debug(f"release lock with update: {update}")
 
+        # if an exception raised inside the context manager do not delete the document
+        if self.delete_on_release and exc_type is None:
             result = self.collection.delete_one(
                 {"_id": self.locked_document["_id"], self.LOCK_KEY: self.lock_id}
             )
             if result.deleted_count == 0:
                 raise RuntimeError("Could not delete the locked document upon release")
         else:
+            if self.delete_on_release and exc_type is not None:
+                logger.warning(
+                    f"A {type(exc_type)} exception was raised while the document was locked. "
+                    f"The document will not be deleted, as instead requested by delete_on_release."
+                )
             result = self.collection.update_one(
                 {"_id": self.locked_document["_id"], self.LOCK_KEY: self.lock_id},
                 update,
