@@ -37,7 +37,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pre-commit>=3.0.0"]
-tests = ["docker ~= 7.0", "pytest ~= 8.0", "pytest-cov ~= 4.0"]
+tests = ["docker ~= 7.0", "pytest ~= 8.0", "pytest-cov >= 4,< 6"]
 docs = [
     "autodoc_pydantic>=2.0.0",
     "pydata-sphinx-theme",
