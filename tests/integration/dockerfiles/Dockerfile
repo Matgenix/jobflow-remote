@@ -6,13 +6,41 @@ FROM ubuntu:22.04 as base
 
 # 3) Add desired queue system as a build stage:
 #
-# Each different queue system must provide an `/etc/startup.sh` script, following the example
-# of the prebuilt SLURM image.
+# Each different queue system must provide an startup script, following the example
+# of the prebuilt SLURM image, that needs to be run by a user with sudo priveleges.
+# This script should also start the SSH server via `service ssh start`.
 # This script is then edited at the final stage to include starting the SSH server and updating
 # the jobflow user's permissions.
-
 FROM nathanhess/slurm:full AS slurm
+COPY ./tests/integration/dockerfiles/slurm_startup.sh /etc/startup.sh
+CMD ["/bin/sh", "-c", "sudo ./etc/startup.sh; /bin/bash -l"]
 
+FROM ubuntu:22.04 as sge
+# Following instructions at https://peteris.rocks/blog/sun-grid-engine-installation-on-ubuntu-server/
+
+COPY ./tests/integration/dockerfiles/sge_startup.sh /etc/startup.sh
+
+RUN echo "gridengine-master       shared/gridenginemaster string  localhost" | debconf-set-selections
+RUN echo "gridengine-master       shared/gridenginecell   string  default" | debconf-set-selections
+RUN echo "gridengine-master       shared/gridengineconfig boolean false" | debconf-set-selections
+RUN echo "gridengine-common       shared/gridenginemaster string  localhost" | debconf-set-selections
+RUN echo "gridengine-common       shared/gridenginecell   string  default" | debconf-set-selections
+RUN echo "gridengine-common       shared/gridengineconfig boolean false" | debconf-set-selections
+RUN echo "gridengine-client       shared/gridenginemaster string  localhost" | debconf-set-selections
+RUN echo "gridengine-client       shared/gridenginecell   string  default" | debconf-set-selections
+RUN echo "gridengine-client       shared/gridengineconfig boolean false" | debconf-set-selections
+RUN echo "postfix postfix/main_mailer_type        select  No configuration" | debconf-set-selections
+RUN apt update && apt install -y gridengine-master gridengine-client gridengine-exec && apt clean && rm -rf /var/lib/apt/lists/*
+USER sgeadmin
+RUN /usr/share/gridengine/scripts/init_cluster /var/lib/gridengine default /var/spool/gridengine/spooldb sgeadmin
+RUN service postfix disable
+RUN update-rc.d postfix disable
+RUN echo -e "group_name @allhosts\nhostlist NONE" > ./grid && qconf -Ahgrp ./grid && rm ./grid
+RUN cat > ./grid $"qname jobflow.q\nhostlist @allhosts\nload_thresholds NONE\n" && qconf -Aq ./grid && rm ./grid
+
+RUN qconf -as localhost
+RUN qconf -aattr hostgrop hostlist localhost @allhosts
+RUN qmod -e jobflow.q@localhost
 
 FROM ${QUEUE_SYSTEM} as final
 
@@ -23,9 +51,8 @@ USER root
 
 # 3) Run an SSH server and set up Python environment and user for jobflow
 # Install OpenSSH server and set it to run on startup
-RUN apt update && apt install -y openssh-server && apt clean && rm -rf /var/lib/apt/lists/*
+RUN apt update && apt install -y openssh-server sudo python3.10-venv && apt clean && rm -rf /var/lib/apt/lists/*
 RUN sed -i 's/#PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config
-RUN sed -ie 's/^SCRIPT/service ssh start\nSCRIPT/g' /etc/startup.sh
 
 # Create desired user with blank password then give user access to startup script as sudo without password
 # See https://github.com/nathan-hess/docker-slurm/blob/a62133d66d624d9ff0ccefbd41a0b1b2abcb9925/dockerfile_base/Dockerfile#L62C1-L65C1
