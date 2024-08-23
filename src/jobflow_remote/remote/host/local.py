@@ -117,7 +117,7 @@ class LocalHost(BaseHost):
         os.remove(path)
 
     def rmtree(self, path: str | Path, raise_on_error: bool = False) -> bool:
-        """Recursively delete a directory tree on a host.
+        """Recursively delete a directory tree on a local host.
 
         It is intended to remove an entire directory tree, including all files
         and subdirectories, on the host represented by the subclass.
