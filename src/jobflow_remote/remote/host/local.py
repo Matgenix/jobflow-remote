@@ -120,7 +120,7 @@ class LocalHost(BaseHost):
         """Recursively delete a directory tree on a local host.
 
         It is intended to remove an entire directory tree, including all files
-        and subdirectories, on the host represented by the subclass.
+        and subdirectories, on this local host.
 
         Parameters
         ----------
