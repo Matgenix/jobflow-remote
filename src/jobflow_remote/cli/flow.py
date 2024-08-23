@@ -227,6 +227,12 @@ def delete(
                             f"since it may not contain a jobflow-remote execution",
                             stacklevel=2,
                         )
+            # explicitly close the connection to all the hosts
+            for host in hosts.values():
+                try:
+                    host.close()
+                except Exception:
+                    pass
 
         progress.add_task(description="Deleting data...", total=None)
 
