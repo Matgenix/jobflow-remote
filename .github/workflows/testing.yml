@@ -46,8 +46,8 @@ jobs:
       - name: Build test bench container
         uses: docker/bake-action@v5
         with:
-          files: tests/integration/dockerfiles/Dockerfile
           load: true 
+          files: tests/integration/dockerfiles/docker-bake.hcl
           set: |
             *.cache-to=type=gha,scope=global,mode=max
             *.cache-from=type=gha,scope=global
