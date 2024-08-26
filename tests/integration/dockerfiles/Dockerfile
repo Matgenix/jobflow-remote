@@ -14,12 +14,13 @@ FROM ubuntu:22.04 as base
 
 # -== SLURM ==-
 FROM nathanhess/slurm:full AS slurm
-#COPY ./tests/integration/dockerfiles/slurm_startup.sh /etc/startup.sh
+COPY ./tests/integration/dockerfiles/slurm_startup.sh /etc/startup.sh
 
 # -== SGE ==-
 FROM ubuntu:22.04 as sge
 # The SGE startup script includes the configuration of SGE, as the docker network is not ready during build
 COPY ./tests/integration/dockerfiles/sge_startup.sh /etc/startup.sh
+CMD sudo /etc/startup.sh ; /bin/bash -l
 
 # Following instructions from https://github.com/daimh/sge/blob/817a7fa019f0ec47425f43e843a1f58865614313/README.md
 ARG SGE_USERNAME=sge
@@ -88,6 +89,3 @@ RUN /home/${USERNAME}/.venv/bin/pip install --verbose -e .
 # Make a job directory for jobflow
 WORKDIR /home/${USERNAME}
 RUN mkdir jfr
-
-USER ${USERNAME}
-CMD /etc/startup.sh ; /bin/bash -l
