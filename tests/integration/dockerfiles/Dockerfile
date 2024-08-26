@@ -1,13 +1,12 @@
 # syntax=docker/dockerfile:experimental
 ARG QUEUE_SYSTEM=slurm
 
-# 1) Start from a Ubuntu server
 FROM ubuntu:22.04 as base
 
+# 1) Start from a Ubuntu server
 FROM base as common
 
 ARG USERNAME=jobflow
-ARG PASSWORD=jobflow
 
 WORKDIR /opt
 USER root
@@ -20,7 +19,7 @@ RUN sed -i 's/#PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/
 # Create desired user with blank password then give user access to startup script as sudo without password
 # See https://github.com/nathan-hess/docker-slurm/blob/a62133d66d624d9ff0ccefbd41a0b1b2abcb9925/dockerfile_base/Dockerfile#L62C1-L65C1
 RUN useradd -rm -d /home/${USERNAME} -s /bin/bash ${USERNAME} && usermod -a -G sudo ${USERNAME}
-RUN echo ${USERNAME}:${PASSWORD} | chpasswd
+RUN echo ${USERNAME}:${USERNAME} | chpasswd
 RUN printf "${USERNAME} ALL=(root:root) NOPASSWD: /etc/startup.sh\n" >> /etc/sudoers.d/startup \
     && chmod 0440 /etc/sudoers.d/startup \
     && visudo -c
@@ -44,7 +43,7 @@ FROM nathanhess/slurm:full AS slurm
 COPY ./tests/integration/dockerfiles/slurm_startup.sh /etc/startup.sh
 
 # -== SGE ==-
-FROM ubuntu:22.04 as sge
+FROM base as sge
 # The SGE startup script includes the configuration of SGE, as the docker network is not ready during build
 COPY ./tests/integration/dockerfiles/sge_startup.sh /etc/startup.sh
 
@@ -64,6 +63,7 @@ WORKDIR /opt/${SGE_USERNAME}
 FROM common as jobflow
 
 ARG USERNAME=jobflow
+
 # Install jobflow from directory, assuming container
 # is built at the root of the jobflow repo
 RUN mkdir jobflow-remote
@@ -92,7 +92,6 @@ RUN /home/${USERNAME}/.venv/bin/pip install --verbose -e .
 FROM ${QUEUE_SYSTEM} as final
 
 ARG USERNAME=jobflow
-ARG PASSWORD=jobflow
 
 COPY --from=jobflow /home/${USERNAME}/.venv /home/${USERNAME}/.venv
 
