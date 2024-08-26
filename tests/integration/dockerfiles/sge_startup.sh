@@ -8,9 +8,10 @@ if [ "$(id -u)" != "0" ]; then
     sudo -k
 fi
 
-# Configure Slurm to use maximum available processors and memory
-# and start required services
+# Run the SGE installation scripts at startup as the docker network is not initialised during build
 ${sudo_cmd} bash <<SCRIPT
+yes "" | ./install_qmaster
+yes "" | ./install_execd
 service gridengine-master start
 service postfix disable
 service ssh start

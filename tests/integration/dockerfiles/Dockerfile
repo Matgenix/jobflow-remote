@@ -11,36 +11,28 @@ FROM ubuntu:22.04 as base
 # This script should also start the SSH server via `service ssh start`.
 # This script is then edited at the final stage to include starting the SSH server and updating
 # the jobflow user's permissions.
+
+# -== SLURM ==-
 FROM nathanhess/slurm:full AS slurm
-COPY ./tests/integration/dockerfiles/slurm_startup.sh /etc/startup.sh
-CMD ["/bin/sh", "-c", "sudo ./etc/startup.sh; /bin/bash -l"]
+#COPY ./tests/integration/dockerfiles/slurm_startup.sh /etc/startup.sh
 
+# -== SGE ==-
 FROM ubuntu:22.04 as sge
-# Following instructions at https://peteris.rocks/blog/sun-grid-engine-installation-on-ubuntu-server/
-
+# The SGE startup script includes the configuration of SGE, as the docker network is not ready during build
 COPY ./tests/integration/dockerfiles/sge_startup.sh /etc/startup.sh
 
-RUN echo "gridengine-master       shared/gridenginemaster string  localhost" | debconf-set-selections
-RUN echo "gridengine-master       shared/gridenginecell   string  default" | debconf-set-selections
-RUN echo "gridengine-master       shared/gridengineconfig boolean false" | debconf-set-selections
-RUN echo "gridengine-common       shared/gridenginemaster string  localhost" | debconf-set-selections
-RUN echo "gridengine-common       shared/gridenginecell   string  default" | debconf-set-selections
-RUN echo "gridengine-common       shared/gridengineconfig boolean false" | debconf-set-selections
-RUN echo "gridengine-client       shared/gridenginemaster string  localhost" | debconf-set-selections
-RUN echo "gridengine-client       shared/gridenginecell   string  default" | debconf-set-selections
-RUN echo "gridengine-client       shared/gridengineconfig boolean false" | debconf-set-selections
-RUN echo "postfix postfix/main_mailer_type        select  No configuration" | debconf-set-selections
-RUN apt update && apt install -y gridengine-master gridengine-client gridengine-exec && apt clean && rm -rf /var/lib/apt/lists/*
-USER sgeadmin
-RUN /usr/share/gridengine/scripts/init_cluster /var/lib/gridengine default /var/spool/gridengine/spooldb sgeadmin
-RUN service postfix disable
-RUN update-rc.d postfix disable
-RUN echo -e "group_name @allhosts\nhostlist NONE" > ./grid && qconf -Ahgrp ./grid && rm ./grid
-RUN cat > ./grid $"qname jobflow.q\nhostlist @allhosts\nload_thresholds NONE\n" && qconf -Aq ./grid && rm ./grid
-
-RUN qconf -as localhost
-RUN qconf -aattr hostgrop hostlist localhost @allhosts
-RUN qmod -e jobflow.q@localhost
+# Following instructions from https://github.com/daimh/sge/blob/817a7fa019f0ec47425f43e843a1f58865614313/README.md
+ARG SGE_USERNAME=sge
+RUN apt update && apt install -y build-essential curl cmake git libdb5.3-dev libhwloc-dev libmotif-dev libncurses-dev libpam0g-dev libssl-dev libsystemd-dev libtirpc-dev libxext-dev pkgconf && apt clean && rm -rf /var/lib/apt/lists/*
+WORKDIR /tmp
+RUN git clone https://github.com/daimh/sge --depth 1 --branch master sge
+WORKDIR /tmp/sge
+RUN cmake -S . -B build -DCMAKE_INSTALL_PREFIX=/opt/${SGE_USERNAME}
+RUN cmake --build build -j
+RUN cmake --install build
+RUN useradd -rm -d /opt/${SGE_USERNAME} -s /bin/bash ${SGE_USERNAME}
+RUN chown -R sge /opt/${SGE_USERNAME}
+WORKDIR /opt/${SGE_USERNAME}
 
 FROM ${QUEUE_SYSTEM} as final
 
@@ -84,6 +76,7 @@ RUN sed -i '/\[tool.versioningit.vcs\]/,+3d' jobflow-remote/pyproject.toml
 # we have to become root for this step
 USER root
 RUN sudo chmod -R 0777 jobflow-remote
+RUN sudo chmod 555 /etc/startup.sh
 USER ${USERNAME}
 
 # Install jobflow in a local native virtualenv
@@ -95,3 +88,6 @@ RUN /home/${USERNAME}/.venv/bin/pip install --verbose -e .
 # Make a job directory for jobflow
 WORKDIR /home/${USERNAME}
 RUN mkdir jfr
+
+USER ${USERNAME}
+CMD /etc/startup.sh ; /bin/bash -l
