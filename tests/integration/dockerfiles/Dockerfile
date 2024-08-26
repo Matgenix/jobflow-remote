@@ -3,34 +3,7 @@ ARG QUEUE_SYSTEM=slurm
 
 FROM ubuntu:22.04 as base
 
-# 1) Start from a Ubuntu server
-FROM base as common
-
-ARG USERNAME=jobflow
-
-WORKDIR /opt
-USER root
-
-# 2) Run an SSH server and set up Python environment and user for jobflow
-# Install OpenSSH server and set it to run on startup
-RUN apt update && apt install -y openssh-server sudo python3.10-venv && apt clean && rm -rf /var/lib/apt/lists/*
-RUN sed -i 's/#PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config
-
-# Create desired user with blank password then give user access to startup script as sudo without password
-# See https://github.com/nathan-hess/docker-slurm/blob/a62133d66d624d9ff0ccefbd41a0b1b2abcb9925/dockerfile_base/Dockerfile#L62C1-L65C1
-RUN useradd -rm -d /home/${USERNAME} -s /bin/bash ${USERNAME} && usermod -a -G sudo ${USERNAME}
-RUN echo ${USERNAME}:${USERNAME} | chpasswd
-RUN printf "${USERNAME} ALL=(root:root) NOPASSWD: /etc/startup.sh\n" >> /etc/sudoers.d/startup \
-    && chmod 0440 /etc/sudoers.d/startup \
-    && visudo -c
-
-# Make a job directory for jobflow
-WORKDIR /home/${USERNAME}
-RUN mkdir jfr
-
-SHELL ["/bin/bash", "--login", "-c"]
-
-# 3) Add desired queue system as a build stage:
+# 1) Add desired queue system as a build stage:
 #
 # Each different queue system must provide an startup script, following the example
 # of the prebuilt SLURM image, that needs to be run by a user with sudo priveleges.
@@ -59,6 +32,34 @@ RUN cmake --install build
 RUN useradd -rm -d /opt/${SGE_USERNAME} -s /bin/bash ${SGE_USERNAME}
 RUN chown -R sge /opt/${SGE_USERNAME}
 WORKDIR /opt/${SGE_USERNAME}
+
+# 2) Add common options from ubuntu server
+FROM ${QUEUE_SYSTEM} as common
+
+ARG USERNAME=jobflow
+
+WORKDIR /opt
+USER root
+
+# 3) Run an SSH server and set up Python environment and user for jobflow
+# Install OpenSSH server and set it to run on startup
+RUN apt update && apt install -y openssh-server sudo python3.10-venv && apt clean && rm -rf /var/lib/apt/lists/*
+RUN sed -i 's/#PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config
+
+# Create desired user with blank password then give user access to startup script as sudo without password
+# See https://github.com/nathan-hess/docker-slurm/blob/a62133d66d624d9ff0ccefbd41a0b1b2abcb9925/dockerfile_base/Dockerfile#L62C1-L65C1
+RUN useradd -rm -d /home/${USERNAME} -s /bin/bash ${USERNAME} && usermod -a -G sudo ${USERNAME}
+RUN echo ${USERNAME}:${USERNAME} | chpasswd
+RUN printf "${USERNAME} ALL=(root:root) NOPASSWD: /etc/startup.sh\n" >> /etc/sudoers.d/startup \
+    && chmod 0440 /etc/sudoers.d/startup \
+    && visudo -c
+
+# Make a job directory for jobflow
+WORKDIR /home/${USERNAME}
+RUN mkdir jfr
+
+SHELL ["/bin/bash", "--login", "-c"]
+
 
 FROM common as jobflow
 
@@ -92,9 +93,6 @@ RUN /home/${USERNAME}/.venv/bin/pip install --verbose -e .
 FROM ${QUEUE_SYSTEM} as final
 
 ARG USERNAME=jobflow
-
-COPY --from=jobflow /home/${USERNAME}/.venv /home/${USERNAME}/.venv
-
 USER root
 RUN sudo chmod 555 /etc/startup.sh
 USER ${USERNAME}
