@@ -69,7 +69,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-buildx-action@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
       - uses: actions/setup-python@v5
         with:
@@ -80,7 +81,7 @@ jobs:
       - name: Load previously built Docker images
         uses: docker/bake-action@v5
         with:
-          files: tests/integration/dockerfiles/Dockerfile
+          files: tests/integration/dockerfiles/docker-bake.hcl
           load: true
           set: |
             *.cache-from=type=gha,scope=global
