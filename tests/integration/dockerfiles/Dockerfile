@@ -4,6 +4,33 @@ ARG QUEUE_SYSTEM=slurm
 # 1) Start from a Ubuntu server
 FROM ubuntu:22.04 as base
 
+FROM base as common
+
+ARG USERNAME=jobflow
+ARG PASSWORD=jobflow
+
+WORKDIR /opt
+USER root
+
+# 2) Run an SSH server and set up Python environment and user for jobflow
+# Install OpenSSH server and set it to run on startup
+RUN apt update && apt install -y openssh-server sudo python3.10-venv && apt clean && rm -rf /var/lib/apt/lists/*
+RUN sed -i 's/#PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config
+
+# Create desired user with blank password then give user access to startup script as sudo without password
+# See https://github.com/nathan-hess/docker-slurm/blob/a62133d66d624d9ff0ccefbd41a0b1b2abcb9925/dockerfile_base/Dockerfile#L62C1-L65C1
+RUN useradd -rm -d /home/${USERNAME} -s /bin/bash ${USERNAME} && usermod -a -G sudo ${USERNAME}
+RUN echo ${USERNAME}:${PASSWORD} | chpasswd
+RUN printf "${USERNAME} ALL=(root:root) NOPASSWD: /etc/startup.sh\n" >> /etc/sudoers.d/startup \
+    && chmod 0440 /etc/sudoers.d/startup \
+    && visudo -c
+
+# Make a job directory for jobflow
+WORKDIR /home/${USERNAME}
+RUN mkdir jfr
+
+SHELL ["/bin/bash", "--login", "-c"]
+
 # 3) Add desired queue system as a build stage:
 #
 # Each different queue system must provide an startup script, following the example
@@ -23,7 +50,7 @@ COPY ./tests/integration/dockerfiles/sge_startup.sh /etc/startup.sh
 
 # Following instructions from https://github.com/daimh/sge/blob/817a7fa019f0ec47425f43e843a1f58865614313/README.md
 ARG SGE_USERNAME=sge
-RUN apt update && apt install -y build-essential curl cmake git libdb5.3-dev libhwloc-dev libmotif-dev libncurses-dev libpam0g-dev libssl-dev libsystemd-dev libtirpc-dev libxext-dev pkgconf && apt clean && rm -rf /var/lib/apt/lists/*
+RUN apt update && apt install -y sudo build-essential curl cmake git libdb5.3-dev libhwloc-dev libmotif-dev libncurses-dev libpam0g-dev libssl-dev libsystemd-dev libtirpc-dev libxext-dev pkgconf && apt clean && rm -rf /var/lib/apt/lists/*
 WORKDIR /tmp
 RUN git clone https://github.com/daimh/sge --depth 1 --branch master sge
 WORKDIR /tmp/sge
@@ -34,31 +61,9 @@ RUN useradd -rm -d /opt/${SGE_USERNAME} -s /bin/bash ${SGE_USERNAME}
 RUN chown -R sge /opt/${SGE_USERNAME}
 WORKDIR /opt/${SGE_USERNAME}
 
-FROM ${QUEUE_SYSTEM} as final
+FROM common as jobflow
 
 ARG USERNAME=jobflow
-ARG PASSWORD=jobflow
-WORKDIR /opt
-USER root
-
-# 3) Run an SSH server and set up Python environment and user for jobflow
-# Install OpenSSH server and set it to run on startup
-RUN apt update && apt install -y openssh-server sudo python3.10-venv && apt clean && rm -rf /var/lib/apt/lists/*
-RUN sed -i 's/#PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config
-
-# Create desired user with blank password then give user access to startup script as sudo without password
-# See https://github.com/nathan-hess/docker-slurm/blob/a62133d66d624d9ff0ccefbd41a0b1b2abcb9925/dockerfile_base/Dockerfile#L62C1-L65C1
-RUN useradd -rm -d /home/${USERNAME} -s /bin/bash ${USERNAME} && usermod -a -G sudo ${USERNAME}
-RUN echo ${USERNAME}:${PASSWORD} | chpasswd
-RUN printf "${USERNAME} ALL=(root:root) NOPASSWD: /etc/startup.sh\n" >> /etc/sudoers.d/startup \
-    && chmod 0440 /etc/sudoers.d/startup \
-    && visudo -c
-
-# Reset workdir and make jobflow data directory
-WORKDIR /home/${USERNAME}
-USER ${USERNAME}
-SHELL ["/bin/bash", "--login", "-c"]
-
 # Install jobflow from directory, assuming container
 # is built at the root of the jobflow repo
 RUN mkdir jobflow-remote
@@ -76,7 +81,6 @@ RUN sed -i '/\[tool.versioningit.vcs\]/,+3d' jobflow-remote/pyproject.toml
 # we have to become root for this step
 USER root
 RUN sudo chmod -R 0777 jobflow-remote
-RUN sudo chmod 555 /etc/startup.sh
 USER ${USERNAME}
 
 # Install jobflow in a local native virtualenv
@@ -85,8 +89,14 @@ RUN python3 -m venv /home/${USERNAME}/.venv
 RUN /home/${USERNAME}/.venv/bin/pip install -U pip
 RUN /home/${USERNAME}/.venv/bin/pip install --verbose -e .
 
-# Make a job directory for jobflow
-WORKDIR /home/${USERNAME}
-RUN mkdir jfr
+FROM ${QUEUE_SYSTEM} as final
 
+ARG USERNAME=jobflow
+ARG PASSWORD=jobflow
+
+COPY --from=jobflow /home/${USERNAME}/.venv /home/${USERNAME}/.venv
+
+USER root
+RUN sudo chmod 555 /etc/startup.sh
+USER ${USERNAME}
 CMD "sudo /etc/startup.sh ; /bin/bash -l"
