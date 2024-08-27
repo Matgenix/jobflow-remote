@@ -1,5 +1,4 @@
-import warnings
-from typing import TYPE_CHECKING, Annotated, Optional
+from typing import Annotated, Optional
 
 import typer
 from jobflow.utils.graph import draw_graph
@@ -13,6 +12,9 @@ from jobflow_remote.cli.jfr_typer import JFRTyper
 from jobflow_remote.cli.types import (
     days_opt,
     db_ids_opt,
+    delete_all_opt,
+    delete_files_opt,
+    delete_output_opt,
     end_date_opt,
     flow_db_id_arg,
     flow_ids_opt,
@@ -40,9 +42,6 @@ from jobflow_remote.cli.utils import (
     out_console,
 )
 from jobflow_remote.jobs.graph import get_graph, plot_dash
-
-if TYPE_CHECKING:
-    from jobflow_remote.remote.host import BaseHost
 
 app_flow = JFRTyper(
     name="flow", help="Commands for managing the flows", no_args_is_help=True
@@ -123,30 +122,9 @@ def delete(
             count=True,
         ),
     ] = False,
-    delete_output: Annotated[
-        bool,
-        typer.Option(
-            "--output",
-            "-o",
-            help="Also delete the outputs of the Jobs in the output Store",
-        ),
-    ] = False,
-    delete_files: Annotated[
-        bool,
-        typer.Option(
-            "--files",
-            "-fi",
-            help="Also delete the files on the worker",
-        ),
-    ] = False,
-    delete_all: Annotated[
-        bool,
-        typer.Option(
-            "--all",
-            "-a",
-            help="enable --output and --files",
-        ),
-    ] = False,
+    delete_output: delete_output_opt = False,
+    delete_files: delete_files_opt = False,
+    delete_all: delete_all_opt = False,
 ) -> None:
     """Permanently delete Flows from the database"""
     check_incompatible_opt({"start_date": start_date, "days": days, "hours": hours})
@@ -199,44 +177,14 @@ def delete(
 
     to_delete = [fi.flow_id for fi in flows_info]
     with loading_spinner(processing=False) as progress:
-        if delete_files:
-            progress.add_task(description="Deleting files...", total=None)
-            # get all jobs to delete
-            jobs_info = jc.get_jobs_info(flow_ids=to_delete)
-            # keep a dictionary of the hosts to avoid connecting multiple times
-            hosts: dict[str, BaseHost] = {}
-            for job_info in jobs_info:
-                if job_info.run_dir:
-                    if job_info.worker in hosts:
-                        host = hosts[job_info.worker]
-                    else:
-                        host = jc.project.workers[job_info.worker].get_host()
-                        hosts[job_info.worker] = host
-                        host.connect()
-                    remote_files = host.listdir(job_info.run_dir)
-                    # safety measure to avoid mistakenly deleting other folders
-                    # maybe too much?
-                    if any(
-                        fn in remote_files
-                        for fn in ("jfremote_in.json", "jfremote_in.json.gz")
-                    ):
-                        host.rmtree(path=job_info.run_dir, raise_on_error=False)
-                    else:
-                        warnings.warn(
-                            f"Did not delete folder {job_info.run_dir} "
-                            f"since it may not contain a jobflow-remote execution",
-                            stacklevel=2,
-                        )
-            # explicitly close the connection to all the hosts
-            for host in hosts.values():
-                try:
-                    host.close()
-                except Exception:
-                    pass
+        progress.add_task(description="Deleting flows...", total=None)
 
-        progress.add_task(description="Deleting data...", total=None)
-
-        jc.delete_flows(flow_ids=to_delete, delete_output=delete_output)
+        jc.delete_flows(
+            flow_ids=to_delete,
+            confirm=True,
+            delete_output=delete_output,
+            delete_files=delete_files,
+        )
 
     out_console.print(
         f"Deleted Flow(s) with id: {', '.join(str(i) for i in to_delete)}"

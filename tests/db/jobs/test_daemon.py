@@ -118,7 +118,7 @@ def test_kill_supervisord(job_controller, daemon_manager, caplog) -> None:
     # present" in log_msg[-1]
 
 
-def test_kill_one_process(job_controller, daemon_manager, caplog) -> None:
+def test_kill_one_process(job_controller, daemon_manager) -> None:
     import signal
     import time
 

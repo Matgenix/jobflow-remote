@@ -1,3 +1,4 @@
+import os.path
 from typing import NoReturn
 
 import pytest
@@ -388,7 +389,7 @@ def test_retry(job_controller, monkeypatch, runner) -> None:
     assert j_info.state == JobState.REMOTE_ERROR
     assert j_info.remote.retry_time_limit is not None
 
-    assert job_controller.retry_job(job_id=j.uuid, job_index=j.index) == [j_info.db_id]
+    assert job_controller.retry_job(job_id=j.uuid, job_index=j.index) == j_info.db_id
 
     j_info = job_controller.get_job_info(job_id=j.uuid, job_index=j.index)
     assert j_info.state == JobState.CHECKED_OUT
@@ -577,16 +578,32 @@ def test_delete_job(job_controller, two_flows_four_jobs, runner):
 
     assert job_controller.jobstore.get_output(two_flows_four_jobs[0][0].uuid) == 6
 
+    # try deleting the last job of the Flow. should not succeed
+    with pytest.raises(
+        RuntimeError, match="It is not possible to delete the only Job of the Flow.*"
+    ):
+        job_controller.delete_job(job_id=two_flows_four_jobs[0][0].uuid)
+
+    runner.run_one_job(job_id=[two_flows_four_jobs[1][0].uuid, 1])
+
+    job3_info = job_controller.get_job_info(two_flows_four_jobs[1][0].uuid)
+
+    assert os.path.isdir(job3_info.run_dir)
+
     assert (
         len(
             job_controller.delete_job(
-                job_id=two_flows_four_jobs[0][0].uuid, delete_output=True
+                job_id=two_flows_four_jobs[1][0].uuid,
+                delete_output=True,
+                delete_files=True,
             )
         )
         == 1
     )
     with pytest.raises(ValueError, match=".*has no outputs.*"):
-        job_controller.jobstore.get_output(two_flows_four_jobs[0][0].uuid)
+        job_controller.jobstore.get_output(two_flows_four_jobs[1][0].uuid)
+
+    assert not os.path.isdir(job3_info.run_dir)
 
 
 def test_delete_job_with_replace(job_controller, runner):
@@ -611,7 +628,10 @@ def test_delete_job_with_replace(job_controller, runner):
     assert flow_doc["parents"][j2.uuid]["1"] == [j1.uuid]
     assert job_controller.count_jobs() == 3
 
+    job1_info = job_controller.get_job_info(j1.uuid)
     assert len(job_controller.delete_job(job_id=j1.uuid, job_index=2)) == 1
+    assert os.path.isdir(job1_info.run_dir)
+
     assert job_controller.count_jobs() == 2
     flow_doc = job_controller.get_flow_info_by_flow_uuid(flow.uuid)
     assert flow_doc["state"] == FlowState.COMPLETED.value
