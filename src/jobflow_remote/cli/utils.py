@@ -361,6 +361,8 @@ def execute_multi_jobs_cmd(
                 modified_ids = single_cmd(
                     job_id=job_id, job_index=job_index, db_id=db_id, **kwargs
                 )
+                if not isinstance(modified_ids, (list, tuple)):
+                    modified_ids = [] if modified_ids is None else [modified_ids]
                 if not modified_ids:
                     exit_with_error_msg("Could not perform the requested operation")
         else:

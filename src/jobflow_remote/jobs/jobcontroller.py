@@ -14,7 +14,6 @@ from typing import TYPE_CHECKING, Any, Callable, cast
 import jobflow
 import pymongo
 from jobflow import JobStore, OnMissing
-from maggma.stores import MongoStore
 from monty.dev import deprecated
 from monty.json import MontyDecoder
 from monty.serialization import loadfn
@@ -53,6 +52,8 @@ if TYPE_CHECKING:
     from collections.abc import Generator
 
     from maggma.stores import MongoStore
+
+    from jobflow_remote.remote.host import BaseHost
 
 
 logger = logging.getLogger(__name__)
@@ -617,7 +618,7 @@ class JobController:
         metadata: dict | None = None,
         raise_on_error: bool = True,
         **method_kwargs,
-    ) -> list[int]:
+    ) -> list[str]:
         """
         Helper method to query Jobs based on criteria and sequentially apply an
         action on all those retrieved.
@@ -683,6 +684,10 @@ class JobController:
         for db_id in queried_dbs_ids:
             try:
                 job_updated_ids = method(db_id=db_id, **method_kwargs)
+                if not isinstance(job_updated_ids, (list, tuple)):
+                    job_updated_ids = (
+                        [] if job_updated_ids is None else [job_updated_ids]
+                    )
                 if job_updated_ids:
                     updated_ids.update(job_updated_ids)
             except Exception:
@@ -706,7 +711,7 @@ class JobController:
         force: bool = False,
         wait: int | None = None,
         break_lock: bool = False,
-    ) -> list[int]:
+    ) -> list[str]:
         """
         Rerun a list of selected Jobs, i.e. bring their state back to READY.
         See the docs of `rerun_job` for more details.
@@ -778,7 +783,7 @@ class JobController:
         force: bool = False,
         wait: int | None = None,
         break_lock: bool = False,
-    ) -> list[int]:
+    ) -> list[str]:
         """
         Rerun a single Job, i.e. bring its state back to READY.
         Selected by db_id or uuid+index. Only one among db_id
@@ -829,7 +834,7 @@ class JobController:
         if wait:
             sleep = 10
 
-        modified_jobs: list[int] = []
+        modified_jobs: list[str] = []
         # the job to rerun is the last to be released since this prevents
         # a checkout of the job while the flow is still locked
         with self.lock_job(
@@ -886,7 +891,7 @@ class JobController:
         wait: int | None = None,
         break_lock: bool = False,
         force: bool = False,
-    ) -> tuple[dict, list[int]]:
+    ) -> tuple[dict, list[str]]:
         """
         Perform the full rerun of Job, in case a Job is FAILED or in one of the
         usually not admissible states. This requires actions on the original
@@ -917,7 +922,7 @@ class JobController:
         """
         job_id = doc["uuid"]
         job_index = doc["index"]
-        modified_jobs: list[int] = []
+        modified_jobs: list[str] = []
 
         flow_filter = {"jobs": job_id}
         with self.lock_flow(
@@ -1087,7 +1092,7 @@ class JobController:
         break_lock: bool = False,
         acceptable_states: list[JobState] | None = None,
         use_pipeline: bool = False,
-    ) -> list[int]:
+    ) -> str | None:
         """
         Helper to set multiple values in a JobDoc while locking the Job.
         Selected by db_id or uuid+index. Only one among db_id
@@ -1119,9 +1124,8 @@ class JobController:
 
         Returns
         -------
-        list
-            List of db_ids of updated Jobs. Could be an empty list or a list
-            with a single element.
+        str
+            The db_id of the updated Job. None if the Job was not updated.
         """
         return self.set_job_doc_properties(
             values=values,
@@ -1144,7 +1148,7 @@ class JobController:
         break_lock: bool = False,
         acceptable_states: list[JobState] | None = None,
         use_pipeline: bool = False,
-    ) -> list[int]:
+    ) -> str:
         """
         Helper to set multiple values in a JobDoc while locking the Job.
         Selected by db_id or uuid+index. Only one among db_id
@@ -1176,9 +1180,8 @@ class JobController:
 
         Returns
         -------
-        list
-            List of db_ids of updated Jobs. Could be an empty list or a list
-            with a single element.
+        str
+            The db_id of the updated Job. None if the Job was not updated.
         """
         sleep = None
         if wait:
@@ -1207,9 +1210,9 @@ class JobController:
                 lock.update_on_release = (
                     [{"$set": values}] if use_pipeline else {"$set": values}
                 )
-                return [doc["db_id"]]
+                return doc["db_id"]
 
-        return []
+        return None
 
     def set_job_state(
         self,
@@ -1219,7 +1222,7 @@ class JobController:
         job_index: int | None = None,
         wait: int | None = None,
         break_lock: bool = False,
-    ) -> list[int]:
+    ) -> str:
         """
         Set the state of a Job to an arbitrary JobState.
         Selected by db_id or uuid+index. Only one among db_id
@@ -1246,9 +1249,8 @@ class JobController:
 
         Returns
         -------
-        list
-            List of db_ids of updated Jobs. Could be an empty list or a list
-            with a single element.
+        str
+            The db_id of the updated Job. None if the Job was not updated.
         """
         values = {
             "state": state.value,
@@ -1281,7 +1283,7 @@ class JobController:
         raise_on_error: bool = True,
         wait: int | None = None,
         break_lock: bool = False,
-    ) -> list[int]:
+    ) -> list[str]:
         """
         Retry selected Jobs, i.e. bring them back to its previous state if REMOTE_ERROR,
         or reset the remote attempts and time of retry if in another running state.
@@ -1349,7 +1351,7 @@ class JobController:
         job_index: int | None = None,
         wait: int | None = None,
         break_lock: bool = False,
-    ) -> list[int]:
+    ) -> str:
         """
         Retry a single Job, i.e. bring it back to its previous state if REMOTE_ERROR,
         or reset the remote attempts and time of retry if in another running state.
@@ -1378,8 +1380,8 @@ class JobController:
 
         Returns
         -------
-        list
-            List containing the db_id of the updated Job.
+        str
+            The db_id of the updated Job.
         """
         lock_filter, sort = self.generate_job_id_query(db_id, job_id, job_index)
         sleep = None
@@ -1423,7 +1425,7 @@ class JobController:
                 lock.update_on_release = {"$set": set_dict}
             else:
                 raise ValueError(f"Job in state {state.value} cannot be retried.")
-            return [doc["db_id"]]
+            return doc["db_id"]
 
     def pause_jobs(
         self,
@@ -1437,7 +1439,7 @@ class JobController:
         metadata: dict | None = None,
         raise_on_error: bool = True,
         wait: int | None = None,
-    ) -> list[int]:
+    ) -> list[str]:
         """
         Pause selected Jobs. Only READY and WAITING Jobs can be paused.
         The action is reversible.
@@ -1506,7 +1508,7 @@ class JobController:
         raise_on_error: bool = True,
         wait: int | None = None,
         break_lock: bool = False,
-    ) -> list[int]:
+    ) -> list[str]:
         """
         Stop selected Jobs. Only Jobs in the READY and all the running states
         can be stopped.
@@ -1575,7 +1577,7 @@ class JobController:
         job_index: int | None = None,
         wait: int | None = None,
         break_lock: bool = False,
-    ) -> list[int]:
+    ) -> str:
         """
         Stop a single Job. Only Jobs in the READY and all the running states
         can be stopped.
@@ -1602,8 +1604,8 @@ class JobController:
 
         Returns
         -------
-        list
-            List of db_ids of the updated Jobs.
+        str
+            The db_id of the updated Job.
         """
         job_lock_kwargs = dict(
             projection=["uuid", "index", "db_id", "state", "remote", "worker"]
@@ -1649,7 +1651,7 @@ class JobController:
             if return_doc is None:
                 raise RuntimeError("No document found in final job lock")
 
-            return [return_doc["db_id"]]
+            return return_doc["db_id"]
 
     def pause_job(
         self,
@@ -1657,7 +1659,7 @@ class JobController:
         db_id: str | None = None,
         job_index: int | None = None,
         wait: int | None = None,
-    ) -> list[int]:
+    ) -> str:
         """
         Pause a single Job. Only READY and WAITING Jobs can be paused.
         Selected by db_id or uuid+index. Only one among db_id
@@ -1679,8 +1681,8 @@ class JobController:
 
         Returns
         -------
-        list
-            List of db_ids of the updated Jobs.
+        str
+            The db_id of the updated Job.
         """
         job_lock_kwargs = dict(projection=["uuid", "index", "db_id", "state"])
         flow_lock_kwargs = dict(projection=["uuid"])
@@ -1712,7 +1714,7 @@ class JobController:
             if return_doc is None:
                 raise RuntimeError("No document found in final job lock")
 
-            return [return_doc["db_id"]]
+            return return_doc["db_id"]
 
     def play_jobs(
         self,
@@ -1727,7 +1729,7 @@ class JobController:
         raise_on_error: bool = True,
         wait: int | None = None,
         break_lock: bool = False,
-    ) -> list[int]:
+    ) -> list[str]:
         """
         Restart selected Jobs that were previously paused.
 
@@ -1794,7 +1796,7 @@ class JobController:
         job_index: int | None = None,
         wait: int | None = None,
         break_lock: bool = False,
-    ) -> list[int]:
+    ) -> str:
         """
         Restart a single Jobs that was previously paused.
         Selected by db_id or uuid+index. Only one among db_id
@@ -1819,8 +1821,8 @@ class JobController:
 
         Returns
         -------
-        list
-            List of db_ids of the updated Jobs.
+        str
+            The db_id of the updated Job.
         """
         job_lock_kwargs = dict(
             projection=["uuid", "index", "db_id", "state", "job.config", "parents"]
@@ -1865,7 +1867,7 @@ class JobController:
                 updated_states=updated_states,
             )
             job_lock.update_on_release = {"$set": {"state": final_state.value}}
-            return [job_lock.locked_document["db_id"]]
+            return job_lock.locked_document["db_id"]
 
     def set_job_run_properties(
         self,
@@ -1882,7 +1884,7 @@ class JobController:
         name: str | None = None,
         metadata: dict | None = None,
         raise_on_error: bool = True,
-    ) -> list[int]:
+    ) -> list[str]:
         """
         Set execution properties for selected Jobs:
         worker, exec_config and resources.
@@ -2158,6 +2160,7 @@ class JobController:
         flow_ids: str | list[str] | None = None,
         confirm: bool = False,
         delete_output: bool = False,
+        delete_files: bool = False,
     ) -> int:
         """
         Delete a list of Flows based on the flow uuids.
@@ -2170,6 +2173,8 @@ class JobController:
             If False only a maximum of 10 Flows can be deleted.
         delete_output
             If True also delete the associated output in the JobStore.
+        delete_files
+            If True also delete the files on the worker.
 
         Returns
         -------
@@ -2189,12 +2194,19 @@ class JobController:
         deleted = 0
         for fid in flow_ids:
             # TODO should it catch errors?
-            if self.delete_flow(fid, delete_output):
+            if self.delete_flow(
+                fid, delete_output=delete_output, delete_files=delete_files
+            ):
                 deleted += 1
 
         return deleted
 
-    def delete_flow(self, flow_id: str, delete_output: bool = False) -> bool:
+    def delete_flow(
+        self,
+        flow_id: str,
+        delete_output: bool = False,
+        delete_files: bool = False,
+    ) -> bool:
         """
         Delete a single Flow based on the uuid.
 
@@ -2212,6 +2224,9 @@ class JobController:
         job_ids = flow["jobs"]
         if delete_output:
             self.jobstore.remove_docs({"uuid": {"$in": job_ids}})
+        if delete_files:
+            jobs_info = self.get_jobs_info(flow_ids=[flow_id])
+            self._safe_delete_files(jobs_info)
 
         self.jobs.delete_many({"uuid": {"$in": job_ids}})
         self.flows.delete_one({"uuid": flow_id})
@@ -2279,6 +2294,56 @@ class JobController:
             update={"$set": {"lock_id": None, "lock_time": None}},
         )
         return result.modified_count
+
+    def _safe_delete_files(self, jobs_info: list[JobInfo]) -> list[JobInfo]:
+        """
+        Delete the files associated to the selected Jobs.
+
+        Checks that the folder to be deleted contains the jfremote_in.json
+        file to avoid mistakenly deleting other folders.
+
+        Parameters
+        ----------
+        jobs_info
+            A list of JobInfo whose files should be deleted.
+
+        Returns
+        -------
+        list
+            The list of JobInfo whose files have been actually deleted.
+        """
+        hosts: dict[str, BaseHost] = {}
+        deleted = []
+        for job_info in jobs_info:
+            if job_info.run_dir:
+                if job_info.worker in hosts:
+                    host = hosts[job_info.worker]
+                else:
+                    host = self.project.workers[job_info.worker].get_host()
+                    hosts[job_info.worker] = host
+                    host.connect()
+                remote_files = host.listdir(job_info.run_dir)
+                # safety measure to avoid mistakenly deleting other folders
+                # maybe too much?
+                if any(
+                    fn in remote_files
+                    for fn in ("jfremote_in.json", "jfremote_in.json.gz")
+                ):
+                    if host.rmtree(path=job_info.run_dir, raise_on_error=False):
+                        deleted.append(job_info)
+                else:
+                    logger.warning(
+                        f"Did not delete folder {job_info.run_dir} "
+                        f"since it may not contain a jobflow-remote execution",
+                    )
+
+        for host in hosts.values():
+            try:
+                host.close()
+            except Exception:
+                pass
+
+        return deleted
 
     def unlock_flows(
         self,
@@ -3029,7 +3094,7 @@ class JobController:
         return len(self.refresh_children(job_uuids)) + 1
 
     # TODO should this refresh all the kind of states? Or just set to ready?
-    def refresh_children(self, job_uuids: list[str]) -> list[int]:
+    def refresh_children(self, job_uuids: list[str]) -> list[str]:
         """
         Set the state of Jobs children to READY following the completion of a Job.
 
@@ -3621,9 +3686,10 @@ class JobController:
         db_id: str | None = None,
         job_index: int | None = None,
         delete_output: bool = False,
+        delete_files: bool = False,
         wait: int | None = None,
         break_lock: bool = False,
-    ) -> list[int]:
+    ) -> str:
         """
         Delete a single job from the queue store and optionally from the job store.
         The Flow document will be updated accordingly but no consistency check
@@ -3632,23 +3698,25 @@ class JobController:
 
         Parameters
         ----------
-        job_id : Optional[str]
+        job_id
             The uuid of the job to delete.
-        db_id : Optional[str]
+        db_id
             The db_id of the job to delete.
-        job_index : Optional[int]
+        job_index
             The index of the job. If None, the job with the largest index will be selected.
         delete_output : bool, default False
             If True, also delete the job output from the JobStore.
-        wait : Optional[int]
+        delete_files
+            If True also delete the files on the worker.
+        wait
             In case the Flow or Job is locked, wait this time (in seconds) for the lock to be released.
-        break_lock : bool, default False
+        break_lock
             Forcibly break the lock on locked documents.
 
         Returns
         -------
-        list
-            List of db_ids of the deleted Jobs.
+        str
+            The db_id of the deleted Job.
         """
 
         job_lock_kwargs = dict(projection=["uuid", "index", "db_id", "state"])
@@ -3672,6 +3740,11 @@ class JobController:
             # Update FlowDoc
             flow_doc = FlowDoc.model_validate(flow_lock.locked_document)
             job_uuid, job_index = job_doc["uuid"], job_doc["index"]
+
+            if len(flow_doc.ids) == 1:
+                raise RuntimeError(
+                    "It is not possible to delete the only Job of the Flow. Delete the entire Flow."
+                )
 
             # Remove job from ids list
             flow_doc.ids = [
@@ -3732,7 +3805,11 @@ class JobController:
                         stacklevel=2,
                     )
 
-            return [job_doc["db_id"]]
+            if delete_files:
+                job_info = JobInfo.from_query_output(job_doc)
+                self._safe_delete_files([job_info])
+
+            return job_doc["db_id"]
 
     def delete_jobs(
         self,
@@ -3747,7 +3824,8 @@ class JobController:
         raise_on_error: bool = True,
         wait: int | None = None,
         delete_output: bool = False,
-    ) -> list[int]:
+        delete_files: bool = False,
+    ) -> list[str]:
         """
         Delete selected jobs from the queue store and optionally from the job store.
         The Flow document will be updated accordingly but no consistency check
@@ -3786,6 +3864,8 @@ class JobController:
             Raise an error if lock is not released.
         delete_output : bool, default False
             If True, also delete the Job output from the JobStore.
+        delete_files
+            If True also delete the files on the worker.
 
         Returns
         -------
@@ -3806,6 +3886,7 @@ class JobController:
             raise_on_error=raise_on_error,
             wait=wait,
             delete_output=delete_output,
+            delete_files=delete_files,
         )
 
 

@@ -25,8 +25,12 @@ def test_flows_list(job_controller, two_flows_four_jobs) -> None:
 
 
 def test_delete(job_controller, two_flows_four_jobs) -> None:
+    from jobflow import Flow
+
+    from jobflow_remote import submit_flow
     from jobflow_remote.jobs.runner import Runner
     from jobflow_remote.jobs.state import JobState
+    from jobflow_remote.testing import add
     from jobflow_remote.testing.cli import run_check_cli
 
     # run one of the jobs to check that the output is not deleted
@@ -83,12 +87,13 @@ def test_delete(job_controller, two_flows_four_jobs) -> None:
     os.remove(os.path.join(job_4_doc.run_dir, "jfremote_in.json"))
 
     outputs = [f"Deleted Flow(s) with id: {two_flows_four_jobs[1].uuid}"]
-    with pytest.warns(UserWarning, match=f"Did not delete folder {job_4_doc.run_dir}"):
-        run_check_cli(
-            ["flow", "delete", "-fid", two_flows_four_jobs[1].uuid, "-a"],
-            required_out=outputs,
-            cli_input="y",
-        )
+    run_check_cli(
+        ["flow", "delete", "-fid", two_flows_four_jobs[1].uuid, "-a"],
+        required_out=outputs,
+        cli_input="y",
+    )
+    assert not os.path.isdir(job_3_doc.run_dir)
+    assert os.path.isdir(job_4_doc.run_dir)
     assert job_controller.count_flows() == 0
 
     # output should be deleted
@@ -97,6 +102,19 @@ def test_delete(job_controller, two_flows_four_jobs) -> None:
 
     assert not os.path.isdir(job_3_doc.run_dir)
     assert os.path.isdir(job_4_doc.run_dir)
+
+    # create more than 10 flows and delete them
+    for i in range(11):
+        j1 = add(i, 1)
+        flow = Flow([j1])
+        submit_flow(flow, worker="test_local_worker")
+
+    outputs = ["Deleted Flow(s) with id"]
+    run_check_cli(
+        ["flow", "delete"],
+        required_out=outputs,
+        cli_input="y",
+    )
 
 
 def test_flow_info(job_controller, two_flows_four_jobs) -> None:

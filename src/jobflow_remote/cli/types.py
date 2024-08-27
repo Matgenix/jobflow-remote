@@ -308,6 +308,36 @@ raise_on_error_opt = Annotated[
 ]
 
 
+delete_output_opt = Annotated[
+    bool,
+    typer.Option(
+        "--output",
+        "-o",
+        help="Also delete the outputs of the Jobs in the output Store",
+    ),
+]
+
+
+delete_files_opt = Annotated[
+    bool,
+    typer.Option(
+        "--files",
+        "-fi",
+        help="Also delete the files on the worker",
+    ),
+]
+
+
+delete_all_opt = Annotated[
+    bool,
+    typer.Option(
+        "--all",
+        "-a",
+        help="enable --output and --files",
+    ),
+]
+
+
 # as of typer version 0.9.0 the dict is not a supported type. Define a custom one
 class DictType(dict):
     pass

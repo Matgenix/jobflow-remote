@@ -17,6 +17,9 @@ from jobflow_remote.cli.types import (
     break_lock_opt,
     days_opt,
     db_ids_opt,
+    delete_all_opt,
+    delete_files_opt,
+    delete_output_opt,
     end_date_opt,
     flow_ids_opt,
     hours_opt,
@@ -513,20 +516,19 @@ def delete(
     verbosity: verbosity_opt = 0,
     wait: wait_lock_opt = None,
     raise_on_error: raise_on_error_opt = False,
-    delete_output: Annotated[
-        bool,
-        typer.Option(
-            "--output",
-            "-o",
-            help="Also delete the outputs of the Jobs in the output Store",
-        ),
-    ] = False,
+    delete_output: delete_output_opt = False,
+    delete_files: delete_files_opt = False,
+    delete_all: delete_all_opt = False,
 ) -> None:
     """
     Delete Jobs individually. The Flow document will be updated accordingly but
     no consistency check is performed. The Flow may be left in an inconsistent state.
     For advanced users only.
     """
+
+    if delete_all:
+        delete_files = delete_output = True
+
     jc = get_job_controller()
 
     execute_multi_jobs_cmd(
@@ -548,6 +550,7 @@ def delete(
         wait=wait,
         raise_on_error=raise_on_error,
         delete_output=delete_output,
+        delete_files=delete_files,
     )
 
 
