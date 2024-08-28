@@ -112,6 +112,16 @@ def delete(
     days: days_opt = None,
     hours: hours_opt = None,
     force: force_opt = False,
+    max_limit: Annotated[
+        int,
+        typer.Option(
+            "--max",
+            "-m",
+            help=(
+                "The Flows will be deleted only if the total number is lower than the specified limit. 0 means no limit"
+            ),
+        ),
+    ] = 10,
     verbosity: Annotated[
         int,
         typer.Option(
@@ -181,9 +191,9 @@ def delete(
 
         jc.delete_flows(
             flow_ids=to_delete,
-            confirm=True,
             delete_output=delete_output,
             delete_files=delete_files,
+            max_limit=max_limit,
         )
 
     out_console.print(

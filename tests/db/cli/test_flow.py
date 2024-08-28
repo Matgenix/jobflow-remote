@@ -109,10 +109,23 @@ def test_delete(job_controller, two_flows_four_jobs) -> None:
         flow = Flow([j1])
         submit_flow(flow, worker="test_local_worker")
 
-    outputs = ["Deleted Flow(s) with id"]
+    outputs = [
+        " Cannot delete 11 Flows as they exceeds the specified maximum limit (10)"
+    ]
+    done_output = ["Deleted Flow(s) with id"]
+    # try deleting the flow with max=10. It fails
     run_check_cli(
         ["flow", "delete"],
         required_out=outputs,
+        excluded_out=done_output,
+        cli_input="y",
+        error=True,
+    )
+
+    # increase the maximum value to succeed
+    run_check_cli(
+        ["flow", "delete", "-m", "20"],
+        required_out=done_output,
         cli_input="y",
     )
 

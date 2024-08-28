@@ -617,6 +617,7 @@ class JobController:
         name: str | None = None,
         metadata: dict | None = None,
         raise_on_error: bool = True,
+        max_limit: int = 0,
         **method_kwargs,
     ) -> list[str]:
         """
@@ -658,6 +659,9 @@ class JobController:
         raise_on_error
             If True raise in case of error on one job error and stop the loop.
             Otherwise, just log the error and proceed.
+        max_limit
+            The action will be applied to the Jobs only if the total number is lower
+            than the specified limit. 0 means no limit.
         method_kwargs
             Kwargs passed to the method called on each Job
 
@@ -679,6 +683,13 @@ class JobController:
         result = self.jobs.find(query, projection=["db_id"])
 
         queried_dbs_ids = [r["db_id"] for r in result]
+
+        if max_limit != 0 and len(queried_dbs_ids) > max_limit:
+            raise ValueError(
+                f"Cannot perform {action_description} on {len(queried_dbs_ids)} Jobs "
+                f"as they exceeds the specified maximum limit ({max_limit})."
+                f"Increase the limit to complete the action on this many Jobs."
+            )
 
         updated_ids = set()
         for db_id in queried_dbs_ids:
@@ -2158,7 +2169,7 @@ class JobController:
     def delete_flows(
         self,
         flow_ids: str | list[str] | None = None,
-        confirm: bool = False,
+        max_limit: int = 10,
         delete_output: bool = False,
         delete_files: bool = False,
     ) -> int:
@@ -2169,8 +2180,9 @@ class JobController:
         ----------
         flow_ids
             One or more Flow uuids.
-        confirm
-            If False only a maximum of 10 Flows can be deleted.
+        max_limit
+            The Flows will be deleted only if the total number is lower than the
+            specified limit. 0 means no limit.
         delete_output
             If True also delete the associated output in the JobStore.
         delete_files
@@ -2179,7 +2191,7 @@ class JobController:
         Returns
         -------
         int
-            Number of delete Flows.
+            Number of deleted Flows.
         """
         if isinstance(flow_ids, str):
             flow_ids = [flow_ids]
@@ -2187,9 +2199,10 @@ class JobController:
         if flow_ids is None:
             flow_ids = [f["uuid"] for f in self.flows.find({}, projection=["uuid"])]
 
-        if len(flow_ids) > 10 and not confirm:
+        if max_limit != 0 and len(flow_ids) > max_limit:
             raise ValueError(
-                "Deleting more than 10 flows requires explicit confirmation"
+                f"Cannot delete {len(flow_ids)} Flows as they exceeds the specified maximum "
+                f"limit ({max_limit}). Increase the limit to delete the Flows."
             )
         deleted = 0
         for fid in flow_ids:
@@ -2216,6 +2229,13 @@ class JobController:
             One or more Flow uuids.
         delete_output
             If True also delete the associated output in the JobStore.
+        delete_files
+            If True also delete the files on the worker.
+
+        Returns
+        -------
+        bool
+            True if the flow has been deleted.
         """
         # TODO should this lock anything (FW does not lock)?
         flow = self.get_flow_info_by_flow_uuid(flow_id)
@@ -3825,6 +3845,7 @@ class JobController:
         wait: int | None = None,
         delete_output: bool = False,
         delete_files: bool = False,
+        max_limit: int = 10,
     ) -> list[str]:
         """
         Delete selected jobs from the queue store and optionally from the job store.
@@ -3866,6 +3887,9 @@ class JobController:
             If True, also delete the Job output from the JobStore.
         delete_files
             If True also delete the files on the worker.
+        max_limit
+            The Jobs will be deleted only if the total number is lower than the
+            specified limit. 0 means no limit.
 
         Returns
         -------
@@ -3887,6 +3911,7 @@ class JobController:
             wait=wait,
             delete_output=delete_output,
             delete_files=delete_files,
+            max_limit=max_limit,
         )
 
 

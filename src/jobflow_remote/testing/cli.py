@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import IO, TYPE_CHECKING, Any
 
 from typer.testing import CliRunner, Result
@@ -41,12 +42,20 @@ def run_check_cli(
         error == (result.exit_code != 0)
     ), f"cli should have {'' if error else 'not '}failed. exit code: {result.exit_code}. stdout: {result.stdout}"
 
+    # the print of the output in the console during the tests may result in newlines added
+    # that prevent the output to be matched. replace all spaces with a single space.
+    single_space_output = re.sub(r"[\n\t\s]*", " ", result.stdout)
+
     if required_out:
         for ro in required_out:
-            assert ro in result.stdout, f"{ro} missing from stdout: {result.stdout}"
+            assert (
+                re.sub(r"[\n\t\s]*", " ", ro) in single_space_output
+            ), f"{ro} missing from stdout: {result.stdout}"
 
     if excluded_out:
         for eo in excluded_out:
-            assert eo not in result.stdout, f"{eo} present in stdout: {result.stdout}"
+            assert (
+                re.sub(r"[\n\t\s]*", " ", eo) not in single_space_output
+            ), f"{eo} present in stdout: {result.stdout}"
 
     return result
