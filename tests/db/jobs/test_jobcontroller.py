@@ -563,6 +563,11 @@ def test_reset(job_controller, two_flows_four_jobs):
 
 
 def test_delete_job(job_controller, two_flows_four_jobs, runner):
+    from jobflow import Flow
+
+    from jobflow_remote import submit_flow
+    from jobflow_remote.utils.test import add
+
     runner.run_one_job(job_id=[two_flows_four_jobs[0][0].uuid, 1])
     flow_doc = job_controller.get_flow_info_by_flow_uuid(two_flows_four_jobs[0].uuid)
     assert flow_doc["state"] == FlowState.RUNNING.value
@@ -604,6 +609,21 @@ def test_delete_job(job_controller, two_flows_four_jobs, runner):
         job_controller.jobstore.get_output(two_flows_four_jobs[1][0].uuid)
 
     assert not os.path.isdir(job3_info.run_dir)
+
+    # add a big flow and try deleting it with small limit
+    many_jobs = [add(1, 2)]
+    for i in range(12):
+        many_jobs.append(add(many_jobs[-1].output, i))
+    large_flow = Flow(many_jobs)
+    submit_flow(large_flow)
+    job_ids = [(j.uuid, 1) for j in many_jobs[1:]]
+    with pytest.raises(ValueError, match="Cannot perform deleting on 12 Jobs"):
+        job_controller.delete_jobs(job_ids)
+
+    # increase the limit and delete
+    assert len(job_controller.delete_jobs(job_ids, max_limit=20)) == 12
+    flow_doc = job_controller.get_flow_info_by_flow_uuid(large_flow.uuid)
+    assert len(flow_doc["ids"]) == 1
 
 
 def test_delete_job_with_replace(job_controller, runner):
