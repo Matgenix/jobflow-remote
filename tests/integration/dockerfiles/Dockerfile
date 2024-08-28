@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:experimental
 ARG QUEUE_SYSTEM=slurm
 
-FROM ubuntu:22.04 as base
+#FROM ubuntu:22.04 as base
 
 # 1) Add desired queue system as a build stage:
 #
@@ -16,25 +16,25 @@ FROM nathanhess/slurm:full AS slurm
 #COPY ./tests/integration/dockerfiles/slurm_startup.sh /etc/startup.sh
 
 # -== SGE ==-
-FROM base as sge
-# The SGE startup script includes the configuration of SGE, as the docker network is not ready during build
-COPY ./tests/integration/dockerfiles/sge_startup.sh /etc/startup.sh
+#FROM base as sge
+## The SGE startup script includes the configuration of SGE, as the docker network is not ready during build
+#COPY ./tests/integration/dockerfiles/sge_startup.sh /etc/startup.sh
 
-# Following instructions from https://github.com/daimh/sge/blob/817a7fa019f0ec47425f43e843a1f58865614313/README.md
-ARG SGE_USERNAME=sge
-RUN apt update && apt install -y sudo build-essential curl cmake git libdb5.3-dev libhwloc-dev libmotif-dev libncurses-dev libpam0g-dev libssl-dev libsystemd-dev libtirpc-dev libxext-dev pkgconf && apt clean && rm -rf /var/lib/apt/lists/*
-WORKDIR /tmp
-RUN git clone https://github.com/daimh/sge --depth 1 --branch master sge
-WORKDIR /tmp/sge
-RUN cmake -S . -B build -DCMAKE_INSTALL_PREFIX=/opt/${SGE_USERNAME}
-RUN cmake --build build -j
-RUN cmake --install build
-RUN useradd -rm -d /opt/${SGE_USERNAME} -s /bin/bash ${SGE_USERNAME}
-RUN chown -R sge /opt/${SGE_USERNAME}
-WORKDIR /opt/${SGE_USERNAME}
+## Following instructions from https://github.com/daimh/sge/blob/817a7fa019f0ec47425f43e843a1f58865614313/README.md
+#ARG SGE_USERNAME=sge
+#RUN apt update && apt install -y sudo build-essential curl cmake git libdb5.3-dev libhwloc-dev libmotif-dev libncurses-dev libpam0g-dev libssl-dev libsystemd-dev libtirpc-dev libxext-dev pkgconf && apt clean && rm -rf /var/lib/apt/lists/*
+#WORKDIR /tmp
+#RUN git clone https://github.com/daimh/sge --depth 1 --branch master sge
+#WORKDIR /tmp/sge
+#RUN cmake -S . -B build -DCMAKE_INSTALL_PREFIX=/opt/${SGE_USERNAME}
+#RUN cmake --build build -j
+#RUN cmake --install build
+#RUN useradd -rm -d /opt/${SGE_USERNAME} -s /bin/bash ${SGE_USERNAME}
+#RUN chown -R sge /opt/${SGE_USERNAME}
+#WORKDIR /opt/${SGE_USERNAME}
 
 # 2) Add common options from ubuntu server
-FROM ${QUEUE_SYSTEM} as jobflow
+FROM slurm as jobflow
 
 ARG USERNAME=jobflow
 
@@ -55,14 +55,11 @@ RUN printf "${USERNAME} ALL=(root:root) NOPASSWD: /etc/startup.sh\n" >> /etc/sud
     && chmod 0440 /etc/sudoers.d/startup \
     && visudo -c
 
-# Make a job directory for jobflow
-WORKDIR /home/${USERNAME}
-RUN mkdir jfr
-
 #SHELL ["/bin/bash", "--login", "-c"]
 
 # Install jobflow from directory, assuming container
 # is built at the root of the jobflow repo
+WORKDIR /home/${USERNAME}
 RUN mkdir jobflow-remote
 COPY src/jobflow_remote jobflow-remote/src/jobflow_remote
 COPY pyproject.toml jobflow-remote/
@@ -86,8 +83,11 @@ RUN python3 -m venv /home/${USERNAME}/.venv
 RUN /home/${USERNAME}/.venv/bin/pip install -U pip
 RUN /home/${USERNAME}/.venv/bin/pip install --verbose -e .
 
-ARG USERNAME=jobflow
-USER root
-RUN sudo chmod 555 /etc/startup.sh
-USER ${USERNAME}
+#USER root
+#RUN sudo chmod 555 /etc/startup.sh
+#USER ${USERNAME}
 #CMD "sudo /etc/startup.sh ; /bin/bash -l"
+
+# Make a job directory for jobflow
+WORKDIR /home/${USERNAME}
+RUN mkdir jfr
