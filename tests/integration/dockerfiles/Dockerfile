@@ -90,8 +90,6 @@ RUN python3 -m venv /home/${USERNAME}/.venv
 RUN /home/${USERNAME}/.venv/bin/pip install -U pip
 RUN /home/${USERNAME}/.venv/bin/pip install --verbose -e .
 
-FROM ${QUEUE_SYSTEM} as final
-
 ARG USERNAME=jobflow
 USER root
 RUN sudo chmod 555 /etc/startup.sh
