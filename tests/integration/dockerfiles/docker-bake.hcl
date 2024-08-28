@@ -9,7 +9,6 @@ target "slurm" {
     dockerfile = "./tests/integration/dockerfiles/Dockerfile"
     args = {
         QUEUE_SYSTEM = "slurm"
-        USERNAME = "jobflow"
     }
     tags = [
         "jobflow-remote-testing-slurm:latest"
