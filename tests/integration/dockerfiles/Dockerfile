@@ -94,4 +94,4 @@ ARG USERNAME=jobflow
 USER root
 RUN sudo chmod 555 /etc/startup.sh
 USER ${USERNAME}
-CMD "sudo /etc/startup.sh ; /bin/bash -l"
+#CMD "sudo /etc/startup.sh ; /bin/bash -l"
