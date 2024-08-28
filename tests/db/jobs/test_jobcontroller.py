@@ -566,7 +566,7 @@ def test_delete_job(job_controller, two_flows_four_jobs, runner):
     from jobflow import Flow
 
     from jobflow_remote import submit_flow
-    from jobflow_remote.utils.test import add
+    from jobflow_remote.testing import add
 
     runner.run_one_job(job_id=[two_flows_four_jobs[0][0].uuid, 1])
     flow_doc = job_controller.get_flow_info_by_flow_uuid(two_flows_four_jobs[0].uuid)
