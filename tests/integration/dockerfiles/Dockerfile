@@ -13,7 +13,9 @@ ARG QUEUE_SYSTEM=slurm
 
 # -== SLURM ==-
 FROM nathanhess/slurm:full AS slurm
-#COPY ./tests/integration/dockerfiles/slurm_startup.sh /etc/startup.sh
+USER root
+COPY ./tests/integration/dockerfiles/slurm_startup.sh /etc/startup.sh
+RUN chmod +x /etc/startup.sh && dos2unix /etc/startup.sh
 
 # -== SGE ==-
 #FROM base as sge
@@ -45,7 +47,6 @@ USER root
 # Install OpenSSH server and set it to run on startup
 RUN apt update && apt install -y openssh-server sudo python3.10-venv && apt clean && rm -rf /var/lib/apt/lists/*
 RUN sed -i 's/#PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config
-RUN sed -ie 's/^SCRIPT/service ssh start\nSCRIPT/g' /etc/startup.sh
 
 # Create desired user with blank password then give user access to startup script as sudo without password
 # See https://github.com/nathan-hess/docker-slurm/blob/a62133d66d624d9ff0ccefbd41a0b1b2abcb9925/dockerfile_base/Dockerfile#L62C1-L65C1
