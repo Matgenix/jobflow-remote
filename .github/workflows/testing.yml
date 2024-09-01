@@ -35,7 +35,7 @@ jobs:
         run: pre-commit run --all-files --show-diff-on-failure
 
   build-test-bench:
-    name: "Build test bench container"
+    name: "Build test bench containers"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -46,20 +46,20 @@ jobs:
       - name: Build test bench container
         uses: docker/bake-action@v5
         with:
-          load: true 
+          load: true
           files: tests/integration/dockerfiles/docker-bake.hcl
           set: |
             *.cache-to=type=gha,scope=global,mode=max
             *.cache-from=type=gha,scope=global
 
   test:
-    needs: [build-test-bench]
     services:
       local_mongodb:
         image: mongo:5.0
         ports:
           - 27017:27017
 
+    needs: [build-test-bench]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -68,9 +68,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
 
       - uses: actions/setup-python@v5
         with:
@@ -82,11 +79,15 @@ jobs:
         run: |
           wget https://fastdl.mongodb.org/tools/db/mongodb-database-tools-ubuntu2204-x86_64-100.10.0.deb
           sudo apt install ./mongodb-database-tools-*-100.10.0.deb
-      - name: Load previously built Docker images
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Load test bench containers
         uses: docker/bake-action@v5
         with:
-          files: tests/integration/dockerfiles/docker-bake.hcl
           load: true
+          files: tests/integration/dockerfiles/docker-bake.hcl
           set: |
             *.cache-from=type=gha,scope=global
 
