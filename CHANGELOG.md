@@ -1,12 +1,30 @@
 # Changelog
 
-## [Unreleased](https://github.com/Matgenix/jobflow-remote/tree/HEAD)
+## [v0.1.3](https://github.com/Matgenix/jobflow-remote/tree/v0.1.3) (2024-08-28)
 
-[Full Changelog](https://github.com/Matgenix/jobflow-remote/compare/v0.1.2...HEAD)
+[Full Changelog](https://github.com/Matgenix/jobflow-remote/compare/v0.1.2...v0.1.3)
 
 **Closed issues:**
 
-- Feature request: support psutil 6.0.0 [\#128](https://github.com/Matgenix/jobflow-remote/issues/128)
+- Cannot force delete more than 10 flows [\#169](https://github.com/Matgenix/jobflow-remote/issues/169)
+- Issue with some db in DOWNLOAD state [\#161](https://github.com/Matgenix/jobflow-remote/issues/161)
+- Jobs fail with error `Remote error: file path/to/job_dir/remote_job_data.json for job xxx does not exist` [\#157](https://github.com/Matgenix/jobflow-remote/issues/157)
+- Correct setup of jfremote config project.yaml file for nested gateways [\#153](https://github.com/Matgenix/jobflow-remote/issues/153)
+- Is there a way to visualize the workflow based on jobflow-remote info? [\#149](https://github.com/Matgenix/jobflow-remote/issues/149)
+- Flow information is shared even when using different queue stores [\#144](https://github.com/Matgenix/jobflow-remote/issues/144)
+- a suggestion to improve the documentation [\#143](https://github.com/Matgenix/jobflow-remote/issues/143)
+- Delete job functionality [\#141](https://github.com/Matgenix/jobflow-remote/issues/141)
+- Queue-out interactive mode [\#90](https://github.com/Matgenix/jobflow-remote/issues/90)
+- Writing to home dir is crashing my submission. [\#81](https://github.com/Matgenix/jobflow-remote/issues/81)
+
+**Merged pull requests:**
+
+- Minor updates [\#156](https://github.com/Matgenix/jobflow-remote/pull/156) ([gpetretto](https://github.com/gpetretto))
+- delete\_job functionality [\#154](https://github.com/Matgenix/jobflow-remote/pull/154) ([gpetretto](https://github.com/gpetretto))
+- Fix ruamel yaml dump [\#151](https://github.com/Matgenix/jobflow-remote/pull/151) ([davidwaroquiers](https://github.com/davidwaroquiers))
+- Add hyperlink for slurm and pbs resource keywords as a note in the documentation [\#148](https://github.com/Matgenix/jobflow-remote/pull/148) ([QuantumChemist](https://github.com/QuantumChemist))
+- CLI add `--pid` option to `jf job info` [\#142](https://github.com/Matgenix/jobflow-remote/pull/142) ([janosh](https://github.com/janosh))
+- Fix legacy `ruff` errors and enable corresponding rules for future linting [\#134](https://github.com/Matgenix/jobflow-remote/pull/134) ([janosh](https://github.com/janosh))
 
 ## [v0.1.2](https://github.com/Matgenix/jobflow-remote/tree/v0.1.2) (2024-06-26)
 
@@ -26,6 +44,7 @@
 
 - Feature request: show more information about the flow\(s\) that will be deleted [\#130](https://github.com/Matgenix/jobflow-remote/issues/130)
 - Feature request: optionally delete outputs when doing jf flow delete [\#129](https://github.com/Matgenix/jobflow-remote/issues/129)
+- Feature request: support psutil 6.0.0 [\#128](https://github.com/Matgenix/jobflow-remote/issues/128)
 - SUGGESTION: Add an example for querying results from the database [\#115](https://github.com/Matgenix/jobflow-remote/issues/115)
 
 **Merged pull requests:**
