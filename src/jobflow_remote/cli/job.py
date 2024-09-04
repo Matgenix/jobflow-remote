@@ -40,10 +40,12 @@ from jobflow_remote.cli.types import (
     start_date_opt,
     verbosity_opt,
     wait_lock_opt,
+    worker_name_opt,
 )
 from jobflow_remote.cli.utils import (
     SortOption,
     check_incompatible_opt,
+    check_query_incompatibility,
     check_stopped_runner,
     execute_multi_jobs_cmd,
     exit_with_error_msg,
@@ -80,6 +82,7 @@ def jobs_list(
     metadata: metadata_opt = None,
     days: days_opt = None,
     hours: hours_opt = None,
+    worker_name: worker_name_opt = None,
     verbosity: verbosity_opt = 0,
     max_results: max_results_opt = 100,
     sort: sort_opt = SortOption.UPDATED_ON,
@@ -101,7 +104,22 @@ def jobs_list(
     check_incompatible_opt({"start_date": start_date, "days": days, "hours": hours})
     check_incompatible_opt({"end_date": end_date, "days": days, "hours": hours})
     check_incompatible_opt({"state": state, "error": error})
-    metadata_dict = str_to_dict(metadata)
+    check_query_incompatibility(
+        custom_query,
+        [
+            job_id,
+            db_id,
+            flow_id,
+            state,
+            start_date,
+            end_date,
+            name,
+            metadata,
+            days,
+            hours,
+            worker_name,
+        ],
+    )
 
     job_ids_indexes = get_job_ids_indexes(job_id)
 
@@ -131,7 +149,8 @@ def jobs_list(
                 locked=locked,
                 end_date=end_date,
                 name=name,
-                metadata=metadata_dict,
+                metadata=metadata,
+                workers=worker_name,
                 limit=max_results,
                 sort=db_sort,
             )
@@ -260,6 +279,8 @@ def rerun(
     metadata: metadata_opt = None,
     days: days_opt = None,
     hours: hours_opt = None,
+    worker_name: worker_name_opt = None,
+    custom_query: query_opt = None,
     verbosity: verbosity_opt = 0,
     wait: wait_lock_opt = None,
     break_lock: break_lock_opt = False,
@@ -303,6 +324,8 @@ def rerun(
         end_date=end_date,
         name=name,
         metadata=metadata,
+        workers=worker_name,
+        custom_query=custom_query,
         days=days,
         hours=hours,
         verbosity=verbosity,
@@ -325,6 +348,8 @@ def retry(
     end_date: end_date_opt = None,
     name: name_opt = None,
     metadata: metadata_opt = None,
+    worker_name: worker_name_opt = None,
+    custom_query: query_opt = None,
     days: days_opt = None,
     hours: hours_opt = None,
     verbosity: verbosity_opt = 0,
@@ -357,6 +382,8 @@ def retry(
         metadata=metadata,
         days=days,
         hours=hours,
+        workers=worker_name,
+        custom_query=custom_query,
         verbosity=verbosity,
         wait=wait,
         break_lock=break_lock,
@@ -376,6 +403,8 @@ def pause(
     end_date: end_date_opt = None,
     name: name_opt = None,
     metadata: metadata_opt = None,
+    worker_name: worker_name_opt = None,
+    custom_query: query_opt = None,
     days: days_opt = None,
     hours: hours_opt = None,
     verbosity: verbosity_opt = 0,
@@ -400,6 +429,8 @@ def pause(
         metadata=metadata,
         days=days,
         hours=hours,
+        workers=worker_name,
+        custom_query=custom_query,
         verbosity=verbosity,
         wait=wait,
         raise_on_error=raise_on_error,
@@ -418,6 +449,8 @@ def play(
     end_date: end_date_opt = None,
     name: name_opt = None,
     metadata: metadata_opt = None,
+    worker_name: worker_name_opt = None,
+    custom_query: query_opt = None,
     days: days_opt = None,
     hours: hours_opt = None,
     verbosity: verbosity_opt = 0,
@@ -442,6 +475,8 @@ def play(
         metadata=metadata,
         days=days,
         hours=hours,
+        workers=worker_name,
+        custom_query=custom_query,
         verbosity=verbosity,
         wait=wait,
         raise_on_error=raise_on_error,
@@ -460,6 +495,8 @@ def stop(
     end_date: end_date_opt = None,
     name: name_opt = None,
     metadata: metadata_opt = None,
+    worker_name: worker_name_opt = None,
+    custom_query: query_opt = None,
     days: days_opt = None,
     hours: hours_opt = None,
     verbosity: verbosity_opt = 0,
@@ -492,6 +529,8 @@ def stop(
         metadata=metadata,
         days=days,
         hours=hours,
+        workers=worker_name,
+        custom_query=custom_query,
         verbosity=verbosity,
         wait=wait,
         break_lock=break_lock,
@@ -511,6 +550,8 @@ def delete(
     end_date: end_date_opt = None,
     name: name_opt = None,
     metadata: metadata_opt = None,
+    worker_name: worker_name_opt = None,
+    custom_query: query_opt = None,
     days: days_opt = None,
     hours: hours_opt = None,
     verbosity: verbosity_opt = 0,
@@ -546,6 +587,8 @@ def delete(
         metadata=metadata,
         days=days,
         hours=hours,
+        workers=worker_name,
+        custom_query=custom_query,
         verbosity=verbosity,
         wait=wait,
         raise_on_error=raise_on_error,
@@ -659,6 +702,8 @@ def worker(
     end_date: end_date_opt = None,
     name: name_opt = None,
     metadata: metadata_opt = None,
+    select_worker_name: worker_name_opt = None,
+    custom_query: query_opt = None,
     days: days_opt = None,
     hours: hours_opt = None,
     verbosity: verbosity_opt = 0,
@@ -684,6 +729,8 @@ def worker(
         metadata=metadata,
         days=days,
         hours=hours,
+        workers=select_worker_name,
+        custom_query=custom_query,
         verbosity=verbosity,
         raise_on_error=raise_on_error,
         worker=worker_name,
@@ -707,6 +754,8 @@ def exec_config(
     end_date: end_date_opt = None,
     name: name_opt = None,
     metadata: metadata_opt = None,
+    worker_name: worker_name_opt = None,
+    custom_query: query_opt = None,
     days: days_opt = None,
     hours: hours_opt = None,
     verbosity: verbosity_opt = 0,
@@ -732,6 +781,8 @@ def exec_config(
         metadata=metadata,
         days=days,
         hours=hours,
+        workers=worker_name,
+        custom_query=custom_query,
         verbosity=verbosity,
         raise_on_error=raise_on_error,
         exec_config=exec_config_value,
@@ -776,6 +827,8 @@ def resources(
     end_date: end_date_opt = None,
     name: name_opt = None,
     metadata: metadata_opt = None,
+    worker_name: worker_name_opt = None,
+    custom_query: query_opt = None,
     days: days_opt = None,
     hours: hours_opt = None,
     verbosity: verbosity_opt = 0,
@@ -806,6 +859,8 @@ def resources(
         metadata=metadata,
         days=days,
         hours=hours,
+        workers=worker_name,
+        custom_query=custom_query,
         verbosity=verbosity,
         raise_on_error=raise_on_error,
         resources=resources,
@@ -823,6 +878,8 @@ def job_dump(
     end_date: end_date_opt = None,
     name: name_opt = None,
     metadata: metadata_opt = None,
+    worker_name: worker_name_opt = None,
+    custom_query: query_opt = None,
     days: days_opt = None,
     hours: hours_opt = None,
     file_path: Annotated[
@@ -837,7 +894,22 @@ def job_dump(
     """Dump to json the documents of the selected Jobs from the DB. For debugging."""
     check_incompatible_opt({"start_date": start_date, "days": days, "hours": hours})
     check_incompatible_opt({"end_date": end_date, "days": days, "hours": hours})
-    metadata_dict = str_to_dict(metadata)
+    check_query_incompatibility(
+        custom_query,
+        [
+            job_id,
+            db_id,
+            flow_id,
+            state,
+            start_date,
+            end_date,
+            name,
+            metadata,
+            days,
+            hours,
+            worker_name,
+        ],
+    )
 
     job_ids_indexes = get_job_ids_indexes(job_id)
 
@@ -846,16 +918,22 @@ def job_dump(
     start_date = get_start_date(start_date, days, hours)
 
     with loading_spinner():
-        jobs_doc = jc.get_jobs_doc(
-            job_ids=job_ids_indexes,
-            db_ids=db_id,
-            flow_ids=flow_id,
-            states=state,
-            start_date=start_date,
-            end_date=end_date,
-            name=name,
-            metadata=metadata_dict,
-        )
+        if custom_query:
+            jobs_doc = jc.get_jobs_doc_query(
+                query=custom_query,
+            )
+        else:
+            jobs_doc = jc.get_jobs_doc(
+                job_ids=job_ids_indexes,
+                db_ids=db_id,
+                flow_ids=flow_id,
+                states=state,
+                start_date=start_date,
+                end_date=end_date,
+                name=name,
+                metadata=metadata,
+                workers=worker_name,
+            )
         if jobs_doc:
             dumpfn(jsanitize(jobs_doc, strict=True, enum_values=True), file_path)
 

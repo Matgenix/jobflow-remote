@@ -181,6 +181,7 @@ class JobController:
         end_date: datetime | None = None,
         name: str | None = None,
         metadata: dict | None = None,
+        workers: str | list[str] | None = None,
     ) -> dict:
         """
         Build a query to search for Jobs, based on standard parameters.
@@ -211,6 +212,8 @@ class JobController:
         metadata
             A dictionary of the values of the metadata to match. Should be an
             exact match for all the values provided.
+        workers
+            One or more worker names.
 
         Returns
         -------
@@ -227,6 +230,8 @@ class JobController:
             flow_ids = [flow_ids]
         if isinstance(states, JobState):
             states = [states]
+        if isinstance(workers, str):
+            workers = [workers]
 
         query: dict = {}
 
@@ -264,6 +269,10 @@ class JobController:
         if metadata:
             metadata_dict = {f"job.metadata.{k}": v for k, v in metadata.items()}
             query.update(metadata_dict)
+            print(query)
+
+        if workers:
+            query["worker"] = {"$in": workers}
 
         return query
 
@@ -379,6 +388,7 @@ class JobController:
         end_date: datetime | None = None,
         name: str | None = None,
         metadata: dict | None = None,
+        workers: str | list[str] | None = None,
         locked: bool = False,
         sort: list[tuple[str, int]] | None = None,
         limit: int = 0,
@@ -411,6 +421,8 @@ class JobController:
         metadata
             A dictionary of the values of the metadata to match. Should be an
             exact match for all the values provided.
+        workers
+            One or more worker names.
         sort
             A list of (key, direction) pairs specifying the sort order for this
             query. Follows pymongo conventions.
@@ -432,6 +444,7 @@ class JobController:
             end_date=end_date,
             name=name,
             metadata=metadata,
+            workers=workers,
         )
         return self.get_jobs_info_query(query=query, sort=sort, limit=limit)
 
@@ -465,6 +478,7 @@ class JobController:
         end_date: datetime | None = None,
         name: str | None = None,
         metadata: dict | None = None,
+        workers: str | list[str] | None = None,
         locked: bool = False,
         sort: list[tuple] | None = None,
         limit: int = 0,
@@ -497,6 +511,8 @@ class JobController:
         metadata
             A dictionary of the values of the metadata to match. Should be an
             exact match for all the values provided.
+        workers
+            One or more worker names.
         sort
             A list of (key, direction) pairs specifying the sort order for this
             query. Follows pymongo conventions.
@@ -518,6 +534,7 @@ class JobController:
             end_date=end_date,
             name=name,
             metadata=metadata,
+            workers=workers,
         )
         return self.get_jobs_doc_query(query=query, sort=sort, limit=limit)
 
@@ -616,6 +633,8 @@ class JobController:
         end_date: datetime | None = None,
         name: str | None = None,
         metadata: dict | None = None,
+        workers: str | list[str] | None = None,
+        custom_query: dict | None = None,
         raise_on_error: bool = True,
         max_limit: int = 0,
         **method_kwargs,
@@ -656,6 +675,10 @@ class JobController:
         metadata
             A dictionary of the values of the metadata to match. Should be an
             exact match for all the values provided.
+        workers
+            One or more worker names.
+        custom_query
+            A generic query. Incompatible with all the other filtering options.
         raise_on_error
             If True raise in case of error on one job error and stop the loop.
             Otherwise, just log the error and proceed.
@@ -670,16 +693,35 @@ class JobController:
         list
             List of db_ids of the updated Jobs.
         """
-        query = self._build_query_job(
-            job_ids=job_ids,
-            db_ids=db_ids,
-            flow_ids=flow_ids,
-            states=states,
-            start_date=start_date,
-            end_date=end_date,
-            name=name,
-            metadata=metadata,
-        )
+        filtering_options = [
+            job_ids,
+            db_ids,
+            flow_ids,
+            states,
+            start_date,
+            end_date,
+            name,
+            metadata,
+            workers,
+        ]
+        if custom_query and any(opt is not None for opt in filtering_options):
+            raise ValueError(
+                "The custom query option is incompatible with all the other filtering options"
+            )
+        if custom_query:
+            query = custom_query
+        else:
+            query = self._build_query_job(
+                job_ids=job_ids,
+                db_ids=db_ids,
+                flow_ids=flow_ids,
+                states=states,
+                start_date=start_date,
+                end_date=end_date,
+                name=name,
+                metadata=metadata,
+                workers=workers,
+            )
         result = self.jobs.find(query, projection=["db_id"])
 
         queried_dbs_ids = [r["db_id"] for r in result]
@@ -718,6 +760,8 @@ class JobController:
         end_date: datetime | None = None,
         name: str | None = None,
         metadata: dict | None = None,
+        workers: str | list[str] | None = None,
+        custom_query: dict | None = None,
         raise_on_error: bool = True,
         force: bool = False,
         wait: int | None = None,
@@ -750,6 +794,10 @@ class JobController:
         metadata
             A dictionary of the values of the metadata to match. Should be an
             exact match for all the values provided.
+        workers
+            One or more worker names.
+        custom_query
+            A generic query. Incompatible with all the other filtering options.
         raise_on_error
             If True raise in case of error on one job error and stop the loop.
             Otherwise, just log the error and proceed.
@@ -780,6 +828,8 @@ class JobController:
             end_date=end_date,
             name=name,
             metadata=metadata,
+            workers=workers,
+            custom_query=custom_query,
             raise_on_error=raise_on_error,
             force=force,
             wait=wait,
@@ -1291,6 +1341,8 @@ class JobController:
         end_date: datetime | None = None,
         name: str | None = None,
         metadata: dict | None = None,
+        workers: str | list[str] | None = None,
+        custom_query: dict | None = None,
         raise_on_error: bool = True,
         wait: int | None = None,
         break_lock: bool = False,
@@ -1322,6 +1374,10 @@ class JobController:
         metadata
             A dictionary of the values of the metadata to match. Should be an
             exact match for all the values provided.
+        workers
+            One or more worker names.
+        custom_query
+            A generic query. Incompatible with all the other filtering options.
         raise_on_error
             If True raise in case of error on one job error and stop the loop.
             Otherwise, just log the error and proceed.
@@ -1350,6 +1406,8 @@ class JobController:
             end_date=end_date,
             name=name,
             metadata=metadata,
+            workers=workers,
+            custom_query=custom_query,
             raise_on_error=raise_on_error,
             wait=wait,
             break_lock=break_lock,
@@ -1448,6 +1506,8 @@ class JobController:
         end_date: datetime | None = None,
         name: str | None = None,
         metadata: dict | None = None,
+        workers: str | list[str] | None = None,
+        custom_query: dict | None = None,
         raise_on_error: bool = True,
         wait: int | None = None,
     ) -> list[str]:
@@ -1478,6 +1538,10 @@ class JobController:
         metadata
             A dictionary of the values of the metadata to match. Should be an
             exact match for all the values provided.
+        workers
+            One or more worker names.
+        custom_query
+            A generic query. Incompatible with all the other filtering options.
         raise_on_error
             If True raise in case of error on one job error and stop the loop.
             Otherwise, just log the error and proceed.
@@ -1502,6 +1566,8 @@ class JobController:
             end_date=end_date,
             name=name,
             metadata=metadata,
+            workers=workers,
+            custom_query=custom_query,
             raise_on_error=raise_on_error,
             wait=wait,
         )
@@ -1516,6 +1582,8 @@ class JobController:
         end_date: datetime | None = None,
         name: str | None = None,
         metadata: dict | None = None,
+        workers: str | list[str] | None = None,
+        custom_query: dict | None = None,
         raise_on_error: bool = True,
         wait: int | None = None,
         break_lock: bool = False,
@@ -1548,6 +1616,10 @@ class JobController:
         metadata
             A dictionary of the values of the metadata to match. Should be an
             exact match for all the values provided.
+        workers
+            One or more worker names.
+        custom_query
+            A generic query. Incompatible with all the other filtering options.
         raise_on_error
             If True raise in case of error on one job error and stop the loop.
             Otherwise, just log the error and proceed.
@@ -1576,6 +1648,8 @@ class JobController:
             end_date=end_date,
             name=name,
             metadata=metadata,
+            workers=workers,
+            custom_query=custom_query,
             raise_on_error=raise_on_error,
             wait=wait,
             break_lock=break_lock,
@@ -1737,6 +1811,8 @@ class JobController:
         end_date: datetime | None = None,
         name: str | None = None,
         metadata: dict | None = None,
+        workers: str | list[str] | None = None,
+        custom_query: dict | None = None,
         raise_on_error: bool = True,
         wait: int | None = None,
         break_lock: bool = False,
@@ -1767,6 +1843,10 @@ class JobController:
         metadata
             A dictionary of the values of the metadata to match. Should be an
             exact match for all the values provided.
+        workers
+            One or more worker names.
+        custom_query
+            A generic query. Incompatible with all the other filtering options.
         raise_on_error
             If True raise in case of error on one job error and stop the loop.
             Otherwise, just log the error and proceed.
@@ -1795,6 +1875,8 @@ class JobController:
             end_date=end_date,
             name=name,
             metadata=metadata,
+            workers=workers,
+            custom_query=custom_query,
             raise_on_error=raise_on_error,
             wait=wait,
             break_lock=break_lock,
@@ -1894,6 +1976,8 @@ class JobController:
         end_date: datetime | None = None,
         name: str | None = None,
         metadata: dict | None = None,
+        workers: str | list[str] | None = None,
+        custom_query: dict | None = None,
         raise_on_error: bool = True,
     ) -> list[str]:
         """
@@ -1934,6 +2018,10 @@ class JobController:
         metadata
             A dictionary of the values of the metadata to match. Should be an
             exact match for all the values provided.
+        workers
+            One or more worker names.
+        custom_query
+            A generic query. Incompatible with all the other filtering options.
         raise_on_error
             If True raise in case of error on one job error and stop the loop.
             Otherwise, just log the error and proceed.
@@ -2008,6 +2096,8 @@ class JobController:
             end_date=end_date,
             name=name,
             metadata=metadata,
+            workers=workers,
+            custom_query=custom_query,
             raise_on_error=raise_on_error,
             values=set_dict,
             acceptable_states=acceptable_states,
@@ -2262,6 +2352,7 @@ class JobController:
         end_date: datetime | None = None,
         name: str | None = None,
         metadata: dict | None = None,
+        workers: str | list[str] | None = None,
     ) -> int:
         """
         Forcibly remove the lock on a locked Job document.
@@ -2291,6 +2382,8 @@ class JobController:
         metadata
             A dictionary of the values of the metadata to match. Should be an
             exact match for all the values provided.
+        workers
+            One or more worker names.
 
         Returns
         -------
@@ -2307,6 +2400,7 @@ class JobController:
             locked=True,
             name=name,
             metadata=metadata,
+            workers=workers,
         )
 
         result = self.jobs.update_many(
@@ -2596,6 +2690,7 @@ class JobController:
         end_date: datetime | None = None,
         name: str | None = None,
         metadata: dict | None = None,
+        workers: str | list[str] | None = None,
     ) -> int:
         """
         Count Jobs based on filters.
@@ -2627,6 +2722,8 @@ class JobController:
         metadata
             A dictionary of the values of the metadata to match. Should be an
             exact match for all the values provided.
+        workers
+            One or more worker names.
 
         Returns
         -------
@@ -2644,6 +2741,7 @@ class JobController:
                 end_date=end_date,
                 name=name,
                 metadata=metadata,
+                workers=workers,
             )
         return self.jobs.count_documents(query)
 
@@ -3841,6 +3939,8 @@ class JobController:
         end_date: datetime | None = None,
         name: str | None = None,
         metadata: dict | None = None,
+        workers: str | list[str] | None = None,
+        custom_query: dict | None = None,
         raise_on_error: bool = True,
         wait: int | None = None,
         delete_output: bool = False,
@@ -3876,6 +3976,10 @@ class JobController:
         metadata
             A dictionary of the values of the metadata to match. Should be an
             exact match for all the values provided.
+        workers
+            One or more worker names.
+        custom_query
+            A generic query. Incompatible with all the other filtering options.
         raise_on_error
             If True raise in case of error on one job error and stop the loop.
             Otherwise, just log the error and proceed.
@@ -3907,6 +4011,8 @@ class JobController:
             end_date=end_date,
             name=name,
             metadata=metadata,
+            workers=workers,
+            custom_query=custom_query,
             raise_on_error=raise_on_error,
             wait=wait,
             delete_output=delete_output,
@@ -3917,7 +4023,7 @@ class JobController:
 
 def get_flow_leafs(job_docs: list[dict]) -> list[dict]:
     """
-    Get the leaf jobs from a list of serilized representation of JobDoc.
+    Get the leaf jobs from a list of serialized representation of JobDoc.
 
     Parameters
     ----------

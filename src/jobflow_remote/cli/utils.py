@@ -149,6 +149,13 @@ def check_incompatible_opt(d: dict) -> None:
         exit_with_error_msg(f"Options {options_list} are incompatible")
 
 
+def check_query_incompatibility(query, incompatible_options):
+    if query and any(opt is not None for opt in incompatible_options):
+        exit_with_error_msg(
+            "The --query option is incompatible with all the other filtering options"
+        )
+
+
 def check_at_least_one_opt(d: dict) -> None:
     not_none = []
     for k, v in d.items():
@@ -332,9 +339,11 @@ def execute_multi_jobs_cmd(
     start_date: datetime | None = None,
     end_date: datetime | None = None,
     name: str | None = None,
-    metadata: str | None = None,
+    metadata: dict | None = None,
     days: int | None = None,
     hours: int | None = None,
+    workers: list[str] | None = None,
+    custom_query: dict | None = None,
     verbosity: int = 0,
     raise_on_error: bool = False,
     **kwargs,
@@ -350,6 +359,8 @@ def execute_multi_jobs_cmd(
         metadata,
         days,
         hours,
+        workers,
+        custom_query,
     ]
     try:
         if job_db_id is not None:
@@ -370,7 +381,22 @@ def execute_multi_jobs_cmd(
                 {"start_date": start_date, "days": days, "hours": hours}
             )
             check_incompatible_opt({"end_date": end_date, "days": days, "hours": hours})
-            metadata_dict = str_to_dict(metadata)
+            check_query_incompatibility(
+                custom_query,
+                [
+                    job_ids,
+                    db_ids,
+                    flow_ids,
+                    states,
+                    start_date,
+                    end_date,
+                    name,
+                    metadata,
+                    days,
+                    hours,
+                    workers,
+                ],
+            )
 
             job_ids_indexes = get_job_ids_indexes(job_ids)
             start_date = get_start_date(start_date, days, hours)
@@ -385,6 +411,8 @@ def execute_multi_jobs_cmd(
                     end_date,
                     name,
                     metadata,
+                    workers,
+                    custom_query,
                 )
             ):
                 text = Text.from_markup(
@@ -405,7 +433,9 @@ def execute_multi_jobs_cmd(
                     start_date=start_date,
                     end_date=end_date,
                     name=name,
-                    metadata=metadata_dict,
+                    metadata=metadata,
+                    workers=workers,
+                    custom_query=custom_query,
                     raise_on_error=raise_on_error,
                     **kwargs,
                 )
