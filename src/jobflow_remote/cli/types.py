@@ -1,11 +1,10 @@
-import json
 from datetime import datetime
 from typing import Annotated, Optional
 
 import click
 import typer
 
-from jobflow_remote.cli.utils import SerializeFileFormat, SortOption
+from jobflow_remote.cli.utils import SerializeFileFormat, SortOption, str_to_dict
 from jobflow_remote.config.base import LogLevel
 from jobflow_remote.jobs.state import FlowState, JobState
 
@@ -83,16 +82,12 @@ name_opt = Annotated[
     ),
 ]
 
-
-metadata_opt = Annotated[
-    Optional[str],
+worker_name_opt = Annotated[
+    Optional[list[str]],
     typer.Option(
-        "--metadata",
-        "-meta",
-        help="A string representing the metadata to be queried. Can be either"
-        " a list of comma separated key=value pairs or a string with the JSON"
-        " representation of a dictionary containing the mongoDB query for "
-        'the metadata subdocument (e.g \'{"key1.key2": 1, "key3": "test"}\')',
+        "--worker",
+        "-wk",
+        help="One or more worker names",
     ),
 ]
 
@@ -355,12 +350,7 @@ class DictTypeParser(click.ParamType):
     name = "DictType"
 
     def convert(self, value, param, ctx):
-        try:
-            value = json.loads(value)
-        except Exception as exc:
-            raise typer.BadParameter(
-                f"Error while converting JSON: {getattr(exc, 'message', str(exc))}"
-            ) from exc
+        value = str_to_dict(value)
         return DictType(value)
 
 
@@ -369,7 +359,25 @@ query_opt = Annotated[
     typer.Option(
         "--query",
         "-q",
-        help="A JSON string representing a generic query in the form of a dictionary. Overrides all other query options. Requires knowledge of the internal structure of the DB. ",
+        help="A JSON string representing a generic query in the form of a dictionary. "
+        "Overrides all other query options. Requires knowledge of the internal structure of the DB. "
+        "Can be either a list of comma separated key=value pairs or a string with the JSON"
+        " representation of a dictionary containing the mongoDB query that "
+        'should be performed (e.g \'{"key1.key2": 1, "key3": "test"}\')',
+        click_type=DictTypeParser(),
+    ),
+]
+
+
+metadata_opt = Annotated[
+    OptionalDictType,
+    typer.Option(
+        "--metadata",
+        "-meta",
+        help="A string representing the metadata to be queried. Can be either"
+        " a list of comma separated key=value pairs or a string with the JSON"
+        " representation of a dictionary containing the mongoDB query for "
+        'the metadata subdocument (e.g \'{"key1.key2": 1, "key3": "test"}\')',
         click_type=DictTypeParser(),
     ),
 ]

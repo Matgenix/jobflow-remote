@@ -289,3 +289,90 @@ def test_delete(job_controller, two_flows_four_jobs) -> None:
     assert len(flow_doc["ids"]) == 1
     assert len(flow_doc["parents"]) == 1
     assert len(flow_doc["parents"][two_flows_four_jobs[0][0].uuid]["1"]) == 0
+
+
+def test_queries(job_controller, two_flows_four_jobs) -> None:
+    import datetime
+
+    from jobflow_remote.testing.cli import run_check_cli
+
+    # test different query methods
+
+    run_check_cli(
+        ["job", "pause", "-meta", '{"test_meta": 1}'],
+        required_out="Operation completed: 1 jobs modified",
+    )
+
+    req_output_all = [
+        "Operation completed: 1 jobs modified",
+        "No filter has been set. This will apply the change to all the jobs in the DB.",
+    ]
+    run_check_cli(
+        ["job", "play"],
+        cli_input="y",
+        required_out=req_output_all,
+    )
+
+    run_check_cli(
+        ["job", "pause", "--query", "db_id=1"],
+        required_out="Operation completed: 1 jobs modified",
+    )
+
+    req_output_partial = [
+        "Operation completed: 1 jobs modified",
+        "Error while playing for job 2 ValueError: Job in state WAITING. The action cannot be performed",
+    ]
+    run_check_cli(
+        ["job", "play", "--worker", "test_local_worker"],
+        cli_input="y",
+        required_out=req_output_partial,
+    )
+
+    now = datetime.datetime.now()
+    yesterday = (now - datetime.timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%S")
+    tomorrow = (now + datetime.timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%S")
+    run_check_cli(
+        ["job", "pause", "--start-date", tomorrow],
+        required_out="Operation completed: 0 jobs modified",
+    )
+    run_check_cli(
+        ["job", "pause", "--start-date", yesterday],
+        required_out="Operation completed: 4 jobs modified",
+    )
+
+    run_check_cli(
+        ["job", "play", "--end-date", yesterday],
+        required_out="Operation completed: 0 jobs modified",
+    )
+    run_check_cli(
+        ["job", "play", "--end-date", tomorrow],
+        required_out="Operation completed: 4 jobs modified",
+    )
+
+    run_check_cli(
+        ["job", "pause", "--days", "1"],
+        required_out="Operation completed: 4 jobs modified",
+    )
+
+    run_check_cli(
+        ["job", "play", "--hours", "1"],
+        required_out="Operation completed: 4 jobs modified",
+    )
+
+    run_check_cli(
+        ["job", "pause", "--start-date", yesterday, "--days", "1"],
+        required_out="Options start_date, days are incompatible",
+    )
+
+    run_check_cli(
+        ["job", "pause", "--name", "addxxx"],
+        required_out="Operation completed: 0 jobs modified",
+    )
+    run_check_cli(
+        ["job", "pause", "--name", "add1"],
+        required_out="Operation completed: 1 jobs modified",
+    )
+    run_check_cli(
+        ["job", "play", "--name", "add*"],
+        required_out="Operation completed: 1 jobs modified",
+    )

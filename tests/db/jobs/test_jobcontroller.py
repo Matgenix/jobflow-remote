@@ -91,6 +91,9 @@ def test_queries(job_controller, runner) -> None:
 
     assert job_controller.count_jobs(flow_ids=flow.uuid) == 2
 
+    assert job_controller.count_jobs(workers="test_local_worker") == 4
+    assert job_controller.count_jobs(workers="xxx") == 0
+
     with job_controller.lock_job(filter={"uuid": add_second.uuid}):
         assert job_controller.count_jobs(locked=True) == 1
 
