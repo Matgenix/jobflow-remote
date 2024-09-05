@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import os
 import random
+from contextlib import ExitStack
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -10,6 +11,7 @@ from flufl.lock import Lock, LockError
 
 if TYPE_CHECKING:
     from jobflow_remote.remote.host import BaseHost
+
 
 logger = logging.getLogger(__name__)
 
@@ -86,18 +88,20 @@ class RemoteBatchManager:
 
         Returns
         -------
-            The list of file names in the directory.
+            The list of file names in the submitted directory.
         """
         return self.host.listdir(self.submitted_dir)
 
     def get_terminated(self) -> list[tuple[str, int, str]]:
         """
         Get job ids and process ids of the terminated jobs from the corresponding
-        directory.
+        directory on the host.
 
         Returns
         -------
-
+        list
+            The list of job ids, job indexes and batch process uuids in the host
+            terminated directory.
         """
         terminated = []
         for i in self.host.listdir(self.terminated_dir):
@@ -107,6 +111,16 @@ class RemoteBatchManager:
         return terminated
 
     def get_running(self) -> list[tuple[str, int, str]]:
+        """
+        Get job ids and process ids of the running jobs from the corresponding
+        directory on the host.
+
+        Returns
+        -------
+        list
+            The list of job ids, job indexes and batch process uuids in the host
+            running directory.
+        """
         running = []
         for filename in self.host.listdir(self.running_dir):
             job_id, _index, process_uuid = filename.split("_")
@@ -127,23 +141,62 @@ class LocalBatchManager:
     Used in the worker to executes the batch Jobs.
     """
 
-    def __init__(self, files_dir: str | Path, process_id: str) -> None:
+    def __init__(
+        self,
+        files_dir: str | Path,
+        process_id: str,
+        multiprocess_lock=None,
+    ) -> None:
+        """
+        Parameters
+        ----------
+        files_dir
+            The full path to directory where the files to handle the jobs
+            to be executed in batch processes are stored.
+        process_id
+            The uuid associated to the batch process.
+        multiprocess_lock
+            A lock from the multiprocessing module to be used when executing jobs in
+            parallel with other processes of the same worker.
+        """
         self.process_id = process_id
         self.files_dir = Path(files_dir)
+        self.multiprocess_lock = multiprocess_lock
         self.submitted_dir = self.files_dir / SUBMITTED_DIR
         self.running_dir = self.files_dir / RUNNING_DIR
         self.terminated_dir = self.files_dir / TERMINATED_DIR
         self.lock_dir = self.files_dir / LOCK_DIR
 
     def get_job(self) -> str | None:
+        """
+        Select randomly a job from the submitted directory to be executed.
+        Move the file to the running directory.
+
+        Locks will prevent the same job from being executed from other processes.
+        If no job can be executed, None is returned.
+
+        Returns
+        -------
+        str | None
+            The name of the job that was selected, or None if no job can be executed.
+        """
         files = os.listdir(self.submitted_dir)
 
         while files:
             selected = random.choice(files)
             try:
-                with Lock(
-                    str(self.lock_dir / selected), lifetime=60, default_timeout=0
-                ):
+                with ExitStack() as lock_stack:
+                    # if in a multiprocess execution, avoid concurrent interaction
+                    # from processes belonging to the same job
+                    if self.multiprocess_lock:
+                        lock_stack.enter_context(self.multiprocess_lock)
+                    lock_stack.enter_context(
+                        Lock(
+                            str(self.lock_dir / selected),
+                            lifetime=60,
+                            default_timeout=0,
+                        )
+                    )
                     os.remove(self.submitted_dir / selected)
                     (self.running_dir / f"{selected}_{self.process_id}").touch()
                     return selected
@@ -155,5 +208,16 @@ class LocalBatchManager:
         return None
 
     def terminate_job(self, job_id: str, index: int) -> None:
+        """
+        Terminate a job by removing the corresponding file from the running
+        directory and adding a new file in the terminated directory.
+
+        Parameters
+        ----------
+        job_id
+            The uuid of the job to terminate.
+        index
+            The index of the job to terminate.
+        """
         os.remove(self.running_dir / f"{job_id}_{index}_{self.process_id}")
         (self.terminated_dir / f"{job_id}_{index}_{self.process_id}").touch()

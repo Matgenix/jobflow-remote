@@ -7,6 +7,7 @@ import os
 import subprocess
 import time
 import traceback
+from multiprocessing import Manager, Process
 from typing import TYPE_CHECKING
 
 from jobflow import JobStore, initialize_logger
@@ -99,11 +100,70 @@ def run_batch_jobs(
     max_time: int | None = None,
     max_wait: int = 60,
     max_jobs: int | None = None,
+    parallel_jobs: int | None = None,
+) -> None:
+    parallel_jobs = parallel_jobs or 1
+
+    if parallel_jobs == 1:
+        run_single_batch_jobs(
+            base_run_dir=base_run_dir,
+            files_dir=files_dir,
+            process_uuid=process_uuid,
+            max_time=max_time,
+            max_wait=max_wait,
+            max_jobs=max_jobs,
+        )
+    else:
+        with Manager() as manager:
+            multiprocess_lock = manager.Lock()
+            parallel_ids = manager.dict()
+            batch_manager = LocalBatchManager(
+                files_dir=files_dir,
+                process_id=process_uuid,
+                multiprocess_lock=multiprocess_lock,
+            )
+            processes = [
+                Process(
+                    target=run_single_batch_jobs,
+                    args=(
+                        base_run_dir,
+                        files_dir,
+                        process_uuid,
+                        max_time,
+                        max_wait,
+                        max_jobs,
+                        batch_manager,
+                        parallel_ids,
+                    ),
+                )
+                for _ in range(parallel_jobs)
+            ]
+            for p in processes:
+                p.start()
+                time.sleep(0.5)
+
+            for p in processes:
+                p.join()
+
+
+def run_single_batch_jobs(
+    base_run_dir: str | Path,
+    files_dir: str | Path,
+    process_uuid: str,
+    max_time: int | None = None,
+    max_wait: int = 60,
+    max_jobs: int | None = None,
+    batch_manager: LocalBatchManager | None = None,
+    parallel_ids: dict | None = None,
 ) -> None:
     initialize_remote_run_log()
 
     # TODO the ID should be somehow linked to the queue job
-    bm = LocalBatchManager(files_dir=files_dir, process_id=process_uuid)
+    if not batch_manager:
+        batch_manager = LocalBatchManager(files_dir=files_dir, process_id=process_uuid)
+
+    if parallel_ids:
+        parallel_ids[os.getpid()] = False
 
     t0 = time.time()
     wait = 0
@@ -115,16 +175,31 @@ def run_batch_jobs(
             return
 
         if max_wait and wait > max_wait:
-            logger.info(
-                f"No jobs available for more than {max_wait} seconds. Stopping."
-            )
-            return
+            # if many jobs run in parallel do not shut down here, unless all
+            # the other jobs are also stopped
+            if parallel_ids:
+                for pid, pid_is_running in parallel_ids.items():
+                    if pid_is_running:
+                        try:
+                            os.kill(pid, 0)  # throws OSError if the process is dead
+                        except OSError:  # means this process is dead!
+                            pid_is_running[pid] = False
+                if not any(parallel_ids.values()):
+                    logger.info(
+                        f"No jobs available for more than {max_wait} seconds and all other jobs are stopped. Stopping."
+                    )
+                    return
+            else:
+                logger.info(
+                    f"No jobs available for more than {max_wait} seconds. Stopping."
+                )
+                return
 
         if max_jobs and count >= max_jobs:
             logger.info(f"Maximum number of jobs reached ({max_jobs}). Stopping.")
             return
 
-        job_str = bm.get_job()
+        job_str = batch_manager.get_job()
         if not job_str:
             time.sleep(sleep_time)
             wait += sleep_time
@@ -135,6 +210,8 @@ def run_batch_jobs(
             index: int = int(_index)
             logger.info(f"Starting job with id {job_id} and index {index}")
             job_path = get_job_path(job_id=job_id, index=index, base_path=base_run_dir)
+            if parallel_ids:
+                parallel_ids[os.getpid()] = True
             try:
                 with cd(job_path):
                     result = subprocess.run(
@@ -147,13 +224,16 @@ def run_batch_jobs(
                         logger.warning(
                             f"Process for job with id {job_id} and index {index} finished with an error"
                         )
-                bm.terminate_job(job_id, index)
+                batch_manager.terminate_job(job_id, index)
             except Exception:
                 logger.exception(
                     "Error while running job with id {job_id} and index {index}"
                 )
             else:
                 logger.info(f"Completed job with id {job_id} and index {index}")
+
+        if parallel_ids:
+            parallel_ids[os.getpid()] = False
 
 
 def decompress_files(store: JobStore) -> None:
