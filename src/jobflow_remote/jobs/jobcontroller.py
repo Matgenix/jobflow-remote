@@ -4066,7 +4066,9 @@ class JobController:
                     f"The connection to host {host} could not be closed.", exc_info=True
                 )
 
-    def get_batch_processes(self, worker: str) -> dict[str, str]:
+    def get_batch_processes(
+        self, worker: str | None = None
+    ) -> dict[str, dict[str, str]]:
         """
         Get the batch processes associated with a given worker.
 
@@ -4081,9 +4083,14 @@ class JobController:
             A dictionary with the {process_id: process_uuid} of the batch
             jobs running on the selected worker.
         """
-        result = self.auxiliary.find_one({"batch_processes": {"$exists": True}})
+        if worker:
+            query = {f"batch_processes.{worker}": {"$exists": True}}
+        else:
+            query = {"batch_processes": {"$exists": True}}
+
+        result = self.auxiliary.find_one(query)
         if result:
-            return result["batch_processes"].get(worker, {})
+            return result["batch_processes"] or {}
         return {}
 
     def add_batch_process(
@@ -4112,7 +4119,7 @@ class JobController:
         """
         return self.auxiliary.find_one_and_update(
             {"batch_processes": {"$exists": True}},
-            {"$push": {f"batch_processes.{worker}.{process_id}": process_uuid}},
+            {"$set": {f"batch_processes.{worker}.{process_id}": process_uuid}},
             upsert=True,
         )
 

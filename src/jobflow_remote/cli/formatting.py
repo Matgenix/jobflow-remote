@@ -14,6 +14,7 @@ from rich.text import Text
 
 from jobflow_remote.cli.utils import ReprStr, fmt_datetime
 from jobflow_remote.jobs.state import FlowState, JobState
+from jobflow_remote.remote.data import get_job_path
 from jobflow_remote.utils.data import convert_utc_time
 
 if TYPE_CHECKING:
@@ -490,3 +491,42 @@ def format_upgrade_actions(actions: list[UpgradeAction]):
         msg += f"* {action.description}\n"
 
     return Markdown(msg)
+
+
+def get_batch_processes_table(
+    batch_processes: dict,
+    workers: dict[str, WorkerBase],
+    running_jobs: dict[str, list[tuple[str, int, str]]],
+    verbosity: int = 0,
+):
+    table = Table(title="Flows info")
+    table.add_column("Process ID")
+    table.add_column("Process UUID")
+    table.add_column("Worker")
+    table.add_column("Process folder")
+    if verbosity > 0:
+        table.add_column("Running Job ids (Index)")
+
+    for worker_name, processes_data in batch_processes.items():
+        worker = workers[worker_name]
+        for process_id, process_uuid in processes_data.items():
+            row = [
+                process_id,
+                process_uuid,
+                worker_name,
+                get_job_path(process_uuid, None, worker.batch.work_dir),
+            ]
+
+            if verbosity > 0:
+                jobs_data = running_jobs.get(worker_name, [])
+                process_jobs = [
+                    f"{job_data[0]} ({job_data[1]})"
+                    for job_data in jobs_data
+                    if job_data[2] == process_uuid
+                ]
+
+                row.append("\n".join(process_jobs))
+
+            table.add_row(*row)
+
+    return table

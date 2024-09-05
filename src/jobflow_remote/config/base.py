@@ -131,7 +131,10 @@ class BatchConfig(BaseModel):
     )
     max_time: Optional[int] = Field(
         None,
-        description="Maximum time after which a job will not submit more jobs (seconds). To help avoid hitting the walltime",
+        description="Maximum time after which a job will not start more jobs (seconds). To help avoid hitting the walltime",
+    )
+    parallel_jobs: Optional[int] = Field(
+        None, description="Number of jobs executed in parallel in the same process"
     )
     model_config = ConfigDict(extra="forbid")
 
