@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import shutil
 import signal
 import time
@@ -996,7 +997,9 @@ class Runner:
 
             # Check the processes that should be running on the remote queue
             # and update the state in the DB if something changed
-            batch_processes_data = self.job_controller.get_batch_processes(worker_name)
+            batch_processes_data = self.job_controller.get_batch_processes(
+                worker_name
+            ).get(worker_name, {})
             processes = list(batch_processes_data)
             queue_manager = self.get_queue_manager(worker_name)
             if processes:
@@ -1030,31 +1033,53 @@ class Runner:
                             ) as lock:
                                 if lock.locked_document:
                                     err_msg = f"The batch process that was running the job (process_id: {pid}, uuid: {process_running_uuid} was likely killed before terminating the job execution"
-                                    raise RuntimeError(err_msg)
+                                    raise RemoteError(err_msg, no_retry=True)
 
                 processes = list(running_processes)
 
             # check that enough processes are submitted and submit the required
             # amount to reach max_jobs, if needed.
-            n_jobs = self.job_controller.count_jobs(
-                {
-                    "state": {
-                        "$in": (
-                            JobState.BATCH_SUBMITTED.value,
-                            JobState.BATCH_RUNNING.value,
-                        )
-                    },
-                    "worker": worker_name,
-                }
+            # n_jobs = self.job_controller.count_jobs(
+            #     {
+            #         "state": {
+            #             "$in": (
+            #                 JobState.BATCH_SUBMITTED.value,
+            #                 JobState.BATCH_RUNNING.value,
+            #             )
+            #         },
+            #         "worker": worker_name,
+            #     }
+            # )
+
+            dict_n_jobs = self.job_controller.count_jobs_states(
+                [JobState.BATCH_SUBMITTED, JobState.BATCH_RUNNING]
             )
+            n_jobs_submitted = dict_n_jobs[JobState.BATCH_SUBMITTED]
+            n_jobs_running = dict_n_jobs[JobState.BATCH_RUNNING]
+
             n_processes = len(processes)
-            n_jobs_to_submit = min(
-                max(worker.max_jobs - n_processes, 0), max(n_jobs - n_processes, 0)
+            n_parallel = worker.batch.parallel_jobs or 1
+            # TODO for n_parallel > 1 here a new job is submitted to the queue even if only
+            # one jobflow Job is available to run. This may result in the submitted job
+            # be partially empty. Would it be better to submit only if more jobs need to be run?
+            # (in that case a single job may remain dangling in the queue)
+
+            # The purpose of dealing with running and submitted jobs separately is to avoid
+            # submitting processes if a job remains stuck in a SBATCH_RUNNING state.
+            # In principle it should not happen but if happening it will keep submitting
+            # batch processes to the queue.
+            available_jobs = max(
+                n_jobs_submitted - max((n_processes * n_parallel) - n_jobs_running, 0),
+                0,
+            )
+            n_processes_to_submit = min(
+                max(worker.max_jobs - n_processes, 0),
+                math.ceil(available_jobs / n_parallel),
             )
             logger.debug(
-                f"submitting {n_jobs_to_submit} batch jobs for worker {worker_name}"
+                f"submitting {n_processes_to_submit} batch jobs for worker {worker_name}"
             )
-            for _ in range(n_jobs_to_submit):
+            for _ in range(n_processes_to_submit):
                 resources = worker.resources or {}
                 process_running_uuid = suuid()
                 remote_path = Path(
@@ -1078,6 +1103,8 @@ class Runner:
                     command += f" -mt {worker.batch.max_time}"
                 if worker.batch.max_wait:
                     command += f" -mw {worker.batch.max_wait}"
+                if worker.batch.parallel_jobs:
+                    command += f" -pj {worker.batch.parallel_jobs}"
 
                 submit_result = queue_manager.submit(
                     commands=[command],
@@ -1096,6 +1123,9 @@ class Runner:
                     )
 
                 elif submit_result.status == SubmissionStatus.SUCCESSFUL:
+                    logger.debug(
+                        f"Batch job submitted to worker {worker_name} in folder {remote_path}. Queue id: {submit_result.job_id}"
+                    )
                     self.job_controller.add_batch_process(
                         submit_result.job_id, process_running_uuid, worker_name
                     )
