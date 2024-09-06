@@ -17,7 +17,7 @@ USER root
 COPY ./tests/integration/dockerfiles/slurm_startup.sh /etc/startup.sh
 
 # -== SGE ==-
-FROM base as sge
+FROM ubuntu:22-04 as sge
 USER root
 ## The SGE startup script includes the configuration of SGE, as the docker network is not ready during build
 COPY ./tests/integration/dockerfiles/sge_startup.sh /etc/startup.sh
