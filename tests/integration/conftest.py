@@ -51,7 +51,7 @@ def _get_random_name(length=6):
 
 
 @pytest.fixture(scope="session")
-def queue_ssh_port():
+def slurm_ssh_port():
     """The exposed local port for SSH connections to the queue container."""
     return _get_free_port()
 
@@ -136,13 +136,13 @@ def build_and_launch_container(
 
 
 @pytest.fixture(scope="session", autouse=True)
-def queue_container(docker_client, queue_ssh_port):
+def slurm_container(docker_client, slurm_ssh_port):
     """Build and launch a container running various queues and SSH, exposed on a random available
     port."""
-    ports = {"22/tcp": queue_ssh_port}
+    ports = {"22/tcp": slurm_ssh_port}
     yield from build_and_launch_container(
         docker_client,
-        Path("./tests/integration/dockerfiles/Dockerfile"),
+        Path("./tests/integration/dockerfiles/Dockerfile.slurm"),
         "jobflow-remote-testing-slurm:latest",
         ports=ports,
         buildargs={"QUEUE_SYSTEM": "slurm"},
@@ -171,7 +171,7 @@ def store_database_name():
 def write_tmp_settings(
     random_project_name,
     store_database_name,
-    queue_ssh_port,
+    slurm_ssh_port,
     db_port,
 ):
     """Collects the various sub-configs and writes them to a temporary file in a
@@ -229,7 +229,7 @@ def write_tmp_settings(
             "test_remote_slurm_worker": dict(
                 type="remote",
                 host="localhost",
-                port=queue_ssh_port,
+                port=slurm_ssh_port,
                 scheduler_type="slurm",
                 work_dir="/home/jobflow/jfr",
                 user="jobflow",
@@ -241,7 +241,7 @@ def write_tmp_settings(
             # "test_remote_sge_worker": dict(
             #     type="remote",
             #     host="localhost",
-            #     port=queue_ssh_port,
+            #     port=slurm_ssh_port,
             #     scheduler_type="sge",
             #     work_dir="/home/jobflow/jfr",
             #     user="jobflow",
@@ -253,7 +253,7 @@ def write_tmp_settings(
             "test_batch_remote_worker": dict(
                 type="remote",
                 host="localhost",
-                port=queue_ssh_port,
+                port=slurm_ssh_port,
                 scheduler_type="slurm",
                 work_dir="/home/jobflow/jfr",
                 user="jobflow",

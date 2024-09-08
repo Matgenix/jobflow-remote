@@ -6,7 +6,7 @@ group "default" {
 }
 
 target "slurm" {
-    dockerfile = "./tests/integration/dockerfiles/Dockerfile"
+    dockerfile = "./tests/integration/dockerfiles/Dockerfile.slurm"
     args = {
         QUEUE_SYSTEM = "slurm"
     }
@@ -16,7 +16,7 @@ target "slurm" {
 }
 
 target "sge" {
-    dockerfile = "./tests/integration/dockerfiles/Dockerfile"
+    dockerfile = "./tests/integration/dockerfiles/Dockerfile.sge"
     args = {
         QUEUE_SYSTEM = "sge"
     }

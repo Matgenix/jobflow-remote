@@ -18,7 +18,7 @@ def test_project_init(random_project_name) -> None:
     assert len(project.workers) == 4
 
 
-def test_paramiko_ssh_connection(job_controller, queue_ssh_port) -> None:
+def test_paramiko_ssh_connection(job_controller, slurm_ssh_port) -> None:
     from paramiko import SSHClient
     from paramiko.client import WarningPolicy
 
@@ -26,7 +26,7 @@ def test_paramiko_ssh_connection(job_controller, queue_ssh_port) -> None:
     client.set_missing_host_key_policy(WarningPolicy)
     client.connect(
         "localhost",
-        port=queue_ssh_port,
+        port=slurm_ssh_port,
         username="jobflow",
         password="jobflow",
         look_for_keys=False,
