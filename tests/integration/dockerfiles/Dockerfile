@@ -45,7 +45,7 @@ USER root
 
 # 3) Run an SSH server and set up Python environment and user for jobflow
 # Install OpenSSH server and set it to run on startup
-RUN apt update && apt install -y openssh-server sudo python3.10-venv && apt clean && rm -rf /var/lib/apt/lists/*
+RUN apt update && apt install -y dos2unix openssh-server sudo python3.10-venv && apt clean && rm -rf /var/lib/apt/lists/*
 RUN sed -i 's/#PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config
 
 # Create desired user with blank password then give user access to startup script as sudo without password
