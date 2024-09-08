@@ -72,6 +72,7 @@ def build_and_launch_container(
     dockerfile: Path | None = None,
     image_name: str | None = None,
     ports: dict[str, int] | None = None,
+    buildargs: dict[str, str] | None = None,
 ):
     """Builds and/or launches a container, returning the container object.
 
@@ -93,6 +94,7 @@ def build_and_launch_container(
         _, logs = docker_client.images.build(
             path=str(Path(__file__).parent.parent.parent.resolve()),
             dockerfile=dockerfile,
+            buildargs=buildargs,
             tag=image_name,
             rm=True,
             quiet=False,
@@ -141,8 +143,9 @@ def queue_container(docker_client, queue_ssh_port):
     yield from build_and_launch_container(
         docker_client,
         Path("./tests/integration/dockerfiles/Dockerfile"),
-        "jobflow-slurm:latest",
+        "jobflow-remote-testing-slurm:latest",
         ports=ports,
+        buildargs={"QUEUE_SYSTEM": "slurm"},
     )
 
 

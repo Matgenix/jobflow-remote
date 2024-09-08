@@ -53,7 +53,7 @@ jobs:
             *.cache-from=type=gha,scope=global
 
   test:
-    needs: [build-test-bench]
+    #needs: [build-test-bench]
     services:
       local_mongodb:
         image: mongo:5.0
@@ -69,8 +69,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      #- name: Set up Docker Buildx
+      #  uses: docker/setup-buildx-action@v3
 
       - uses: actions/setup-python@v5
         with:
@@ -78,13 +78,13 @@ jobs:
           cache: pip
           cache-dependency-path: pyproject.toml
 
-      - name: Load previously built Docker images
-        uses: docker/bake-action@v5
-        with:
-          files: tests/integration/dockerfiles/docker-bake.hcl
-          load: true
-          set: |
-            *.cache-from=type=gha,scope=global
+      #- name: Load previously built Docker images
+      #  uses: docker/bake-action@v5
+      #  with:
+      #    files: tests/integration/dockerfiles/docker-bake.hcl
+      #    load: true
+      #    set: |
+      #      *.cache-from=type=gha,scope=global
 
       - name: Install dependencies
         run: |
