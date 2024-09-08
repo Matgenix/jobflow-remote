@@ -17,11 +17,10 @@ USER root
 COPY ./tests/integration/dockerfiles/slurm_startup.sh /etc/startup.sh
 
 # -== SGE ==-
-FROM ubuntu:22-04 as sge
+FROM ubuntu:22.04 as sge
 USER root
 ## The SGE startup script includes the configuration of SGE, as the docker network is not ready during build
 COPY ./tests/integration/dockerfiles/sge_startup.sh /etc/startup.sh
-RUN chmod +x /etc/startup.sh && dos2unix /etc/startup.sh
 
 ## Following instructions from https://github.com/daimh/sge/blob/817a7fa019f0ec47425f43e843a1f58865614313/README.md
 ARG SGE_USERNAME=sge
@@ -37,7 +36,7 @@ RUN chown -R sge /opt/${SGE_USERNAME}
 WORKDIR /opt/${SGE_USERNAME}
 
 # 2) Add common options from ubuntu server
-FROM slurm as jobflow
+FROM ${QUEUE_SYSTEM} as jobflow
 
 ARG USERNAME=jobflow
 
