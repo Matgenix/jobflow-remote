@@ -165,7 +165,7 @@ def slurm_container(docker_client, slurm_ssh_port):
     ports = {"22/tcp": slurm_ssh_port}
     yield from build_and_launch_container(
         docker_client,
-        Path("./tests/integration/dockerfiles/Dockerfile.slurm"),
+        Path("./tests/integration/dockerfiles/Dockerfile"),
         "jobflow-remote-slurm:latest",
         ports=ports,
         buildargs={"QUEUE_SYSTEM": "slurm"},
