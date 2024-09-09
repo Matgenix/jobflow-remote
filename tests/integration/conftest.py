@@ -109,33 +109,56 @@ def build_and_launch_container(
         container = docker_client.containers.run(
             image_name,
             detach=True,
-            remove=True,
-            auto_remove=True,
+            remove=False,
+            auto_remove=False,
             tty=True,
             ports=ports,
         )
         assert isinstance(container, Container)
         print(" * Waiting for container to be ready...", end="")
-        time.sleep(1)
-        while container.status != "running":
+        max_retries = 30
+        while (retries := 0) < max_retries:
+            if container.status == "running":
+                print(f"\n{container.logs().decode()}\n")
+                print(f"\n * Container {container.id} launched.")
+                break
+            if container.status == "exited":
+                logs = f"\n{container.logs().decode()}\n"
+                pytest.fail(
+                    f"Container {container.name!r} ({container.image}) exited before being ready.\nFull logs: {logs}"
+                )
             print(".", end="")
             time.sleep(1)
+            retries += 1
             container.reload()
-        print("")
-        print(f" * Container {container.id} launched.")
-        print(f"{container.logs().decode()}\n")
+        else:
+            logs = f"\n{container.logs().decode()}\n"
+            pytest.fail(
+                f"Container {container.name!r} ({container.image}) did not start in time. Full\nlogs: {logs}"
+            )
 
         yield container
     finally:
         try:
             print(f"\n * Stopping container {container.id}...")
-            container.stop()
+            try:
+                container.stop()
+            except (docker.errors.APIError, docker.errors.NotFound):
+                pass
+            try:
+                container.kill()
+            except (docker.errors.APIError, docker.errors.NotFound):
+                pass
+            try:
+                container.remove()
+            except (docker.errors.APIError, docker.errors.NotFound):
+                pass
             print(" * Done!")
         except Exception as exc:
             print(f" x Failed to stop container: {exc}")
 
 
-@pytest.fixture(scope="session", autouse=True)
+@pytest.fixture(scope="module", autouse=True)
 def slurm_container(docker_client, slurm_ssh_port):
     """Build and launch a container running various queues and SSH, exposed on a random available
     port."""
@@ -143,13 +166,13 @@ def slurm_container(docker_client, slurm_ssh_port):
     yield from build_and_launch_container(
         docker_client,
         Path("./tests/integration/dockerfiles/Dockerfile.slurm"),
-        "jobflow-remote-testing-slurm:latest",
+        "jobflow-remote-slurm:latest",
         ports=ports,
         buildargs={"QUEUE_SYSTEM": "slurm"},
     )
 
 
-@pytest.fixture(scope="session", autouse=True)
+@pytest.fixture(scope="module", autouse=True)
 def mongo_container(docker_client, db_port):
     """Build and launch a container running MongoDB, exposed on a random available
     port."""
@@ -167,7 +190,7 @@ def store_database_name():
     return _get_random_name()
 
 
-@pytest.fixture(scope="session", autouse=True)
+@pytest.fixture(scope="module", autouse=True)
 def write_tmp_settings(
     random_project_name,
     store_database_name,
@@ -178,119 +201,131 @@ def write_tmp_settings(
     temporary directory."""
     tmp_dir: Path = Path(tempfile.mkdtemp())
 
-    os.environ["JFREMOTE_PROJECTS_FOLDER"] = str(tmp_dir.resolve())
-    workdir = tmp_dir / "jfr"
-    workdir.mkdir(exist_ok=True)
-    os.environ["JFREMOTE_PROJECT"] = random_project_name
-    # Set config file to a random path so that we don't accidentally load the default
-    os.environ["JFREMOTE_CONFIG_FILE"] = _get_random_name(length=10) + ".json"
-    # This import must come after setting the env vars as jobflow loads the default
-    # config on import
-    from jobflow_remote.config import Project
+    original_jf_remote_projects_folder = os.environ.get("JFREMOTE_PROJECTS_FOLDER")
+    original_jf_remote_project = os.environ.get("JFREMOTE_PROJECT")
+    original_config_file = os.environ.get("JFREMOTE_CONFIG_FILE")
+    try:
+        os.environ["JFREMOTE_PROJECTS_FOLDER"] = str(tmp_dir.resolve())
+        workdir = tmp_dir / "jfr"
+        workdir.mkdir(exist_ok=True)
+        os.environ["JFREMOTE_PROJECT"] = random_project_name
+        # Set config file to a random path so that we don't accidentally load the default
+        os.environ["JFREMOTE_CONFIG_FILE"] = _get_random_name(length=10) + ".json"
+        # This import must come after setting the env vars as jobflow loads the default
+        # config on import
+        from jobflow_remote.config import Project
 
-    project = Project(
-        name=random_project_name,
-        jobstore={
-            "docs_store": {
-                "type": "MongoStore",
-                "database": store_database_name,
-                "host": "localhost",
-                "port": db_port,
-                "collection_name": "docs",
-            },
-            "additional_stores": {
-                "big_data": {
-                    "type": "GridFSStore",
+        project = Project(
+            name=random_project_name,
+            jobstore={
+                "docs_store": {
+                    "type": "MongoStore",
                     "database": store_database_name,
                     "host": "localhost",
                     "port": db_port,
-                    "collection_name": "data",
+                    "collection_name": "docs",
+                },
+                "additional_stores": {
+                    "big_data": {
+                        "type": "GridFSStore",
+                        "database": store_database_name,
+                        "host": "localhost",
+                        "port": db_port,
+                        "collection_name": "data",
+                    },
                 },
             },
-        },
-        queue={
-            "store": {
-                "type": "MongoStore",
-                "database": store_database_name,
-                "host": "localhost",
-                "port": db_port,
-                "collection_name": "jobs",
-            },
-            "flows_collection": "flows",
-        },
-        log_level="debug",
-        workers={
-            "test_local_worker": dict(
-                type="local",
-                scheduler_type="shell",
-                work_dir=str(workdir),
-                resources={},
-            ),
-            "test_remote_slurm_worker": dict(
-                type="remote",
-                host="localhost",
-                port=slurm_ssh_port,
-                scheduler_type="slurm",
-                work_dir="/home/jobflow/jfr",
-                user="jobflow",
-                password="jobflow",
-                pre_run="source /home/jobflow/.venv/bin/activate",
-                resources={"partition": "debug", "ntasks": 1, "time": "00:01:00"},
-                connect_kwargs={"allow_agent": False, "look_for_keys": False},
-            ),
-            # "test_remote_sge_worker": dict(
-            #     type="remote",
-            #     host="localhost",
-            #     port=slurm_ssh_port,
-            #     scheduler_type="sge",
-            #     work_dir="/home/jobflow/jfr",
-            #     user="jobflow",
-            #     password="jobflow",
-            #     pre_run="source /home/jobflow/.venv/bin/activate",
-            #     resources={"partition": "debug", "ntasks": 1, "time": "00:01:00"},
-            #     connect_kwargs={"allow_agent": False, "look_for_keys": False},
-            # ),
-            "test_batch_remote_worker": dict(
-                type="remote",
-                host="localhost",
-                port=slurm_ssh_port,
-                scheduler_type="slurm",
-                work_dir="/home/jobflow/jfr",
-                user="jobflow",
-                password="jobflow",
-                pre_run="source /home/jobflow/.venv/bin/activate",
-                resources={"partition": "debug", "ntasks": 1, "time": "00:01:00"},
-                connect_kwargs={"allow_agent": False, "look_for_keys": False},
-                batch={
-                    "jobs_handle_dir": "/home/jobflow/jfr/batch_handle",
-                    "work_dir": "/home/jobflow/jfr/batch_work",
-                    "max_wait": 10,
+            queue={
+                "store": {
+                    "type": "MongoStore",
+                    "database": store_database_name,
+                    "host": "localhost",
+                    "port": db_port,
+                    "collection_name": "jobs",
                 },
-                max_jobs=1,
+                "flows_collection": "flows",
+            },
+            log_level="debug",
+            workers={
+                "test_local_worker": dict(
+                    type="local",
+                    scheduler_type="shell",
+                    work_dir=str(workdir),
+                    resources={},
+                ),
+                "test_remote_slurm_worker": dict(
+                    type="remote",
+                    host="localhost",
+                    port=slurm_ssh_port,
+                    scheduler_type="slurm",
+                    work_dir="/home/jobflow/jfr",
+                    user="jobflow",
+                    password="jobflow",
+                    pre_run="source /home/jobflow/.venv/bin/activate",
+                    resources={"partition": "debug", "ntasks": 1, "time": "00:01:00"},
+                    connect_kwargs={"allow_agent": False, "look_for_keys": False},
+                ),
+                # "test_remote_sge_worker": dict(
+                #     type="remote",
+                #     host="localhost",
+                #     port=slurm_ssh_port,
+                #     scheduler_type="sge",
+                #     work_dir="/home/jobflow/jfr",
+                #     user="jobflow",
+                #     password="jobflow",
+                #     pre_run="source /home/jobflow/.venv/bin/activate",
+                #     resources={"partition": "debug", "ntasks": 1, "time": "00:01:00"},
+                #     connect_kwargs={"allow_agent": False, "look_for_keys": False},
+                # ),
+                "test_batch_remote_worker": dict(
+                    type="remote",
+                    host="localhost",
+                    port=slurm_ssh_port,
+                    scheduler_type="slurm",
+                    work_dir="/home/jobflow/jfr",
+                    user="jobflow",
+                    password="jobflow",
+                    pre_run="source /home/jobflow/.venv/bin/activate",
+                    resources={"partition": "debug", "ntasks": 1, "time": "00:01:00"},
+                    connect_kwargs={"allow_agent": False, "look_for_keys": False},
+                    batch={
+                        "jobs_handle_dir": "/home/jobflow/jfr/batch_handle",
+                        "work_dir": "/home/jobflow/jfr/batch_work",
+                        "max_wait": 10,
+                    },
+                    max_jobs=1,
+                ),
+                "test_max_jobs_worker": dict(
+                    type="local",
+                    scheduler_type="shell",
+                    work_dir=str(workdir),
+                    resources={},
+                    max_jobs=2,
+                ),
+            },
+            exec_config={"test": {"export": {"TESTING_ENV_VAR": random_project_name}}},
+            runner=dict(
+                delay_checkout=1,
+                delay_check_run_status=1,
+                delay_advance_status=1,
+                max_step_attempts=3,
+                delta_retry=(1, 1, 1),
             ),
-            "test_max_jobs_worker": dict(
-                type="local",
-                scheduler_type="shell",
-                work_dir=str(workdir),
-                resources={},
-                max_jobs=2,
-            ),
-        },
-        exec_config={"test": {"export": {"TESTING_ENV_VAR": random_project_name}}},
-        runner=dict(
-            delay_checkout=1,
-            delay_check_run_status=1,
-            delay_advance_status=1,
-            max_step_attempts=3,
-            delta_retry=(1, 1, 1),
-        ),
-    )
-    project_json = project.model_dump_json(indent=2)
-    with open(tmp_dir / f"{random_project_name}.json", "w") as f:
-        f.write(project_json)
+        )
+        project_json = project.model_dump_json(indent=2)
+        with open(tmp_dir / f"{random_project_name}.json", "w") as f:
+            f.write(project_json)
 
-    yield
-    shutil.rmtree(tmp_dir)
+        yield
+    finally:
+        shutil.rmtree(tmp_dir)
+        # Reset environment variables if they were set elsewhere
+        if original_jf_remote_projects_folder is not None:
+            os.environ["JFREMOTE_PROJECTS_FOLDER"] = original_jf_remote_projects_folder
+        if original_jf_remote_project is not None:
+            os.environ["JFREMOTE_PROJECT"] = original_jf_remote_project
+        if original_config_file is not None:
+            os.environ["JFREMOTE_CONFIG_FILE"] = original_config_file
 
 
 @pytest.fixture()
