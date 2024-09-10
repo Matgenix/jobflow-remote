@@ -158,7 +158,7 @@ def build_and_launch_container(
             print(f" x Failed to stop container: {exc}")
 
 
-@pytest.fixture(scope="module", autouse=True)
+@pytest.fixture(scope="session", autouse=True)
 def slurm_container(docker_client, slurm_ssh_port):
     """Build and launch a container running various queues and SSH, exposed on a random available
     port."""
@@ -172,7 +172,7 @@ def slurm_container(docker_client, slurm_ssh_port):
     )
 
 
-@pytest.fixture(scope="module", autouse=True)
+@pytest.fixture(scope="session", autouse=True)
 def mongo_container(docker_client, db_port):
     """Build and launch a container running MongoDB, exposed on a random available
     port."""
@@ -190,7 +190,7 @@ def store_database_name():
     return _get_random_name()
 
 
-@pytest.fixture(scope="module", autouse=True)
+@pytest.fixture(scope="session", autouse=True)
 def write_tmp_settings(
     random_project_name,
     store_database_name,
