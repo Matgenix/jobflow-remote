@@ -233,7 +233,7 @@ class JobController:
         if isinstance(workers, str):
             workers = [workers]
 
-        query: dict = {}
+        query: dict = defaultdict(dict)
 
         if db_ids:
             query["db_id"] = {"$in": db_ids}
@@ -255,7 +255,7 @@ class JobController:
             query["updated_on"] = {"$gte": start_date_str}
         if end_date:
             end_date_str = end_date.astimezone(timezone.utc)
-            query["updated_on"] = {"$lte": end_date_str}
+            query["updated_on"]["$lte"] = end_date_str
 
         if locked:
             query["lock_id"] = {"$ne": None}
@@ -269,7 +269,6 @@ class JobController:
         if metadata:
             metadata_dict = {f"job.metadata.{k}": v for k, v in metadata.items()}
             query.update(metadata_dict)
-            print(query)
 
         if workers:
             query["worker"] = {"$in": workers}
