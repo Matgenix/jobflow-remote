@@ -173,6 +173,7 @@ to set the values of the resources and execution configurations.
 
 .. note::
 
-    In order for this to be meaningful only Jobs that have not been started
-    can be modified. So this commands can be applied only to Jobs in the
-    ``READY`` or ``WAITING`` states.
+    In order for this to be meaningful only a subset of Jobs states are
+    acceptable. This commands can be applied only to Jobs in the
+    ``READY``, ``WAITING``, ``COMPLETED``, ``FAILED``, ``PAUSED`` and
+    ``REMOTE_ERROR`` states.
