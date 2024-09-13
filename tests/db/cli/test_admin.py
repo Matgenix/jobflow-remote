@@ -77,3 +77,50 @@ def test_unlock_flow(job_controller, one_job) -> None:
         required_out="No data matching the request",
         error=True,
     )
+
+
+def test_index_rebuild(job_controller, one_job):
+    from jobflow_remote.testing.cli import run_check_cli
+
+    assert job_controller.count_jobs() == 1
+
+    # use foreground to avoid checking before the DB created the index
+    run_check_cli(
+        ["admin", "index", "rebuild", "-fg"],
+        required_out="Indexes rebuilt",
+    )
+    job_indexes = list(job_controller.jobs.list_indexes())
+    flows_indexes = list(job_controller.flows.list_indexes())
+    assert len(job_indexes) == 11
+    assert len(flows_indexes) == 7
+
+
+def test_index_create(job_controller, one_job):
+    from jobflow_remote.testing.cli import run_check_cli
+
+    assert job_controller.count_jobs() == 1
+
+    run_check_cli(
+        ["admin", "index", "create", "-fg", "test_ind", "desc"],
+        required_out="Index created",
+    )
+
+    run_check_cli(
+        ["admin", "index", "create", "-c", "flows", "-fg", "test_ind_2"],
+        required_out="Index created",
+    )
+
+    job_indexes = list(job_controller.jobs.list_indexes())
+    flows_indexes = list(job_controller.flows.list_indexes())
+    assert len(job_indexes) == 12
+    assert len(flows_indexes) == 8
+
+    run_check_cli(
+        ["admin", "index", "rebuild", "-fg"],
+        required_out="Indexes rebuilt",
+    )
+
+    job_indexes = list(job_controller.jobs.list_indexes())
+    flows_indexes = list(job_controller.flows.list_indexes())
+    assert len(job_indexes) == 11
+    assert len(flows_indexes) == 7

@@ -1,4 +1,4 @@
-from typing import Annotated
+from typing import Annotated, Optional
 
 import typer
 from rich.prompt import Confirm
@@ -12,11 +12,15 @@ from jobflow_remote.cli.types import (
     flow_ids_opt,
     flow_state_opt,
     force_opt,
+    foreground_index_opt,
+    index_direction_arg,
+    index_key_arg,
     job_ids_indexes_opt,
     job_state_opt,
     start_date_opt,
 )
 from jobflow_remote.cli.utils import (
+    IndexDirection,
     check_stopped_runner,
     exit_with_error_msg,
     get_config_manager,
@@ -25,6 +29,7 @@ from jobflow_remote.cli.utils import (
     loading_spinner,
     out_console,
 )
+from jobflow_remote.jobs.data import DbCollection
 
 app_admin = JFRTyper(
     name="admin", help="Commands for administering the database", no_args_is_help=True
@@ -230,3 +235,70 @@ def unlock_flow(
         )
 
     out_console.print(f"{num_unlocked} flows were unlocked")
+
+
+app_index = JFRTyper(
+    name="index",
+    help="Commands for managing the indexes of the queue database",
+    no_args_is_help=True,
+)
+app_admin.add_typer(app_index)
+
+
+@app_index.command()
+def rebuild(
+    foreground: foreground_index_opt = False,
+):
+    """
+    Rebuild all the standard indexes.
+    Old indexes will be dropped, including the custom ones.
+    """
+    with loading_spinner(processing=False) as progress:
+        progress.add_task(description="Resetting the indexes...", total=None)
+        jc = get_job_controller()
+        jc.build_indexes(background=not foreground, drop=True)
+
+    if foreground:
+        out_console.print("Indexes rebuilt")
+    else:
+        out_console.print("Indexes rebuild started in background")
+
+
+@app_index.command()
+def create(
+    key: index_key_arg,
+    direction: index_direction_arg = IndexDirection.ASC,
+    foreground: foreground_index_opt = False,
+    collection: Annotated[
+        Optional[DbCollection],
+        typer.Option(
+            "--collection",
+            "-c",
+            help="The collection where the index should be added",
+        ),
+    ] = DbCollection.JOBS.value,  # type: ignore[assignment]
+    unique: Annotated[
+        bool,
+        typer.Option(
+            "--unique",
+            "-u",
+            help="The index will be unique",
+        ),
+    ] = False,
+):
+    """
+    Add an index to one of the queue collections
+    """
+    with loading_spinner(processing=False) as progress:
+        progress.add_task(description="Resetting the indexes...", total=None)
+        jc = get_job_controller()
+        jc.create_indexes(
+            indexes=[[(key, direction.as_pymongo)]],
+            unique=unique,
+            collection=collection,
+            background=not foreground,
+        )
+    if foreground:
+        out_console.print("Index created")
+    else:
+        out_console.print("Index creation started in background")
