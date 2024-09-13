@@ -1,6 +1,20 @@
 # Changelog
 
-## [v0.1.3](https://github.com/Matgenix/jobflow-remote/tree/v0.1.3) (2024-08-28)
+## [v0.1.4](https://github.com/Matgenix/jobflow-remote/tree/v0.1.4) (2024-09-13)
+
+[Full Changelog](https://github.com/Matgenix/jobflow-remote/compare/v0.1.3...v0.1.4)
+
+**Closed issues:**
+
+- Remote errors in interactive mode when larger workflows are run [\#174](https://github.com/Matgenix/jobflow-remote/issues/174)
+- Add  `--query` \(or `--worker`\) flag to `jf job rerun/retry` [\#170](https://github.com/Matgenix/jobflow-remote/issues/170)
+
+**Merged pull requests:**
+
+- Bugfix: improve collection indexes to prevent duplications [\#177](https://github.com/Matgenix/jobflow-remote/pull/177) ([gpetretto](https://github.com/gpetretto))
+- Add --worker and --query option in CLI [\#171](https://github.com/Matgenix/jobflow-remote/pull/171) ([gpetretto](https://github.com/gpetretto))
+
+## [v0.1.3](https://github.com/Matgenix/jobflow-remote/tree/v0.1.3) (2024-09-02)
 
 [Full Changelog](https://github.com/Matgenix/jobflow-remote/compare/v0.1.2...v0.1.3)
 
