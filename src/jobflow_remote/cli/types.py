@@ -4,7 +4,7 @@ from typing import Annotated, Optional
 import click
 import typer
 
-from jobflow_remote.cli.utils import SerializeFileFormat, SortOption, str_to_dict
+from jobflow_remote.cli.utils import IndexDirection, SerializeFileFormat, SortOption, str_to_dict
 from jobflow_remote.config.base import LogLevel
 from jobflow_remote.jobs.state import FlowState, JobState
 
@@ -329,6 +329,31 @@ delete_all_opt = Annotated[
         "--all",
         "-a",
         help="enable --output and --files",
+    ),
+]
+
+foreground_index_opt = Annotated[
+    bool,
+    typer.Option(
+        "--foreground",
+        "-fg",
+        help="The build of the indexes will not be executed in the background",
+    ),
+]
+
+index_key_arg = Annotated[
+    str,
+    typer.Argument(
+        help="The field on which the index will be created",
+        metavar="INDEX",
+    ),
+]
+
+index_direction_arg = Annotated[
+    Optional[IndexDirection],
+    typer.Argument(
+        help="The direction of the index",
+        metavar="DIRECTION",
     ),
 ]
 

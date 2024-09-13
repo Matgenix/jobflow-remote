@@ -482,6 +482,12 @@ class DynamicResponseType(Enum):
     ADDITION = "addition"
 
 
+class DbCollection(Enum):
+    JOBS = "jobs"
+    FLOWS = "flows"
+    AUX = "aux"
+
+
 def get_reset_job_base_dict() -> dict:
     """
     Generate a dictionary with the basic properties to update in case of reset.

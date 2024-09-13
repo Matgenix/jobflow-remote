@@ -1,6 +1,7 @@
 import os.path
 from typing import NoReturn
 
+import pymongo
 import pytest
 
 from jobflow_remote.jobs.state import FlowState
@@ -672,3 +673,35 @@ def test_delete_job_with_replace(job_controller, runner):
     assert len(flow_doc["ids"]) == 1
     assert len(flow_doc["parents"]) == 1
     assert flow_doc["parents"][j2.uuid]["1"] == []
+
+
+def test_add_flow(job_controller):
+    from jobflow import Flow
+
+    from jobflow_remote.testing import add
+
+    j = add(1, 2)
+    flow = Flow([j])
+
+    job_controller.add_flow(flow, worker="test_local_worker")
+    assert job_controller.count_jobs() == 1
+
+    # the same flow cannot be inserted twice
+    with pytest.raises(
+        ValueError, match=".*A duplicate key error happened while inserting the flow.*"
+    ):
+        job_controller.add_flow(flow, worker="test_local_worker")
+    assert job_controller.count_jobs() == 1
+
+
+def test_indexes(job_controller, one_job):
+    assert len(list(job_controller.jobs.list_indexes())) == 11
+    job_controller.create_indexes(
+        [[("xxx", pymongo.DESCENDING), ("yyy", pymongo.ASCENDING)]],
+        unique=True,
+        background=False,
+    )
+    assert len(list(job_controller.jobs.list_indexes())) == 12
+
+    job_controller.build_indexes(background=False, drop=True)
+    assert len(list(job_controller.jobs.list_indexes())) == 11

@@ -23,6 +23,7 @@ from jobflow_remote.config.base import ConfigError, ExecutionConfig, Project
 from jobflow_remote.config.manager import ConfigManager
 from jobflow_remote.jobs.data import (
     OUT_FILENAME,
+    DbCollection,
     DynamicResponseType,
     FlowDoc,
     FlowInfo,
@@ -2553,7 +2554,7 @@ class JobController:
         self.flows.drop()
         self.auxiliary.drop()
         self.auxiliary.insert_one({"next_id": 1})
-        self.build_indexes()
+        self.build_indexes(drop=True)
         return True
 
     def build_indexes(
@@ -2561,6 +2562,7 @@ class JobController:
         background: bool = True,
         job_custom_indexes: list[str | list] | None = None,
         flow_custom_indexes: list[str | list] | None = None,
+        drop: bool = False,
     ) -> None:
         """
         Build indexes in the database.
@@ -2575,8 +2577,21 @@ class JobController:
         flow_custom_indexes
             List of custom indexes for the flows collection.
             Same as job_custom_indexes.
+        drop
+            If True all existing indexes in the collections will be dropped.
         """
+
+        if drop:
+            self.jobs.drop_indexes()
+            self.flows.drop_indexes()
+            self.auxiliary.drop_indexes()
+
         self.jobs.create_index("db_id", unique=True, background=background)
+        self.jobs.create_index(
+            [("uuid", pymongo.ASCENDING), ("index", pymongo.ASCENDING)],
+            unique=True,
+            background=background,
+        )
 
         job_indexes = [
             "uuid",
@@ -2595,8 +2610,8 @@ class JobController:
             for idx in job_custom_indexes:
                 self.jobs.create_index(idx, background=background)
 
+        self.flows.create_index("uuid", unique=True, background=background)
         flow_indexes = [
-            "uuid",
             "name",
             "state",
             "updated_on",
@@ -2610,6 +2625,76 @@ class JobController:
         if flow_custom_indexes:
             for idx in flow_custom_indexes:
                 self.flows.create_index(idx, background=background)
+
+    def create_indexes(
+        self,
+        indexes: list[str | list],
+        collection: DbCollection = DbCollection.JOBS,
+        unique: bool = False,
+        background: bool = True,
+    ) -> None:
+        """
+        Build the selected indexes
+
+        Parameters
+        ----------
+        indexes
+            List of indexes to be added to the collection. Each element is passed
+            to pymongo's create_index, thus following those conventions.
+        collection
+            The collection where the index will be created.
+        unique
+
+        background
+            If True, the indexes should be created in the background.
+        """
+        coll = self.get_collection(collection)
+        for idx in indexes:
+            coll.create_index(idx, background=background, unique=unique)
+
+    def drop_indexes(
+        self,
+        indexes: list[str | list],
+        collection: DbCollection = DbCollection.JOBS,
+        unique: bool = False,
+        background: bool = True,
+    ) -> None:
+        """
+        Build the selected indexes
+
+        Parameters
+        ----------
+        indexes
+            List of indexes to be added to the collection. Each element is passed
+            to pymongo's create_index, thus following those conventions.
+        collection
+            The collection where the index will be created.
+        unique
+
+        background
+            If True, the indexes should be created in the background.
+        """
+        coll = self.get_collection(collection)
+        coll.create_indexes(indexes, background=background, unique=unique)
+
+    def get_collection(self, collection: DbCollection):
+        """
+        Return the internal collection corresponding to the selected DbCollection.
+
+        Parameters
+        ----------
+        collection
+            The collection selected.
+
+        Returns
+        -------
+            The internal instance of the MongoDB collection.
+        """
+        return {
+            DbCollection.JOBS: self.jobs,
+            DbCollection.FLOWS: self.flows,
+            DbCollection.AUX: self.auxiliary,
+        }[collection]
 
     def compact(self) -> None:
         """Compact jobs and flows collections in MongoDB."""
@@ -2852,8 +2937,14 @@ class JobController:
         # should not lead to inconsistencies in the states, even if one of
         # the jobs is checked out in the meanwhile. The opposite could lead
         # to errors.
-        self.flows.insert_one(flow_doc)
-        self.jobs.insert_many(job_dicts)
+        try:
+            self.flows.insert_one(flow_doc)
+            self.jobs.insert_many(job_dicts)
+        except pymongo.errors.DuplicateKeyError as exc:
+            raise ValueError(
+                "A duplicate key error happened while inserting the flow. If this is not an unlikely "
+                "event of uuid overlap, check that you are not trying to submit the same flow multiple times."
+            ) from exc
 
         logger.info(f"Added flow ({flow.uuid}) with jobs: {flow.job_uuids}")
 

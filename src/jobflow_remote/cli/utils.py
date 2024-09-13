@@ -107,6 +107,20 @@ class SerializeFileFormat(str, Enum):
     TOML = "toml"
 
 
+class IndexDirection(str, Enum):
+    ASC = "asc"
+    DESC = "desc"
+
+    @property
+    def as_pymongo(self):
+        import pymongo
+
+        return {
+            IndexDirection.ASC: pymongo.ASCENDING,
+            IndexDirection.DESC: pymongo.DESCENDING,
+        }[self]
+
+
 class ReprStr(str):
     r"""
     Helper class that overrides the standard __repr__ to return the string itself
