@@ -2652,31 +2652,6 @@ class JobController:
         for idx in indexes:
             coll.create_index(idx, background=background, unique=unique)
 
-    def drop_indexes(
-        self,
-        indexes: list[str | list],
-        collection: DbCollection = DbCollection.JOBS,
-        unique: bool = False,
-        background: bool = True,
-    ) -> None:
-        """
-        Build the selected indexes
-
-        Parameters
-        ----------
-        indexes
-            List of indexes to be added to the collection. Each element is passed
-            to pymongo's create_index, thus following those conventions.
-        collection
-            The collection where the index will be created.
-        unique
-
-        background
-            If True, the indexes should be created in the background.
-        """
-        coll = self.get_collection(collection)
-        coll.create_indexes(indexes, background=background, unique=unique)
-
     def get_collection(self, collection: DbCollection):
         """
         Return the internal collection corresponding to the selected DbCollection.
@@ -2941,9 +2916,17 @@ class JobController:
             self.flows.insert_one(flow_doc)
             self.jobs.insert_many(job_dicts)
         except pymongo.errors.DuplicateKeyError as exc:
+            # note that if the same Flow is inserted twice, the error will happen
+            # during the insert_one(flow_doc), so no inconsistency will be left in
+            # the DB. Since jobflow prevents the same job to belong to two different
+            # Flows, the only apparently reasonable case where the flow uuid is
+            # different but a job has a duplicated uuid is a random clash between
+            # two generated uuid, which should have a negligible probability of
+            # occurring. If a problem shows up a solution might be enclosing the
+            # previous two operations in a transaction.
             raise ValueError(
-                "A duplicate key error happened while inserting the flow. If this is not an unlikely "
-                "event of uuid overlap, check that you are not trying to submit the same flow multiple times."
+                "A duplicate key error happened while inserting the flow. Check "
+                "that you are not trying to submit the same flow multiple times."
             ) from exc
 
         logger.info(f"Added flow ({flow.uuid}) with jobs: {flow.job_uuids}")
