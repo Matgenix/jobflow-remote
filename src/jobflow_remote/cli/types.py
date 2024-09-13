@@ -4,7 +4,12 @@ from typing import Annotated, Optional
 import click
 import typer
 
-from jobflow_remote.cli.utils import IndexDirection, SerializeFileFormat, SortOption, str_to_dict
+from jobflow_remote.cli.utils import (
+    IndexDirection,
+    SerializeFileFormat,
+    SortOption,
+    str_to_dict,
+)
 from jobflow_remote.config.base import LogLevel
 from jobflow_remote.jobs.state import FlowState, JobState
 
