@@ -1,12 +1,15 @@
-from typing import Annotated
+from typing import Annotated, Optional
 
 import typer
 from rich.text import Text
+from rich.tree import Tree
 
 from jobflow_remote.cli.jfr_typer import JFRTyper
 from jobflow_remote.cli.utils import (
     cleanup_job_controller,
     complete_profiling,
+    find_subcommand,
+    get_command_tree,
     get_config_manager,
     initialize_config_manager,
     out_console,
@@ -96,3 +99,77 @@ def main(
     except ConfigError:
         # no warning printed if not needed as this seems to be confusing for the user
         pass
+
+
+@app.command()
+def tree(
+    ctx: typer.Context,
+    start_path: Annotated[
+        Optional[list[str]],
+        typer.Argument(help="Path to the starting command. e.g. 'jf tree job set'"),
+    ] = None,
+    show_options: Annotated[
+        bool,
+        typer.Option(
+            "--options",
+            "-o",
+            help="Show command options in the tree",
+        ),
+    ] = False,
+    show_docs: Annotated[
+        bool,
+        typer.Option(
+            "--docs",
+            "-D",
+            help="Show hidden commands",
+        ),
+    ] = False,
+    show_hidden: Annotated[
+        bool,
+        typer.Option(
+            "--hidden",
+            "-h",
+            help="Show hidden commands",
+        ),
+    ] = False,
+    max_depth: Annotated[
+        Optional[int],
+        typer.Option(
+            "--max-depth",
+            "-d",
+            help="Maximum depth of the tree to display",
+        ),
+    ] = None,
+):
+    """
+    Display a tree representation of the CLI command structure.
+
+    This command shows the structure of the CLI application as a tree, with options to customize the output.
+
+    Args:
+        ctx (typer.Context): The Typer context object.
+        start_path (List[str]): Path to the starting command for the tree.
+        show_options (bool): If True, show command options in the tree.
+        show_docs (bool): If True, show documentation for commands and options.
+        show_hidden (bool): If True, show hidden commands.
+        max_depth (Optional[int]): Maximum depth of the tree to display.
+    """
+    # Get the top-level app
+    main_app = ctx.find_root().command
+
+    if start_path:
+        start_command = find_subcommand(main_app, start_path)
+        if start_command is None:
+            typer.echo(f"Error: Command '{' '.join(start_path)}' not found", err=True)
+            raise typer.Exit(code=1)
+        tree_title = f"[bold red]{' '.join(start_path)}[/bold red]"
+    else:
+        start_command = main_app
+        tree_title = "[bold red]CLI App[/bold red]"
+
+    tree = Tree(tree_title)
+    command_tree = get_command_tree(
+        start_command, tree, show_options, show_docs, show_hidden, max_depth
+    )
+
+    out_console.print(command_tree)
