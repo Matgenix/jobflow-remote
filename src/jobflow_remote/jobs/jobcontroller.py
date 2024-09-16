@@ -63,7 +63,7 @@ from jobflow_remote.utils.db import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Generator
+    from collections.abc import Generator, Sequence
 
     from maggma.stores import MongoStore
 
@@ -2946,7 +2946,7 @@ class JobController:
 
     def get_trends(
         self,
-        states: list[JobState | FlowState],
+        states: Sequence[JobState | FlowState],
         interval: str = "days",
         num_intervals: int | None = None,
         interval_timezone: str = "UTC",
@@ -3017,7 +3017,7 @@ class JobController:
 
         if isinstance(states[0], JobState):
             collection = self.jobs
-            state_cls = JobState
+            state_cls: type = JobState
         elif isinstance(states[0], FlowState):
             collection = self.flows
             state_cls = FlowState

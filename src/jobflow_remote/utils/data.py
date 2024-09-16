@@ -208,7 +208,10 @@ def get_utc_offset(timezone: str):
     str
         The UTC offset as a string in the format +/-HH:MM.
     """
-    now = datetime.now(gettz(timezone))
+    tz_info_val = gettz(timezone)
+    if not tz_info_val:
+        raise ValueError(f"Could not determine the timezone for {timezone}")
+    now = datetime.now(tz_info_val)
 
     # Get the UTC offset
     utc_offset = now.utcoffset()

@@ -390,7 +390,7 @@ def test_queries(job_controller, two_flows_four_jobs) -> None:
     )
 
 
-def test_report(job_controller, one_job) -> None:
+def test_report(job_controller) -> None:
     from datetime import datetime
 
     from jobflow import Flow
