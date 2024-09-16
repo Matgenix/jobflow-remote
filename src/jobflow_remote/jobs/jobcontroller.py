@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING, Any, Callable, cast
 
 import jobflow
 import pymongo
+from dateutil.tz import gettz
 from jobflow import JobStore, OnMissing
 from monty.dev import deprecated
 from monty.json import MontyDecoder
@@ -46,7 +47,11 @@ from jobflow_remote.jobs.state import (
 )
 from jobflow_remote.remote.data import get_remote_store, update_store
 from jobflow_remote.remote.queue import QueueManager
-from jobflow_remote.utils.data import deep_merge_dict
+from jobflow_remote.utils.data import (
+    deep_merge_dict,
+    get_past_time_rounded,
+    get_utc_offset,
+)
 from jobflow_remote.utils.db import (
     FlowLockedError,
     JobLockedError,
@@ -2882,6 +2887,159 @@ class JobController:
                 name=name,
             )
         return self.flows.count_documents(query)
+
+    def count_jobs_states(self, states: list[JobState]) -> dict[JobState, int]:
+        """
+        Count the number of jobs in each of the given states.
+
+        Parameters
+        ----------
+        states
+            List of JobState to count.
+
+        Returns
+        -------
+        dict[JobState, int]
+            A dictionary with the count of jobs in each state.
+        """
+        pipeline = [
+            {"$match": {"state": {"$in": [s.value for s in states]}}},
+            {"$group": {"_id": "$state", "count": {"$sum": 1}}},
+        ]
+        result = self.jobs.aggregate(pipeline) or []
+        out = {}
+        for r in result:
+            out[JobState(r["_id"])] = r["count"]
+
+        for state in states:
+            out[state] = out.get(state, 0)
+
+        return out
+
+    def count_flows_states(self, states: list[FlowState]) -> dict[FlowState, int]:
+        """
+        Count the number of flows in each of the given states.
+
+        Parameters
+        ----------
+        states
+            List of FlowState to count.
+
+        Returns
+        -------
+        dict[FlowState, int]
+            A dictionary with the count of flows in each state.
+        """
+        pipeline = [
+            {"$match": {"state": {"$in": [s.value for s in states]}}},
+            {"$group": {"_id": "$state", "count": {"$sum": 1}}},
+        ]
+        result = self.flows.aggregate(pipeline) or []
+        out = {}
+        for r in result:
+            out[FlowState(r["_id"])] = r["count"]
+
+        for state in states:
+            out[state] = out.get(state, 0)
+
+        return out
+
+    def get_trends(
+        self,
+        states: list[JobState | FlowState],
+        interval: str = "days",
+        num_intervals: int | None = None,
+        interval_timezone: str = "UTC",
+    ) -> dict[str, dict[JobState | FlowState, int]]:
+        """
+        Generates a pipeline to retrieve trends of job states over time for the given interval.
+
+        Parameters
+        ----------
+        states
+            A list of JobStates or FlowStates to be considered in the trend.
+        interval
+            One of 'hours', 'days', 'weeks', 'months', or 'years' to define the grouping period.
+        num_intervals
+            The number of intervals to consider. If not provided, it will be set to a default
+            value based on the interval.
+        interval_timezone
+            The timezone to use for the date aggregation.
+
+        Returns
+        -------
+        dict[str, dict[JobState | FlowState, int]]
+            A dictionary with the date in the local timezone as key, and another dictionary as value.
+            The inner dictionary contains the state as key and the number of jobs in that state as value.
+        """
+
+        tz = gettz(interval_timezone)
+        utc_now = datetime.now(timezone.utc)
+        tznow = utc_now.astimezone(tz)
+        num_intervals = (
+            num_intervals
+            or {"hours": 12, "days": 7, "weeks": 4, "months": 12, "years": 3}[interval]
+        )
+
+        # Map the interval to a MongoDB date format
+        date_format = {
+            "hours": "%Y-%m-%d %H",
+            "days": "%Y-%m-%d",
+            "weeks": "%Y-%U",  # Week number of the year
+            "months": "%Y-%m",
+            "years": "%Y",
+        }[interval]
+
+        start = get_past_time_rounded(
+            interval=interval, num_intervals=num_intervals, reference=tznow
+        )
+        start.replace(tzinfo=tz)
+        start_utc = start.astimezone(timezone.utc)
+
+        date_to_string = {"format": date_format, "date": "$updated_on"}
+        if interval_timezone != "UTC":
+            date_to_string["timezone"] = get_utc_offset(interval_timezone)
+        pipeline = [
+            {"$match": {"updated_on": {"$gte": start_utc}}},
+            {
+                "$group": {
+                    "_id": {"$dateToString": date_to_string},
+                    **{
+                        state.value.lower(): {
+                            "$sum": {"$cond": [{"$eq": ["$state", state.value]}, 1, 0]}
+                        }
+                        for state in states
+                    },
+                }
+            },
+            {"$sort": {"_id": 1}},
+        ]
+
+        if isinstance(states[0], JobState):
+            collection = self.jobs
+            state_cls = JobState
+        elif isinstance(states[0], FlowState):
+            collection = self.flows
+            state_cls = FlowState
+        else:
+            raise TypeError(f"Wrong type of state passed: {states}")
+
+        results = list(collection.aggregate(pipeline))
+
+        result_dict = {}
+        for r in results:
+            result_dict[r["_id"]] = {
+                state_cls(s.upper()): n for s, n in r.items() if s != "_id"
+            }
+
+        for i in range(1, num_intervals + 1):
+            expected_date = get_past_time_rounded(
+                interval=interval, num_intervals=i, reference=tznow
+            ).strftime(date_format)
+            if expected_date not in result_dict:
+                result_dict[expected_date] = {state: 0 for state in states}
+
+        return result_dict
 
     def get_jobs_info_by_flow_uuid(
         self, flow_uuid, projection: list | dict | None = None

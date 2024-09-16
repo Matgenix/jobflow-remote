@@ -5,8 +5,6 @@ from typing import NoReturn
 import pymongo
 import pytest
 
-from jobflow_remote.jobs.state import FlowState
-
 
 def test_submit_flow(job_controller, runner) -> None:
     from jobflow import Flow
@@ -125,7 +123,7 @@ def test_rerun_completed(job_controller, runner) -> None:
     from jobflow import Flow
 
     from jobflow_remote import submit_flow
-    from jobflow_remote.jobs.state import JobState
+    from jobflow_remote.jobs.state import FlowState, JobState
     from jobflow_remote.testing import add
     from jobflow_remote.utils.db import JobLockedError
 
@@ -236,7 +234,7 @@ def test_rerun_failed(job_controller, runner) -> None:
     from jobflow import Flow, OnMissing
 
     from jobflow_remote import submit_flow
-    from jobflow_remote.jobs.state import JobState
+    from jobflow_remote.jobs.state import FlowState, JobState
     from jobflow_remote.testing import add, always_fails, ignore_input, self_replace
 
     j1 = always_fails()
@@ -325,7 +323,7 @@ def test_rerun_remote_error(job_controller, monkeypatch, runner) -> None:
 
     from jobflow_remote import submit_flow
     from jobflow_remote.jobs.runner import Runner
-    from jobflow_remote.jobs.state import JobState
+    from jobflow_remote.jobs.state import FlowState, JobState
     from jobflow_remote.testing import add
 
     j1 = add(1, 2)
@@ -596,6 +594,7 @@ def test_delete_job(job_controller, two_flows_four_jobs, runner):
     from jobflow import Flow
 
     from jobflow_remote import submit_flow
+    from jobflow_remote.jobs.state import FlowState
     from jobflow_remote.testing import add
 
     runner.run_one_job(job_id=[two_flows_four_jobs[0][0].uuid, 1])
@@ -660,6 +659,7 @@ def test_delete_job_with_replace(job_controller, runner):
     from jobflow import Flow
 
     from jobflow_remote import submit_flow
+    from jobflow_remote.jobs.state import FlowState
     from jobflow_remote.testing import add, self_replace
 
     # create a job with a replace to check that the job deletion is handled correctly,
@@ -848,3 +848,95 @@ def test_backup(job_controller_drop, python, compress):
                 job_controller_drop.backup_dump(
                     dir_path=dir_name, compress=compress, python=python
                 )
+
+
+def test_count_states(job_controller):
+    from jobflow import Flow
+
+    from jobflow_remote import submit_flow
+    from jobflow_remote.jobs.runner import Runner
+    from jobflow_remote.jobs.state import FlowState, JobState
+    from jobflow_remote.testing import add
+
+    j1 = add(1, 2)
+    j2 = add(j1.output, 2)
+    flow = Flow([j1, j2])
+
+    # test both job and flow state count to avoid rerunning the job.
+    submit_flow(flow, worker="test_local_worker")
+
+    jobs_states = job_controller.count_jobs_states(list(JobState))
+    assert jobs_states[JobState.COMPLETED] == 0
+    assert jobs_states[JobState.READY] == 1
+    assert jobs_states[JobState.RUNNING] == 0
+    assert jobs_states[JobState.WAITING] == 1
+
+    flows_states = job_controller.count_flows_states(list(FlowState))
+    assert flows_states[FlowState.COMPLETED] == 0
+    assert flows_states[FlowState.READY] == 1
+    assert flows_states[FlowState.RUNNING] == 0
+
+    runner = Runner()
+    runner.run_one_job()
+
+    jobs_states = job_controller.count_jobs_states(list(JobState))
+    assert jobs_states[JobState.COMPLETED] == 1
+    assert jobs_states[JobState.READY] == 1
+    assert jobs_states[JobState.RUNNING] == 0
+
+    flows_states = job_controller.count_flows_states(list(FlowState))
+    assert flows_states[FlowState.COMPLETED] == 0
+    assert flows_states[FlowState.READY] == 0
+    assert flows_states[FlowState.RUNNING] == 1
+
+
+def test_get_trends(job_controller, one_job):
+    from datetime import datetime
+
+    import dateutil
+
+    from jobflow_remote.jobs.state import FlowState, JobState
+
+    tzname = datetime.now(dateutil.tz.tzlocal()).tzname()
+
+    now = datetime.now()
+    utcnow = datetime.utcnow()
+    job_trends = job_controller.get_trends(
+        list(JobState), interval="days", interval_timezone=tzname
+    )
+    assert len(job_trends) == 7
+    assert now.strftime("%Y-%m-%d") in job_trends
+    assert job_trends[now.strftime("%Y-%m-%d")][JobState.READY] == 1
+    assert job_trends[now.strftime("%Y-%m-%d")][JobState.COMPLETED] == 0
+
+    job_trends = job_controller.get_trends(
+        list(JobState), interval="hours", num_intervals=5, interval_timezone=tzname
+    )
+    assert len(job_trends) == 5
+    assert now.strftime("%Y-%m-%d %H") in job_trends
+    assert job_trends[now.strftime("%Y-%m-%d %H")][JobState.READY] == 1
+    assert job_trends[now.strftime("%Y-%m-%d %H")][JobState.COMPLETED] == 0
+
+    job_trends = job_controller.get_trends(
+        list(JobState), interval="weeks", interval_timezone="UTC"
+    )
+    assert len(job_trends) == 4
+    assert utcnow.strftime("%Y-%U") in job_trends
+    assert job_trends[utcnow.strftime("%Y-%U")][JobState.READY] == 1
+    assert job_trends[utcnow.strftime("%Y-%U")][JobState.COMPLETED] == 0
+
+    job_trends = job_controller.get_trends(
+        list(JobState), interval="years", num_intervals=2, interval_timezone=tzname
+    )
+    assert len(job_trends) == 2
+    assert now.strftime("%Y") in job_trends
+    assert job_trends[now.strftime("%Y")][JobState.READY] == 1
+    assert job_trends[now.strftime("%Y")][JobState.COMPLETED] == 0
+
+    flow_trends = job_controller.get_trends(
+        list(FlowState), interval="days", interval_timezone=tzname
+    )
+    assert len(flow_trends) == 7
+    assert now.strftime("%Y-%m-%d") in flow_trends
+    assert flow_trends[now.strftime("%Y-%m-%d")][FlowState.READY] == 1
+    assert flow_trends[now.strftime("%Y-%m-%d")][FlowState.COMPLETED] == 0
