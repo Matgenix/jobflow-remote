@@ -38,6 +38,7 @@ repos:
     - tokenize-rt==4.1.0
     - types-paramiko
     - pydantic~=2.0
+    - types-python-dateutil
 - repo: https://github.com/codespell-project/codespell
   rev: v2.3.0
   hooks:
