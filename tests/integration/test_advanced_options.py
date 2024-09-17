@@ -34,6 +34,49 @@ def test_run_batch(job_controller, monkeypatch) -> None:
 
     assert job_controller.count_jobs(states=JobState.COMPLETED) == 6
 
+    # verify that only one job was executed at the time. start_time of a job
+    # is after the end_time of the one preceding it.
+    # This should test that the batch runner is not running with multiple
+    # parallel processes
+    jobs_info = job_controller.get_jobs_info()
+    jobs_info = sorted(jobs_info, key=lambda x: x.start_time)
+    for i in range(len(jobs_info) - 1):
+        assert jobs_info[i].end_time < jobs_info[i + 1].start_time
+
+
+def test_run_batch_multi(job_controller, monkeypatch) -> None:
+    from jobflow import Flow
+
+    from jobflow_remote import submit_flow
+    from jobflow_remote.jobs.runner import Runner
+    from jobflow_remote.jobs.state import JobState
+    from jobflow_remote.testing import add_sleep
+
+    # add two jobs that will take a few seconds to run. They should
+    # be executed simultaneously
+    job_ids = []
+    for _ in range(2):
+        add_j = add_sleep(2, 15)
+
+        flow = Flow([add_j])
+        submit_flow(flow, worker="test_batch_multi_remote_worker")
+        job_ids.append(add_j.uuid)
+
+    runner = Runner()
+
+    # set this so it will be called
+    monkeypatch.setattr(runner.runner_options, "delay_update_batch", 5)
+
+    runner.run_all_jobs(max_seconds=120)
+
+    assert job_controller.count_jobs(states=JobState.COMPLETED) == 2
+
+    # verify that the two jobs where executed in parallel.
+    jobs_info = job_controller.get_jobs_info()
+    for ji1 in jobs_info:
+        for ji2 in jobs_info:
+            assert ji1.start_time < ji2.end_time
+
 
 def test_max_jobs_worker(job_controller, daemon_manager) -> None:
     import time
