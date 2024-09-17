@@ -63,10 +63,10 @@ jobs:
           pip install .[tests]
 
       - name: Unit tests
-        run: pytest --cov-report=xml --cov-config pyproject.toml --ignore tests/integration
+        run: pytest --cov='./src/jobflow_remote' --cov-report=xml --cov-config pyproject.toml --ignore tests/integration
 
       - name: Integration tests
-        run: pytest --cov-append --cov-report=xml --cov-config pyproject.toml tests/integration
+        run: pytest --cov='./src/jobflow_remote' --cov-append --cov-report=xml --cov-config pyproject.toml tests/integration
 
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v4
