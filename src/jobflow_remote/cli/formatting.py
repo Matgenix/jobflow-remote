@@ -329,7 +329,7 @@ def get_job_report_components(report: JobsReport) -> list[RenderableType]:
     # Find the max count to normalize the histograms
     max_count = max(*state_counts.values(), 1)
 
-    total_count = sum(state_counts.values())
+    total_count = sum(state_counts.values()) or 1
 
     # Display job states in a histogram
     state_colors = {
@@ -432,7 +432,7 @@ def get_flow_report_components(report: FlowsReport) -> list[RenderableType]:
     # Find the max count to normalize the histograms
     max_count = max(*state_counts.values(), 1)
 
-    total_count = sum(state_counts.values())
+    total_count = sum(state_counts.values()) or 1
 
     # Display job states in a histogram
     state_colors = {
