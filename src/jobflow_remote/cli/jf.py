@@ -143,16 +143,6 @@ def tree(
 ):
     """
     Display a tree representation of the CLI command structure.
-
-    This command shows the structure of the CLI application as a tree, with options to customize the output.
-
-    Args:
-        ctx (typer.Context): The Typer context object.
-        start_path (List[str]): Path to the starting command for the tree.
-        show_options (bool): If True, show command options in the tree.
-        show_docs (bool): If True, show documentation for commands and options.
-        show_hidden (bool): If True, show hidden commands.
-        max_depth (Optional[int]): Maximum depth of the tree to display.
     """
     # Get the top-level app
     main_app = ctx.find_root().command
