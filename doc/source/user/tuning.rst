@@ -120,7 +120,7 @@ following example
     flow = Flow([job1, job2])
 
     flow = set_run_config(
-        flow, name_filter="add", worker="secondw", exec_config="anotherconfig"
+        flow, name_filter="add", worker="secondw", exec_config="anotherconfig", priority=10
     )
 
     resource = {"nodes": 1, "ntasks": 4, "partition": "batch"}
@@ -128,8 +128,9 @@ following example
 
 After being submitted to the database the ``value`` Job will be executed
 on the ``firstw`` worker, while the ``add`` Job will be executed on the
-``secondw`` worker. On the other hand, since ``resources`` is not set
-explicitly when ``set_run_config`` is called the same ``resource`` dictionary
+``secondw`` worker. ``add`` will also have a priority of 10, while ``value`` will
+remain with the default 0 value. On the other hand, since ``resources`` is not set
+explicitly when ``set_run_config`` is called, the same ``resource`` dictionary
 is applied to **all** the Jobs in the Flow.
 
 .. note::
