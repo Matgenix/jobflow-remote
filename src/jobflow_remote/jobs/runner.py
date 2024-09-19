@@ -844,12 +844,18 @@ class Runner:
             if not ids_docs:
                 continue
 
+            worker = self.get_worker(worker_name)
+
             qjobs_dict = {}
             try:
                 ids_list = list(ids_docs)
                 queue = self.get_queue_manager(worker_name)
-                qjobs = queue.get_jobs_list(ids_list)
-                qjobs_dict = {qjob.job_id: qjob for qjob in qjobs}
+                qjobs = queue.get_jobs_list(
+                    jobs=ids_list, user=worker.scheduler_username
+                )
+                qjobs_dict = {
+                    qjob.job_id: qjob for qjob in qjobs if qjob.job_id in ids_list
+                }
             except Exception:
                 logger.warning(
                     f"error trying to get jobs list for worker: {worker_name}",
@@ -874,7 +880,6 @@ class Runner:
                         f"remote job with id {remote_doc['process_id']} is running"
                     )
                 elif qstate in [None, QState.DONE, QState.FAILED]:
-                    worker = self.get_worker(worker_name)
                     # if the worker is local go directly to DOWNLOADED, as files
                     # are not copied locally
                     if not worker.is_local:
@@ -995,8 +1000,12 @@ class Runner:
             processes = list(batch_processes_data)
             queue_manager = self.get_queue_manager(worker_name)
             if processes:
-                qjobs = queue_manager.get_jobs_list(processes)
-                running_processes = {qjob.job_id for qjob in qjobs}
+                qjobs = queue_manager.get_jobs_list(
+                    jobs=processes, user=worker.scheduler_username
+                )
+                running_processes = {
+                    qjob.job_id for qjob in qjobs if qjob.job_id in processes
+                }
                 stopped_processes = set(processes) - running_processes
                 for pid in stopped_processes:
                     self.job_controller.remove_batch_process(pid, worker_name)

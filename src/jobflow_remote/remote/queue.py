@@ -220,6 +220,10 @@ class QueueManager:
         user: str | None = None,
         timeout: int | None = None,
     ) -> list[QJob]:
+        # in order to avoid issues with schedulers that do not support query by
+        # list of job ids, if the user is passed ignore the job ids.
+        if user is not None:
+            jobs = None
         job_cmd = self.scheduler_io.get_jobs_list_cmd(jobs, user)
         stdout, stderr, returncode = self.execute_cmd(job_cmd, timeout=timeout)
         return self.scheduler_io.parse_jobs_list_output(

@@ -305,3 +305,60 @@ def test_undefined_additional_stores(worker, job_controller) -> None:
         job_controller.count_jobs(states=[JobState.COMPLETED, JobState.REMOTE_ERROR])
         == 2
     )
+
+
+def test_submit_flow_with_scheduler_username(monkeypatch, job_controller) -> None:
+    from jobflow import Flow
+
+    from jobflow_remote import submit_flow
+    from jobflow_remote.jobs.runner import Runner
+    from jobflow_remote.jobs.state import FlowState, JobState
+    from jobflow_remote.remote.queue import QueueManager
+    from jobflow_remote.testing import add
+
+    remote_worker_name = "test_remote_worker"
+
+    job = add(1, 1)
+    flow = Flow([job])
+    submit_flow(flow, worker=remote_worker_name)
+
+    # modify the runner so that uses a patched version of the worker
+    # where the scheduler_username is set
+    runner = Runner()
+    patched_worker = runner.get_worker(remote_worker_name).model_copy()
+    patched_worker.scheduler_username = "jobflow"
+
+    def patched_get_worker(self, worker_name):
+        if worker_name != remote_worker_name:
+            return runner.workers[worker_name]
+        return patched_worker
+
+    # Patch the get_jobs_list function to ensure that it is called with
+    # the correct parameters.
+    patch_called = False
+    user_arg = None
+    orig_get_jobs_list = QueueManager.get_jobs_list
+
+    def patched_get_jobs_list(self, jobs=None, user=None, timeout=None):
+        nonlocal patch_called
+        nonlocal user_arg
+        patch_called = True
+        user_arg = user
+        return orig_get_jobs_list(self=self, jobs=jobs, user=user, timeout=timeout)
+
+    with monkeypatch.context() as m:
+        m.setattr(Runner, "get_worker", patched_get_worker)
+        m.setattr(QueueManager, "get_jobs_list", patched_get_jobs_list)
+        runner.run_all_jobs(max_seconds=30)
+
+    assert patch_called, "The patched method was not called"
+    assert (
+        user_arg == "jobflow"
+    ), f"The argument for user passed to QueueManager.get_jobs_list is '{user_arg}' instead of 'jobflow'"
+
+    assert (
+        job_controller.count_jobs(states=JobState.COMPLETED) == 1
+    ), f"Jobs not marked as completed, full job info:\n{job_controller.get_jobs({})}"
+    assert (
+        job_controller.count_flows(states=FlowState.COMPLETED) == 1
+    ), f"Flows not marked as completed, full flow info:\n{job_controller.get_flows({})}"
