@@ -10,10 +10,10 @@ fi
 
 # Run the SGE installation scripts at startup as the docker network is not initialised during build
 ${sudo_cmd} bash <<SCRIPT
-yes "" | ./install_qmaster
-yes "" | ./install_execd
-service gridengine-master start
-service postfix disable
+cd /opt/sge && yes "" | ./install_qmaster
+source /opt/sge/default/common/settings.sh
+/opt/sge/default/common/sgemaster start
+cd /opt/sge && yes "" | ./install_execd
 service ssh start
 SCRIPT
 
@@ -21,3 +21,5 @@ SCRIPT
 if [[ ${sudo_cmd} ]]; then
     sudo -k
 fi
+
+source /opt/sge/default/common/settings.sh
