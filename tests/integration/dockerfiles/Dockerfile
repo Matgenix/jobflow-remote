@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:experimental
 ARG QUEUE_SYSTEM=slurm
 
-FROM ubuntu:22.04 as base
+#FROM ubuntu:22.04 as base
 
 # 1) Add desired queue system as a build stage:
 #
@@ -32,6 +32,7 @@ RUN cmake --install build
 
 RUN useradd -rm -d /opt/${SGE_USERNAME} -s /bin/bash ${SGE_USERNAME}
 RUN chown -R sge /opt/${SGE_USERNAME}
+WORKDIR /opt/${SGE_USERNAME}
 
 EXPOSE 6444
 ARG USERNAME=jobflow
@@ -61,7 +62,7 @@ USER root
 
 # 3) Run an SSH server and set up Python environment and user for jobflow
 # Install OpenSSH server and set it to run on startup
-RUN apt update && apt install -y openssh-server sudo && apt clean && rm -rf /var/lib/apt/lists/*
+RUN apt update && apt install -y dos2unix openssh-server sudo python3.10-venv && apt clean && rm -rf /var/lib/apt/lists/*
 RUN sed -i 's/#PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config
 
 # Create desired user with blank password then give user access to startup script as sudo without password
@@ -72,12 +73,9 @@ RUN printf "${USERNAME} ALL=(root:root) NOPASSWD: /etc/startup.sh\n" >> /etc/sud
     && chmod 0440 /etc/sudoers.d/startup \
     && visudo -c
 
-FROM base as jobflow-builder
+
 # Install jobflow from directory, assuming container
 # is built at the root of the jobflow repo
-RUN apt update && apt install -y python3.10-venv && apt clean && rm -rf /var/lib/apt/lists/*
-ARG USERNAME=jobflow
-RUN useradd -rm -d /home/${USERNAME} -s /bin/bash ${USERNAME} || exit 0 && usermod -a -G sudo ${USERNAME}
 WORKDIR /home/${USERNAME}
 RUN mkdir jobflow-remote
 COPY src/jobflow_remote jobflow-remote/src/jobflow_remote
@@ -93,7 +91,7 @@ RUN sed -i '/\[tool.versioningit.vcs\]/,+3d' jobflow-remote/pyproject.toml
 # so cannot use --chmod in the copy directly and
 # we have to become root for this step
 USER root
-RUN chmod -R 0777 jobflow-remote
+RUN sudo chmod -R 0777 jobflow-remote
 USER ${USERNAME}
 
 # Install jobflow in a local native virtualenv
@@ -102,17 +100,12 @@ RUN python3 -m venv /home/${USERNAME}/.venv
 RUN /home/${USERNAME}/.venv/bin/pip install -U pip
 RUN /home/${USERNAME}/.venv/bin/pip install --verbose -e .
 
-FROM jobflow as final
-
-ARG USERNAME=jobflow
-
-COPY --from=jobflow-builder /home/jobflow/.venv /home/${USERNAME}/.venv
-# Finalize permissions on startup script
-USER root
-RUN chmod +x /etc/startup.sh
-USER ${USERNAME}
-
-CMD sudo /etc/startup.sh ; /bin/bash -l
 # Make a job directory for jobflow
 WORKDIR /home/${USERNAME}
 RUN mkdir jfr
+
+# Finalize permissions on startup script
+USER root
+RUN chmod +x /etc/startup.sh && dos2unix /etc/startup.sh
+USER ${USERNAME}
+CMD sudo /etc/startup.sh ; /bin/bash -l
