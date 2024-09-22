@@ -11,9 +11,11 @@ fi
 # Run the SGE installation scripts at startup as the docker network is not initialised during build
 ${sudo_cmd} bash <<SCRIPT
 cd /opt/sge && yes "" | ./install_qmaster
-source /opt/sge/default/common/settings.sh
 /opt/sge/default/common/sgemaster start
 cd /opt/sge && yes "" | ./install_execd
+/opt/sge/default/common/sgeexecd start
+source /opt/sge/default/common/settings.sh
+qconf -as $HOSTNAME
 service ssh start
 SCRIPT
 
@@ -21,5 +23,3 @@ SCRIPT
 if [[ ${sudo_cmd} ]]; then
     sudo -k
 fi
-
-source /opt/sge/default/common/settings.sh

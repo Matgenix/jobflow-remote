@@ -21,22 +21,21 @@ HEALTHCHECK CMD sinfo || exit 1
 FROM ubuntu:22.04 as sge
 USER root
 ## Following instructions from https://github.com/daimh/sge/blob/817a7fa019f0ec47425f43e843a1f58865614313/README.md
-ARG SGE_USERNAME=sge
+ARG SGE_USERNAME=jobflow
 RUN apt update && apt install -y sudo build-essential curl cmake git libdb5.3-dev libhwloc-dev libmotif-dev libncurses-dev libpam0g-dev libssl-dev libsystemd-dev libtirpc-dev libxext-dev pkgconf && apt clean && rm -rf /var/lib/apt/lists/*
 WORKDIR /tmp
 RUN git clone https://github.com/daimh/sge --depth 1 --branch master sge
 WORKDIR /tmp/sge
-RUN cmake -S . -B build -DCMAKE_INSTALL_PREFIX=/opt/${SGE_USERNAME}
+RUN cmake -S . -B build -DCMAKE_INSTALL_PREFIX=/opt/sge
 RUN cmake --build build -j
 RUN cmake --install build
 
-RUN useradd -rm -d /opt/${SGE_USERNAME} -s /bin/bash ${SGE_USERNAME}
-RUN chown -R sge /opt/${SGE_USERNAME}
-WORKDIR /opt/${SGE_USERNAME}
+RUN useradd -rm -d /home/${SGE_USERNAME} -s /bin/bash ${SGE_USERNAME} && usermod -a -G sudo ${SGE_USERNAME}
+RUN chown -R ${SGE_USERNAME} /opt/sge
+WORKDIR /opt/sge
 
 EXPOSE 6444
 ARG USERNAME=jobflow
-RUN useradd -rm -d /home/${USERNAME} -s /bin/bash ${USERNAME} && usermod -a -G sudo ${USERNAME}
 RUN echo ${USERNAME}:${USERNAME} | chpasswd
 
 RUN printf "${USERNAME} ALL=(root:root) NOPASSWD: /opt/sge/install_qmaster\n" >> /etc/sudoers.d/startup \
