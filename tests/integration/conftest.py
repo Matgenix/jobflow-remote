@@ -57,6 +57,12 @@ def slurm_ssh_port():
 
 
 @pytest.fixture(scope="session")
+def sge_ssh_port():
+    """The exposed local port for SSH connections to the queue container."""
+    return _get_free_port()
+
+
+@pytest.fixture(scope="session")
 def db_port():
     """The exposed local port for connections to the MongoDB stores."""
     return _get_free_port()
@@ -160,7 +166,7 @@ def build_and_launch_container(
 
 @pytest.fixture(scope="session", autouse=True)
 def slurm_container(docker_client, slurm_ssh_port):
-    """Build and launch a container running various queues and SSH, exposed on a random available
+    """Build and launch a container running Slurm and SSH, exposed on a random available
     port."""
     ports = {"22/tcp": slurm_ssh_port}
     yield from build_and_launch_container(
@@ -169,6 +175,20 @@ def slurm_container(docker_client, slurm_ssh_port):
         "jobflow-remote-slurm:latest",
         ports=ports,
         buildargs={"QUEUE_SYSTEM": "slurm"},
+    )
+
+
+@pytest.fixture(scope="session", autouse=True)
+def sge_container(docker_client, sge_ssh_port):
+    """Build and launch a container running SGE and SSH, exposed on a random available
+    port."""
+    ports = {"22/tcp": sge_ssh_port}
+    yield from build_and_launch_container(
+        docker_client,
+        Path("./tests/integration/dockerfiles/Dockerfile"),
+        "jobflow-remote-sge:latest",
+        ports=ports,
+        buildargs={"QUEUE_SYSTEM": "sge"},
     )
 
 
@@ -195,6 +215,7 @@ def write_tmp_settings(
     random_project_name,
     store_database_name,
     slurm_ssh_port,
+    sge_ssh_port,
     db_port,
 ):
     """Collects the various sub-configs and writes them to a temporary file in a
@@ -265,18 +286,18 @@ def write_tmp_settings(
                     resources={"partition": "debug", "ntasks": 1, "time": "00:01:00"},
                     connect_kwargs={"allow_agent": False, "look_for_keys": False},
                 ),
-                # "test_remote_sge_worker": dict(
-                #     type="remote",
-                #     host="localhost",
-                #     port=slurm_ssh_port,
-                #     scheduler_type="sge",
-                #     work_dir="/home/jobflow/jfr",
-                #     user="jobflow",
-                #     password="jobflow",
-                #     pre_run="source /home/jobflow/.venv/bin/activate",
-                #     resources={"partition": "debug", "ntasks": 1, "time": "00:01:00"},
-                #     connect_kwargs={"allow_agent": False, "look_for_keys": False},
-                # ),
+                "test_remote_sge_worker": dict(
+                    type="remote",
+                    host="localhost",
+                    port=sge_ssh_port,
+                    scheduler_type="sge",
+                    work_dir="/home/jobflow/jfr",
+                    user="jobflow",
+                    password="jobflow",
+                    pre_run="source /home/jobflow/.venv/bin/activate",
+                    resources={"partition": "debug", "ntasks": 1, "time": "00:01:00"},
+                    connect_kwargs={"allow_agent": False, "look_for_keys": False},
+                ),
                 "test_batch_remote_worker": dict(
                     type="remote",
                     host="localhost",
