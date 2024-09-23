@@ -169,6 +169,24 @@ def job_controller(random_project_name):
 
 
 @pytest.fixture()
+def job_controller_drop(random_project_name):
+    """Yields a jobcontroller instance for the test suite that also sets up the
+    jobstore. Drops the database at the end of the test.
+    Useful for tests that may leave entries in the DB that are not cleaned with
+    a reset.
+    """
+    from jobflow_remote.jobs.jobcontroller import JobController
+
+    jc = JobController.from_project_name(random_project_name)
+    assert jc.reset()
+    try:
+        yield jc
+    except:
+        jc.db.drop()
+        raise
+
+
+@pytest.fixture()
 def one_job(random_project_name):
     """Add one flow with one job to the DB."""
     from jobflow import Flow
