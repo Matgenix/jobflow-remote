@@ -57,7 +57,9 @@ jobs:
           cache-dependency-path: pyproject.toml
 
       - name: Install mongo-tools
-        run: sudo dpkg -l mongodb-database-tools
+        run: |
+          wget https://fastdl.mongodb.org/tools/db/mongodb-database-tools-ubuntu2204-x86_64-100.10.0.deb
+          sudo apt install ./mongodb-database-tools-*-100.10.0.deb
 
       - name: Install dependencies
         run: |
