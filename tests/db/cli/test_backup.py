@@ -1,4 +1,5 @@
 import tempfile
+from shutil import which
 
 import pytest
 
@@ -20,7 +21,15 @@ def check_files(files: list[str], meta: bool, compress: bool):
 
 @pytest.mark.parametrize(
     "python",
-    [True, False],
+    [
+        True,
+        pytest.param(
+            False,
+            marks=pytest.mark.skipif(
+                not which("mongodump"), reason="mongodump missing"
+            ),
+        ),
+    ],
 )
 @pytest.mark.parametrize(
     "compress",
