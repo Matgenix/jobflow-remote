@@ -286,5 +286,5 @@ def job_controller(random_project_name):
     from jobflow_remote.jobs.jobcontroller import JobController
 
     jc = JobController.from_project_name(random_project_name)
-    assert jc.reset()
+    assert jc.reset(max_limit=0)
     return jc
