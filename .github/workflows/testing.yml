@@ -56,6 +56,9 @@ jobs:
           cache: pip
           cache-dependency-path: pyproject.toml
 
+      - name: Install mongo-tools
+        run: sudo dpkg -l mongodb-database-tools
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
