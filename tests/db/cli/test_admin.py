@@ -1,21 +1,41 @@
 import pytest
 
 
-def test_reset(job_controller, two_flows_four_jobs) -> None:
+def test_reset(job_controller, one_job) -> None:
+    from datetime import datetime
+
+    from jobflow import Flow
+
+    from jobflow_remote import submit_flow
+    from jobflow_remote.testing import add
     from jobflow_remote.testing.cli import run_check_cli
 
     run_check_cli(
-        ["admin", "reset", "-m", "1"],
+        ["admin", "reset"],
+        required_out="The database was reset",
+        cli_input="y",
+    )
+    assert job_controller.count_jobs() == 0
+
+    for _ in range(26):
+        f = Flow(add(1, 2))
+        submit_flow(f, worker="test_local_worker")
+
+    run_check_cli(
+        ["admin", "reset"],
         required_out="The database was NOT reset",
         cli_input="y",
     )
-    assert job_controller.count_jobs() == 4
+    assert job_controller.count_jobs() == 26
 
-    run_check_cli(["admin", "reset", "-m", "10"], cli_input="n")
-    assert job_controller.count_jobs() == 4
+    run_check_cli(["admin", "reset"], cli_input="n")
+    assert job_controller.count_jobs() == 26
+
+    run_check_cli(["admin", "reset", "1220-01-01"], cli_input="y")
+    assert job_controller.count_jobs() == 26
 
     run_check_cli(
-        ["admin", "reset", "-m", "10"],
+        ["admin", "reset", datetime.now().strftime("%Y-%m-%d")],
         required_out="The database was reset",
         cli_input="y",
     )

@@ -39,6 +39,16 @@ app.add_typer(app_admin)
 
 @app_admin.command()
 def reset(
+    validation: Annotated[
+        Optional[str],
+        typer.Argument(
+            help=(
+                "If the number of flows in the DB exceed 25 it will be required to pass "
+                "today's date in the YYYY-MM-DD to proceed with the reset"
+            ),
+            metavar="DATE",
+        ),
+    ] = None,
     reset_output: Annotated[
         bool,
         typer.Option(
@@ -47,16 +57,6 @@ def reset(
             help="Also delete all the documents in the current store",
         ),
     ] = False,
-    max_limit: Annotated[
-        int,
-        typer.Option(
-            "--max",
-            "-m",
-            help=(
-                "The database will be reset only if the number of Flows is lower than the specified limit. 0 means no limit"
-            ),
-        ),
-    ] = 25,
     force: force_opt = False,
 ) -> None:
     """
@@ -81,43 +81,14 @@ def reset(
     with loading_spinner(processing=False) as progress:
         progress.add_task(description="Resetting the DB...", total=None)
         jc = get_job_controller()
-        done = jc.reset(reset_output=reset_output, max_limit=max_limit)
+        done = jc.reset(reset_output=reset_output, max_limit=25, validation=validation)
     not_text = "" if done else "[bold]NOT [/bold]"
     out_console.print(f"The database was {not_text}reset")
     if not done and SETTINGS.cli_suggestions:
         out_console.print(
-            "Check the amount of Flows and change --max-limit if this is the correct project to reset",
+            "Check the amount of Flows and set the DATE argument if this is the correct project to reset",
             style="yellow",
         )
-
-
-@app_admin.command(hidden=True)
-def remove_lock(
-    job_id: job_ids_indexes_opt = None,
-    db_id: db_ids_opt = None,
-    state: job_state_opt = None,
-    start_date: start_date_opt = None,
-    end_date: end_date_opt = None,
-    force: force_opt = False,
-) -> None:
-    """
-    DEPRECATED: use unlock instead
-    Forcibly removes the lock from the documents of the selected jobs.
-    WARNING: can lead to inconsistencies if the processes is actually running.
-    """
-    out_console.print(
-        "remove-lock command has been DEPRECATED. Use unlock instead.",
-        style="bold yellow",
-    )
-
-    unlock(
-        job_id=job_id,
-        db_id=db_id,
-        state=state,
-        start_date=start_date,
-        end_date=end_date,
-        force=force,
-    )
 
 
 @app_admin.command()

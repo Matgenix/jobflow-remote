@@ -558,11 +558,31 @@ def test_set_job_doc_properties(job_controller, one_job) -> None:
 
 
 def test_reset(job_controller, two_flows_four_jobs):
+    from datetime import datetime
+
+    from jobflow import Flow
+
+    from jobflow_remote import submit_flow
+    from jobflow_remote.testing import add
+
     assert job_controller.count_jobs() == 4
 
     assert not job_controller.reset(max_limit=1)
+    assert job_controller.count_jobs() == 4
     assert job_controller.reset(max_limit=10, reset_output=True)
 
+    assert job_controller.count_jobs() == 0
+
+    for _ in range(4):
+        f = Flow(add(1, 2))
+        submit_flow(f, worker="test_local_worker")
+
+    assert job_controller.count_jobs() == 4
+    assert not job_controller.reset(max_limit=1, validation="1327-01-01")
+    assert job_controller.count_jobs() == 4
+    assert job_controller.reset(
+        max_limit=1, validation=datetime.now().strftime("%Y-%m-%d")
+    )
     assert job_controller.count_jobs() == 0
 
 

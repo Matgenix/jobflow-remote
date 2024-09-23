@@ -2516,7 +2516,12 @@ class JobController:
         )
         return result.modified_count
 
-    def reset(self, reset_output: bool = False, max_limit: int = 25) -> bool:
+    def reset(
+        self,
+        reset_output: bool = False,
+        max_limit: int = 25,
+        validation: str | None = None,
+    ) -> bool:
         """
         Reset the content of the queue database and builds the indexes.
         Optionally deletes the content of the JobStore with the outputs.
@@ -2529,8 +2534,13 @@ class JobController:
             If True also reset the JobStore containing the outputs.
         max_limit
             Maximum number of Flows present in the DB. If number is larger
-            the database will not be reset. Set 0 for not limit.
-
+            the database a validation should be passed. Set 0 for not limit.
+            Setting max_limit to a large number or 0 will always lead to a
+            reset of the DB without validation. Prefer setting the password
+            to avoid unwanted deletions.
+        validation
+            A string representing today's date in the format YYYY-MM-DD.
+            Required if the number of Flows to delete exceed max_limit.
         Returns
         -------
         bool
@@ -2540,10 +2550,12 @@ class JobController:
         # what if the outputs are in other stores? Should take those as well
         if max_limit:
             n_flows = self.flows.count_documents({})
-            if n_flows >= max_limit:
+            today = datetime.now().strftime("%Y-%m-%d")
+            if n_flows >= max_limit and today != validation:
                 logger.warning(
                     f"The database contains {n_flows} flows and will not be reset. "
-                    "Increase the max_limit value or set it to 0"
+                    "Pass today's date in the YYYY-MM-DD format to validate the reset "
+                    "or change the max_limit value."
                 )
                 return False
 

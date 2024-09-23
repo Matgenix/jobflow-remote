@@ -239,28 +239,29 @@ Project specs
 
 .. _projectconf general:
 
-General Settings
-================
+General Settings - Environment variables
+========================================
 
 Aside from the project specific configuration, a few options can also be
 defined in general. There are two ways to set these options:
 
 * set the value in the ``~/.jfremote.yaml`` configuration file.
-* export the variable name prepended by the ``jfremote`` prefix::
+* set an environment variable composed by the name of the variable and
+  prepended by the ``JFREMOTE_`` prefix::
 
-    export jfremote_project=project_name
+    export JFREMOTE_PROJECT=project_name
 
 .. note::
 
-    The name of the exported variables is case-insensitive (i.e. JFREMOTE_PROJECT
+    The name of the exported variables is case-insensitive (i.e. jfremote_project
     is equally valid).
 
 The most useful variable to set is the ``project`` one, allowing to select the
 default project to be used in a multi-project environment.
 
 Other generic options are the location of the projects folder, instead of
-``~/.jfremote`` (``projects_folder``) and the path to the ``~/.jfremote.yaml``
-file itself (``config_file``).
+``~/.jfremote`` (``JFREMOTE_PROJECT_FOLDER``) and the path to the ``~/.jfremote.yaml``
+file itself (``JFREMOTE_CONFIG_FILE``).
 
 Some customization options are also available for the behaviour of the CLI.
 For more details see the API documentation :py:class:`jobflow_remote.config.settings.JobflowRemoteSettings`.
