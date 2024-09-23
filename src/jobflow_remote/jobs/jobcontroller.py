@@ -47,7 +47,15 @@ from jobflow_remote.jobs.state import (
 from jobflow_remote.remote.data import get_remote_store, update_store
 from jobflow_remote.remote.queue import QueueManager
 from jobflow_remote.utils.data import deep_merge_dict
-from jobflow_remote.utils.db import FlowLockedError, JobLockedError, MongoLock
+from jobflow_remote.utils.db import (
+    FlowLockedError,
+    JobLockedError,
+    MongoLock,
+    mongodump_from_store,
+    mongorestore_to_store,
+    pymongo_dump,
+    pymongo_restore,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Generator
@@ -4117,6 +4125,163 @@ class JobController:
             delete_files=delete_files,
             max_limit=max_limit,
         )
+
+    def backup_dump(
+        self,
+        dir_path: str | Path = ".",
+        mongo_bin_path: str | None = None,
+        compress: bool = False,
+        python: bool = False,
+    ) -> dict[str, int]:
+        """
+        Create a backup of the queue database using either mongodump or a python implementation.
+        The mongodump version is faster and stores metadata, but requires the mongodump executable
+        and may not support all the connection options defined in the project configuration.
+        The python version is available if the mongodump executable is not available and may support
+        more connection options.
+
+        Parameters
+        ----------
+        dir_path
+            The path of the folder where the output files will be saved. Follows the mongodump
+            convention: a subfolder with the name of the DB will created inside this path.
+        mongo_bin_path
+            The path to a folder containing the mongodump executable, if not present in the PATH.
+        compress
+            If True, the output files will be compressed with gzip.
+        python
+            If True a python implementation will be used to create a backup. WARNING: In this case
+            metadata of the collections will not be saved.
+
+        Returns
+        -------
+        dict[str, int]
+            A dictionary containing the collection names as keys and the number of documents
+            saved for each collection as values.
+        """
+        dir_path = Path(dir_path)
+        doc_count = {}
+        collection_names = ["jobs", "flows", "jf_auxiliary"]
+        if python:
+            for name, collection in zip(
+                collection_names, [self.jobs, self.flows, self.auxiliary]
+            ):
+                doc_count[name] = pymongo_dump(
+                    collection=collection, output_path=dir_path, compress=compress
+                )
+        else:
+            for name, collection in zip(
+                collection_names,
+                [
+                    self.jobs_collection,
+                    self.flows_collection,
+                    self.auxiliary_collection,
+                ],
+            ):
+                doc_count[name] = mongodump_from_store(
+                    store=self.queue_store,
+                    collection=collection,
+                    output_path=dir_path,
+                    compress=compress,
+                    mongo_bin_path=mongo_bin_path,
+                )
+
+        # move the files produced to match the standard names
+        for name, collection in zip(
+            collection_names,
+            [self.jobs_collection, self.flows_collection, self.auxiliary_collection],
+        ):
+            if collection != name:
+                full_dir_path = dir_path / self.queue_store.database
+                data_file_name = f"{collection}.bson"
+                if compress:
+                    data_file_name += ".gz"
+                file_path = full_dir_path / data_file_name
+                if file_path.exists():
+                    new_file_name = f"{name}.bson"
+                    if compress:
+                        new_file_name += ".gz"
+                    file_path.rename(full_dir_path / new_file_name)
+                metadata_file_name = f"{collection}.metadata.json"
+                if compress:
+                    metadata_file_name += ".gz"
+                file_path = full_dir_path / metadata_file_name
+                if file_path.exists():
+                    new_file_name = f"{name}.metadata.json"
+                    if compress:
+                        new_file_name += ".gz"
+                    file_path.rename(full_dir_path / new_file_name)
+
+        return doc_count
+
+    def backup_restore(
+        self,
+        dir_path: str | Path = ".",
+        mongo_bin_path: str | None = None,
+        compress: bool = False,
+        python: bool = False,
+    ):
+        """
+        Restore the queue database from a backup.
+
+        It will restore the content of the collections jobs, flows and auxiliary
+        from the files '<name>.bson(.gz)' in the given directory. If `python` is not
+        selected, it will use the 'mongorestore' command with the specified 'mongo_bin_path'.
+        If `python` is selected it will use a pure python implementation.
+
+        Will allow to restore the backup with pristine collections.
+
+        Parameters
+        ----------
+        dir_path
+            The directory where to find the backup files.
+        mongo_bin_path
+            The path to a folder containing the mongodump executable, if not present in the PATH.
+        compress
+            If True the backup files are compressed.
+        python
+            If True, a pure python implementation will be used instead of the 'mongorestore'
+            command. WARNING: In this case metadata of the collections will not be restored.
+        """
+        dir_path = Path(dir_path)
+        collection_names = ["jobs", "flows", "jf_auxiliary"]
+        for name, db_name, collection in zip(
+            collection_names,
+            [self.jobs_collection, self.flows_collection],
+            [self.jobs, self.flows],
+        ):
+            count = collection.count_documents({})
+            if count > 0:
+                raise RuntimeError(
+                    f"The collection named {db_name} for {name} contains {count} documents."
+                    "Choose an empty collection."
+                )
+        next_id_doc = self.auxiliary.find_one({"next_id": {"$exists": True}})
+        if next_id_doc and next_id_doc["next_id"] != 1:
+            raise RuntimeError(
+                "next_id value is different from one in the auxiliary collection. "
+                "Choose an empty collection."
+            )
+        self.auxiliary.delete_many({})
+        for name, db_name, collection in zip(
+            collection_names,
+            [self.jobs_collection, self.flows_collection, self.auxiliary_collection],
+            [self.jobs, self.flows, self.auxiliary],
+        ):
+            file_name = f"{name}.bson"
+            if compress:
+                file_name += ".gz"
+            file_path = dir_path / file_name
+            if python:
+                pymongo_restore(collection=collection, input_file=file_path)
+            else:
+                mongorestore_to_store(
+                    store=self.queue_store,
+                    collection=db_name,
+                    input_file=file_path,
+                    compress=compress,
+                    mongo_bin_path=mongo_bin_path,
+                )
 
 
 def get_flow_leafs(job_docs: list[dict]) -> list[dict]:

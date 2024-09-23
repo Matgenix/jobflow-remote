@@ -2,13 +2,21 @@ from __future__ import annotations
 
 import copy
 import logging
+import os
+import re
+import subprocess
 import time
 import warnings
 from collections import defaultdict
 from datetime import datetime
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+import bson
+from maggma.stores.mongolike import MongoStore, MongoURIStore
+from monty.io import zopen
 from pymongo import ReturnDocument
+from pymongo.errors import PyMongoError
 
 from jobflow_remote.utils.data import deep_merge_dict, suuid
 
@@ -398,3 +406,213 @@ class FlowLockedError(LockedDocumentError):
         if additional_msg:
             msg += " " + additional_msg
         return cls(msg)
+
+
+def mongo_operation(
+    store: MongoStore | MongoURIStore,
+    collection: str,
+    file_path: str | Path,
+    operation: str,
+    mongo_bin_path: str | None = None,
+    compress: bool = False,
+) -> tuple[str, str]:
+    """
+    Execute a mongo operation (mongodump or mongorestore) on a given store.
+
+    Parameters
+    ----------
+    store
+        The store containing the data to be backed up.
+    collection
+        The name of the collection to be backed up.
+    file_path
+        The path of the folder where the backup files are located.
+    operation
+        The mongo operation to perform. Can be either 'mongodump' or 'mongorestore'.
+    mongo_bin_path
+        The path to the folder containing the mongo executable. If None, the executable is
+        searched in the PATH.
+    compress
+        If True, the backup files are compressed.
+
+    Returns
+    -------
+    tuple[str, str]
+        The stdout and stderr of the executed command.
+    """
+    if operation not in ("mongodump", "mongorestore"):
+        raise ValueError(f"Operation {operation} not supported")
+
+    if mongo_bin_path:
+        operation = os.path.join(mongo_bin_path, operation)
+
+    # here is not checked with isinstance(), because the current other subclasses will fail
+    if type(store) is MongoURIStore:
+        cmd = [
+            operation,
+            "--uri",
+            store.uri,
+        ]
+    elif type(store) is MongoStore:
+        cmd = [
+            operation,
+            "--host",
+            store.host,
+            "--port",
+            str(store.port),
+        ]
+        if store.username and store.password:
+            cmd.extend(["--username", store.username, "--password", store.password])
+            if store.auth_source:
+                cmd.extend(["--authenticationDatabase", store.auth_source])
+    else:
+        raise ValueError(
+            f"Unsupported store type {type(store).__name__}. Consider using the python version."
+        )
+
+    # check this afterwards, since other stores may not have ssh_tunnel attribute
+    if store.ssh_tunnel is not None:
+        raise NotImplementedError(
+            "SSH tunnel is not supported. Consider using the python version."
+        )
+
+    cmd.extend(["--db", store.database, "--collection", collection])
+
+    if compress:
+        cmd.append("--gzip")
+
+    if operation.endswith("mongodump"):
+        cmd.extend(["--out", file_path])
+    elif operation.endswith("mongorestore"):
+        cmd.append(file_path)
+
+    str_cmd = " ".join(str(s) for s in cmd)
+    result = subprocess.run(
+        str_cmd, check=True, capture_output=True, text=True, shell=True
+    )
+    logger.debug(
+        f"output during execution of {str_cmd}. Stdout: {result.stdout}. Stderr: {result.stderr}"
+    )
+    return result.stdout, result.stderr
+
+
+def mongodump_from_store(
+    store: MongoStore | MongoURIStore,
+    collection: str,
+    output_path: str | Path,
+    mongo_bin_path: str | None = None,
+    compress: bool = False,
+) -> int:
+    """
+    Use mongodump to dump a collection from a MongoDB store to a file.
+
+    Parameters
+    ----------
+    store
+        The store containing the data to be backed up.
+    collection
+        The name of the collection to be backed up.
+    output_path
+        The path of the folder where the backup files are located.
+    mongo_bin_path
+        The path to the folder containing the mongo executable. If None, the executable is
+        searched in the PATH.
+    compress
+        If True, the backup files are compressed.
+
+    Returns
+    -------
+    int
+        The number of documents dumped.
+    """
+    stdout, stderr = mongo_operation(
+        store, collection, output_path, "mongodump", mongo_bin_path, compress=compress
+    )
+
+    # Extract the number of documents dumped
+    match = re.search(r"done dumping .*\((\d+) documents*\)", stderr)
+    return int(match.group(1)) if match else 0
+
+
+def mongorestore_to_store(
+    store: MongoStore | MongoURIStore,
+    collection: str,
+    input_file: str | Path,
+    mongo_bin_path: str | None = None,
+    compress: bool = False,
+) -> None:
+    """
+    Restore a collection from a BSON file using mongorestore.
+
+    Parameters
+    ----------
+    store
+        The store where the data should be restored.
+    collection
+        The name of the collection to be restored.
+    input_file
+        The path of the BSON file containing the data to be restored.
+    mongo_bin_path
+        The path to the folder containing the mongo executable. If None, the executable is
+        searched in the PATH.
+    compress
+        If True, the input file is expected to be compressed.
+    """
+    mongo_operation(
+        store, collection, input_file, "mongorestore", mongo_bin_path, compress=compress
+    )
+
+
+def pymongo_dump(
+    collection: Collection, output_path: str | Path, compress: bool = False
+) -> int:
+    """
+    Dump the contents of a PyMongo collection to a BSON file.
+
+    Parameters
+    ----------
+    collection
+        The PyMongo collection to be dumped.
+    output_path
+        The path of the folder where the BSON file should be saved.
+    compress : bool
+        If True, the output file is compressed.
+
+    Returns
+    -------
+    int
+        The number of documents dumped.
+    """
+    dir_path = Path(output_path) / collection.database.name
+    dir_path.mkdir(exist_ok=True)
+    # add the db name for consistency with mongodump and use the collection name as file name
+    file_name = f"{collection.name}.bson"
+    if compress:
+        file_name += ".gz"
+    with zopen(dir_path / file_name, "wb") as f:
+        num_documents = 0
+        for doc in collection.find():
+            f.write(bson.BSON.encode(doc))
+            num_documents += 1
+
+    return num_documents
+
+
+def pymongo_restore(collection: Collection, input_file: str | Path) -> None:
+    """
+    Restore the contents of a BSON file to a PyMongo collection.
+
+    Parameters
+    ----------
+    collection
+        The PyMongo collection to be dumped.
+    input_file
+        The path of the BSON file used to restore the data.
+    """
+    try:
+        with zopen(input_file, "rb") as f:
+            collection.insert_many(bson.decode_all(f.read()))
+    except PyMongoError as e:
+        raise RuntimeError(f"Error during PyMongo restore: {e!s}") from e
+    except OSError as e:
+        raise RuntimeError(f"Error reading from file: {e!s}") from e
