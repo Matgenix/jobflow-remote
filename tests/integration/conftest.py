@@ -337,7 +337,7 @@ def write_tmp_settings(
         with open(tmp_dir / f"{random_project_name}.json", "w") as f:
             f.write(project_json)
 
-        yield
+        yield project
     finally:
         shutil.rmtree(tmp_dir)
         # Reset environment variables if they were set elsewhere

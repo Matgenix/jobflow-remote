@@ -10,14 +10,14 @@ pytestmark = pytest.mark.skipif(
 WORKERS = ["test_local_worker", "test_remote_slurm_worker", "test_remote_sge_worker"]
 
 
-def test_project_init(random_project_name) -> None:
+def test_project_init(random_project_name, write_tmp_settings) -> None:
     from jobflow_remote.config import ConfigManager
 
     cm = ConfigManager()
     assert len(cm.projects) == 1
     assert cm.projects[random_project_name]
     project = cm.get_project()
-    assert len(project.workers) == 4
+    assert len(project.workers) == len(write_tmp_settings.workers)
 
 
 def test_paramiko_ssh_connection(job_controller, slurm_ssh_port) -> None:
