@@ -12,8 +12,9 @@ from jobflow_remote.remote.host.base import BaseHost
 
 
 class LocalHost(BaseHost):
-    def __init__(self, timeout_execute: int = None) -> None:
+    def __init__(self, timeout_execute: int = None, sanitize: bool = False) -> None:
         self.timeout_execute = timeout_execute
+        super().__init__(sanitize=sanitize)
 
     def __eq__(self, other):
         return isinstance(other, LocalHost)
@@ -34,6 +35,10 @@ class LocalHost(BaseHost):
         ----------
         command: str or list of str
             Command to execute, as a str or list of str
+        workdir: str or None
+            path where the command will be executed.
+        timeout
+            Timeout for the execution of the commands.
 
         Returns
         -------
@@ -46,13 +51,16 @@ class LocalHost(BaseHost):
         """
         if isinstance(command, (list, tuple)):
             command = " ".join(command)
+        command = self.sanitize_command(command)
         workdir = str(workdir) if workdir else Path.cwd()
         timeout = timeout or self.timeout_execute
         with cd(workdir):
             proc = subprocess.run(
                 command, capture_output=True, shell=True, timeout=timeout, check=False
             )
-        return proc.stdout.decode(), proc.stderr.decode(), proc.returncode
+        stdout = self.sanitize_output(proc.stdout.decode())
+        stderr = self.sanitize_output(proc.stderr.decode())
+        return stdout, stderr, proc.returncode
 
     def mkdir(
         self, directory: str | Path, recursive: bool = True, exist_ok: bool = True
