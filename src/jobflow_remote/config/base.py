@@ -183,6 +183,11 @@ class WorkerBase(BaseModel):
         "username instead that from the list of job ids. May be necessary for some "
         "scheduler_type (e.g. SGE)",
     )
+    sanitize_command: bool = Field(
+        default=False,
+        description="Sanitize the output of commands in case of failures due to spurious text produced"
+        "by the worker shell.",
+    )
     model_config = ConfigDict(extra="forbid")
 
     @field_validator("scheduler_type")

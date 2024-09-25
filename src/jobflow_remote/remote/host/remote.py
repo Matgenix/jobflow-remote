@@ -42,6 +42,7 @@ class RemoteHost(BaseHost):
         login_shell=True,
         retry_on_closed_connection=True,
         interactive_login=False,
+        sanitize: bool = False,
     ) -> None:
         self.host = host
         self.user = user
@@ -59,6 +60,7 @@ class RemoteHost(BaseHost):
         self.retry_on_closed_connection = retry_on_closed_connection
         self._interactive_login = interactive_login
         self._create_connection()
+        super().__init__(sanitize=sanitize)
 
     def _create_connection(self) -> None:
         if self.interactive_login:
@@ -175,6 +177,8 @@ class RemoteHost(BaseHost):
         if isinstance(command, (list, tuple)):
             command = " ".join(command)
 
+        command = self.sanitize_command(command)
+
         # TODO: check if this works:
         if not workdir:
             workdir = "."
@@ -201,7 +205,10 @@ class RemoteHost(BaseHost):
                 timeout=timeout,
             )
 
-        return out.stdout, out.stderr, out.exited
+        stdout = self.sanitize_output(out.stdout)
+        stderr = self.sanitize_output(out.stderr)
+
+        return stdout, stderr, out.exited
 
     def mkdir(
         self, directory: str | Path, recursive: bool = True, exist_ok: bool = True

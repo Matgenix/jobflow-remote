@@ -15,7 +15,7 @@ def test_project_init(random_project_name) -> None:
     assert len(cm.projects) == 1
     assert cm.projects[random_project_name]
     project = cm.get_project()
-    assert len(project.workers) == 5
+    assert len(project.workers) == 7
 
 
 def test_paramiko_ssh_connection(job_controller, slurm_ssh_port) -> None:
@@ -39,7 +39,12 @@ def test_project_check(job_controller, capsys) -> None:
 
     expected = [
         "✓ Worker test_local_worker",
+        "✓ Worker test_sanitize_local_worker",
         "✓ Worker test_remote_worker",
+        "✓ Worker test_remote_limited_worker",
+        "✓ Worker test_batch_remote_worker",
+        "✓ Worker test_max_jobs_worker",
+        "✓ Worker test_sanitize_remote_worker",
         "✓ Jobstore",
         "✓ Queue store",
     ]
@@ -404,3 +409,23 @@ def test_priority(worker, job_controller) -> None:
     jobs_info = sorted(jobs_info, key=lambda x: x.priority, reverse=True)
     for i in range(len(jobs_info) - 1):
         assert jobs_info[i].end_time < jobs_info[i + 1].start_time
+
+@pytest.mark.parametrize(
+    "worker",
+    ["test_sanitize_local_worker", "test_sanitize_remote_worker"],
+)
+def test_sanitize(worker, job_controller):
+    from jobflow import Flow
+
+    from jobflow_remote import submit_flow
+    from jobflow_remote.jobs.runner import Runner
+    from jobflow_remote.jobs.state import JobState
+    from jobflow_remote.testing import add
+
+    flow = Flow([add(1, 2)])
+    submit_flow(flow, worker=worker)
+
+    runner = Runner()
+    runner.run_one_job()
+
+    assert job_controller.count_jobs(states=JobState.COMPLETED) == 1
