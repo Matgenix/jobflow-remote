@@ -528,7 +528,8 @@ def test_set_job_run_properties(job_controller, one_job) -> None:
 
     assert job_controller.set_job_run_properties(priority=10)
     assert job_controller.get_job_doc(job_id=one_job[0].uuid).priority == 10
-
+    assert job_controller.set_job_run_properties()
+    assert job_controller.get_job_doc(job_id=one_job[0].uuid).priority == 10
 
 def test_set_job_doc_properties(job_controller, one_job) -> None:
     from jobflow_remote.jobs.state import JobState
