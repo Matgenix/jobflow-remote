@@ -257,7 +257,9 @@ class LocalWorker(WorkerBase):
         -------
         The LocalHost.
         """
-        return LocalHost(timeout_execute=self.timeout_execute)
+        return LocalHost(
+            timeout_execute=self.timeout_execute, sanitize=self.sanitize_command
+        )
 
     @property
     def cli_info(self) -> dict:
@@ -407,6 +409,7 @@ class RemoteWorker(WorkerBase):
             shell_cmd=self.shell_cmd,
             login_shell=self.login_shell,
             interactive_login=self.interactive_login,
+            sanitize=self.sanitize_command,
         )
 
     @property
