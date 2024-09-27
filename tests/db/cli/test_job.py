@@ -210,6 +210,17 @@ def test_set_resources(job_controller, one_job) -> None:
     assert job_controller.get_job_doc(db_id="1").resources == {"ntasks": 1}
 
 
+def test_set_priority(job_controller, one_job) -> None:
+    from jobflow_remote.testing.cli import run_check_cli
+
+    run_check_cli(
+        ["job", "set", "priority", "-did", "1", "10"],
+        required_out="Operation completed: 1 jobs modified",
+    )
+
+    assert job_controller.get_job_doc(db_id="1").priority == 10
+
+
 def test_job_dump(job_controller, one_job, tmp_dir) -> None:
     import os
 
