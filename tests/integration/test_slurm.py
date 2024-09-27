@@ -377,20 +377,28 @@ def test_priority(worker, job_controller) -> None:
     from jobflow_remote.jobs.state import JobState
     from jobflow_remote.testing import add
 
+    # use 5 jobs to reduce the possibility of an accidental matching of the
+    # order, but not too many, to avoid taking too much time.
     add1 = add(1, 1)
     flow1 = Flow([add1])
-    submit_flow(flow1, worker=worker, priority=2)
+    submit_flow(flow1, worker=worker, priority=4)
     add2 = add(1, 1)
     flow2 = Flow([add2])
     submit_flow(flow2, worker=worker, priority=1)
     add3 = add(1, 1)
     flow3 = Flow([add3])
-    submit_flow(flow3, worker=worker, priority=3)
+    submit_flow(flow3, worker=worker, priority=5)
+    add4 = add(1, 1)
+    flow4 = Flow([add4])
+    submit_flow(flow4, worker=worker, priority=3)
+    add5 = add(1, 1)
+    flow5 = Flow([add5])
+    submit_flow(flow5, worker=worker, priority=2)
 
     runner = Runner()
     runner.run_all_jobs(max_seconds=120)
 
-    assert job_controller.count_jobs(states=[JobState.COMPLETED]) == 3
+    assert job_controller.count_jobs(states=[JobState.COMPLETED]) == 5
     # check that the jobs were executed according to the priority
     jobs_info = job_controller.get_jobs_info()
     jobs_info = sorted(jobs_info, key=lambda x: x.priority, reverse=True)
