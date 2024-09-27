@@ -42,7 +42,7 @@ def submit_flow(
         the options to set before the execution of the job in the submission script.
         In addition to those defined in the Worker.
     resources
-        information passed to qtoolkit to require the resources for the submission
+        Information passed to qtoolkit to require the resources for the submission
         to the queue.
     priority
         The priority assigned to the Jobs.
