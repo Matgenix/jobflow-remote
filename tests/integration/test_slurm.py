@@ -15,7 +15,7 @@ def test_project_init(random_project_name) -> None:
     assert len(cm.projects) == 1
     assert cm.projects[random_project_name]
     project = cm.get_project()
-    assert len(project.workers) == 4
+    assert len(project.workers) == 5
 
 
 def test_paramiko_ssh_connection(job_controller, slurm_ssh_port) -> None:
@@ -362,3 +362,37 @@ def test_submit_flow_with_scheduler_username(monkeypatch, job_controller) -> Non
     assert (
         job_controller.count_flows(states=FlowState.COMPLETED) == 1
     ), f"Flows not marked as completed, full flow info:\n{job_controller.get_flows({})}"
+
+
+@pytest.mark.parametrize(
+    "worker",
+    ["test_remote_limited_worker"],
+)
+def test_priority(worker, job_controller) -> None:
+    # test only on a limited worker to be sure that only one job will run at the time
+    from jobflow import Flow
+
+    from jobflow_remote import submit_flow
+    from jobflow_remote.jobs.runner import Runner
+    from jobflow_remote.jobs.state import JobState
+    from jobflow_remote.testing import add
+
+    add1 = add(1, 1)
+    flow1 = Flow([add1])
+    submit_flow(flow1, worker=worker, priority=2)
+    add2 = add(1, 1)
+    flow2 = Flow([add2])
+    submit_flow(flow2, worker=worker, priority=1)
+    add3 = add(1, 1)
+    flow3 = Flow([add3])
+    submit_flow(flow3, worker=worker, priority=3)
+
+    runner = Runner()
+    runner.run_all_jobs(max_seconds=120)
+
+    assert job_controller.count_jobs(states=[JobState.COMPLETED]) == 3
+    # check that the jobs were executed according to the priority
+    jobs_info = job_controller.get_jobs_info()
+    jobs_info = sorted(jobs_info, key=lambda x: x.priority, reverse=True)
+    for i in range(len(jobs_info) - 1):
+        assert jobs_info[i].end_time < jobs_info[i + 1].start_time

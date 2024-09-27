@@ -17,6 +17,7 @@ def set_run_config(
     function_filter: Callable = None,
     exec_config: str | ExecutionConfig | None = None,
     resources: dict | QResources | None = None,
+    priority: int | None = None,
     worker: str | None = None,
     dynamic: bool = True,
 ) -> Flow | Job:
@@ -52,6 +53,8 @@ def set_run_config(
         The execution configuration to be added to the selected Jobs.
     resources
         The resources to be set for the selected Jobs.
+    priority
+        The priority of the Job.
     worker
         The worker where the selected Jobs will be executed.
     dynamic
@@ -72,6 +75,8 @@ def set_run_config(
         config["manager_config"]["resources"] = resources
     if worker is not None:
         config["manager_config"]["worker"] = worker
+    if priority is not None:
+        config["manager_config"]["priority"] = priority
 
     flow_or_job.update_config(
         config=config,

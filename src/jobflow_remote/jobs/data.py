@@ -23,6 +23,7 @@ def get_initial_job_doc_dict(
     worker: str,
     exec_config: Optional[ExecutionConfig],
     resources: Optional[Union[dict, QResources]],
+    priority: int,
 ) -> dict:
     """
     Generate an instance of JobDoc for initial insertion in the DB.
@@ -41,6 +42,8 @@ def get_initial_job_doc_dict(
         The ExecutionConfig used for execution.
     resources
         The resources used to run the Job.
+    priority
+        The priority of the Job.
 
     Returns
     -------
@@ -58,6 +61,7 @@ def get_initial_job_doc_dict(
     job_resources = config_resources if config_resources is not None else resources
     job_exec_config = job.config.manager_config.get("exec_config") or exec_config
     worker = job.config.manager_config.get("worker") or worker
+    priority = job.config.manager_config.get("priority") or priority
 
     job_doc = JobDoc(
         job=jsanitize(job, strict=True, enum_values=True),
@@ -69,6 +73,7 @@ def get_initial_job_doc_dict(
         worker=worker,
         exec_config=job_exec_config,
         resources=job_resources,
+        priority=priority,
     )
 
     return job_doc.as_db_dict()

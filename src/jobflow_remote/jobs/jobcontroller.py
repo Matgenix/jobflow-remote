@@ -1967,6 +1967,7 @@ class JobController:
         worker: str | None = None,
         exec_config: str | ExecutionConfig | dict | None = None,
         resources: dict | QResources | None = None,
+        priority: int | None = None,
         update: bool = True,
         job_ids: tuple[str, int] | list[tuple[str, int]] | None = None,
         db_ids: str | list[str] | None = None,
@@ -1993,6 +1994,8 @@ class JobController:
             ExecutionConfig or dict.
         resources
             The resources to be set, either as a dict or a QResources instance.
+        priority
+            The priority of the Job.
         update
             If True, when setting exec_config and resources a passed dictionary
             will be used to update already existing values.
@@ -2075,6 +2078,9 @@ class JobController:
                 set_dict["resources"] = {"$mergeObjects": ["$resources", resources]}
             else:
                 set_dict["resources"] = resources
+
+        if priority is not None:
+            set_dict["priority"] = priority
 
         acceptable_states = [
             JobState.READY,
@@ -2882,6 +2888,7 @@ class JobController:
         allow_external_references: bool = False,
         exec_config: ExecutionConfig | None = None,
         resources: dict | QResources | None = None,
+        priority: int = 0,
     ) -> list[str]:
         from jobflow.core.flow import get_flow
 
@@ -2915,6 +2922,7 @@ class JobController:
                     worker=worker,
                     exec_config=exec_config,
                     resources=resources,
+                    priority=priority,
                 )
             )
 
@@ -2954,6 +2962,7 @@ class JobController:
         response_type: DynamicResponseType,
         exec_config: ExecutionConfig | None = None,
         resources: QResources | None = None,
+        priority: int = 0,
     ) -> None:
         from jobflow import Flow, Job
 
@@ -3026,6 +3035,7 @@ class JobController:
                     worker=worker,
                     exec_config=exec_config,
                     resources=resources,
+                    priority=priority,
                 )
             )
             flow_updates["$set"][f"parents.{job.uuid}.{job.index}"] = parents
@@ -3244,6 +3254,7 @@ class JobController:
                     worker=job_doc["worker"],
                     exec_config=job_doc["exec_config"],
                     resources=job_doc["resources"],
+                    priority=job_doc["priority"],
                 )
 
             if response["addition"] is not None:
@@ -3255,6 +3266,7 @@ class JobController:
                     worker=job_doc["worker"],
                     exec_config=job_doc["exec_config"],
                     resources=job_doc["resources"],
+                    priority=job_doc["priority"],
                 )
 
             if response["detour"] is not None:
@@ -3266,6 +3278,7 @@ class JobController:
                     worker=job_doc["worker"],
                     exec_config=job_doc["exec_config"],
                     resources=job_doc["resources"],
+                    priority=job_doc["priority"],
                 )
 
             if response["stored_data"] is not None:
