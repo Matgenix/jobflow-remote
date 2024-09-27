@@ -4161,53 +4161,53 @@ class JobController:
         """
         dir_path = Path(dir_path)
         doc_count = {}
-        collection_names = ["jobs", "flows", "jf_auxiliary"]
+        standard_collection_names = ["jobs", "flows", "jf_auxiliary"]
         if python:
-            for name, collection in zip(
-                collection_names, [self.jobs, self.flows, self.auxiliary]
+            for std_name, collection in zip(
+                standard_collection_names, [self.jobs, self.flows, self.auxiliary]
             ):
-                doc_count[name] = pymongo_dump(
+                doc_count[std_name] = pymongo_dump(
                     collection=collection, output_path=dir_path, compress=compress
                 )
         else:
-            for name, collection in zip(
-                collection_names,
+            for std_name, collection_name in zip(
+                standard_collection_names,
                 [
                     self.jobs_collection,
                     self.flows_collection,
                     self.auxiliary_collection,
                 ],
             ):
-                doc_count[name] = mongodump_from_store(
+                doc_count[std_name] = mongodump_from_store(
                     store=self.queue_store,
-                    collection=collection,
+                    collection=collection_name,
                     output_path=dir_path,
                     compress=compress,
                     mongo_bin_path=mongo_bin_path,
                 )
 
         # move the files produced to match the standard names
-        for name, collection in zip(
-            collection_names,
+        for std_name, collection_name in zip(
+            standard_collection_names,
             [self.jobs_collection, self.flows_collection, self.auxiliary_collection],
         ):
-            if collection != name:
+            if collection_name != std_name:
                 full_dir_path = dir_path / self.queue_store.database
-                data_file_name = f"{collection}.bson"
+                data_file_name = f"{collection_name}.bson"
                 if compress:
                     data_file_name += ".gz"
                 file_path = full_dir_path / data_file_name
                 if file_path.exists():
-                    new_file_name = f"{name}.bson"
+                    new_file_name = f"{std_name}.bson"
                     if compress:
                         new_file_name += ".gz"
                     file_path.rename(full_dir_path / new_file_name)
-                metadata_file_name = f"{collection}.metadata.json"
+                metadata_file_name = f"{collection_name}.metadata.json"
                 if compress:
                     metadata_file_name += ".gz"
                 file_path = full_dir_path / metadata_file_name
                 if file_path.exists():
-                    new_file_name = f"{name}.metadata.json"
+                    new_file_name = f"{std_name}.metadata.json"
                     if compress:
                         new_file_name += ".gz"
                     file_path.rename(full_dir_path / new_file_name)
@@ -4218,7 +4218,7 @@ class JobController:
         self,
         dir_path: str | Path = ".",
         mongo_bin_path: str | None = None,
-        compress: bool = False,
+        compress: bool | None = None,
         python: bool = False,
     ):
         """
@@ -4238,7 +4238,8 @@ class JobController:
         mongo_bin_path
             The path to a folder containing the mongodump executable, if not present in the PATH.
         compress
-            If True the backup files are compressed.
+            If True the backup files are compressed. If None it will be determined based
+            on the file extension.
         python
             If True, a pure python implementation will be used instead of the 'mongorestore'
             command. WARNING: In this case metadata of the collections will not be restored.
@@ -4269,16 +4270,22 @@ class JobController:
             [self.jobs, self.flows, self.auxiliary],
         ):
             file_name = f"{name}.bson"
+            # compress may be set automatically in the restore functions, but if
+            # compress is set explicitly to True the name should match.
             if compress:
                 file_name += ".gz"
-            file_path = dir_path / file_name
+            files_paths = list(dir_path.glob(f"{file_name}*"))
+            if len(files_paths) != 1:
+                raise RuntimeError(
+                    f"{len(files_paths)} files matching the name {file_name} were found in {dir_path}"
+                )
             if python:
-                pymongo_restore(collection=collection, input_file=file_path)
+                pymongo_restore(collection=collection, input_file=files_paths[0])
             else:
                 mongorestore_to_store(
                     store=self.queue_store,
                     collection=db_name,
-                    input_file=file_path,
+                    input_file=files_paths[0],
                     compress=compress,
                     mongo_bin_path=mongo_bin_path,
                 )
