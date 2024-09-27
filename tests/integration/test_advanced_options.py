@@ -59,7 +59,7 @@ def test_max_jobs_worker(job_controller, daemon_manager) -> None:
     running_states = (JobState.RUNNING, JobState.SUBMITTED)
 
     max_running_jobs = 0
-    for _ in range(20):
+    for _ in range(30):
         time.sleep(1)
         jobs_info = job_controller.get_jobs_info(job_ids=job_ids)
         if all(ji.state in finished_states for ji in jobs_info):

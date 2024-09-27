@@ -1,15 +1,21 @@
 import io
+from datetime import datetime
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Optional
 
 import typer
+from dateutil.tz import tzlocal
 from monty.json import jsanitize
 from monty.serialization import dumpfn
 from qtoolkit.core.data_objects import QResources
 from rich.pretty import pprint
 
 from jobflow_remote import SETTINGS
-from jobflow_remote.cli.formatting import format_job_info, get_job_info_table
+from jobflow_remote.cli.formatting import (
+    format_job_info,
+    get_job_info_table,
+    get_job_report_components,
+)
 from jobflow_remote.cli.jf import app
 from jobflow_remote.cli.jfr_typer import JFRTyper
 from jobflow_remote.cli.types import (
@@ -43,6 +49,7 @@ from jobflow_remote.cli.types import (
     worker_name_opt,
 )
 from jobflow_remote.cli.utils import (
+    ReportInterval,
     SortOption,
     check_incompatible_opt,
     check_query_incompatibility,
@@ -61,6 +68,7 @@ from jobflow_remote.cli.utils import (
     print_success_msg,
     str_to_dict,
 )
+from jobflow_remote.jobs.report import JobsReport
 from jobflow_remote.jobs.state import JobState
 from jobflow_remote.remote.queue import ERR_FNAME, OUT_FNAME
 
@@ -677,6 +685,36 @@ def queue_out(
     else:
         out_console.print(f"Queue error from {err_path!s}:\n")
         out_console.print(err)
+
+
+@app_job.command()
+def report(
+    interval: Annotated[
+        ReportInterval,
+        typer.Argument(
+            help="The interval of the trends for the report",
+            metavar="INTERVAL",
+        ),
+    ] = ReportInterval.DAYS,
+    num_intervals: Annotated[
+        Optional[int],
+        typer.Argument(
+            help="The number of intervals to consider. Default depends on the interval type",
+            metavar="NUM_INTERVALS",
+        ),
+    ] = None,
+):
+    jc = get_job_controller()
+
+    timezone = datetime.now(tzlocal()).tzname()
+
+    jobs_report = JobsReport.generate_report(
+        job_controller=jc,
+        interval=interval.value,
+        num_intervals=num_intervals,
+        timezone=timezone,
+    )
+    out_console.print(*get_job_report_components(jobs_report))
 
 
 app_job_set = JFRTyper(

@@ -17,6 +17,7 @@ from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.prompt import Confirm
 from rich.text import Text
+from typer.core import TyperCommand, TyperGroup
 
 from jobflow_remote import ConfigManager, JobController
 from jobflow_remote.config.base import ProjectUndefinedError
@@ -24,6 +25,8 @@ from jobflow_remote.jobs.daemon import DaemonError, DaemonManager, DaemonStatus
 
 if TYPE_CHECKING:
     from cProfile import Profile
+
+    from rich.tree import Tree
 
     from jobflow_remote.jobs.state import JobState
 
@@ -119,6 +122,14 @@ class IndexDirection(str, Enum):
             IndexDirection.ASC: pymongo.ASCENDING,
             IndexDirection.DESC: pymongo.DESCENDING,
         }[self]
+
+
+class ReportInterval(str, Enum):
+    HOURS = "hours"
+    DAYS = "days"
+    WEEKS = "weeks"
+    MONTHS = "months"
+    YEARS = "years"
 
 
 class ReprStr(str):
@@ -489,3 +500,105 @@ def check_stopped_runner(error: bool = True) -> None:
             confirmed = Confirm.ask(text, default=False)
             if not confirmed:
                 raise typer.Exit(0)
+
+
+def get_command_tree(
+    app: TyperGroup,
+    tree: Tree,
+    show_options: bool,
+    show_docs: bool,
+    show_hidden: bool,
+    max_depth: int | None,
+    current_depth: int = 0,
+) -> Tree:
+    """
+    Recursively build a tree representation of the command structure.
+
+    Parameters
+    ----------
+    app
+        The Typer app or command group to process.
+    tree
+        The Rich Tree object to add nodes to.
+    show_options
+        Whether to display command options.
+    show_docs
+        Whether to display command and option documentation.
+    show_hidden
+        Whether to display hidden commands.
+    max_depth
+        Maximum depth of the tree to display.
+    current_depth
+        Current depth in the tree (used for recursion).
+
+    Returns
+    -------
+    Tree
+        The populated Rich Tree object.
+    """
+    if max_depth is not None and current_depth >= max_depth:
+        return tree
+
+    for command_name, command in sorted(app.commands.items()):
+        if not show_hidden and getattr(command, "hidden", False):
+            continue
+
+        command_str = f"[bold green]{command_name}[/bold green]"
+        if show_docs and isinstance(command, TyperCommand) and command.help:
+            command_str += f": {command.help}"
+        branch = tree.add(command_str)
+
+        if isinstance(command, TyperGroup):
+            get_command_tree(
+                command,
+                branch,
+                show_options,
+                show_docs,
+                show_hidden,
+                max_depth,
+                current_depth + 1,
+            )
+        elif show_options:
+            for param in command.params:
+                param_str = f"[blue]{param.name}[/blue]"
+                if param.default is not None:
+                    default_value = param.default if param.default != "" else '""'
+                    param_str += f" (default: {default_value})"
+                if param.required:
+                    param_str += " [red](required)[/red]"
+                if show_docs and param.help:
+                    param_str += f": {param.help}"
+                branch.add(param_str)
+    return tree
+
+
+def find_subcommand(app: TyperGroup, path: list[str]) -> TyperGroup | None:
+    """
+    Find a subcommand in the command tree based on the given path.
+
+    Parameters
+    ----------
+    app
+        The root Typer app or command group.
+    path
+        List of command names forming the path to the desired subcommand.
+
+    Returns
+    -------
+    TyperGroup
+        The found subcommand, or None if not found.
+    """
+    if not path:
+        return app
+
+    current_command = app.commands.get(path[0])
+    if current_command is None:
+        return None
+
+    if len(path) == 1:
+        return current_command if isinstance(current_command, TyperGroup) else None
+
+    if isinstance(current_command, TyperGroup):
+        return find_subcommand(current_command, path[1:])
+
+    return None

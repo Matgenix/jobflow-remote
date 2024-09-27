@@ -8,6 +8,8 @@ from typing import Any
 from uuid import UUID
 
 import maggma.stores  # required to enable subclass searching
+from dateutil.relativedelta import relativedelta
+from dateutil.tz import gettz
 from maggma.core.store import Store
 from monty.json import MontyDecoder
 
@@ -144,6 +146,81 @@ def convert_utc_time(datetime_value: datetime) -> datetime:
         The datetime in the zone of the current system
     """
     return datetime_value.replace(tzinfo=timezone.utc).astimezone(tz=None)
+
+
+def get_past_time_rounded(
+    interval: str, num_intervals: int, reference: datetime | None = None
+) -> datetime:
+    """
+    Return a datetime object that is the specified number of intervals in the
+    past relative to the given reference datetime. The returned datetime is
+    rounded to the nearest interval start time.
+
+    Parameters
+    ----------
+    interval
+        One of 'hours', 'days', 'weeks', 'months', 'years'
+    num_intervals
+        The number of intervals to go back in time
+    reference
+        The datetime to use as the reference for the calculation. If not
+        specified, the current time is used.
+
+    Returns
+    -------
+    datetime
+        The datetime object that is the specified number of intervals in the
+        past relative to the given reference datetime.
+    """
+    if not reference:
+        reference = datetime.utcnow()
+    past = reference - relativedelta(**{interval: num_intervals - 1})  # type: ignore[arg-type]
+
+    # Define starting point modifications based on quantity type
+    start_modifiers = {
+        "hours": lambda dt: dt.replace(minute=0, second=0, microsecond=0),
+        "days": lambda dt: dt.replace(hour=0, minute=0, second=0, microsecond=0),
+        "weeks": lambda dt: dt.replace(hour=0, minute=0, second=0, microsecond=0)
+        - relativedelta(days=dt.weekday()),
+        "months": lambda dt: dt.replace(
+            day=1, hour=0, minute=0, second=0, microsecond=0
+        ),
+        "years": lambda dt: dt.replace(
+            month=1, day=1, hour=0, minute=0, second=0, microsecond=0
+        ),
+    }
+
+    return start_modifiers[interval](past)
+
+
+def get_utc_offset(timezone: str):
+    # Get current time in the specified timezone
+    """
+    Return the UTC offset of the given timezone as a string.
+
+    Parameters
+    ----------
+    timezone
+        The timezone for which to get the UTC offset.
+
+    Returns
+    -------
+    str
+        The UTC offset as a string in the format +/-HH:MM.
+    """
+    tz_info_val = gettz(timezone)
+    if not tz_info_val:
+        raise ValueError(f"Could not determine the timezone for {timezone}")
+    now = datetime.now(tz_info_val)
+
+    # Get the UTC offset
+    utc_offset = now.utcoffset()
+
+    # Extract hours and minutes
+    hours, remainder = divmod(utc_offset.total_seconds(), 3600)
+    minutes = remainder // 60
+
+    return f"{int(hours):+03d}:{int(minutes):02d}"
 
 
 # TODO imported this from jobflow remote for backward compatibility.

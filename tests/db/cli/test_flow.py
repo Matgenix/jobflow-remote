@@ -139,3 +139,36 @@ def test_flow_info(job_controller, two_flows_four_jobs) -> None:
     run_check_cli(
         ["flow", "info", "-j", "1"], required_out=outputs, excluded_out=excluded
     )
+
+
+def test_report(job_controller) -> None:
+    from datetime import datetime
+
+    from jobflow import Flow
+
+    from jobflow_remote import submit_flow
+    from jobflow_remote.testing import add_sleep
+    from jobflow_remote.testing.cli import run_check_cli
+
+    # run first with an empty db to check that everything works fine
+    now = datetime.now()
+    output = [
+        "Flow Summary",
+        "Flow State Distribution",
+        "Flow Trends",
+        now.strftime("%Y-%m-%d"),
+    ]
+    run_check_cli(
+        ["flow", "report", "days", "2"],
+        required_out=[*output, "Running Flows │   0"],
+    )
+
+    # a long sleeping job. Will not finish.
+    j = add_sleep(1, 10)
+    flow = Flow([j])
+    submit_flow(flow, worker="test_local_worker")
+
+    run_check_cli(
+        ["flow", "report", "days", "2"],
+        required_out=[*output, "Running Flows │   0"],
+    )
