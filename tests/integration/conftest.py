@@ -228,6 +228,7 @@ def write_tmp_settings(
                 scheduler_type="shell",
                 work_dir=str(workdir),
                 resources={},
+                sanitize_command=True,
             ),
             "test_remote_worker": dict(
                 type="remote",

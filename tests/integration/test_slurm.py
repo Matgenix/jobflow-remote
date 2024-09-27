@@ -422,6 +422,8 @@ def test_sanitize(worker, job_controller):
     from jobflow_remote.jobs.state import JobState
     from jobflow_remote.testing import add
 
+    assert job_controller.project.workers[worker].get_host().sanitize is True
+
     flow = Flow([add(1, 2)])
     submit_flow(flow, worker=worker)
 
