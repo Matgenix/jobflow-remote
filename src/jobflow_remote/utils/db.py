@@ -504,7 +504,7 @@ def mongo_operation(
         str_cmd, check=True, capture_output=True, text=True, shell=True
     )
     logger.debug(
-        f"output during execution of {str_cmd}. Stdout: {result.stdout}. Stderr: {result.stderr}"
+        f"output during execution of '{str_cmd}'. Stdout: {result.stdout}. Stderr: {result.stderr}"
     )
     return result.stdout, result.stderr
 
