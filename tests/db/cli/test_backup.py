@@ -65,8 +65,6 @@ def test_reset(job_controller, two_flows_four_jobs, python, compress) -> None:
         assert job_controller.count_jobs() == 0
 
         cmd = ["backup", "restore"]
-        if compress:
-            cmd.append("--compress")
         if python:
             cmd.append("--python")
         cmd.append(str(dir_path / db_name))

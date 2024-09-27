@@ -833,9 +833,7 @@ def test_backup(job_controller_drop, python, compress):
 
         job_controller_drop.auxiliary.delete_many({})
 
-        job_controller_drop.backup_restore(
-            dir_path=dir_path / db_name, compress=compress, python=python
-        )
+        job_controller_drop.backup_restore(dir_path=dir_path / db_name, python=python)
 
         assert job_controller_drop.count_jobs() == 2
         assert job_controller_drop.count_flows() == 1

@@ -21,11 +21,11 @@ app.add_typer(app_backup)
 
 @app_backup.command()
 def create(
-    out_path: Annotated[
+    backup_dir: Annotated[
         str,
         typer.Argument(
-            help="The path of the folder where the output files will be saved",
-            metavar="PATH",
+            help="The path of the directory where the output files will be saved",
+            metavar="BACKUP_DIR",
         ),
     ] = ".",
     compress: Annotated[
@@ -67,7 +67,7 @@ def create(
         progress.add_task(description="Creating backup...", total=None)
         jc = get_job_controller()
         n_docs = jc.backup_dump(
-            dir_path=out_path,
+            dir_path=backup_dir,
             mongo_bin_path=mongo_dir,
             compress=compress,
             python=python,
@@ -81,25 +81,17 @@ def create(
 
 @app_backup.command()
 def restore(
-    out_path: Annotated[
+    backup_dir: Annotated[
         str,
         typer.Argument(
-            help="The path of the folder where the backup files are located",
-            metavar="PATH",
+            help="The path of the directory where the backup files are located",
+            metavar="BACKUP_DIR",
         ),
     ] = ".",
-    compress: Annotated[
-        bool,
-        typer.Option(
-            "--compress",
-            "-c",
-            help="The backup files were generated with the --compress option and should be decompressed",
-        ),
-    ] = False,
-    mongo_dir: Annotated[
+    mongo_path: Annotated[
         Optional[str],
         typer.Option(
-            "--mongo-dir",
+            "--mongo-path",
             "-m",
             help=(
                 "The path to a folder containing the mongorestore executable, if not present in the PATH"
@@ -125,9 +117,8 @@ def restore(
         progress.add_task(description="Restoring backup...", total=None)
         jc = get_job_controller()
         jc.backup_restore(
-            dir_path=out_path,
-            mongo_bin_path=mongo_dir,
-            compress=compress,
+            dir_path=backup_dir,
+            mongo_bin_path=mongo_path,
             python=python,
         )
 

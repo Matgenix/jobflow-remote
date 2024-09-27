@@ -10,6 +10,7 @@ import warnings
 from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
+from shutil import which
 from typing import TYPE_CHECKING, Any
 
 import bson
@@ -410,9 +411,9 @@ class FlowLockedError(LockedDocumentError):
 
 def mongo_operation(
     store: MongoStore | MongoURIStore,
-    collection: str,
     file_path: str | Path,
     operation: str,
+    collection: str | None,
     mongo_bin_path: str | None = None,
     compress: bool = False,
 ) -> tuple[str, str]:
@@ -423,12 +424,13 @@ def mongo_operation(
     ----------
     store
         The store containing the data to be backed up.
-    collection
-        The name of the collection to be backed up.
     file_path
         The path of the folder where the backup files are located.
     operation
         The mongo operation to perform. Can be either 'mongodump' or 'mongorestore'.
+    collection
+        The name of the collection to be backed up. If None the collection defined in
+        the store will be used.
     mongo_bin_path
         The path to the folder containing the mongo executable. If None, the executable is
         searched in the PATH.
@@ -445,6 +447,12 @@ def mongo_operation(
 
     if mongo_bin_path:
         operation = os.path.join(mongo_bin_path, operation)
+
+    if not which(operation):
+        raise RuntimeError(
+            f"It looks like the command {operation} is not available. Check the path or consider "
+            f"installing the mongodb database tools. Alternatively use the pure python implementation."
+        )
 
     # here is not checked with isinstance(), because the current other subclasses will fail
     if type(store) is MongoURIStore:
@@ -465,6 +473,11 @@ def mongo_operation(
             cmd.extend(["--username", store.username, "--password", store.password])
             if store.auth_source:
                 cmd.extend(["--authenticationDatabase", store.auth_source])
+        elif store.username or store.password:
+            raise ValueError(
+                "To use the mongotools the username and password in the queue store should be "
+                "either both present or both absent."
+            )
     else:
         raise ValueError(
             f"Unsupported store type {type(store).__name__}. Consider using the python version."
@@ -498,8 +511,8 @@ def mongo_operation(
 
 def mongodump_from_store(
     store: MongoStore | MongoURIStore,
-    collection: str,
     output_path: str | Path,
+    collection: str | None = None,
     mongo_bin_path: str | None = None,
     compress: bool = False,
 ) -> int:
@@ -510,10 +523,11 @@ def mongodump_from_store(
     ----------
     store
         The store containing the data to be backed up.
-    collection
-        The name of the collection to be backed up.
     output_path
         The path of the folder where the backup files are located.
+    collection
+        The name of the collection to be backed up. If None the collection defined in
+        the store will be used.
     mongo_bin_path
         The path to the folder containing the mongo executable. If None, the executable is
         searched in the PATH.
@@ -526,7 +540,12 @@ def mongodump_from_store(
         The number of documents dumped.
     """
     stdout, stderr = mongo_operation(
-        store, collection, output_path, "mongodump", mongo_bin_path, compress=compress
+        store=store,
+        collection=collection,
+        file_path=output_path,
+        operation="mongodump",
+        mongo_bin_path=mongo_bin_path,
+        compress=compress,
     )
 
     # Extract the number of documents dumped
@@ -536,10 +555,10 @@ def mongodump_from_store(
 
 def mongorestore_to_store(
     store: MongoStore | MongoURIStore,
-    collection: str,
     input_file: str | Path,
+    collection: str | None = None,
     mongo_bin_path: str | None = None,
-    compress: bool = False,
+    compress: bool | None = None,
 ) -> None:
     """
     Restore a collection from a BSON file using mongorestore.
@@ -548,18 +567,27 @@ def mongorestore_to_store(
     ----------
     store
         The store where the data should be restored.
-    collection
-        The name of the collection to be restored.
     input_file
         The path of the BSON file containing the data to be restored.
+    collection
+        The name of the collection to be backed up. If None the collection defined in
+        the store will be used.
     mongo_bin_path
         The path to the folder containing the mongo executable. If None, the executable is
         searched in the PATH.
     compress
-        If True, the input file is expected to be compressed.
+        If True, the input file is expected to be compressed. If None it will be determined
+        based on the file extension.
     """
+    if compress is None:
+        compress = Path(input_file).name.endswith(".gz")
     mongo_operation(
-        store, collection, input_file, "mongorestore", mongo_bin_path, compress=compress
+        store=store,
+        collection=collection,
+        file_path=input_file,
+        operation="mongorestore",
+        mongo_bin_path=mongo_bin_path,
+        compress=compress,
     )
 
 
@@ -584,7 +612,7 @@ def pymongo_dump(
         The number of documents dumped.
     """
     dir_path = Path(output_path) / collection.database.name
-    dir_path.mkdir(exist_ok=True)
+    dir_path.mkdir(exist_ok=True, parents=True)
     # add the db name for consistency with mongodump and use the collection name as file name
     file_name = f"{collection.name}.bson"
     if compress:
