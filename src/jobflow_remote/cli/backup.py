@@ -36,10 +36,10 @@ def create(
             help="Compress the output files",
         ),
     ] = False,
-    mongo_dir: Annotated[
+    mongo_path: Annotated[
         Optional[str],
         typer.Option(
-            "--mongo-dir",
+            "--mongo-path",
             "-m",
             help=(
                 "The path to a folder containing the mongodump executable, if not present in the PATH"
@@ -68,7 +68,7 @@ def create(
         jc = get_job_controller()
         n_docs = jc.backup_dump(
             dir_path=backup_dir,
-            mongo_bin_path=mongo_dir,
+            mongo_bin_path=mongo_path,
             compress=compress,
             python=python,
         )
@@ -123,3 +123,8 @@ def restore(
         )
 
     out_console.print("Backup restored")
+    if python:
+        out_console.print(
+            "Python version does not restore indexes in the DB. It is advisable to run "
+            "'jf admin index rebuild' to create them."
+        )
