@@ -15,7 +15,7 @@ def test_project_init(random_project_name) -> None:
     assert len(cm.projects) == 1
     assert cm.projects[random_project_name]
     project = cm.get_project()
-    assert len(project.workers) == 6
+    assert len(project.workers) == 7
 
 
 def test_paramiko_ssh_connection(job_controller, slurm_ssh_port) -> None:
@@ -48,7 +48,7 @@ def test_project_check(job_controller, capsys) -> None:
         "✓ Jobstore",
         "✓ Queue store",
     ]
-    run_check_cli(["project", "check"], required_out=expected)
+    run_check_cli(["project", "check", "-e"], required_out=expected)
 
 
 @pytest.mark.parametrize(
@@ -409,6 +409,7 @@ def test_priority(worker, job_controller) -> None:
     jobs_info = sorted(jobs_info, key=lambda x: x.priority, reverse=True)
     for i in range(len(jobs_info) - 1):
         assert jobs_info[i].end_time < jobs_info[i + 1].start_time
+
 
 @pytest.mark.parametrize(
     "worker",
