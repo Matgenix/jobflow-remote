@@ -17,9 +17,9 @@ def test_sanitize(mock_cd, mock_run):
 
     cmd = "echo 'test'"
 
-    echo_cmd = f'echo -n "{SANITIZE_KEY}" | tee >(cat >&2)'
+    echo_cmd = f'echo "{SANITIZE_KEY}" | tee /dev/stderr'
     expected_cmd = f"{echo_cmd};{cmd};{echo_cmd}"
-    mock_stdout = f"SOME NOISE --{SANITIZE_KEY}test{SANITIZE_KEY}SOME appended TEXT"
+    mock_stdout = f"SOME NOISE --{SANITIZE_KEY}\ntest{SANITIZE_KEY}\nSOME appended TEXT"
 
     # Configure the mock
     mock_cd.return_value.__enter__ = (
