@@ -22,7 +22,7 @@ There are two options to create and restore a backup. The default relies on the 
 MongoDB tools: ``mongodump`` and ``mongorestore``. For this to work the
 `MongoDB database tools <https://www.mongodb.com/docs/database-tools>`_  need to be
 installed. The connection details provided in the project configuration will be used
-to executed the commands. This is the preferred option, since it is faster and also
+to execute the commands. This is the preferred option, since it is faster and also
 dumps and restores all the metadata of the collections. However, not all the connection
 options defined in the ``queue`` Store may be supported or it may be not possible
 to install the tools. For this reason a second option, based on a pure python implementation
