@@ -94,8 +94,19 @@ class BaseHost(MSONable):
         try:
             cmd = "echo 'test'"
             stdout, stderr, returncode = self.execute(cmd)
-            if returncode != 0 or stdout.strip() != "test":
-                msg = f"Command was executed but some error occurred.\nstdoud: {stdout}\nstderr: {stderr}"
+            if returncode != 0:
+                msg = f"Command was executed but return code was different from zero.\nstdoud: {stdout}\nstderr: {stderr}"
+            elif stdout.strip() != "test" or stderr.strip() != "":
+                msg = (
+                    "Command was executed but the output is not the expected one (i.e. a single 'test' "
+                    f"string in both stdout and stderr).\nstdoud: {stdout}\nstderr: {stderr}"
+                )
+                if not self.sanitize:
+                    msg += (
+                        "\nIf the output contains additional text the problem may be solved by setting "
+                        "the 'sanitize_command' option to True in the project configuration."
+                    )
+
         except Exception:
             exc = traceback.format_exc()
             msg = f"Error while executing command:\n {exc}"
@@ -151,8 +162,11 @@ class BaseHost(MSONable):
         """
         if not self._sanitize_regex:
             escaped_key = re.escape(SANITIZE_KEY)
+            # Optionally match the newline that comes from the "echo" command.
+            # The -n option for echo to suppress the newline seems to not be
+            # supported on all systems
             self._sanitize_regex = re.compile(
-                f"{escaped_key}(.*?)(?:{escaped_key}|$)", re.DOTALL
+                f"{escaped_key}\r?\n?(.*?)(?:{escaped_key}\r?\n?|$)", re.DOTALL
             )
 
         return self._sanitize_regex
@@ -175,7 +189,7 @@ class BaseHost(MSONable):
             The sanitized command string
         """
         if self.sanitize:
-            echo_cmd = f'echo -n "{SANITIZE_KEY}" | tee >(cat >&2)'
+            echo_cmd = f'echo "{SANITIZE_KEY}" | tee /dev/stderr'
             cmd = f"{echo_cmd};{cmd};{echo_cmd}"
         return cmd
 
