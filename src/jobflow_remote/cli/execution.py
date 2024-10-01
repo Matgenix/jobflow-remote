@@ -76,6 +76,14 @@ def run_batch(
             help=("The maximum number of jobs that will be executed by the batch job"),
         ),
     ] = None,
+    parallel_jobs: Annotated[
+        Optional[int],
+        typer.Option(
+            "--parallel-jobs",
+            "-pj",
+            help=("Number of jobs executed in parallel"),
+        ),
+    ] = None,
 ) -> None:
     """Run Jobs in batch mode."""
     run_batch_jobs(
@@ -85,4 +93,5 @@ def run_batch(
         max_time=max_time,
         max_wait=max_wait,
         max_jobs=max_jobs,
+        parallel_jobs=parallel_jobs,
     )

@@ -119,6 +119,11 @@ An minimal configuration for a *batch* worker would thus be:
       work_dir: /home/guido/software/python/test_jfr/
       host: hpc_host
       max_jobs: 5
+      resources:
+        partition: debug
+        ntasks: 128
+        nodes: 1
+        time: "24:00:00"
       batch:
         jobs_handle_dir: /remote/path/jfr_handle_dir
         work_dir: /remote/path/jfr_batch_jobs
@@ -138,3 +143,48 @@ end of one Job and the availability of a new one the *batch* job in the queue wi
     process submitted to the queue (e.g. a SLURM job). This should not be confused with
     the ``max_jobs`` value mentioned above, that defines the number of submitted *batch*
     processes (e.g. the maximum number of SLURM Jobs simultaneously in the queue).
+
+
+Parallel batch
+--------------
+
+Another potential use case is the need of executing multiple Jobs in parallel, inside the
+same process submitted to the queue manager. For example requesting multiple nodes for a
+job of the worker (e.g. a SLURM job) and running a different Job on each of the nodes.
+
+It is possible to achieve this by enabling the execution of multiple Jobs in parallel
+specifying a value of ``parallel_jobs`` larger than 1 in the ``batch`` section.
+An example of a configuration for a parallel *batch* worker is:
+
+.. code-block:: yaml
+
+    worker_name:
+      scheduler_type: slurm
+      work_dir: /home/guido/software/python/test_jfr/
+      host: hpc_host
+      max_jobs: 5
+      resources:
+        partition: debug
+        ntasks: 512
+        nodes: 4
+        time: "24:00:00"
+      batch:
+        jobs_handle_dir: /remote/path/jfr_handle_dir
+        work_dir: /remote/path/jfr_batch_jobs
+        parallel_jobs: 4
+
+Consider that, depending on how the cluster is configured and how the job is implemented,
+it will probably be needed to specify the number of processors used by each of the Jobs.
+For example, for a Job running a code based on MPI parallelization in SLURM, it may be
+needed to run the code with the command:
+
+    srun --nodes 1 -n 128 --exclusive EXECUTABLE
+
+Additional options may need to be set. It would be advisable to verify the requirements
+to execute multiple processes in parallel outside jobflow-remote.
+
+.. note::
+
+    There is currently no way of obtaining a list of nodes/cores assigned to each Job
+    from jobflow-remote. If this might be needed to run in the parallel batch mode,
+    consider opening an issue on `Github <https://github.com/Matgenix/jobflow-remote/issues>`_.
