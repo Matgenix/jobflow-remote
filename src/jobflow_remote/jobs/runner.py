@@ -265,19 +265,28 @@ class Runner:
         # run a first call for each case, since schedule will wait for the delay
         # to make the first execution.
         if checkout:
-            self.checkout()
+            try:
+                self.checkout()
+            except Exception:
+                logger.exception("Error during initial checkout")
             scheduler.every(self.runner_options.delay_checkout).seconds.do(
                 self.checkout
             )
 
         if transfer or queue or complete:
-            self.advance_state(states)
+            try:
+                self.advance_state(states)
+            except Exception:
+                logger.exception("Error during initial advance_state")
             scheduler.every(self.runner_options.delay_advance_status).seconds.do(
                 self.advance_state, states=states
             )
 
         if queue:
-            self.check_run_status()
+            try:
+                self.check_run_status()
+            except Exception:
+                logger.exception("Error during initial check_run_status")
             scheduler.every(self.runner_options.delay_check_run_status).seconds.do(
                 self.check_run_status
             )
@@ -289,12 +298,18 @@ class Runner:
             # account for actions from the user (e.g. rerun, cancel), that can alter
             # the number of submitted/running jobs.
             if self.limited_workers:
-                self.refresh_num_current_jobs()
+                try:
+                    self.refresh_num_current_jobs()
+                except Exception:
+                    logger.exception("Error during initial refresh_num_current_jobs")
                 scheduler.every(self.runner_options.delay_refresh_limited).seconds.do(
                     self.refresh_num_current_jobs
                 )
             if self.batch_workers:
-                self.update_batch_jobs()
+                try:
+                    self.update_batch_jobs()
+                except Exception:
+                    logger.exception("Error during initial update_batch_jobs")
                 scheduler.every(self.runner_options.delay_update_batch).seconds.do(
                     self.update_batch_jobs
                 )
@@ -972,8 +987,16 @@ class Runner:
         for worker_name, batch_manager in self.batch_workers.items():
             worker = self.get_worker(worker_name)
             # first check the processes that are running from the folder
-            #  and set them to running if needed
-            running_jobs = batch_manager.get_running()
+            # and set them to running if needed
+            running_jobs = []
+            try:
+                running_jobs = batch_manager.get_running()
+            except Exception:
+                logger.warning(
+                    f"error trying to get the list of batch running jobs for worker: {worker_name}",
+                    exc_info=True,
+                )
+
             for job_id, job_index, process_running_uuid in running_jobs:
                 lock_filter = {
                     "uuid": job_id,
@@ -1003,13 +1026,22 @@ class Runner:
             processes = list(batch_processes_data)
             queue_manager = self.get_queue_manager(worker_name)
             if processes:
-                qjobs = queue_manager.get_jobs_list(
-                    jobs=processes, user=worker.scheduler_username
-                )
-                running_processes = {
-                    qjob.job_id for qjob in qjobs if qjob.job_id in processes
-                }
-                stopped_processes = set(processes) - running_processes
+                stopped_processes = set()
+                running_processes = set()
+                try:
+                    qjobs = queue_manager.get_jobs_list(
+                        jobs=processes, user=worker.scheduler_username
+                    )
+                    running_processes = {
+                        qjob.job_id for qjob in qjobs if qjob.job_id in processes
+                    }
+                    stopped_processes = set(processes) - running_processes
+                except Exception:
+                    logger.warning(
+                        f"error trying to get the list of batch processes for worker: {worker_name}",
+                        exc_info=True,
+                    )
+
                 for pid in stopped_processes:
                     self.job_controller.remove_batch_process(pid, worker_name)
                     # check if there are jobs that were in the running folder of a
@@ -1039,17 +1071,6 @@ class Runner:
 
             # check that enough processes are submitted and submit the required
             # amount to reach max_jobs, if needed.
-            # n_jobs = self.job_controller.count_jobs(
-            #     {
-            #         "state": {
-            #             "$in": (
-            #                 JobState.BATCH_SUBMITTED.value,
-            #                 JobState.BATCH_RUNNING.value,
-            #             )
-            #         },
-            #         "worker": worker_name,
-            #     }
-            # )
 
             dict_n_jobs = self.job_controller.count_jobs_states(
                 [JobState.BATCH_SUBMITTED, JobState.BATCH_RUNNING]
@@ -1134,7 +1155,14 @@ class Runner:
 
             # check for jobs that have terminated in the batch runner and
             # update the DB state accordingly
-            terminated_jobs = batch_manager.get_terminated()
+            terminated_jobs = []
+            try:
+                terminated_jobs = batch_manager.get_terminated()
+            except Exception:
+                logger.warning(
+                    f"error trying to get the list of terminated batch jobs for worker: {worker_name}",
+                    exc_info=True,
+                )
             for job_id, job_index, process_running_uuid in terminated_jobs:
                 lock_filter = {
                     "uuid": job_id,
