@@ -58,6 +58,8 @@ from jobflow_remote.utils.data import (
 from jobflow_remote.utils.db import (
     FlowLockedError,
     JobLockedError,
+    LockedDocumentError,
+    MissingDocumentError,
     MongoLock,
     mongodump_from_store,
     mongorestore_to_store,
@@ -3686,12 +3688,27 @@ class JobController:
 
         return list(self.flows.aggregate(pipeline))
 
-    def get_running_runner(self):
+    def get_running_runner(self) -> dict | str:
         """Get the running runner information from the auxiliary collection."""
         rr_doc = self.auxiliary.find_one({"running_runner": {"$exists": True}})
         if rr_doc:
             return rr_doc["running_runner"]
         return "NO_DOCUMENT"
+
+    def clean_running_runner(self, break_lock: bool = False) -> None:
+        db_filter = {"running_runner": {"$exists": True}}
+        with self.lock_auxiliary(
+            filter=db_filter, break_lock=break_lock, get_locked_doc=True
+        ) as lock:
+            if not lock.locked_document:
+                if lock.unavailable_document:
+                    raise LockedDocumentError(
+                        "Document for the running runner in the auxiliary collection is locked"
+                    )
+                raise MissingDocumentError(
+                    "Runner document missing from auxiliary collection"
+                )
+            lock.update_on_release = {"$set": {"running_runner": None}}
 
     def update_flow_state(
         self,
