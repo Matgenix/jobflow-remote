@@ -2,6 +2,7 @@ import os
 import random
 import shutil
 import tempfile
+import time
 import warnings
 from pathlib import Path
 
@@ -236,3 +237,21 @@ def two_flows_four_jobs(random_project_name):
 def version_candidate():
     """Next version candidate. Used for tests of upgrade methods."""
     return "0.1.3"
+
+
+@pytest.fixture(scope="session")
+def wait_daemon_started():
+    def _wait_daemon_started(daemon_manager, max_wait: int = 10) -> bool:
+        from jobflow_remote.jobs.daemon import DaemonStatus
+
+        for _i in range(max_wait):
+            time.sleep(1)
+            state = daemon_manager.check_status()
+            assert state in (DaemonStatus.STARTING, DaemonStatus.RUNNING)
+            if state == DaemonStatus.RUNNING:
+                return True
+        raise RuntimeError(
+            f"The daemon did not start running within the expected time ({max_wait})"
+        )
+
+    return _wait_daemon_started

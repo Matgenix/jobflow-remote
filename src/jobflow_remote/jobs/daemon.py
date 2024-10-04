@@ -1,16 +1,18 @@
 from __future__ import annotations
 
+import contextlib
 import datetime
 import getpass
 import logging
 import os
+import re
 import socket
 import subprocess
 import time
 from enum import Enum
 from pathlib import Path
 from string import Template
-from typing import Callable
+from typing import TYPE_CHECKING, Callable
 from xmlrpc.client import Fault
 
 import psutil
@@ -24,7 +26,10 @@ from supervisor.xmlrpc import Faults
 
 from jobflow_remote.config import ConfigManager, Project
 from jobflow_remote.jobs.jobcontroller import JobController
-from jobflow_remote.utils.db import RunnersLockedError
+from jobflow_remote.utils.db import MongoLock, RunnerLockedError
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 logger = logging.getLogger(__name__)
 
@@ -118,7 +123,15 @@ class DaemonError(Exception):
     pass
 
 
+class RunningDaemonError(Exception):
+    pass
+
+
 class DaemonStatus(Enum):
+    """
+    Possible states of the daemon.
+    """
+
     SHUT_DOWN = "SHUT_DOWN"
     STOPPED = "STOPPED"
     STOPPING = "STOPPING"
@@ -128,6 +141,14 @@ class DaemonStatus(Enum):
 
 
 class DaemonManager:
+    """
+    A manager for handling the daemonized Runner processes.
+
+    Checks are performed to avoid starting a daemon in two different machines.
+    To perform the actions on the daemon process the information about the runner
+    in the DB should match with the one of the current machine.
+    """
+
     conf_template_single = Template(supervisord_conf_str)
     conf_template_split = Template(supervisord_conf_str_split)
 
@@ -138,37 +159,90 @@ class DaemonManager:
         project: Project,
         job_controller: JobController | None = None,
     ) -> None:
+        """
+        Parameters
+        ----------
+        daemon_dir
+            Directory where the supervisord configuration file is written.
+        log_dir
+            Directory where the supervisord log file is written.
+        project
+            Project configuration.
+        job_controller
+            JobController instance, used internally to handle the job queue.
+        """
         self.project = project
         self.daemon_dir = Path(daemon_dir).absolute()
         self.log_dir = Path(log_dir).absolute()
         self._job_controller = job_controller
 
     @classmethod
-    def from_project(cls, project: Project):
+    def from_project(cls, project: Project) -> DaemonManager:
+        """
+        Generate a DaemonManager instance from a Project configuration.
+
+        Parameters
+        ----------
+        project
+            Project configuration.
+
+        Returns
+        -------
+        DaemonManager
+            An instance of DaemonManager associated with the project.
+        """
         daemon_dir = project.daemon_dir
         log_dir = project.log_dir
         return cls(daemon_dir, log_dir, project)
 
     @classmethod
-    def from_project_name(cls, project_name: str | None = None):
+    def from_project_name(cls, project_name: str | None = None) -> DaemonManager:
+        """
+        Generate a DaemonManager instance from a project name.
+
+        Parameters
+        ----------
+        project_name
+            Name of the project to use. If None, the default project will be used.
+
+        Returns
+        -------
+        DaemonManager
+            An instance of DaemonManager associated with the project.
+        """
         config_manager = ConfigManager()
         project = config_manager.get_project(project_name)
         return cls.from_project(project)
 
     @property
     def conf_filepath(self) -> Path:
+        """
+        Path to the supervisord configuration file.
+        """
         return self.daemon_dir / "supervisord.conf"
 
     @property
     def pid_filepath(self) -> Path:
+        """
+        Path to the supervisord PID file.
+        """
         return self.daemon_dir / "supervisord.pid"
 
     @property
     def log_filepath(self) -> Path:
+        """
+        Path to the supervisord log file.
+        """
         return self.log_dir / "supervisord.log"
 
     @property
     def sock_filepath(self) -> Path:
+        """
+        Path to the supervisord socket file.
+
+        This path is used by supervisord to communicate with the client.
+        The length of the path is checked to ensure it is not too long for UNIX systems.
+        """
         path = self.daemon_dir / "s.sock"
         if len(str(path)) > 97:
             msg = f"socket path {path} is too long for UNIX systems. Set the daemon_dir value "
@@ -177,16 +251,30 @@ class DaemonManager:
         return path
 
     @property
-    def job_controller(self):
+    def job_controller(self) -> JobController:
+        """
+        JobController instance associated with the project.
+        """
         if self._job_controller is None:
             self._job_controller = JobController.from_project(self.project)
         return self._job_controller
 
     def clean_files(self) -> None:
+        """
+        Clean up the supervisord PID and socket files.
+        """
         self.pid_filepath.unlink(missing_ok=True)
         self.sock_filepath.unlink(missing_ok=True)
 
     def get_interface(self):
+        """
+        Return an interface to the supervisord RPC server using the socket file.
+
+        Returns
+        -------
+        xmlrpc.ServerProxy
+            Interface to the supervisord RPC server.
+        """
         env = {
             "SUPERVISOR_SERVER_URL": f"unix://{self.sock_filepath!s}",
             "SUPERVISOR_USERNAME": "",
@@ -195,6 +283,16 @@ class DaemonManager:
         return childutils.getRPCInterface(env)
 
     def get_supervisord_pid(self) -> int | None:
+        """
+        Get the PID of the supervisord process from the PID file.
+
+        If the PID file does not exist or can not be parsed, return None.
+
+        Returns
+        -------
+        int | None
+            PID of the supervisord process.
+        """
         pid_fp = self.pid_filepath
 
         if not pid_fp.is_file():
@@ -209,6 +307,16 @@ class DaemonManager:
         return pid
 
     def check_supervisord_process(self) -> bool:
+        """
+        Check if the supervisord process is running and belongs to the same user.
+
+        If the supervisord process is not running but the daemon files are present, clean them up.
+
+        Returns
+        -------
+        bool
+            True if the supervisord process is running and belongs to the same user, False otherwise.
+        """
         pid = self.get_supervisord_pid()
 
         running = True
@@ -241,6 +349,15 @@ class DaemonManager:
         return running
 
     def check_status(self) -> DaemonStatus:
+        """
+        Get the current status of the daemon based on the state of the supervisord
+        process and the running processes.
+
+        Returns
+        -------
+        DaemonStatus
+            Status of the daemon. Can be one of the following:
+        """
         process_active = self.check_supervisord_process()
 
         if not process_active:
@@ -289,6 +406,18 @@ class DaemonManager:
         raise DaemonError("Could not determine the current status of the daemon")
 
     def get_processes_info(self) -> dict[str, dict] | None:
+        """
+        Get the information about the processes of the daemon.
+
+        None if the daemon is not running.
+
+        Returns
+        -------
+        dict
+            A dictionary with the information about the processes.
+            The keys are the process names and the values are dictionaries
+            with the process information.
+        """
         process_active = self.check_supervisord_process()
 
         if not process_active:
@@ -330,6 +459,28 @@ class DaemonManager:
         nodaemon: bool = False,
         connect_interactive: bool = False,
     ) -> None:
+        """
+        Write the configuration file for the daemon.
+
+        If `single` is True, a configuration to execute all the Runner tasks
+        in a single process is written. Otherwise, a split configuration is
+        written with separate sections for each task of the Runner.
+
+        Parameters
+        ----------
+        num_procs_transfer : int
+            Number of processes to use for the transfer step.
+        num_procs_complete : int
+            Number of processes to use for the complete step.
+        single : bool, optional
+            Write a single configuration file instead of a split one.
+        log_level : str, optional
+            The log level to use for the daemon.
+        nodaemon : bool, optional
+            Run the daemon in foreground.
+        connect_interactive : bool, optional
+            Allow the daemon to perform an interactive initial setup.
+        """
         if single:
             conf = self.conf_template_single.substitute(
                 sock_file=str(self.sock_filepath),
@@ -368,6 +519,29 @@ class DaemonManager:
         nodaemon: bool = False,
         connect_interactive: bool = False,
     ) -> str | None:
+        """
+        Start the supervisord daemon.
+
+        Parameters
+        ----------
+        num_procs_transfer
+            Number of processes to use for the transfer step.
+        num_procs_complete
+            Number of processes to use for the complete step.
+        single
+            Write a single configuration file instead of a split one.
+        log_level
+            The log level to use for the daemon.
+        nodaemon : bool, optional
+            Run the daemon in foreground.
+        connect_interactive : bool, optional
+            Allow the daemon to perform an interactive initial setup.
+
+        Returns
+        -------
+        str | None
+            An error message if the daemon could not be started, otherwise None.
+        """
         makedirs_p(self.daemon_dir)
         makedirs_p(self.log_dir)
         self.write_config(
@@ -393,6 +567,14 @@ class DaemonManager:
         return None
 
     def start_processes(self) -> str | None:
+        """
+        Start all the processes of the daemon.
+
+        Returns
+        -------
+        str | None
+            An error message if not all the processes started correctly, otherwise None.
+        """
         interface = self.get_interface()
         result = interface.supervisor.startAllProcesses()
         if not result:
@@ -418,38 +600,38 @@ class DaemonManager:
         raise_on_error: bool = False,
         connect_interactive: bool = False,
     ) -> bool:
-        db_filter = {"running_runner": {"$exists": True}}
-        with self.job_controller.lock_auxiliary(
-            filter=db_filter, get_locked_doc=True
-        ) as lock:
+        """
+        Start the daemon by starting the supervisord process and all the processes of the daemon.
+
+        Parameters
+        ----------
+        num_procs_transfer
+            Number of processes to use for the transfer of jobs.
+        num_procs_complete
+            Number of processes to use for the completion of jobs.
+        single
+            If True, the runner will be started with a single process.
+        log_level : str
+            Log level of the daemon.
+        raise_on_error : bool
+            If True, raise an exception if an error occurs.
+        connect_interactive : bool
+            Allow the daemon to perform an interactive initial setup.
+
+        Returns
+        -------
+        bool
+            True if the daemon is started correctly, False otherwise.
+        """
+        with self.lock_runner_doc() as lock:
             doc = lock.locked_document
-            if not doc:
-                if lock.unavailable_document:
-                    raise RunnersLockedError.from_runner_doc(lock.unavailable_document)
-                raise ValueError(
-                    "No daemon runner document.\n"
-                    "The auxiliary collection does not contain information about running daemon. "
-                    "Your database was likely set up or reset using an old version of Jobflow Remote. "
-                    'You can upgrade the database using the command "jf admin upgrade".'
-                )
+            doc_error = self._check_running_runner(doc, raise_on_error=raise_on_error)
+            if doc_error:
+                logger.error(doc_error)
+                return False
             status = self.check_status()
             if status == DaemonStatus.RUNNING:
                 error = "Daemon process is already running"
-            elif doc["running_runner"] is not None:
-                drr = doc["running_runner"]
-                # TODO: add reasonable skip here
-                #  same hostname, same project, same user then it should be fine ?
-                error = (
-                    "A daemon runner process may be running.\n"
-                    "Here is the information retrieved from the database:\n"
-                    f"- hostname: {drr['hostname']}\n"
-                    f"- project_name: {drr['project_name']}\n"
-                    f"- start_time: {drr['start_time']}\n"
-                    f"- last_pinged: {drr['last_pinged']}\n"
-                    f"- daemon_dir: {drr['daemon_dir']}\n"
-                    f"- user: {drr['user']}"
-                )
-
             elif status == DaemonStatus.SHUT_DOWN:
                 error = self.start_supervisord(
                     num_procs_transfer=num_procs_transfer,
@@ -459,16 +641,35 @@ class DaemonManager:
                     connect_interactive=connect_interactive,
                 )
             elif status == DaemonStatus.STOPPED:
-                self.shut_down(raise_on_error=raise_on_error)
-                error = self.start_supervisord(
-                    num_procs_transfer=num_procs_transfer,
-                    num_procs_complete=num_procs_complete,
-                    single=single,
-                    log_level=log_level,
-                    connect_interactive=connect_interactive,
-                )
-                # else:
-                #     error = self.start_processes()
+                # Supervisor sets the processes configuration when the supervisord
+                # process is started. In the STOPPED state it is not possible to switch
+                # them. Initially the code used to perform a shut_down here before
+                # restarting, but this would require handling the lock mechanism in
+                # shut_down() and made pointless the concept of STOP.
+                # Now the user is warned that the runner restarted with the same
+                # old configuration.
+                old_config = self.parse_config_file()
+                new_config = {
+                    "num_procs_transfer": num_procs_transfer,
+                    "num_procs_complete": num_procs_complete,
+                    "single": single,
+                    "log_level": log_level,
+                    "connect_interactive": connect_interactive,
+                }
+                diffs_config = []
+                for config_name, config_value in new_config.items():
+                    if config_value != old_config.get(config_name):
+                        diffs_config.append(config_name)
+                if diffs_config:
+                    print("WARNING!!!!")
+                    logger.warning(
+                        f"Daemon is {DaemonStatus.STOPPED.value}, but the options {', '.join(diffs_config)} "
+                        "differ from the values used to activate supervisor. The daemon will start with the initial "
+                        "configurations. To change the configuration shut down the daemon and start it again."
+                    )
+                else:
+                    print("NO WARNING-----")
+                error = self.start_processes()
             elif status == DaemonStatus.STOPPING:
                 error = "Daemon process are stopping. Cannot start."
             else:
@@ -485,14 +686,28 @@ class DaemonManager:
             return True
 
     def stop(self, wait: bool = False, raise_on_error: bool = False) -> bool:
-        db_filter = {"running_runner": {"$exists": True}}
-        with self.job_controller.lock_auxiliary(filter=db_filter) as lock:
-            if lock is None:
-                # print('Handle case where the document is not present!')
-                pass
-            if lock.is_locked:
-                # print('Handle case where the document is locked')
-                pass
+        """
+        Stop the daemon.
+
+        Parameters
+        ----------
+        wait
+            If True wait until the daemon has stopped.
+        raise_on_error
+            Raise an exception if the daemon cannot be stopped.
+
+        Returns
+        -------
+        bool
+            True if the daemon was stopped successfully, False otherwise.
+        """
+        with self.lock_runner_doc() as lock:
+            doc_error = self._check_running_runner(
+                lock.locked_document, raise_on_error=raise_on_error
+            )
+            if doc_error:
+                logger.error(doc_error)
+                return False
             status = self.check_status()
             if status in (
                 DaemonStatus.STOPPED,
@@ -520,6 +735,24 @@ class DaemonManager:
     def _verify_call_result(
         self, result, action: str, raise_on_error: bool = False
     ) -> str | None:
+        """
+        Verify that the result of the XML-RPC call to send a signal to the
+        processes completed correctly.
+
+        Parameters
+        ----------
+        result
+            The result of the XML-RPC call.
+        action
+            The action that was requested.
+        raise_on_error
+            If True, raise an exception if the result is not correct.
+
+        Returns
+        -------
+        str | None
+            The error message if the operation was not executed correctly, None otherwise.
+        """
         error = None
         if not result:
             error = f"The action {action} was not applied to the processes"
@@ -539,8 +772,13 @@ class DaemonManager:
         return None
 
     def kill(self, raise_on_error: bool = False) -> bool:
-        db_filter = {"running_runner": {"$exists": True}}
-        with self.job_controller.lock_auxiliary(filter=db_filter) as lock:
+        with self.lock_runner_doc() as lock:
+            doc_error = self._check_running_runner(
+                lock.locked_document, raise_on_error=raise_on_error
+            )
+            if doc_error:
+                logger.error(doc_error)
+                return False
             # If the daemon is shutting down supervisord may not be able to identify
             # the state. Try proceeding in that case, since we really want to kill
             # the process
@@ -579,8 +817,26 @@ class DaemonManager:
         raise DaemonError(f"Daemon status {status} could not be handled")
 
     def shut_down(self, raise_on_error: bool = False) -> bool:
-        db_filter = {"running_runner": {"$exists": True}}
-        with self.job_controller.lock_auxiliary(filter=db_filter) as lock:
+        """
+        Shut down the supervisord process and all the processes of the daemon.
+
+        Parameters
+        ----------
+        raise_on_error
+            If True, raise an exception if an error occurs.
+
+        Returns
+        -------
+        bool
+            True if the daemon is shut down correctly, False otherwise.
+        """
+        with self.lock_runner_doc() as lock:
+            doc_error = self._check_running_runner(
+                lock.locked_document, raise_on_error=raise_on_error
+            )
+            if doc_error:
+                logger.error(doc_error)
+                return False
             status = self.check_status()
             if status == DaemonStatus.SHUT_DOWN:
                 logger.info("supervisord is already shut down.")
@@ -597,6 +853,14 @@ class DaemonManager:
             return True
 
     def wait_start(self, timeout: int = 30) -> None:
+        """
+        Wait for all processes of the daemon to start.
+
+        Parameters
+        ----------
+        timeout
+            Maximum time in seconds to wait for all processes to start.
+        """
         time_limit = time.time() + timeout
         while True:
             processes_info = self.get_processes_info()
@@ -620,6 +884,18 @@ class DaemonManager:
         processes_names: list | None = None,
         print_function: Callable | None = None,
     ) -> None:
+        """
+        Attach to the foreground of the processes of the daemon.
+
+        Parameters
+        ----------
+        processes_names
+            Names of the processes to attach to. If None, all processes are
+            attached to.
+        print_function
+            A function to use to print the output of the processes. If None,
+            the default print function is used.
+        """
         processes_info = self.get_processes_info()
         if processes_names is None:
             processes_names = [pn for pn in processes_info if pn != "supervisord"]
@@ -636,6 +912,17 @@ class DaemonManager:
             self.foreground_process(name, print_function)
 
     def foreground_process(self, name, print_function: Callable | None = None) -> None:
+        """
+        Attach to the foreground of one process based on the process name.
+
+        Parameters
+        ----------
+        name
+            Name of the process to attach to.
+        print_function
+            A function to use to print the output of the process. If None,
+            the default print function is used.
+        """
         # This is adapted from supervisor.supervisorctl.DefaultControllerPlugin.do_fg
         a = None
         if print_function is None:
@@ -680,7 +967,11 @@ class DaemonManager:
             if a:
                 a.kill()
 
-    def _get_runner_info(self):
+    def _get_runner_info(self) -> dict:
+        """
+        Generate a dictionary with the information about the runner and
+        the system where it is being executed.
+        """
         try:
             user = os.getlogin()
         except OSError:
@@ -710,8 +1001,151 @@ class DaemonManager:
             "runner_options": self.project.runner.model_dump(mode="json"),
         }
 
-    def get_controller(self):
+    def get_controller(self) -> Controller:
+        """
+        Return a Supervisor `supervisor.supervisorctl.Controller`
+        connected to the supervisord configured in the project.
+        """
         options = ClientOptions()
         args = ["-c", self.conf_filepath]
         options.realize(args, doc="")
         return Controller(options)
+
+    @contextlib.contextmanager
+    def lock_runner_doc(self) -> Generator[MongoLock, None, None]:
+        """
+        Context manager to lock a document in the auxiliary collection that is used to keep
+        track of the currently running runner.
+        """
+        db_filter = {"running_runner": {"$exists": True}}
+        with self.job_controller.lock_auxiliary(
+            filter=db_filter, get_locked_doc=True
+        ) as lock:
+            doc = lock.locked_document
+            if not doc:
+                if lock.unavailable_document:
+                    raise RunnerLockedError.from_runner_doc(lock.unavailable_document)
+                raise ValueError(
+                    "No daemon runner document.\n"
+                    "The auxiliary collection does not contain information about running daemon. "
+                    "Your database was likely set up or reset using an old version of Jobflow Remote. "
+                    'You can upgrade the database using the command "jf admin upgrade".'
+                )
+            yield lock
+
+    def _check_running_runner(
+        self, doc: dict, raise_on_error: bool = False
+    ) -> str | None:
+        """
+        Check if the information in the DB about the running runner matches the information about the local machine.
+
+        Parameters
+        ----------
+        doc
+            The document from the DB with the information about the running runner.
+        raise_on_error
+            If True, raise an error if the information does not match, otherwise return a string with the error message.
+
+        Returns
+        -------
+        str | None
+            If the information matches, return None. Otherwise, return a string with the error message.
+        """
+        if not doc["running_runner"]:
+            return None
+
+        db_data = doc["running_runner"]
+
+        local_data = self._get_runner_info()
+        data_to_check = [
+            "hostname",
+            "project_name",
+            "user",
+            "mac_address",
+            "daemon_dir",
+        ]
+        for data in data_to_check:
+            if local_data[data] != db_data[data]:
+                break
+        else:
+            logger.info(
+                "The DB reports that there is a running runner and it corresponds to this machine"
+            )
+            return None
+
+        error = (
+            "A daemon runner process may be running on a different machine.\n"
+            "Here is the information retrieved from the database:\n"
+            f"- hostname: {db_data['hostname']}\n"
+            f"- project_name: {db_data['project_name']}\n"
+            f"- start_time: {db_data['start_time']}\n"
+            f"- last_pinged: {db_data['last_pinged']}\n"
+            f"- daemon_dir: {db_data['daemon_dir']}\n"
+            f"- user: {db_data['user']}"
+        )
+        if raise_on_error:
+            raise RunningDaemonError(error)
+        return error
+
+    def parse_config_file(self) -> dict:
+        """
+        Parses a supervisord config file and returns the extracted input variables.
+        This includes values for `num_procs_transfer`, `num_procs_complete`, `single`,
+        `log_level`, `nodaemon`, and `connect_interactive`.
+
+        Parameters
+        ----------
+        file_path
+            Path to the config file.
+
+        Returns
+        -------
+        dict
+            Dictionary containing the extracted input variables.
+        """
+        variables = {
+            "num_procs_transfer": 1,
+            "num_procs_complete": 1,
+            "single": False,
+            "log_level": "info",
+            "nodaemon": False,
+            "connect_interactive": False,
+        }
+
+        with open(self.conf_filepath) as f:
+            content = f.read()
+
+        # Check if this is the 'single' configuration
+        if "[program:runner_daemon]" in content:
+            variables["single"] = True
+        else:
+            variables["single"] = False
+
+            # Extract num_procs_transfer and num_procs_complete if they exist in the split configuration
+            match_transfer = re.search(r"numprocs\s*=\s*(\d+)", content, re.MULTILINE)
+            if match_transfer:
+                variables["num_procs_transfer"] = int(match_transfer.group(1))
+
+            match_complete = re.search(
+                r"\[program:runner_daemon_complete\][^[]*numprocs\s*=\s*(\d+)",
+                content,
+                re.MULTILINE,
+            )
+            if match_complete:
+                variables["num_procs_complete"] = int(match_complete.group(1))
+
+        # Extract loglevel
+        match_loglevel = re.search(r"loglevel\s*=\s*(\w+)", content)
+        if match_loglevel:
+            variables["log_level"] = match_loglevel.group(1)
+
+        # Extract nodaemon
+        match_nodaemon = re.search(r"nodaemon\s*=\s*(\w+)", content)
+        if match_nodaemon:
+            variables["nodaemon"] = match_nodaemon.group(1) == "true"
+
+        # Extract connect_interactive
+        if "--connect-interactive" in content:
+            variables["connect_interactive"] = True
+
+        return variables

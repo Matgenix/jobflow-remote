@@ -391,7 +391,7 @@ class LockedDocumentError(Exception):
     """Exception to signal a problem when locking the document."""
 
 
-class RunnersLockedError(LockedDocumentError):
+class RunnerLockedError(LockedDocumentError):
     """Exception to signal a problem when locking a Runner document."""
 
     @classmethod
@@ -431,6 +431,10 @@ class FlowLockedError(LockedDocumentError):
         if additional_msg:
             msg += " " + additional_msg
         return cls(msg)
+
+
+class MissingDocumentError(Exception):
+    """Exception to signal that a document is missing from the DB"""
 
 
 def mongo_operation(

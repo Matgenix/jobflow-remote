@@ -940,3 +940,26 @@ def test_get_trends(job_controller, one_job):
     assert now.strftime("%Y-%m-%d") in flow_trends
     assert flow_trends[now.strftime("%Y-%m-%d")][FlowState.READY] == 1
     assert flow_trends[now.strftime("%Y-%m-%d")][FlowState.COMPLETED] == 0
+
+
+def test_running_runner(job_controller, daemon_manager, wait_daemon_started):
+    from jobflow_remote.utils.db import LockedDocumentError, MissingDocumentError
+
+    assert job_controller.get_running_runner() is None
+    daemon_manager.start(single=True)
+    wait_daemon_started(daemon_manager)
+    assert job_controller.get_running_runner() is not None
+
+    with job_controller.lock_auxiliary(filter={"running_runner": {"$exists": True}}):
+        with pytest.raises(LockedDocumentError):
+            job_controller.clean_running_runner()
+
+        job_controller.clean_running_runner(break_lock=True)
+        assert job_controller.get_running_runner() is None
+
+    job_controller.auxiliary.delete_one({"running_runner": {"$exists": True}})
+    with pytest.raises(
+        MissingDocumentError, match="Runner document missing from auxiliary collection"
+    ):
+        job_controller.clean_running_runner()
+    assert job_controller.get_running_runner() == "NO_DOCUMENT"
