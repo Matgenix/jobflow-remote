@@ -3,25 +3,6 @@ import time
 
 import pytest
 
-# pytestmark = pytest.mark.skipif(
-#     not os.environ.get("CI"),
-#     reason="Only run integration tests in CI, unless forced with 'CI' env var",
-# )
-
-
-def _wait_daemon_started(daemon_manager, max_wait: int = 10) -> bool:
-    from jobflow_remote.jobs.daemon import DaemonStatus
-
-    for _i in range(max_wait):
-        time.sleep(1)
-        state = daemon_manager.check_status()
-        assert state in (DaemonStatus.STARTING, DaemonStatus.RUNNING)
-        if state == DaemonStatus.RUNNING:
-            return True
-    raise RuntimeError(
-        f"The daemon did not start running within the expected time ({max_wait})"
-    )
-
 
 def _wait_daemon_shutdown(daemon_manager, max_wait: int = 10) -> bool:
     from jobflow_remote.jobs.daemon import DaemonError, DaemonStatus
@@ -41,11 +22,25 @@ def _wait_daemon_shutdown(daemon_manager, max_wait: int = 10) -> bool:
     )
 
 
+def _check_running_runner_doc(job_controller, runner_info):
+    # check that the state in the DB was not changed.
+    # do not check dates, as apparently they can be slightly off by few a fraction of a second.
+    db_info = job_controller.auxiliary.find_one({"running_runner": {"$exists": True}})[
+        "running_runner"
+    ]
+    for key in db_info:
+        if key in ("start_time", "last_pinged"):
+            continue
+        assert db_info[key] == runner_info[key]
+
+
 @pytest.mark.parametrize(
     "single",
     [True, False],
 )
-def test_start_stop(job_controller, single, daemon_manager) -> None:
+def test_start_stop(
+    job_controller, single, daemon_manager, wait_daemon_started
+) -> None:
     from jobflow import Flow
 
     from jobflow_remote import submit_flow
@@ -62,7 +57,7 @@ def test_start_stop(job_controller, single, daemon_manager) -> None:
 
     assert daemon_manager.check_status() == DaemonStatus.SHUT_DOWN
     assert daemon_manager.start(raise_on_error=True, single=single)
-    _wait_daemon_started(daemon_manager)
+    wait_daemon_started(daemon_manager)
 
     finished_states = (JobState.REMOTE_ERROR, JobState.FAILED, JobState.COMPLETED)
 
@@ -82,7 +77,7 @@ def test_start_stop(job_controller, single, daemon_manager) -> None:
     assert daemon_manager.check_status() == DaemonStatus.STOPPED
 
     assert daemon_manager.start(raise_on_error=True, single=True)
-    _wait_daemon_started(daemon_manager)
+    wait_daemon_started(daemon_manager)
     assert daemon_manager.shut_down(raise_on_error=True)
     _wait_daemon_shutdown(daemon_manager)
     assert daemon_manager.check_status() == DaemonStatus.SHUT_DOWN
@@ -91,7 +86,7 @@ def test_start_stop(job_controller, single, daemon_manager) -> None:
     assert processes_info is None
 
 
-def test_kill(job_controller, daemon_manager) -> None:
+def test_kill(job_controller, daemon_manager, wait_daemon_started) -> None:
     from jobflow_remote.jobs.daemon import DaemonStatus
 
     assert daemon_manager.check_status() == DaemonStatus.SHUT_DOWN
@@ -100,14 +95,16 @@ def test_kill(job_controller, daemon_manager) -> None:
     assert daemon_manager.kill(raise_on_error=True)
 
     assert daemon_manager.start(raise_on_error=True, single=True)
-    _wait_daemon_started(daemon_manager)
+    wait_daemon_started(daemon_manager)
 
     assert daemon_manager.kill(raise_on_error=True)
     time.sleep(1)
     assert daemon_manager.check_status() == DaemonStatus.STOPPED
 
 
-def test_kill_supervisord(job_controller, daemon_manager, caplog) -> None:
+def test_kill_supervisord(
+    job_controller, daemon_manager, caplog, wait_daemon_started
+) -> None:
     import signal
     import time
 
@@ -115,7 +112,7 @@ def test_kill_supervisord(job_controller, daemon_manager, caplog) -> None:
 
     assert daemon_manager.check_status() == DaemonStatus.SHUT_DOWN
     assert daemon_manager.start(raise_on_error=True, single=True)
-    _wait_daemon_started(daemon_manager)
+    wait_daemon_started(daemon_manager)
 
     processes_info = daemon_manager.get_processes_info()
     supervisord_pid = processes_info["supervisord"]["pid"]
@@ -136,7 +133,7 @@ def test_kill_supervisord(job_controller, daemon_manager, caplog) -> None:
     # present" in log_msg[-1]
 
 
-def test_kill_one_process(job_controller, daemon_manager) -> None:
+def test_kill_one_process(job_controller, daemon_manager, wait_daemon_started) -> None:
     import signal
     import time
 
@@ -144,7 +141,7 @@ def test_kill_one_process(job_controller, daemon_manager) -> None:
 
     assert daemon_manager.check_status() == DaemonStatus.SHUT_DOWN
     assert daemon_manager.start(raise_on_error=True, single=False)
-    _wait_daemon_started(daemon_manager)
+    wait_daemon_started(daemon_manager)
 
     procs_info = daemon_manager.get_processes_info()
     run_jobflow_queue_pid = procs_info["runner_daemon_queue:run_jobflow_queue"]["pid"]
@@ -155,7 +152,9 @@ def test_kill_one_process(job_controller, daemon_manager) -> None:
     assert daemon_manager.check_status() == DaemonStatus.PARTIALLY_RUNNING
 
 
-def test_runner_info_auxiliary(job_controller, daemon_manager) -> None:
+def test_runner_info_auxiliary(
+    job_controller, daemon_manager, wait_daemon_started
+) -> None:
     import datetime
 
     from jobflow_remote.jobs.daemon import DaemonStatus
@@ -163,7 +162,7 @@ def test_runner_info_auxiliary(job_controller, daemon_manager) -> None:
     assert daemon_manager.check_status() == DaemonStatus.SHUT_DOWN
     assert job_controller.get_running_runner() is None
     assert daemon_manager.start(raise_on_error=True, single=False)
-    _wait_daemon_started(daemon_manager)
+    wait_daemon_started(daemon_manager)
     ref_runner_info = daemon_manager._get_runner_info()
     runner_info = job_controller.get_running_runner()
     for key in [
@@ -192,15 +191,90 @@ def test_runner_info_auxiliary(job_controller, daemon_manager) -> None:
     assert isinstance(runner_info["last_pinged"], datetime.datetime)
 
 
-def test_start_two_runners(daemon_manager, mocker) -> None:
-    from jobflow_remote.jobs.daemon import DaemonError, DaemonStatus
+def test_runner_different_machine(daemon_manager, job_controller, caplog) -> None:
+    # Test that all the methods will not have effect if in the DB
+    # a running_runner is present with a different machine
+    from jobflow_remote.jobs.daemon import DaemonStatus, RunningDaemonError
+
+    # set some fake value inside the running_runner document
+    runner_info = daemon_manager._get_runner_info()
+    runner_info["mac_address"] = "XXXXXXX"
+    runner_info["hostname"] = "YYYYYYY"
+    job_controller.auxiliary.find_one_and_update(
+        {"running_runner": {"$exists": True}}, {"$set": {"running_runner": runner_info}}
+    )
+
+    assert daemon_manager.check_status() == DaemonStatus.SHUT_DOWN
+    with pytest.raises(
+        RunningDaemonError,
+        match=r"A daemon runner process may be running on a different machine",
+    ):
+        daemon_manager.start(raise_on_error=True, single=False)
+
+    assert not daemon_manager.start(raise_on_error=False, single=False)
+
+    assert daemon_manager.check_status() == DaemonStatus.SHUT_DOWN
+
+    _check_running_runner_doc(job_controller=job_controller, runner_info=runner_info)
+
+    with pytest.raises(
+        RunningDaemonError,
+        match=r"A daemon runner process may be running on a different machine",
+    ):
+        daemon_manager.kill(raise_on_error=True)
+
+    assert not daemon_manager.kill(raise_on_error=False)
+
+    assert daemon_manager.check_status() == DaemonStatus.SHUT_DOWN
+
+    _check_running_runner_doc(job_controller=job_controller, runner_info=runner_info)
+
+    with pytest.raises(
+        RunningDaemonError,
+        match=r"A daemon runner process may be running on a different machine",
+    ):
+        daemon_manager.stop(raise_on_error=True)
+
+    assert not daemon_manager.stop(raise_on_error=False)
+
+    assert daemon_manager.check_status() == DaemonStatus.SHUT_DOWN
+
+    _check_running_runner_doc(job_controller=job_controller, runner_info=runner_info)
+
+    with pytest.raises(
+        RunningDaemonError,
+        match=r"A daemon runner process may be running on a different machine",
+    ):
+        daemon_manager.shut_down(raise_on_error=True)
+
+    assert not daemon_manager.shut_down(raise_on_error=False)
+
+    assert daemon_manager.check_status() == DaemonStatus.SHUT_DOWN
+
+    _check_running_runner_doc(job_controller=job_controller, runner_info=runner_info)
+
+
+def test_stop_restart_diff(daemon_manager, caplog, wait_daemon_started):
+    from jobflow_remote.jobs.daemon import DaemonStatus
 
     assert daemon_manager.check_status() == DaemonStatus.SHUT_DOWN
     assert daemon_manager.start(raise_on_error=True, single=False)
-    _wait_daemon_started(daemon_manager)
+    wait_daemon_started(daemon_manager)
 
-    mocker.patch.object(
-        daemon_manager, "check_status", return_value="FAKE_NOT_RUNNING_LOCALLY"
+    assert daemon_manager.stop(raise_on_error=True, wait=True)
+    assert daemon_manager.check_status() == DaemonStatus.STOPPED
+
+    assert daemon_manager.start(raise_on_error=True, single=False)
+    wait_daemon_started(daemon_manager)
+    assert caplog.text == ""
+
+    assert daemon_manager.stop(raise_on_error=True, wait=True)
+    assert daemon_manager.check_status() == DaemonStatus.STOPPED
+
+    assert daemon_manager.start(raise_on_error=True, single=True, log_level="debug")
+    wait_daemon_started(daemon_manager)
+    assert (
+        "Daemon is STOPPED, but the options single, log_level differ from the values used to activate supervisor"
+        in caplog.text
     )
-    with pytest.raises(DaemonError, match=r"A daemon runner process may be running"):
-        daemon_manager.start(raise_on_error=True, single=False)
+    assert daemon_manager.check_status() == DaemonStatus.RUNNING

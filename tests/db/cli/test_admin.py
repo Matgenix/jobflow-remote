@@ -123,7 +123,7 @@ def test_unlock_runner(job_controller) -> None:
     )
 
 
-def test_upgrade_from_before_0_1_3(job_controller, version_candidate, caplog) -> None:
+def test_upgrade_from_before_0_1_3(job_controller, version_candidate) -> None:
     import jobflow_remote
     from jobflow_remote.testing.cli import run_check_cli
 
