@@ -1,8 +1,8 @@
 .. _install:
 
-**********************
-Setup and installation
-**********************
+*******************************
+Setup, installation and upgrade
+*******************************
 
 Introduction
 ============
@@ -96,6 +96,50 @@ Install
 or, for the development version::
 
   pip install git+https://github.com/Matgenix/jobflow-remote.git
+
+.. _upgrade :
+
+Upgrade
+=======
+
+If you upgraded ``jobflow-remote`` to a new version and plan to use it with an
+already existing project, it is possible that there will be incompatibilities
+between the existing database or project configuration and those used in the upgraded
+version. In order to smooth the upgrade procedure a tool to upgrade the configuration
+has been implemented. This is exposed through the ``jf`` command line tool::
+
+    jf admin upgrade
+
+This performs the following steps:
+
+* Compare the version of the installed ``jobflow-remote`` with the one stored
+  in the database (set when executing a ``jf admin reset``) and use this as a
+  reference to determine which upgrades will be applied.
+* Check the version of ``jobflow`` installed and compare with the version stored
+  in the database. Optionally compare the versions of all the other packages
+  installed (use the ``--check-env`` option).
+* Provide a list of upgrades that will be performed.
+* Ask the user for confirmation
+* Sequentially apply the required upgrades.
+* Update the version information in the database.
+
+This will resolve potential incompatibilities and make the configuration compatible
+with the current version of ``jobflow-remote``.
+
+.. warning::
+    It is advisable to perform a backup of the content of the queue database
+    before performing the upgrade. See the :ref:`backup` section for more details.
+
+.. note::
+    The version will be upgraded in steps, so that if multiple versions have
+    been skipped before the current upgrade, the code will proceed by upgrading
+    between subsequent versions, one at the time.
+
+.. note::
+    A difference in the packages does not necessarily imply issues for the upgrade.
+    It may help checking if anything problematic or an unexpected difference may
+    be present.
+
 
 Environments
 ============
@@ -215,5 +259,11 @@ As a last step you should reset the database with the command::
 
   This will also delete the content of the database. If are reusing an existing database
   and do not want to erase your data skip this step.
+
+.. note::
+
+    This will also set the information about the ``jobflow-remote`` version and
+    python environment in the database. This will be used during the :ref:`upgrade`
+    procedure.
 
 You are now ready to start running workflows with jobflow-remote!
