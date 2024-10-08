@@ -1012,10 +1012,19 @@ class DaemonManager:
         return Controller(options)
 
     @contextlib.contextmanager
-    def lock_runner_doc(self) -> Generator[MongoLock, None, None]:
+    def lock_runner_doc(
+        self, allow_missing: bool = False
+    ) -> Generator[MongoLock, None, None]:
         """
         Context manager to lock a document in the auxiliary collection that is used to keep
         track of the currently running runner.
+
+        Parameters
+        ----------
+        allow_missing
+            Determine if it is acceptable that the document is not present in the DB.
+            If not, raise an error. Mainly present to handle databases that have been
+            created with version <=0.1.4.
         """
         db_filter = {"running_runner": {"$exists": True}}
         with self.job_controller.lock_auxiliary(
@@ -1025,12 +1034,13 @@ class DaemonManager:
             if not doc:
                 if lock.unavailable_document:
                     raise RunnerLockedError.from_runner_doc(lock.unavailable_document)
-                raise ValueError(
-                    "No daemon runner document.\n"
-                    "The auxiliary collection does not contain information about running daemon. "
-                    "Your database was likely set up or reset using an old version of Jobflow Remote. "
-                    'You can upgrade the database using the command "jf admin upgrade".'
-                )
+                if not allow_missing:
+                    raise ValueError(
+                        "No daemon runner document.\n"
+                        "The auxiliary collection does not contain information about running daemon. "
+                        "Your database was likely set up or reset using an old version of Jobflow Remote. "
+                        'You can upgrade the database using the command "jf admin upgrade".'
+                    )
             yield lock
 
     def _check_running_runner(
@@ -1087,16 +1097,36 @@ class DaemonManager:
             raise RunningDaemonError(error)
         return error
 
+    def check_matching_runner(
+        self, raise_on_error: bool = False, allow_missing: bool = False
+    ) -> str | None:
+        """
+        Checks if the information stored in the runner document in the auxiliary collection
+        matches the current machine.
+
+        Parameters
+        ----------
+        raise_on_error
+            If True and the information does not match, raise an error.
+        allow_missing
+            If True, return None instead of raising an error if the document is not present.
+
+        Returns
+        -------
+        str | None
+            If the information matches, return None. Otherwise, return a string with the error message.
+        """
+        with self.lock_runner_doc(allow_missing=allow_missing) as lock:
+            doc = lock.locked_document
+            if allow_missing and not doc:
+                return None
+            return self._check_running_runner(doc, raise_on_error=raise_on_error)
+
     def parse_config_file(self) -> dict:
         """
         Parses a supervisord config file and returns the extracted input variables.
         This includes values for `num_procs_transfer`, `num_procs_complete`, `single`,
         `log_level`, `nodaemon`, and `connect_interactive`.
-
-        Parameters
-        ----------
-        file_path
-            Path to the config file.
 
         Returns
         -------
