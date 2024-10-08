@@ -484,11 +484,21 @@ def check_stopped_runner(error: bool = True) -> None:
         exit_with_error_msg(
             f"Error while checking the status of the daemon: {getattr(e, 'message', str(e))}"
         )
-    if current_status not in (DaemonStatus.STOPPED, DaemonStatus.SHUT_DOWN):
+
+    # the current status is only local. Also check that the DB does not contain
+    # a running_runner document that does not match the current machine.
+    runner_stopped = False
+    if current_status in (DaemonStatus.STOPPED, DaemonStatus.SHUT_DOWN):
+        matching_error = dm.check_matching_runner(allow_missing=True)
+        if matching_error:
+            logger.warning(matching_error)
+        else:
+            runner_stopped = True
+    if not runner_stopped:
         if error:
             exit_with_error_msg(
                 f"The status of the daemon is {current_status.value}. "
-                "The daemon should not be running while resetting the database"
+                "The daemon should not be running while performing this operation"
             )
         else:
             text = Text.from_markup(
@@ -611,3 +621,34 @@ def tree_callback(
 
         out_console.print(command_tree)
         raise typer.Exit(0)
+
+
+def confirm_project_name(style: str | None = "red", exit_on_error: bool = True) -> bool:
+    """
+    Ask the user to insert the name of the current project to confirm that a specific operation
+    should be performed.
+
+    Parameters
+    ----------
+    style
+        The style to use for the message. If None, no style is used.
+    exit_on_error
+        If True, exit the program with an error message if the user does not insert the correct
+        project name. Otherwise, return False.
+
+    Returns
+    -------
+    bool
+        True if the user inserted the correct project name, False otherwise.
+    """
+    cm = get_config_manager()
+    project = cm.get_project()
+    msg = f"Insert the name of the project ({project.name}) to confirm that you want to proceed "
+    if style:
+        msg = f"[{style}]{msg}[/]"
+    user_project_name = out_console.input(msg)
+    if user_project_name.strip() != project.name:
+        if exit_on_error:
+            exit_with_error_msg("The input does not match the current project name")
+        return False
+    return True

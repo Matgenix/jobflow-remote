@@ -4,6 +4,7 @@ import typer
 from rich.prompt import Confirm
 from rich.text import Text
 
+from jobflow_remote.cli.formatting import format_upgrade_actions
 from jobflow_remote.cli.jf import app
 from jobflow_remote.cli.jfr_typer import JFRTyper
 from jobflow_remote.cli.types import (
@@ -22,6 +23,7 @@ from jobflow_remote.cli.types import (
 from jobflow_remote.cli.utils import (
     IndexDirection,
     check_stopped_runner,
+    confirm_project_name,
     exit_with_error_msg,
     get_config_manager,
     get_job_controller,
@@ -30,7 +32,7 @@ from jobflow_remote.cli.utils import (
     out_console,
 )
 from jobflow_remote.jobs.data import DbCollection
-from jobflow_remote.jobs.jobcontroller import Upgrader
+from jobflow_remote.jobs.upgrade import DatabaseUpgrader
 
 app_admin = JFRTyper(
     name="admin", help="Commands for administering the database", no_args_is_help=True
@@ -40,7 +42,6 @@ app.add_typer(app_admin)
 
 @app_admin.command()
 def upgrade(
-    force: force_opt = False,
     test_version_upgrade: Annotated[
         Optional[str],
         typer.Option(
@@ -48,29 +49,71 @@ def upgrade(
             hidden=True,
         ),
     ] = None,
+    no_dry_run: Annotated[
+        bool,
+        typer.Option(
+            "--no-dry-run",
+            "-ndr",
+            help="Skip the dry-run step",
+        ),
+    ] = False,
+    check_env: Annotated[
+        bool,
+        typer.Option(
+            "--check-env",
+            "-ce",
+            help="Report the changes in the package installed in the python environment before "
+            "proceeding with the upgrade",
+        ),
+    ] = False,
 ) -> None:
     """
     Upgrade the jobflow database.
     WARNING: can modify all the data. Previous version could not be retrieved anymore.
+    It preferable to perform a backup before upgrading.
     """
     check_stopped_runner(error=True)
 
     jc = get_job_controller()
-    if not force:
-        jobflow_check = jc.upgrade_check_jobflow()
+    jobflow_check = jc.upgrade_check_jobflow()
+    if jobflow_check:
+        out_console.print(jobflow_check)
+
+    if check_env:
         full_check = jc.upgrade_full_check()
         if jobflow_check or full_check:
             text = Text.from_markup(
-                "[bold]Possible issues in upgrade of the database.[/bold]\n"
-                + jobflow_check
-                + full_check
-                + "Carefully check this is ok and use 'jf admin upgrade --force'"
+                +full_check
+                + "This does not necessarily pose a problem. Just check if there is any potential "
+                "incompatible upgrade"
             )
-            exit_with_error_msg(text)
+            out_console.print(text)
+
+    upgrader = DatabaseUpgrader(jc)
+    if not no_dry_run:
+        target_version = test_version_upgrade or upgrader.current_version
+        actions = upgrader.dry_run(target_version=test_version_upgrade)
+        if not actions:
+            out_console.print(
+                f"No actions will be required for upgrading to version {target_version}"
+            )
+        else:
+            out_console.print(
+                f"In order to upgrade the DB to version {target_version} the following actions will be performed:"
+            )
+            actions_formatted = format_upgrade_actions(actions)
+            out_console.print(actions_formatted)
+
+    warn_text = Text.from_markup(
+        "[bold red]Performing the upgrade will permanently modify data in the queue DB. "
+        "It is advisable to perform a backup before proceeding.[/]"
+    )
+    out_console.print(warn_text)
+    confirm_project_name(style="bold red", exit_on_error=True)
     with loading_spinner(processing=False) as progress:
         progress.add_task(description="Upgrading the DB...", total=None)
-        ugprader = Upgrader(jc)
-        done = ugprader.upgrade(this_version=test_version_upgrade)
+
+        done = upgrader.upgrade(target_version=test_version_upgrade)
     not_text = "" if done else "[bold]NOT [/bold]"
     out_console.print(f"The database has {not_text}been upgraded")
 

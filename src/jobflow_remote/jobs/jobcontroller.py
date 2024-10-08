@@ -9,6 +9,7 @@ import warnings
 from collections import defaultdict
 from contextlib import ExitStack
 from datetime import datetime, timedelta, timezone
+from functools import cached_property
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, cast
 
@@ -20,6 +21,7 @@ from monty.dev import deprecated
 from monty.json import MontyDecoder
 from monty.serialization import loadfn
 from packaging.version import Version
+from packaging.version import parse as parse_version
 from qtoolkit.core.data_objects import CancelStatus, QResources
 
 import jobflow_remote
@@ -2615,7 +2617,7 @@ class JobController:
         self.auxiliary.drop()
         self.auxiliary.insert_one({"next_id": 1})
         self.auxiliary.insert_one({"running_runner": None})
-        _update_version_information(self.auxiliary)
+        self.update_version_information()
         self.build_indexes(drop=True)
 
         return True
@@ -4523,38 +4525,52 @@ class JobController:
                 )
 
     def upgrade_check_jobflow(self):
+        """
+        Check if the jobflow version in the database matches the current one.
+        Returns an empty string if they match, an error message otherwise.
+
+        Returns
+        -------
+        str
+            An empty string if configurations match, an error message otherwise.
+        """
         environment_doc = self.auxiliary.find_one(
             {"jobflow_remote_version": {"$exists": True}}
         )
         if environment_doc is None:
-            msg = (
+            return (
                 "No information about jobflow version in the database.\n"
-                "The database is likely from before version 0.1.3 of jobflow-remote.\n"
+                "The database is likely from before version 0.1.5 of jobflow-remote.\n"
             )
-            logger.warning(msg)
-            return msg
+
         previous_jobflow_version = environment_doc["jobflow_version"]
         current_jobflow_version = jobflow.__version__
         if jobflow.__version__ != previous_jobflow_version:
-            msg = (
+            return (
                 f"The previous jobflow version ({previous_jobflow_version}) "
                 f"is not the same as the current one ({current_jobflow_version}).\n"
             )
-            logger.warning(msg)
-            return msg
         return ""
 
     def upgrade_full_check(self):
+        """
+        Check if the packages used to generate the database match the current ones.
+        Returns an empty string if they match, an error message otherwise.
+
+        Returns
+        -------
+        str
+            An empty string if configurations match, an error message otherwise.
+        """
         environment_doc = self.auxiliary.find_one(
             {"jobflow_remote_version": {"$exists": True}}
         )
         if environment_doc is None:
-            msg = (
+            return (
                 "No information about environment (all packages versions) in the database.\n"
-                "The database is likely from before version 0.1.3 of jobflow-remote.\n"
+                "The database is likely from before version 0.1.5 of jobflow-remote.\n"
             )
-            logger.warning(msg)
-            return msg
+
         previous_package_versions = environment_doc["full_environment"]
         installed_packages = importlib.metadata.distributions()
         package_versions = {
@@ -4594,51 +4610,72 @@ class JobController:
                     f"have different versions:\n "
                     f"{different_str}\n"
                 )
-            logger.warning(msg)
             return msg
         return ""
 
-    def upgrade(self, previous_version, this_version):
-        """Upgrade the database to the new version of Jobflow Remote.
+    def update_version_information(
+        self, jobflow_remote_version: str | Version | None = None
+    ):
+        """
+        Update the version information in the database.
+
+        This method will update the version information of jobflow-remote and jobflow,
+        as well as the versions of all packages in the environment.
 
         Parameters
         ----------
-        previous_version : str
-            Previous version of Jobflow Remote.
-        this_version : str
-            New version of Jobflow Remote.
+        jobflow_remote_version
+            The version of jobflow-remote to use. If ``None`` the current version of
+            jobflow-remote is used.
         """
-        # TODO: do this with a transaction ?
-        logger.info(
-            f"Starting upgrade of the database from version {previous_version} to version {this_version}"
-        )
-        upgrade_functions = {
-            "0.1.3": self._upgrade_to_0_1_3,
-            # "0.1.4": self._upgrade_0_1_3_to_0_1_4,
-        }
-        _versions = [
-            "before_0_1_3",
-            *sorted(upgrade_functions.keys(), key=Version),
-        ]
-        for prev, new in zip(
-            _versions, _versions[1 : _versions.index(this_version) + 1]
-        ):
-            logger.info(
-                f"Performing incremental upgrade of the database from version {prev} to version {new}"
-            )
-            upgrade_functions[new]()
-        _update_version_information(self.auxiliary)
-        logger.info(
-            f"Finished upgrade of the database from version {previous_version} to version {this_version}"
-        )
-        return True
-
-    def _upgrade_to_0_1_3(self):
+        installed_packages = importlib.metadata.distributions()
+        jobflow_remote_version = jobflow_remote_version or jobflow_remote.__version__
         self.auxiliary.find_one_and_update(
-            filter={"running_runner": {"$exists": True}},
-            update={"$set": {"running_runner": None}},
+            filter={"jobflow_remote_version": {"$exists": True}},
+            update={
+                "$set": {
+                    "jobflow_remote_version": str(jobflow_remote_version),
+                    "jobflow_version": jobflow.__version__,
+                    "full_environment": {
+                        package.metadata["Name"]: package.version
+                        for package in installed_packages
+                    },
+                }
+            },
             upsert=True,
         )
+
+    def get_current_db_version(self) -> Version:
+        """Get the current database version"""
+        version_doc = self.auxiliary.find_one(
+            {"jobflow_remote_version": {"$exists": True}}
+        )
+        if not version_doc:
+            return parse_version("0.1.0")  # Default for old DBs
+        return parse_version(version_doc["jobflow_remote_version"])
+
+    @cached_property
+    def queue_supports_transactions(self) -> bool:
+        """
+        Check if the version of MongoDB defined in the queue Store supports transactions.
+        It explicitly tries to open a session and use it to verify.
+        Cached property.
+
+        Returns
+        -------
+        bool
+            True if transactions are supported.
+        """
+        # note: there could be cheaper methods to check if it is supported,
+        # but this should be 100% sure to give the right answer and should be
+        # called only on rare events. If this becomes a more common requirement
+        # a benchmark of different options will be required
+        try:
+            with self.db.client.start_session() as session, session.start_transaction():
+                self.auxiliary.find_one({}, projection=[], session=session)
+                return True
+        except Exception:
+            return False
 
 
 def get_flow_leafs(job_docs: list[dict]) -> list[dict]:
@@ -4664,69 +4701,3 @@ def get_flow_leafs(job_docs: list[dict]) -> list[dict]:
                 d.pop(parent_id, None)
 
     return list(d.values())
-
-
-class Upgrader:
-    """
-    Class used to upgrade the database.
-    """
-
-    def __init__(self, job_controller: JobController):
-        self.job_controller = job_controller
-
-    def upgrade(self, previous_version=None, this_version=None):
-        """
-        Upgrade the database to a new version of Jobflow Remote.
-
-        Notes
-        -----
-        This method will not check whether there is a daemon running.
-        This (currently) only deals with the Queue store (i.e. Jobflow Remote-related),
-        not with the Jobflow Store (i.e. outputs).
-
-        Parameters
-        ----------
-        previous_version : str
-            Previous version of Jobflow Remote. Should be defined automatically
-            from the auxiliary collection. Explicitly setting it is mainly for
-            testing purposes.
-        this_version : str
-            New version of Jobflow Remote. Should be defined automatically
-            from the current environment. Explicitly setting it is mainly for
-            testing purposes.
-
-        Returns
-        -------
-        bool
-            True if the database was upgraded, False otherwise.
-        """
-        this_version = this_version or jobflow_remote.__version__
-
-        if previous_version is None:
-            environment_doc = self.job_controller.auxiliary.find_one(
-                {"jobflow_remote_version": {"$exists": True}}
-            )
-            if not environment_doc:
-                # Database is from a jobflow remote version <= 0.1.2
-                previous_version = "before_0_1_3"
-            else:
-                previous_version = environment_doc["jobflow_remote_version"]
-        return self.job_controller.upgrade(previous_version, this_version)
-
-
-def _update_version_information(auxiliary_coll):
-    installed_packages = importlib.metadata.distributions()
-    auxiliary_coll.find_one_and_update(
-        filter={"jobflow_remote_version": {"$exists": True}},
-        update={
-            "$set": {
-                "jobflow_remote_version": jobflow_remote.__version__,
-                "jobflow_version": jobflow.__version__,
-                "full_environment": {
-                    package.metadata["Name"]: package.version
-                    for package in installed_packages
-                },
-            }
-        },
-        upsert=True,
-    )
