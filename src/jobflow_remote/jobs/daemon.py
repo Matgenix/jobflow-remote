@@ -666,8 +666,6 @@ class DaemonManager:
                         "differ from the values used to activate supervisor. The daemon will start with the initial "
                         "configurations. To change the configuration shut down the daemon and start it again."
                     )
-                else:
-                    print("NO WARNING-----")
                 error = self.start_processes()
             elif status == DaemonStatus.STOPPING:
                 error = "Daemon process are stopping. Cannot start."
