@@ -661,7 +661,6 @@ class DaemonManager:
                     if config_value != old_config.get(config_name):
                         diffs_config.append(config_name)
                 if diffs_config:
-                    print("WARNING!!!!")
                     logger.warning(
                         f"Daemon is {DaemonStatus.STOPPED.value}, but the options {', '.join(diffs_config)} "
                         "differ from the values used to activate supervisor. The daemon will start with the initial "
