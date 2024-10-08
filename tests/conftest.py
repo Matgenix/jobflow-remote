@@ -3,14 +3,13 @@ import logging.config
 import random
 import time
 import warnings
+from pathlib import Path
 
 import pytest
 
 
 @pytest.fixture(scope="session")
 def test_dir():
-    from pathlib import Path
-
     module_dir = Path(__file__).resolve().parent
     test_dir = module_dir / "test_data"
     return test_dir.resolve()
@@ -144,3 +143,15 @@ def reset_logging_config():
         logger.handlers = [h for h in logger.handlers if not isinstance(h, RichHandler)]
         logger.propagate = was_propagating
         logger.disabled = False  # Re-enable any disabled loggers
+
+
+@pytest.fixture(scope="session")
+def upgrade_test_dir(test_dir):
+    """
+    Path to the test data directory used for upgrade tests.
+
+    Returns:
+        Path: Path to the test data directory used for upgrade tests.
+    """
+
+    return test_dir / "upgrade"

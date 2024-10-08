@@ -123,43 +123,41 @@ def test_unlock_runner(job_controller) -> None:
     )
 
 
-def test_upgrade_from_before_0_1_3(job_controller, version_candidate) -> None:
-    import jobflow_remote
+def test_upgrade_to_0_1_5(
+    job_controller, upgrade_test_dir, random_project_name
+) -> None:
     from jobflow_remote.testing.cli import run_check_cli
 
-    assert job_controller.get_running_runner() is None
-    job_controller.auxiliary.delete_many({"running_runner": {"$exists": True}})
-    # with pytest.raises(TypeError, match=r"'NoneType' object is not subscriptable"):
-    #     assert job_controller.get_running_runner()
-    assert job_controller.get_running_runner() == "NO_DOCUMENT"
+    job_controller.backup_restore(upgrade_test_dir / "0.1.5", python=True)
 
-    job_controller.auxiliary.delete_many({"jobflow_remote_version": {"$exists": True}})
+    assert job_controller.count_jobs() == 1
+    assert job_controller.count_flows() == 1
+
+    assert job_controller.get_running_runner() == "NO_DOCUMENT"
+    assert str(job_controller.get_current_db_version()) == "0.1.0"
 
     run_check_cli(
-        ["admin", "upgrade", "--test-version-upgrade", "0.1.3"],
+        ["admin", "upgrade", "--test-version-upgrade", "0.1.5"],
+        cli_input="wrong_project_name",
         required_out=[
-            "Possible issues in upgrade of the database.",
             "No information about jobflow version in the database.",
-            "The database is likely from before version 0.1.3 of jobflow-remote.",
-            "No information about environment (all packages versions) in the database.",
-            "The database is likely from before version 0.1.3 of jobflow-remote.",
-            "Carefully check this is ok and use 'jf admin upgrade --force'",
+            "The database is likely from before version 0.1.5 of jobflow-remote.",
+            "In order to upgrade the DB to version 0.1.5 the following actions will be performed:",
+            "Create a document for the running runner in the auxiliary collection",
+            "Update database version number to 0.1.5",
+            "It is advisable to perform a backup before proceeding",
+            f"Insert the name of the project ({random_project_name}) to confirm that you want to proceed",
         ],
         error=True,
     )
-    # with pytest.raises(TypeError, match=r"'NoneType' object is not subscriptable"):
-    #     assert job_controller.get_running_runner()
     assert job_controller.get_running_runner() == "NO_DOCUMENT"
-    running_runner_doc = job_controller.auxiliary.find_one(
-        {"running_runner": {"$exists": True}}
-    )
-    assert running_runner_doc is None
     versions_info = job_controller.auxiliary.find_one(
         {"jobflow_remote_version": {"$exists": True}}
     )
     assert versions_info is None
     run_check_cli(
-        ["admin", "upgrade", "--test-version-upgrade", "0.1.3", "--force"],
+        ["admin", "upgrade", "--test-version-upgrade", "0.1.5"],
+        cli_input=random_project_name,
         required_out=["The database has been upgraded"],
     )
     running_runner_doc = job_controller.auxiliary.find_one(
@@ -170,8 +168,11 @@ def test_upgrade_from_before_0_1_3(job_controller, version_candidate) -> None:
         {"jobflow_remote_version": {"$exists": True}}
     )
     assert versions_info is not None
-    assert versions_info["jobflow_remote_version"] == jobflow_remote.__version__
+    assert versions_info["jobflow_remote_version"] == "0.1.5"
     assert job_controller.get_running_runner() is None
+
+    assert job_controller.count_jobs() == 1
+    assert job_controller.count_flows() == 1
 
 
 def test_index_rebuild(job_controller, one_job):
