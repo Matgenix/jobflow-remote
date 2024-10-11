@@ -103,6 +103,14 @@ configurations. Those can better be set with the :ref:`projectconf execconfig`.
     If a single worker is defined it will be used as default in the submission
     of new Flows.
 
+.. warning::
+
+    By default, jobflow-remote fetches the status of the jobs from the scheduler by
+    passing the list of ids. If the selected scheduler does not support this option
+    (e.g. SGE), it is also necessary to specify the username on the worker machine
+    through the ``scheduler_username`` option. Jobflow-remote will use that as a filter,
+    instead of the list of ids.
+
 .. _projectconf jobstore:
 
 JobStore

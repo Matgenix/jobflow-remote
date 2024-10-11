@@ -868,6 +868,58 @@ def resources(
     )
 
 
+@app_job_set.command()
+def priority(
+    priority_value: Annotated[
+        int,
+        typer.Argument(
+            help="The priority of the Job",
+            metavar="PRIORITY",
+        ),
+    ],
+    job_id: job_ids_indexes_opt = None,
+    db_id: db_ids_opt = None,
+    flow_id: flow_ids_opt = None,
+    state: job_state_opt = None,
+    start_date: start_date_opt = None,
+    end_date: end_date_opt = None,
+    name: name_opt = None,
+    metadata: metadata_opt = None,
+    worker_name: worker_name_opt = None,
+    custom_query: query_opt = None,
+    days: days_opt = None,
+    hours: hours_opt = None,
+    verbosity: verbosity_opt = 0,
+    raise_on_error: raise_on_error_opt = False,
+):
+    """
+    Set the priority for the selected Jobs.
+    Only Jobs not in an evolving state (e.g. CHECKED_OUT, UPLOADED, ...).
+    """
+    jc = get_job_controller()
+    execute_multi_jobs_cmd(
+        single_cmd=jc.set_job_run_properties,
+        multi_cmd=jc.set_job_run_properties,
+        job_db_id=None,
+        job_index=None,
+        job_ids=job_id,
+        db_ids=db_id,
+        flow_ids=flow_id,
+        states=state,
+        start_date=start_date,
+        end_date=end_date,
+        name=name,
+        metadata=metadata,
+        days=days,
+        hours=hours,
+        workers=worker_name,
+        custom_query=custom_query,
+        verbosity=verbosity,
+        raise_on_error=raise_on_error,
+        priority=priority_value,
+    )
+
+
 @app_job.command(name="dump", hidden=True)
 def job_dump(
     job_id: job_ids_indexes_opt = None,

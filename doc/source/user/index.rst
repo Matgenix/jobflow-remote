@@ -19,6 +19,7 @@ details are found in :ref:`reference`.
    errors
    states
    advancedoptions
+   backup
 
 .. toctree::
    :hidden:

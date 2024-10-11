@@ -19,6 +19,7 @@ def submit_flow(
     project: str | None = None,
     exec_config: str | ExecutionConfig | None = None,
     resources: dict | QResources | None = None,
+    priority: int = 0,
     allow_external_references: bool = False,
 ) -> list[int]:
     """
@@ -37,12 +38,14 @@ def submit_flow(
     project
         the name of the project to which the Flow should be submitted. If None the
         current project will be used.
-    exec_config: str or ExecutionConfig
+    exec_config
         the options to set before the execution of the job in the submission script.
         In addition to those defined in the Worker.
-    resources: Dict or QResources
-        information passed to qtoolkit to require the resources for the submission
+    resources
+        Information passed to qtoolkit to require the resources for the submission
         to the queue.
+    priority
+        The priority assigned to the Jobs.
     allow_external_references
         If False all the references to other outputs should be from other Jobs
         of the Flow.
@@ -85,5 +88,6 @@ def submit_flow(
         worker=worker,
         exec_config=exec_config,
         resources=resources,
+        priority=priority,
         allow_external_references=allow_external_references,
     )

@@ -86,6 +86,11 @@ jobs:
           set: |
             *.cache-from=type=gha,scope=global
 
+      - name: Install mongo-tools
+        run: |
+          wget https://fastdl.mongodb.org/tools/db/mongodb-database-tools-ubuntu2204-x86_64-100.10.0.deb
+          sudo apt install ./mongodb-database-tools-*-100.10.0.deb
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip

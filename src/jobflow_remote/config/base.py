@@ -177,6 +177,12 @@ class WorkerBase(BaseModel):
         None,
         description="Options for batch execution. If define the worker will be considered a batch worker",
     )
+    scheduler_username: Optional[str] = Field(
+        None,
+        description="If defined, the list of jobs running on the worker will be fetched based on the"
+        "username instead that from the list of job ids. May be necessary for some "
+        "scheduler_type (e.g. SGE)",
+    )
     model_config = ConfigDict(extra="forbid")
 
     @field_validator("scheduler_type")

@@ -1,4 +1,5 @@
 import os.path
+from shutil import which
 from typing import NoReturn
 
 import pymongo
@@ -526,6 +527,11 @@ def test_set_job_run_properties(job_controller, one_job) -> None:
     assert job_controller.set_job_run_properties(resources=qr)
     assert job_controller.get_job_doc(job_id=one_job[0].uuid).resources == qr
 
+    assert job_controller.set_job_run_properties(priority=10)
+    assert job_controller.get_job_doc(job_id=one_job[0].uuid).priority == 10
+    assert job_controller.set_job_run_properties()
+    assert job_controller.get_job_doc(job_id=one_job[0].uuid).priority == 10
+
 
 def test_set_job_doc_properties(job_controller, one_job) -> None:
     from jobflow_remote.jobs.state import JobState
@@ -725,3 +731,120 @@ def test_indexes(job_controller, one_job):
 
     job_controller.build_indexes(background=False, drop=True)
     assert len(list(job_controller.jobs.list_indexes())) == 11
+
+
+@pytest.mark.parametrize(
+    "python",
+    [
+        True,
+        pytest.param(
+            False,
+            marks=pytest.mark.skipif(
+                not which("mongodump"), reason="mongodump missing"
+            ),
+        ),
+    ],
+)
+@pytest.mark.parametrize(
+    "compress",
+    [True, False],
+)
+def test_backup(job_controller_drop, python, compress):
+    import tempfile
+    from pathlib import Path
+
+    from jobflow import Flow
+    from maggma.stores.mongolike import MemoryStore
+
+    from jobflow_remote.testing import add
+
+    # modify the jobcontroller so that the collections are not the standard ones
+    jobs_name = "test_jobs"
+    flows_name = "test_flows"
+    aux_name = "test_auxiliary"
+    job_controller_drop.jobs_collection = jobs_name
+    job_controller_drop.jobs = job_controller_drop.db[jobs_name]
+    job_controller_drop.queue_store.collection_name = jobs_name
+    job_controller_drop.queue_store._coll = job_controller_drop.jobs
+    job_controller_drop.flows_collection = flows_name
+    job_controller_drop.flows = job_controller_drop.db[flows_name]
+    job_controller_drop.auxiliary_collection = aux_name
+    job_controller_drop.auxiliary = job_controller_drop.db[aux_name]
+
+    job_controller_drop.reset()
+
+    j1 = add(1, 2)
+    j2 = add(j1.output, 2)
+    flow = Flow([j1, j2])
+
+    # do not use submit_flow, otherwise the original collections will be used.
+    job_controller_drop.add_flow(flow, worker="test_local_worker")
+
+    assert job_controller_drop.count_jobs() == 2
+
+    db_name = job_controller_drop.queue_store.database
+    with tempfile.TemporaryDirectory() as dir_name:
+        dir_path = Path(dir_name)
+
+        job_controller_drop.backup_dump(
+            dir_path=dir_name, compress=compress, python=python
+        )
+
+        files = [str(p.name) for p in (dir_path / db_name).glob("*")]
+
+        ext = ".gz" if compress else ""
+        assert "flows.bson" + ext in files
+        assert "jf_auxiliary.bson" + ext in files
+        assert "jobs.bson" + ext in files
+        if python:
+            assert len(files) == 3
+        else:
+            assert "flows.metadata.json" + ext in files
+            assert "jf_auxiliary.metadata.json" + ext in files
+            assert "jobs.metadata.json" + ext in files
+
+            assert len(files) == 6
+
+        with pytest.raises(
+            RuntimeError,
+            match=f"The collection named {jobs_name} for jobs contains 2 documents.*",
+        ):
+            job_controller_drop.backup_restore(
+                dir_path=dir_path / db_name, compress=compress, python=python
+            )
+
+        job_controller_drop.jobs.delete_many({})
+        with pytest.raises(
+            RuntimeError,
+            match=f"The collection named {flows_name} for flows contains 1 documents.*",
+        ):
+            job_controller_drop.backup_restore(
+                dir_path=dir_path / db_name, compress=compress, python=python
+            )
+
+        job_controller_drop.flows.delete_many({})
+        with pytest.raises(
+            RuntimeError,
+            match="next_id value is different from one in the auxiliary collection.*",
+        ):
+            job_controller_drop.backup_restore(
+                dir_path=dir_path / db_name, compress=compress, python=python
+            )
+
+        job_controller_drop.auxiliary.delete_many({})
+
+        job_controller_drop.backup_restore(dir_path=dir_path / db_name, python=python)
+
+        assert job_controller_drop.count_jobs() == 2
+        assert job_controller_drop.count_flows() == 1
+        assert job_controller_drop.auxiliary.find({})[0]["next_id"] == 3
+
+        # Other stores not supported for mongodump
+        if not python:
+            job_controller_drop.queue_store = MemoryStore()
+            with pytest.raises(
+                ValueError, match="Unsupported store type MemoryStore.*"
+            ):
+                job_controller_drop.backup_dump(
+                    dir_path=dir_name, compress=compress, python=python
+                )
