@@ -23,11 +23,12 @@ def test_project_init(random_project_name, write_tmp_settings) -> None:
 def test_paramiko_ssh_connection(random_project_name, job_controller) -> None:
     from paramiko import SSHClient
     from paramiko.client import WarningPolicy
+
     from jobflow_remote.config import ConfigManager
 
     cm = ConfigManager()
 
-    for name, worker in cm.projects[random_project_name].workers.items():
+    for worker in cm.projects[random_project_name].workers.values():
         if worker.type == "remote" and worker.port:
             client = SSHClient()
             client.set_missing_host_key_policy(WarningPolicy)
