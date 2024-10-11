@@ -106,6 +106,3 @@ SCRIPT
 if [[ ${sudo_cmd} ]]; then
     sudo -k
 fi
-
-# Load the relevant SGE environment on shell startup
-echo "source /opt/sge/default/common/settings.sh" >> /home/jobflow/.bashrc

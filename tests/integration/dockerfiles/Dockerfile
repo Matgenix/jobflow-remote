@@ -104,6 +104,11 @@ COPY ./tests/integration/dockerfiles/sge_startup.sh /etc/startup.sh
 RUN ln -s /opt/sge/bin/lx-amd64/qstat /usr/bin/qstat && \
     ln -s /opt/sge/bin/lx-amd64/qsub /usr/bin/qsub
 
+# Echo the SGE environment variables to the default /etc/profile
+RUN echo "export SGE_ROOT=/opt/sge" >> /etc/profile && \
+    echo "export SGE_CLUSTER_NAME=p6444" >> /etc/profile && \
+    echo "export SGE_CELL=default" >> /etc/profile
+
 #HEALTHCHECK CMD qstat -f || exit 1
 
 # 2) Add common options from ubuntu server
