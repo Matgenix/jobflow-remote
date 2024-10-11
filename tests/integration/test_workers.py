@@ -20,20 +20,25 @@ def test_project_init(random_project_name, write_tmp_settings) -> None:
     assert len(project.workers) == len(write_tmp_settings.workers)
 
 
-def test_paramiko_ssh_connection(job_controller, slurm_ssh_port) -> None:
+def test_paramiko_ssh_connection(random_project_name, job_controller) -> None:
     from paramiko import SSHClient
     from paramiko.client import WarningPolicy
+    from jobflow_remote.config import ConfigManager
 
-    client = SSHClient()
-    client.set_missing_host_key_policy(WarningPolicy)
-    client.connect(
-        "localhost",
-        port=slurm_ssh_port,
-        username="jobflow",
-        password="jobflow",
-        look_for_keys=False,
-        allow_agent=False,
-    )
+    cm = ConfigManager()
+
+    for name, worker in cm.projects[random_project_name].workers.items():
+        if worker.type == "remote" and worker.port:
+            client = SSHClient()
+            client.set_missing_host_key_policy(WarningPolicy)
+            client.connect(
+                "localhost",
+                port=worker.port,
+                username="jobflow",
+                password="jobflow",
+                look_for_keys=False,
+                allow_agent=False,
+            )
 
 
 def test_project_check(job_controller, capsys) -> None:
@@ -46,7 +51,7 @@ def test_project_check(job_controller, capsys) -> None:
         "✓ Jobstore",
         "✓ Queue store",
     ]
-    run_check_cli(["project", "check"], required_out=expected)
+    run_check_cli(["project", "check", "--errors"], required_out=expected)
 
 
 @pytest.mark.parametrize(
