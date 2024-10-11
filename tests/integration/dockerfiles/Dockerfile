@@ -100,7 +100,16 @@ RUN printf "${USERNAME} ALL=(root:root) NOPASSWD: /opt/sge/install_execd\n" >> /
 ## The SGE startup script includes the configuration of SGE, as the docker network is not ready during build
 COPY ./tests/integration/dockerfiles/sge_startup.sh /etc/startup.sh
 
-HEALTHCHECK CMD qstat || exit 1
+# To avoid issues setting the user PATH
+RUN ln -s /opt/sge/bin/lx-amd64/qstat /usr/bin/qstat && \
+    ln -s /opt/sge/bin/lx-amd64/qsub /usr/bin/qsub
+
+# Echo the SGE environment variables to the default /etc/profile
+RUN echo "export SGE_ROOT=/opt/sge" >> /etc/profile && \
+    echo "export SGE_CLUSTER_NAME=p6444" >> /etc/profile && \
+    echo "export SGE_CELL=default" >> /etc/profile
+
+#HEALTHCHECK CMD qstat -f || exit 1
 
 # 2) Add common options from ubuntu server
 FROM ${QUEUE_SYSTEM} as jobflow
