@@ -34,6 +34,24 @@ jobs:
       - name: Lint
         run: pre-commit run --all-files --show-diff-on-failure
 
+  build-test-bench:
+    name: "Build test bench containers"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build test bench container
+        uses: docker/bake-action@v5
+        with:
+          load: true
+          files: tests/integration/dockerfiles/docker-bake.hcl
+          set: |
+            *.cache-to=type=gha,scope=global,mode=max
+            *.cache-from=type=gha,scope=global
+
   test:
     services:
       local_mongodb:
@@ -41,6 +59,7 @@ jobs:
         ports:
           - 27017:27017
 
+    needs: [build-test-bench]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -55,6 +74,17 @@ jobs:
           python-version: ${{ matrix.python-version }}
           cache: pip
           cache-dependency-path: pyproject.toml
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Load test bench containers
+        uses: docker/bake-action@v5
+        with:
+          load: true
+          files: tests/integration/dockerfiles/docker-bake.hcl
+          set: |
+            *.cache-from=type=gha,scope=global
 
       - name: Install mongo-tools
         run: |

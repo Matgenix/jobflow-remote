@@ -26,7 +26,7 @@ dependencies = [
     "jobflow >= 0.1.14",
     "psutil >= 5.9,< 7.0",
     "pydantic ~= 2.4",
-    "qtoolkit ~= 0.1, >= 0.1.4",
+    "qtoolkit @ git+https://github.com/QuantumChemist/qtoolkit.git@sge",
     "rich ~= 13.7",
     "ruamel.yaml >= 0.17",
     "schedule ~= 1.2",
