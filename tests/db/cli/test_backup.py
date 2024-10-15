@@ -48,7 +48,7 @@ def test_reset(job_controller, two_flows_four_jobs, python, compress) -> None:
         required_out = [
             "Backup created",
             "flows collection: 2 documents",
-            "jf_auxiliary collection: 1 documents",
+            "jf_auxiliary collection: 3 documents",
             "jobs collection: 4 documents",
         ]
         cmd = ["backup", "create"]
@@ -73,5 +73,5 @@ def test_reset(job_controller, two_flows_four_jobs, python, compress) -> None:
         assert job_controller.count_jobs() == 4
         assert job_controller.count_flows() == 2
         aux_docs = list(job_controller.auxiliary.find({}))
-        assert len(aux_docs) == 1
+        assert len(aux_docs) == 3
         assert aux_docs[0]["next_id"] == 5

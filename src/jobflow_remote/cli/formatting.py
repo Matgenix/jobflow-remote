@@ -6,6 +6,7 @@ import time
 from typing import TYPE_CHECKING
 
 from monty.json import jsanitize
+from rich.markdown import Markdown
 from rich.scope import render_scope
 from rich.table import Table
 from rich.text import Text
@@ -17,9 +18,10 @@ from jobflow_remote.utils.data import convert_utc_time
 if TYPE_CHECKING:
     from jobflow_remote.config.base import ExecutionConfig, WorkerBase
     from jobflow_remote.jobs.data import FlowInfo, JobDoc, JobInfo
+    from jobflow_remote.jobs.upgrade import UpgradeAction
 
 
-def get_job_info_table(jobs_info: list[JobInfo], verbosity: int):
+def get_job_info_table(jobs_info: list[JobInfo], verbosity: int) -> Table:
     time_zone_str = f" [{time.tzname[0]}]"
 
     table = Table(title="Jobs info")
@@ -96,7 +98,7 @@ def get_job_info_table(jobs_info: list[JobInfo], verbosity: int):
     return table
 
 
-def get_flow_info_table(flows_info: list[FlowInfo], verbosity: int):
+def get_flow_info_table(flows_info: list[FlowInfo], verbosity: int) -> Table:
     time_zone_str = f" [{time.tzname[0]}]"
 
     table = Table(title="Flows info")
@@ -165,7 +167,7 @@ def format_job_info(
     return render_scope(d)
 
 
-def format_flow_info(flow_info: FlowInfo):
+def format_flow_info(flow_info: FlowInfo) -> Table:
     title = f"Flow: {flow_info.name} - {flow_info.flow_id} - {flow_info.state.name}"
     table = Table(title=title)
     table.title_style = "bold"
@@ -191,7 +193,9 @@ def format_flow_info(flow_info: FlowInfo):
     return table
 
 
-def get_exec_config_table(exec_config: dict[str, ExecutionConfig], verbosity: int = 0):
+def get_exec_config_table(
+    exec_config: dict[str, ExecutionConfig], verbosity: int = 0
+) -> Table:
     table = Table(title="Execution config", show_lines=verbosity > 0)
     table.add_column("Name")
     if verbosity > 0:
@@ -230,7 +234,7 @@ def get_exec_config_table(exec_config: dict[str, ExecutionConfig], verbosity: in
     return table
 
 
-def get_worker_table(workers: dict[str, WorkerBase], verbosity: int = 0):
+def get_worker_table(workers: dict[str, WorkerBase], verbosity: int = 0) -> Table:
     table = Table(title="Workers", show_lines=verbosity > 1)
     table.add_column("Name")
     if verbosity > 0:
@@ -255,3 +259,11 @@ def get_worker_table(workers: dict[str, WorkerBase], verbosity: int = 0):
         table.add_row(*row)
 
     return table
+
+
+def format_upgrade_actions(actions: list[UpgradeAction]):
+    msg = ""
+    for action in actions:
+        msg += f"* {action.description}\n"
+
+    return Markdown(msg)
