@@ -5,7 +5,7 @@ tomlkit==0.13.2
 qtoolkit==0.1.5
 typer==0.12.5
 rich==13.8.1
-psutil==6.0.0
+psutil==6.1.0
 supervisor==4.2.5
 ruamel.yaml==0.17.35
 schedule==1.2.2
