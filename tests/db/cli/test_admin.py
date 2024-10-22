@@ -99,14 +99,23 @@ def test_unlock_flow(job_controller, one_job) -> None:
     )
 
 
+@pytest.mark.filterwarnings("ignore:Could not release lock for document")
 def test_unlock_runner(job_controller) -> None:
     from jobflow_remote.testing.cli import run_check_cli
 
     with job_controller.lock_auxiliary(filter={"running_runner": {"$exists": True}}):
+        rr_before = job_controller.auxiliary.find_one(
+            {"running_runner": {"$exists": True}}
+        )
+        assert rr_before.get("lock_id") is not None
         run_check_cli(
             ["admin", "unlock-runner"],
             required_out="The runner document has been unlocked",
         )
+        rr_after = job_controller.auxiliary.find_one(
+            {"running_runner": {"$exists": True}}
+        )
+        assert rr_after.get("lock_id") is None
 
     run_check_cli(
         ["admin", "unlock-runner"],
@@ -173,6 +182,14 @@ def test_upgrade_to_0_1_5(
 
     assert job_controller.count_jobs() == 1
     assert job_controller.count_flows() == 1
+
+    # test upgrading again to check that it will not perform the upgrade
+    run_check_cli(
+        ["admin", "upgrade", "--test-version-upgrade", "0.1.5"],
+        required_out=[
+            "Current DB version: 0.1.5. No upgrade required for target version 0.1.5"
+        ],
+    )
 
 
 def test_index_rebuild(job_controller, one_job):

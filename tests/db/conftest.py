@@ -4,6 +4,7 @@ import shutil
 import tempfile
 import time
 import warnings
+from functools import partial
 from pathlib import Path
 
 import pytest
@@ -233,25 +234,58 @@ def two_flows_four_jobs(random_project_name):
     return [flow, flow2]
 
 
-@pytest.fixture()
-def version_candidate():
-    """Next version candidate. Used for tests of upgrade methods."""
-    return "0.1.3"
+def wait_daemon_status(
+    daemon_manager, target_status, acceptable_states=None, max_wait: int = 10
+) -> bool:
+    from jobflow_remote.jobs.daemon import DaemonError
+
+    if not acceptable_states:
+        acceptable_states = [target_status]
+
+    for _i in range(max_wait):
+        time.sleep(1)
+        # if the state cannot be determined keep waiting
+        try:
+            state = daemon_manager.check_status()
+        except DaemonError:
+            continue
+        assert state in acceptable_states
+        if state == target_status:
+            return True
+    raise RuntimeError(
+        f"The daemon did not start {target_status.value} within the expected time ({max_wait})"
+    )
 
 
 @pytest.fixture(scope="session")
 def wait_daemon_started():
-    def _wait_daemon_started(daemon_manager, max_wait: int = 10) -> bool:
-        from jobflow_remote.jobs.daemon import DaemonStatus
+    from jobflow_remote.jobs.daemon import DaemonStatus
 
-        for _i in range(max_wait):
-            time.sleep(1)
-            state = daemon_manager.check_status()
-            assert state in (DaemonStatus.STARTING, DaemonStatus.RUNNING)
-            if state == DaemonStatus.RUNNING:
-                return True
-        raise RuntimeError(
-            f"The daemon did not start running within the expected time ({max_wait})"
-        )
+    return partial(
+        wait_daemon_status,
+        target_status=DaemonStatus.RUNNING,
+        acceptable_states=[DaemonStatus.STARTING, DaemonStatus.RUNNING],
+    )
 
-    return _wait_daemon_started
+
+@pytest.fixture(scope="session")
+def wait_daemon_stopped():
+    from jobflow_remote.jobs.daemon import DaemonStatus
+
+    return partial(
+        wait_daemon_status,
+        target_status=DaemonStatus.STOPPED,
+        acceptable_states=[
+            DaemonStatus.STOPPING,
+            DaemonStatus.STOPPED,
+            DaemonStatus.RUNNING,
+            DaemonStatus.PARTIALLY_RUNNING,
+        ],
+    )
+
+
+@pytest.fixture(scope="session")
+def wait_daemon_shutdown():
+    from jobflow_remote.jobs.daemon import DaemonStatus
+
+    return partial(wait_daemon_status, target_status=DaemonStatus.SHUT_DOWN)

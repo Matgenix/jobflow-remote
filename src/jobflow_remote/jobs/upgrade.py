@@ -129,6 +129,10 @@ class DatabaseUpgrader:
         target_version = (
             parse_version(target_version) if target_version else self.current_version
         )
+
+        if db_version >= target_version:
+            return []
+
         versions_needing_upgrade = self.collect_upgrades(db_version, target_version)
 
         all_actions = []
@@ -184,11 +188,11 @@ class DatabaseUpgrader:
         target_version = (
             parse_version(target_version) if target_version else self.current_version
         )
-        versions_needing_upgrade = self.collect_upgrades(db_version, target_version)
-
         if db_version >= target_version:
             logger.info("Database is already at the target version")
             return False
+
+        versions_needing_upgrade = self.collect_upgrades(db_version, target_version)
 
         logger.info(f"Starting upgrade from version {db_version} to {target_version}")
 

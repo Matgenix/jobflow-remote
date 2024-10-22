@@ -25,6 +25,8 @@ All of these should have a python environment with at least jobflow-remote insta
 However, only **USER** and **RUNNER** need to have access to the database. If not overlapping
 with the other **RUNNER** only needs ``jobflow-remote`` and its dependencies to be installed.
 
+.. _setup options:
+
 Setup options
 =============
 

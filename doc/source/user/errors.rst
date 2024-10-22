@@ -333,6 +333,8 @@ rerun a Job. In particular
   inconsistencies.
 
 
+.. _errors runner:
+
 Runner errors and Locked jobs
 =============================
 
