@@ -17,6 +17,7 @@ from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.prompt import Confirm
 from rich.text import Text
+from rich.tree import Tree
 from typer.core import TyperCommand, TyperGroup
 
 from jobflow_remote import ConfigManager, JobController
@@ -25,8 +26,6 @@ from jobflow_remote.jobs.daemon import DaemonError, DaemonManager, DaemonStatus
 
 if TYPE_CHECKING:
     from cProfile import Profile
-
-    from rich.tree import Tree
 
     from jobflow_remote.jobs.state import JobState
 
@@ -510,6 +509,7 @@ def get_command_tree(
     show_hidden: bool,
     max_depth: int | None,
     current_depth: int = 0,
+    max_doc_lines: int | None = None,
 ) -> Tree:
     """
     Recursively build a tree representation of the command structure.
@@ -530,6 +530,9 @@ def get_command_tree(
         Maximum depth of the tree to display.
     current_depth
         Current depth in the tree (used for recursion).
+    max_doc_lines
+        If show_docs is True, the maximum number of lines showed from the
+        documentation of each command/option.
 
     Returns
     -------
@@ -544,8 +547,17 @@ def get_command_tree(
             continue
 
         command_str = f"[bold green]{command_name}[/bold green]"
-        if show_docs and isinstance(command, TyperCommand) and command.help:
+        if (
+            show_docs
+            and isinstance(command, (TyperCommand, TyperGroup))
+            and command.help
+        ):
             command_str += f": {command.help}"
+            if max_doc_lines:
+                lines = command_str.splitlines()
+                command_str = "\n".join(lines[:max_doc_lines])
+                if len(lines) > max_doc_lines:
+                    command_str += " ..."
         branch = tree.add(command_str)
 
         if isinstance(command, TyperGroup):
@@ -557,6 +569,7 @@ def get_command_tree(
                 show_hidden,
                 max_depth,
                 current_depth + 1,
+                max_doc_lines,
             )
         elif show_options:
             for param in command.params:
@@ -568,37 +581,33 @@ def get_command_tree(
                     param_str += " [red](required)[/red]"
                 if show_docs and param.help:
                     param_str += f": {param.help}"
+                if max_doc_lines:
+                    lines = param_str.splitlines()
+                    param_str = "\n".join(lines[:max_doc_lines])
+                    if len(lines) > max_doc_lines:
+                        param_str += " ..."
                 branch.add(param_str)
     return tree
 
 
-def find_subcommand(app: TyperGroup, path: list[str]) -> TyperGroup | None:
-    """
-    Find a subcommand in the command tree based on the given path.
+def tree_callback(
+    ctx: typer.Context,
+    value: bool,
+):
+    if value:
+        main_app = ctx.command
+        tree_title = f"[bold red]{ctx.command.name}[/bold red]"
 
-    Parameters
-    ----------
-    app
-        The root Typer app or command group.
-    path
-        List of command names forming the path to the desired subcommand.
+        tree = Tree(tree_title)
+        command_tree = get_command_tree(
+            main_app,
+            tree,
+            show_options=False,
+            show_docs=True,
+            show_hidden=False,
+            max_depth=None,
+            max_doc_lines=1,
+        )
 
-    Returns
-    -------
-    TyperGroup
-        The found subcommand, or None if not found.
-    """
-    if not path:
-        return app
-
-    current_command = app.commands.get(path[0])
-    if current_command is None:
-        return None
-
-    if len(path) == 1:
-        return current_command if isinstance(current_command, TyperGroup) else None
-
-    if isinstance(current_command, TyperGroup):
-        return find_subcommand(current_command, path[1:])
-
-    return None
+        out_console.print(command_tree)
+        raise typer.Exit(0)

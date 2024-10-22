@@ -9,9 +9,20 @@ from jobflow_remote.cli.utils import (
     SerializeFileFormat,
     SortOption,
     str_to_dict,
+    tree_callback,
 )
 from jobflow_remote.config.base import LogLevel
 from jobflow_remote.jobs.state import FlowState, JobState
+
+tree_opt = Annotated[
+    bool,
+    typer.Option(
+        "--tree",
+        help="Display a tree representation of the CLI command structure",
+        is_eager=True,
+        callback=tree_callback,
+    ),
+]
 
 job_ids_indexes_opt = Annotated[
     Optional[list[str]],
