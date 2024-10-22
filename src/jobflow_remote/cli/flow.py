@@ -333,6 +333,9 @@ def report(
         ),
     ] = None,
 ):
+    """
+    Generate a report about the Flows in the database.
+    """
     jc = get_job_controller()
 
     timezone = datetime.now(tzlocal()).tzname()

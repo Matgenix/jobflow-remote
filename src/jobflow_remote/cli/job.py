@@ -704,6 +704,9 @@ def report(
         ),
     ] = None,
 ):
+    """
+    Generate a report about the Jobs in the database.
+    """
     jc = get_job_controller()
 
     timezone = datetime.now(tzlocal()).tzname()
@@ -718,7 +721,7 @@ def report(
 
 
 app_job_set = JFRTyper(
-    name="set", help="Commands for managing the jobs", no_args_is_help=True
+    name="set", help="Commands for setting properties for jobs", no_args_is_help=True
 )
 app_job.add_typer(app_job_set)
 
@@ -1162,6 +1165,9 @@ def files_get(
         ),
     ] = None,
 ) -> None:
+    """
+    Retrieve files from the Job's execution folder.
+    """
     db_id, job_id = get_job_db_ids(job_db_id, job_index)
 
     cm = get_config_manager()

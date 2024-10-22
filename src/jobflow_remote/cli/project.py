@@ -7,7 +7,12 @@ from rich.text import Text
 from jobflow_remote.cli.formatting import get_exec_config_table, get_worker_table
 from jobflow_remote.cli.jf import app
 from jobflow_remote.cli.jfr_typer import JFRTyper
-from jobflow_remote.cli.types import force_opt, serialize_file_format_opt, verbosity_opt
+from jobflow_remote.cli.types import (
+    force_opt,
+    serialize_file_format_opt,
+    tree_opt,
+    verbosity_opt,
+)
 from jobflow_remote.cli.utils import (
     SerializeFileFormat,
     check_incompatible_opt,
@@ -86,7 +91,10 @@ def list_projects(
 
 
 @app_project.callback(invoke_without_command=True)
-def current_project(ctx: typer.Context) -> None:
+def current_project(
+    ctx: typer.Context,
+    print_tree: tree_opt = False,  # If selected will print the tree of the CLI and exit
+) -> None:
     """Print the list of the project currently selected."""
     # only run if no other subcommand is executed
     if ctx.invoked_subcommand is None:
@@ -266,6 +274,9 @@ app_project.add_typer(app_exec_config)
 def list_exec_config(
     verbosity: verbosity_opt = 0,
 ) -> None:
+    """
+    The list of defined Execution configurations
+    """
     cm = get_config_manager()
     project = cm.get_project()
     table = get_exec_config_table(project.exec_config, verbosity)
@@ -289,6 +300,9 @@ app_project.add_typer(app_worker)
 def list_worker(
     verbosity: verbosity_opt = 0,
 ) -> None:
+    """
+    The list of defined workers
+    """
     cm = get_config_manager()
     project = cm.get_project()
     table = get_worker_table(project.workers, verbosity)

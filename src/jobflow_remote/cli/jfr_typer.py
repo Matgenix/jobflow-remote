@@ -3,6 +3,7 @@ from typing import Callable
 import typer
 from typer.models import CommandFunctionType
 
+from jobflow_remote.cli.types import tree_opt
 from jobflow_remote.cli.utils import cli_error_handler
 
 
@@ -17,6 +18,9 @@ class JFRTyper(typer.Typer):
 
         if "rich_markup_mode" not in kwargs:
             kwargs["rich_markup_mode"] = "rich"
+
+        if "callback" not in kwargs:
+            kwargs["callback"] = default_callback
 
         # if "result_callback" not in kwargs:
         #     kwargs["result_callback"] = test_cb
@@ -44,3 +48,7 @@ class JFRTyper(typer.Typer):
             return typer_wrapper(fn)
 
         return wrapper
+
+
+def default_callback(print_tree: tree_opt = False):
+    pass
