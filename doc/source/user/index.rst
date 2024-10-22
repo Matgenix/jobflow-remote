@@ -18,6 +18,7 @@ details are found in :ref:`reference`.
    tuning
    errors
    states
+   runner
    advancedoptions
    backup
 

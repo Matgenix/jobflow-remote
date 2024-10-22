@@ -1,6 +1,7 @@
 from typing import Annotated, Optional
 
 import typer
+from packaging.version import parse as parse_version
 from rich.prompt import Confirm
 from rich.text import Text
 
@@ -25,6 +26,7 @@ from jobflow_remote.cli.utils import (
     check_stopped_runner,
     confirm_project_name,
     exit_with_error_msg,
+    exit_with_warning_msg,
     get_config_manager,
     get_job_controller,
     get_job_ids_indexes,
@@ -69,12 +71,20 @@ def upgrade(
 ) -> None:
     """
     Upgrade the jobflow database.
-    WARNING: can modify all the data. Previous version could not be retrieved anymore.
+    WARNING: can modify all the data. Previous version cannot be retrieved anymore.
     It preferable to perform a backup before upgrading.
     """
     check_stopped_runner(error=True)
 
     jc = get_job_controller()
+    upgrader = DatabaseUpgrader(jc)
+    target_version = parse_version(test_version_upgrade) or upgrader.current_version
+    db_version = jc.get_current_db_version()
+    if db_version >= target_version:
+        exit_with_warning_msg(
+            f"Current DB version: {db_version}. No upgrade required for target version {target_version}"
+        )
+
     jobflow_check = jc.upgrade_check_jobflow()
     if jobflow_check:
         out_console.print(jobflow_check)
@@ -89,9 +99,7 @@ def upgrade(
             )
             out_console.print(text)
 
-    upgrader = DatabaseUpgrader(jc)
     if not no_dry_run:
-        target_version = test_version_upgrade or upgrader.current_version
         actions = upgrader.dry_run(target_version=test_version_upgrade)
         if not actions:
             out_console.print(

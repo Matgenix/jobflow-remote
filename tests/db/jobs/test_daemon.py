@@ -39,7 +39,7 @@ def _check_running_runner_doc(job_controller, runner_info):
     [True, False],
 )
 def test_start_stop(
-    job_controller, single, daemon_manager, wait_daemon_started
+    job_controller, single, daemon_manager, wait_daemon_started, caplog
 ) -> None:
     from jobflow import Flow
 
@@ -77,6 +77,13 @@ def test_start_stop(
     assert daemon_manager.check_status() == DaemonStatus.STOPPED
 
     assert daemon_manager.start(raise_on_error=True, single=True)
+    if not single:
+        warn_msg = (
+            "Daemon is STOPPED, but the options single differ from the values used "
+            "to activate supervisor. The daemon will start with the initial configurations"
+        )
+        assert warn_msg in caplog.text
+
     wait_daemon_started(daemon_manager)
     assert daemon_manager.shut_down(raise_on_error=True)
     _wait_daemon_shutdown(daemon_manager)

@@ -520,7 +520,7 @@ class DaemonManager:
         connect_interactive: bool = False,
     ) -> str | None:
         """
-        Start the supervisord daemon.
+        Start the supervisord daemon and all the processes.
 
         Parameters
         ----------
@@ -568,7 +568,8 @@ class DaemonManager:
 
     def start_processes(self) -> str | None:
         """
-        Start all the processes of the daemon.
+        Start all the processes of the daemon when the supervisord processes
+        is running but the daemon processes are stopped.
 
         Returns
         -------
@@ -580,16 +581,14 @@ class DaemonManager:
         if not result:
             return "No process started"
 
-        failed = [r for r in result if r.get("status") == Faults.SUCCESS]
+        failed = [r for r in result if r.get("status") != Faults.SUCCESS]
         if len(failed) == 0:
             return None
-        if len(failed) != len(result):
-            msg = "Not all the daemon processes started correctly. Details: \n"
-            for f in failed:
-                msg += f"  - {f.get('description')}\n"
-            return msg
 
-        return None
+        msg = "Not all the daemon processes started correctly. Details: \n"
+        for f in failed:
+            msg += f"  - {f.get('description')} - {f.get('status')}\n"
+        return msg
 
     def start(
         self,
