@@ -22,7 +22,7 @@ configuration. In particular all the workers, the MongoDB database defined in th
 
 .. image:: ../_static/img/daemon_schema.svg
    :width: 50%
-   :alt: All-in-one configuration
+   :alt: Runner daemon
    :align: center
 
 Runner processes
@@ -73,9 +73,10 @@ and ``--complete`` options allow to increase the number of processes dedicated t
 the steps 3 and 4.
 
 .. warning::
-    The ``Runner`` reads the project configurations when each of the processes is
-    started and does not attempt to refresh them during the execution. Whenever
-    changing
+    The ``Runner`` **reads the project configurations when the processes is
+    started** and does not attempt to refresh them during the execution. Whenever
+    the project configuration is changed the ``Runner`` needed the runner needs
+    to be restarted.
 
 .. _runner stop:
 
@@ -93,11 +94,11 @@ is specified, the completion of the command will not imply that all the ``Runner
 processes have been terminated.
 
 .. warning::
-    The ``Runner`` is designed to recognize the signal and **wait the completion of
+    The ``Runner`` is designed to recognize the signal and **wait for the completion of
     the action being performed**, before actually exiting.
 
 .. note::
-    Since the supervisor processes remains active, when starting the runner again after
+    Since the supervisor process remains active, when starting the runner again after
     a stop it is not possible to switch from a single process to a split configuration
     or the other way round. It is necessary to shut down the whole daemon in that case.
 
@@ -163,8 +164,10 @@ There are no strict limitations to which machine should be used to execute the `
 as a daemon, and, as explained in the :ref:`setup options` section, there are several
 possible configurations. It is thus possible for a user to mistakenly start
 the runner daemon on two different locations. While this should not corrupt
-the database, thanks to the locking mechanism, it may be confusing as a user
-may be unaware that a runner is already active on some machine.
+the database, thanks to the locking mechanism, it may still generate errors
+since the Job outputs could be downloaded from one of the runners and another one
+may try to complete it, but without having access to the downloaded files.
+This can be confusing as a user may be unaware that a runner is already active on some machine.
 To mitigate the possibility of this to occur, jobflow-remote also adds information
 in the database about the machine where a ``Runner`` daemon is started. The
 code will then prevent the system to start a daemon on a different machine. All the

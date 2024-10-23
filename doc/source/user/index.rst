@@ -21,6 +21,7 @@ details are found in :ref:`reference`.
    runner
    advancedoptions
    backup
+   cli
 
 .. toctree::
    :hidden:

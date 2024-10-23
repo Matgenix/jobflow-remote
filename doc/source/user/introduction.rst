@@ -57,7 +57,7 @@ equivalent for the other kinds of setup.
 
 .. image:: ../_static/img/daemon_schema.svg
    :width: 50%
-   :alt: All-in-one configuration
+   :alt: Runner daemon
    :align: center
 
 Once the daemon is started, the runner loops over the different actions that it can
@@ -68,6 +68,7 @@ perform and updates the state of Jobs in the database performing some actions on
   - resolving all the references of the Job from the database (including everything in additional stores)
   - using those data to generate a JSON representation of the Job without external references
   - uploading a JSON file with this information on the runner
+
   Once this is done, the state of the Job is ``UPLOADED``.
 * The runner generates a submission script suitable for the type of chosen worker.
   Uploads it and submits the job. The Job is now ``SUBMITTED``.
