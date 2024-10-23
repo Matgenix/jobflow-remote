@@ -4,24 +4,6 @@ import time
 import pytest
 
 
-def _wait_daemon_shutdown(daemon_manager, max_wait: int = 10) -> bool:
-    from jobflow_remote.jobs.daemon import DaemonError, DaemonStatus
-
-    for _i in range(max_wait):
-        time.sleep(1)
-        state = None
-        try:
-            state = daemon_manager.check_status()
-        except DaemonError:
-            pass
-        # TODO: should we check state here such as in _wait_daemon_started ?
-        if state == DaemonStatus.SHUT_DOWN:
-            return True
-    raise RuntimeError(
-        f"The daemon did not start running within the expected time ({max_wait})"
-    )
-
-
 def _check_running_runner_doc(job_controller, runner_info):
     # check that the state in the DB was not changed.
     # do not check dates, as apparently they can be slightly off by few a fraction of a second.
@@ -39,7 +21,12 @@ def _check_running_runner_doc(job_controller, runner_info):
     [True, False],
 )
 def test_start_stop(
-    job_controller, single, daemon_manager, wait_daemon_started, caplog
+    job_controller,
+    single,
+    daemon_manager,
+    wait_daemon_started,
+    wait_daemon_shutdown,
+    caplog,
 ) -> None:
     from jobflow import Flow
 
@@ -86,7 +73,7 @@ def test_start_stop(
 
     wait_daemon_started(daemon_manager)
     assert daemon_manager.shut_down(raise_on_error=True)
-    _wait_daemon_shutdown(daemon_manager)
+    wait_daemon_shutdown(daemon_manager)
     assert daemon_manager.check_status() == DaemonStatus.SHUT_DOWN
 
     processes_info = daemon_manager.get_processes_info()

@@ -950,7 +950,10 @@ def test_running_runner(job_controller, daemon_manager, wait_daemon_started):
     wait_daemon_started(daemon_manager)
     assert job_controller.get_running_runner() is not None
 
-    with job_controller.lock_auxiliary(filter={"running_runner": {"$exists": True}}):
+    with (
+        pytest.warns(UserWarning, match="Could not release lock for document"),
+        job_controller.lock_auxiliary(filter={"running_runner": {"$exists": True}}),
+    ):
         with pytest.raises(LockedDocumentError):
             job_controller.clean_running_runner()
 
