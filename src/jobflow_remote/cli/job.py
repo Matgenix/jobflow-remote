@@ -305,6 +305,14 @@ def rerun(
         ),
     ] = False,
     raise_on_error: raise_on_error_opt = False,
+    err_regex: Annotated[
+        str,
+        typer.Option(
+            "--err-regex",
+            "-er",
+            help="A regular expression to match against job error messages. Only jobs with matching error messages will be rerun.",
+        ),
+    ] = None,
 ) -> None:
     """
     Rerun a Job. By default, this is limited to jobs that failed and children did
@@ -341,6 +349,7 @@ def rerun(
         break_lock=break_lock,
         force=force,
         raise_on_error=raise_on_error,
+        err_regex=err_regex,
     )
 
 

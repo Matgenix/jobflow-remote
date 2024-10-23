@@ -779,6 +779,7 @@ class JobController:
         force: bool = False,
         wait: int | None = None,
         break_lock: bool = False,
+        err_regex: str | None = None,
     ) -> list[str]:
         """
         Rerun a list of selected Jobs, i.e. bring their state back to READY.
@@ -824,6 +825,9 @@ class JobController:
             Forcibly break the lock on locked documents. Use with care and
             verify that the lock has been set by a process that is not running
             anymore. Doing otherwise will likely lead to inconsistencies in the DB.
+        err_regex : str, optional
+            A regular expression to match against job error messages.
+            Only jobs with matching error messages will be rerun.
 
         Returns
         -------
@@ -842,7 +846,8 @@ class JobController:
             name=name,
             metadata=metadata,
             workers=workers,
-            custom_query=custom_query,
+            custom_query=custom_query
+            | ({"error": {"$regex": err_regex}} if err_regex else {}),
             raise_on_error=raise_on_error,
             force=force,
             wait=wait,
