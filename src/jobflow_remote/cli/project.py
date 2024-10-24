@@ -205,12 +205,15 @@ def check(
             else:
                 err, worker_warn = check_worker(worker_to_test, full_check=full)
             header = tick
+            # At the moment the check_worker should return either an error or a
+            # warning. The code below also deals with the case where both are
+            # returned in the future.
+            if worker_warn:
+                errors.append((f"Worker {worker_name} warning ", worker_warn))
+                header = tick_warn
             if err:
                 errors.append((f"Worker {worker_name} ", err))
                 header = cross
-            elif worker_warn:
-                errors.append((f"Worker {worker_name} warning ", worker_warn))
-                header = tick_warn
             progress.print(Text.from_markup(header + f"Worker {worker_name}"))
 
         if check_all or jobstore:
