@@ -167,6 +167,7 @@ def check(
         bool,
         typer.Option(
             "--full",
+            "-f",
             help="Perform a full check",
         ),
     ] = False,
@@ -190,6 +191,7 @@ def check(
         workers_to_test = [worker]
 
     tick = "[bold green]✓[/] "
+    tick_warn = "[bold yellow]✓[/] "
     cross = "[bold red]x[/] "
     errors = []
     with loading_spinner(processing=False) as progress:
@@ -199,13 +201,16 @@ def check(
             worker_to_test = project.workers[worker_name]
             if worker_to_test.get_host().interactive_login:
                 with hide_progress(progress):
-                    err = check_worker(worker_to_test, full_check=full)
+                    err, worker_warn = check_worker(worker_to_test, full_check=full)
             else:
-                err = check_worker(worker_to_test, full_check=full)
+                err, worker_warn = check_worker(worker_to_test, full_check=full)
             header = tick
             if err:
-                errors.append((f"Worker {worker_name}", err))
+                errors.append((f"Worker {worker_name} ", err))
                 header = cross
+            elif worker_warn:
+                errors.append((f"Worker {worker_name} warning ", worker_warn))
+                header = tick_warn
             progress.print(Text.from_markup(header + f"Worker {worker_name}"))
 
         if check_all or jobstore:

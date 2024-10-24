@@ -48,7 +48,10 @@ def test_project_check(job_controller, capsys) -> None:
         "✓ Jobstore",
         "✓ Queue store",
     ]
-    run_check_cli(["project", "check", "-e"], required_out=expected)
+    excluded = ["Errors:"]
+    run_check_cli(
+        ["project", "check", "-e"], required_out=expected, excluded_out=excluded
+    )
 
 
 @pytest.mark.parametrize(
