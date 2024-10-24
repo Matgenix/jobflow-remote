@@ -122,8 +122,8 @@ class BatchConfig(BaseModel):
         description="Absolute path to a folder where the batch jobs will be executed. This refers to the jobs submitted"
         "to the queue. Jobflow's Job will still be executed in the standard folders."
     )
-    max_jobs: Optional[int] = Field(
-        None, description="Maximum number of jobs executed in a single run in the queue"
+    max_jobs_per_batch: Optional[int] = Field(
+        None, description="Maximum number of jobs executed in a single batch process"
     )
     max_wait: Optional[int] = Field(
         60,

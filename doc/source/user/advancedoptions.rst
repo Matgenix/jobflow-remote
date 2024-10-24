@@ -138,12 +138,13 @@ end of one Job and the availability of a new one the *batch* job in the queue wi
 
 .. warning::
 
-    The ``batch`` section of a worker's configuration also has a ``max_jobs`` option.
-    It allows for the definition of the maximum number of jobflow Jobs that will be executed in a single
-    process submitted to the queue (e.g. a SLURM job). This should not be confused with
+    The ``batch`` section of a worker's configuration has a ``max_jobs_per_batch`` option.
+    It allows for the definition of the maximum number of jobflow Jobs that will be executed
+    in a single *batch* process. This should not be confused with
     the ``max_jobs`` value mentioned above, that defines the number of submitted *batch*
     processes (e.g. the maximum number of SLURM Jobs simultaneously in the queue).
 
+.. _advancedoptions paralbatch:
 
 Parallel batch
 --------------
