@@ -1118,8 +1118,8 @@ class Runner:
                 # note that here the worker.work_dir needs to be passed,
                 # not the worker.batch.work_dir
                 command = f"jf -fe execution run-batch {worker.work_dir} {worker.batch.jobs_handle_dir} {process_running_uuid}"
-                if worker.batch.max_jobs:
-                    command += f" -mj {worker.batch.max_jobs}"
+                if worker.batch.max_jobs_per_batch:
+                    command += f" -mj {worker.batch.max_jobs_per_batch}"
                 if worker.batch.max_time:
                     command += f" -mt {worker.batch.max_time}"
                 if worker.batch.max_wait:
