@@ -388,3 +388,51 @@ def test_queries(job_controller, two_flows_four_jobs) -> None:
         ["job", "play", "--name", "add*"],
         required_out="Operation completed: 1 jobs modified",
     )
+
+
+def test_report(job_controller) -> None:
+    from datetime import datetime
+
+    from jobflow import Flow
+
+    from jobflow_remote import submit_flow
+    from jobflow_remote.jobs.runner import Runner
+    from jobflow_remote.testing import add_sleep
+    from jobflow_remote.testing.cli import run_check_cli
+
+    now = datetime.now()
+    output = [
+        "Job Summary",
+        "Job State Distribution",
+        "Job Trends",
+        now.strftime("%Y-%m-%d"),
+    ]
+    excluded = ["Longest running jobs"]
+
+    # run first with an empty db to check that everything works fine
+    run_check_cli(
+        ["job", "report", "days", "2"],
+        required_out=[*output, "Running Jobs │   0"],
+        excluded_out=excluded,
+    )
+
+    # a long sleeping job. Will not finish.
+    j = add_sleep(1, 10)
+    flow = Flow([j])
+    submit_flow(flow, worker="test_local_worker")
+
+    output.append("Worker Jobs Distribution")
+
+    run_check_cli(
+        ["job", "report", "days", "2"],
+        required_out=[*output, "Running Jobs │   0"],
+        excluded_out=excluded,
+    )
+
+    runner = Runner()
+    runner.run(ticks=2)
+
+    run_check_cli(
+        ["job", "report", "days", "2"],
+        required_out=output + excluded + ["Running Jobs │   1"],
+    )

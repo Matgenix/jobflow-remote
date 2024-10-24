@@ -177,9 +177,7 @@ class JobInfo(BaseModel):
             The estimated run time in seconds.
         """
         if self.start_time:
-            return (
-                datetime.now(tz=self.start_time.tzinfo) - self.start_time
-            ).total_seconds()
+            return (datetime.utcnow() - self.start_time).total_seconds()
 
         return None
 

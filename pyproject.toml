@@ -26,6 +26,7 @@ dependencies = [
     "jobflow >= 0.1.14",
     "psutil >= 5.9,< 7.0",
     "pydantic ~= 2.4",
+    "python-dateutil>=2.8.2",
     "qtoolkit @ git+https://github.com/QuantumChemist/qtoolkit.git@sge",
     "rich ~= 13.7",
     "ruamel.yaml >= 0.17",
@@ -37,7 +38,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pre-commit>=3.0.0"]
-tests = ["docker ~= 7.0", "pytest ~= 8.0", "pytest-cov >= 4,< 6"]
+tests = ["docker ~= 7.0", "pytest ~= 8.0", "pytest-cov >= 4,< 6", "pytest-mock ~= 3.14"]
 docs = [
     "autodoc_pydantic>=2.0.0",
     "pydata-sphinx-theme",
@@ -45,6 +46,7 @@ docs = [
     "sphinx-copybutton",
     "sphinx_design",
     "sphinxcontrib-mermaid",
+    "sphinxcontrib-typer[html]",
 ]
 
 [project.scripts]

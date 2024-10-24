@@ -4,6 +4,7 @@ import typer
 from rich.text import Text
 
 from jobflow_remote.cli.jfr_typer import JFRTyper
+from jobflow_remote.cli.types import tree_opt
 from jobflow_remote.cli.utils import (
     cleanup_job_controller,
     complete_profiling,
@@ -65,6 +66,7 @@ def main(
             hidden=True,
         ),
     ] = False,
+    print_tree: tree_opt = False,  # If selected will print the tree of the CLI and exit
 ) -> None:
     """The controller CLI for jobflow-remote."""
     from jobflow_remote import SETTINGS

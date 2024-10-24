@@ -1,12 +1,18 @@
+from datetime import datetime
 from typing import Annotated, Optional
 
 import typer
+from dateutil.tz import tzlocal
 from jobflow.utils.graph import draw_graph
 from rich.prompt import Confirm
 from rich.text import Text
 
 from jobflow_remote import SETTINGS
-from jobflow_remote.cli.formatting import format_flow_info, get_flow_info_table
+from jobflow_remote.cli.formatting import (
+    format_flow_info,
+    get_flow_info_table,
+    get_flow_report_components,
+)
 from jobflow_remote.cli.jf import app
 from jobflow_remote.cli.jfr_typer import JFRTyper
 from jobflow_remote.cli.types import (
@@ -31,6 +37,7 @@ from jobflow_remote.cli.types import (
     verbosity_opt,
 )
 from jobflow_remote.cli.utils import (
+    ReportInterval,
     SortOption,
     check_incompatible_opt,
     exit_with_error_msg,
@@ -42,6 +49,7 @@ from jobflow_remote.cli.utils import (
     out_console,
 )
 from jobflow_remote.jobs.graph import get_graph, plot_dash
+from jobflow_remote.jobs.report import FlowsReport
 
 app_flow = JFRTyper(
     name="flow", help="Commands for managing the flows", no_args_is_help=True
@@ -306,3 +314,36 @@ def graph(
             plt.savefig(file_path)
         else:
             plt.show()
+
+
+@app_flow.command()
+def report(
+    interval: Annotated[
+        ReportInterval,
+        typer.Argument(
+            help="The interval of the trends for the report",
+            metavar="INTERVAL",
+        ),
+    ] = ReportInterval.DAYS,
+    num_intervals: Annotated[
+        Optional[int],
+        typer.Argument(
+            help="The number of intervals to consider. Default depends on the interval type",
+            metavar="NUM_INTERVALS",
+        ),
+    ] = None,
+):
+    """
+    Generate a report about the Flows in the database.
+    """
+    jc = get_job_controller()
+
+    timezone = datetime.now(tzlocal()).tzname()
+
+    jobs_report = FlowsReport.generate_report(
+        job_controller=jc,
+        interval=interval.value,
+        num_intervals=num_intervals,
+        timezone=timezone,
+    )
+    out_console.print(*get_flow_report_components(jobs_report))

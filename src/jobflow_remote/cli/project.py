@@ -7,7 +7,12 @@ from rich.text import Text
 from jobflow_remote.cli.formatting import get_exec_config_table, get_worker_table
 from jobflow_remote.cli.jf import app
 from jobflow_remote.cli.jfr_typer import JFRTyper
-from jobflow_remote.cli.types import force_opt, serialize_file_format_opt, verbosity_opt
+from jobflow_remote.cli.types import (
+    force_opt,
+    serialize_file_format_opt,
+    tree_opt,
+    verbosity_opt,
+)
 from jobflow_remote.cli.utils import (
     SerializeFileFormat,
     check_incompatible_opt,
@@ -86,7 +91,10 @@ def list_projects(
 
 
 @app_project.callback(invoke_without_command=True)
-def current_project(ctx: typer.Context) -> None:
+def current_project(
+    ctx: typer.Context,
+    print_tree: tree_opt = False,  # If selected will print the tree of the CLI and exit
+) -> None:
     """Print the list of the project currently selected."""
     # only run if no other subcommand is executed
     if ctx.invoked_subcommand is None:
@@ -155,6 +163,14 @@ def check(
             help="Print the errors at the end of the checks",
         ),
     ] = False,
+    full: Annotated[
+        bool,
+        typer.Option(
+            "--full",
+            "-f",
+            help="Perform a full check",
+        ),
+    ] = False,
 ) -> None:
     """Check that the connection to the different elements of the projects are working."""
     check_incompatible_opt({"jobstore": jobstore, "queue": queue, "worker": worker})
@@ -175,6 +191,7 @@ def check(
         workers_to_test = [worker]
 
     tick = "[bold green]✓[/] "
+    tick_warn = "[bold yellow]✓[/] "
     cross = "[bold red]x[/] "
     errors = []
     with loading_spinner(processing=False) as progress:
@@ -184,12 +201,18 @@ def check(
             worker_to_test = project.workers[worker_name]
             if worker_to_test.get_host().interactive_login:
                 with hide_progress(progress):
-                    err = check_worker(worker_to_test)
+                    err, worker_warn = check_worker(worker_to_test, full_check=full)
             else:
-                err = check_worker(worker_to_test)
+                err, worker_warn = check_worker(worker_to_test, full_check=full)
             header = tick
+            # At the moment the check_worker should return either an error or a
+            # warning. The code below also deals with the case where both are
+            # returned in the future.
+            if worker_warn:
+                errors.append((f"Worker {worker_name} warning ", worker_warn))
+                header = tick_warn
             if err:
-                errors.append((f"Worker {worker_name}", err))
+                errors.append((f"Worker {worker_name} ", err))
                 header = cross
             progress.print(Text.from_markup(header + f"Worker {worker_name}"))
 
@@ -266,6 +289,9 @@ app_project.add_typer(app_exec_config)
 def list_exec_config(
     verbosity: verbosity_opt = 0,
 ) -> None:
+    """
+    The list of defined Execution configurations
+    """
     cm = get_config_manager()
     project = cm.get_project()
     table = get_exec_config_table(project.exec_config, verbosity)
@@ -289,6 +315,9 @@ app_project.add_typer(app_worker)
 def list_worker(
     verbosity: verbosity_opt = 0,
 ) -> None:
+    """
+    The list of defined workers
+    """
     cm = get_config_manager()
     project = cm.get_project()
     table = get_worker_table(project.workers, verbosity)

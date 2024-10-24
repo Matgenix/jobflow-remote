@@ -6,20 +6,27 @@ import time
 from typing import TYPE_CHECKING
 
 from monty.json import jsanitize
+from rich.markdown import Markdown
+from rich.panel import Panel
 from rich.scope import render_scope
 from rich.table import Table
 from rich.text import Text
 
 from jobflow_remote.cli.utils import ReprStr, fmt_datetime
-from jobflow_remote.jobs.state import JobState
+from jobflow_remote.jobs.state import FlowState, JobState
+from jobflow_remote.remote.data import get_job_path
 from jobflow_remote.utils.data import convert_utc_time
 
 if TYPE_CHECKING:
+    from rich.console import RenderableType
+
     from jobflow_remote.config.base import ExecutionConfig, WorkerBase
     from jobflow_remote.jobs.data import FlowInfo, JobDoc, JobInfo
+    from jobflow_remote.jobs.report import FlowsReport, JobsReport
+    from jobflow_remote.jobs.upgrade import UpgradeAction
 
 
-def get_job_info_table(jobs_info: list[JobInfo], verbosity: int):
+def get_job_info_table(jobs_info: list[JobInfo], verbosity: int) -> Table:
     time_zone_str = f" [{time.tzname[0]}]"
 
     table = Table(title="Jobs info")
@@ -96,7 +103,7 @@ def get_job_info_table(jobs_info: list[JobInfo], verbosity: int):
     return table
 
 
-def get_flow_info_table(flows_info: list[FlowInfo], verbosity: int):
+def get_flow_info_table(flows_info: list[FlowInfo], verbosity: int) -> Table:
     time_zone_str = f" [{time.tzname[0]}]"
 
     table = Table(title="Flows info")
@@ -136,6 +143,33 @@ def get_flow_info_table(flows_info: list[FlowInfo], verbosity: int):
     return table
 
 
+JOB_INFO_ORDER = [
+    "db_id",
+    "uuid",
+    "index",
+    "name",
+    "state",
+    "error",
+    "remote",
+    "previous_state",
+    "job",
+    "created_on",
+    "updated_on",
+    "start_time",
+    "end_time",
+    "metadata",
+    "run_dir",
+    "parents",
+    "priority",
+    "worker",
+    "resources",
+    "exec_config",
+    "lock_id",
+    "lock_time",
+    "stored_data",
+]
+
+
 def format_job_info(
     job_info: JobInfo | JobDoc, verbosity: int, show_none: bool = False
 ):
@@ -162,10 +196,17 @@ def format_job_info(
     if remote_error:
         d["remote"]["error"] = ReprStr(remote_error)
 
-    return render_scope(d)
+    # reorder the keys
+    # Do not check here that all the keys in JobInfo are in JOB_INFO_ORDER. Check in the tests
+    sorted_d = {}
+    for k in JOB_INFO_ORDER:
+        if k in d:
+            sorted_d[k] = d[k]
+
+    return render_scope(sorted_d, sort_keys=False)
 
 
-def format_flow_info(flow_info: FlowInfo):
+def format_flow_info(flow_info: FlowInfo) -> Table:
     title = f"Flow: {flow_info.name} - {flow_info.flow_id} - {flow_info.state.name}"
     table = Table(title=title)
     table.title_style = "bold"
@@ -191,7 +232,9 @@ def format_flow_info(flow_info: FlowInfo):
     return table
 
 
-def get_exec_config_table(exec_config: dict[str, ExecutionConfig], verbosity: int = 0):
+def get_exec_config_table(
+    exec_config: dict[str, ExecutionConfig], verbosity: int = 0
+) -> Table:
     table = Table(title="Execution config", show_lines=verbosity > 0)
     table.add_column("Name")
     if verbosity > 0:
@@ -230,7 +273,7 @@ def get_exec_config_table(exec_config: dict[str, ExecutionConfig], verbosity: in
     return table
 
 
-def get_worker_table(workers: dict[str, WorkerBase], verbosity: int = 0):
+def get_worker_table(workers: dict[str, WorkerBase], verbosity: int = 0) -> Table:
     table = Table(title="Workers", show_lines=verbosity > 1)
     table.add_column("Name")
     if verbosity > 0:
@@ -253,5 +296,237 @@ def get_worker_table(workers: dict[str, WorkerBase], verbosity: int = 0):
             row.append(render_scope(d))
 
         table.add_row(*row)
+
+    return table
+
+
+def create_bar(count, max_count, size=30, color="white"):
+    """Creates a text-based bar for a histogram with fixed color per state."""
+    bar_filled = "█" * int(size * count / max_count)
+    bar_empty = " " * (size - len(bar_filled))
+    return f"[{color}]{bar_filled}[white]{bar_empty}"
+
+
+def get_job_report_components(report: JobsReport) -> list[RenderableType]:
+    components = []
+
+    # Summary of Key Metrics
+    summary_table = Table(title="Job Summary", title_style="bold green")
+    summary_table.add_column("Metric", style="cyan", justify="right")
+    summary_table.add_column("Count", style="green", justify="center")
+
+    summary_table.add_row("Completed Jobs", str(report.completed))
+    summary_table.add_row("Running Jobs", str(report.running))
+    summary_table.add_row("Error Jobs", str(report.error))
+    summary_table.add_row("Active Jobs", str(report.active))
+
+    components.append(summary_table)
+
+    # Job State Distribution
+    components.append(
+        Panel("[bold green]Job State Distribution[/bold green]", expand=False)
+    )
+
+    # Remove COMPLETED, as this will likely account for most of the jobs present in the DB
+    state_counts = dict(report.state_counts)
+    state_counts.pop(JobState.COMPLETED)
+
+    # Find the max count to normalize the histograms
+    max_count = max(*state_counts.values(), 1)
+
+    total_count = sum(state_counts.values()) or 1
+
+    # Display job states in a histogram
+    state_colors = {
+        JobState.WAITING: "grey39",
+        JobState.READY: "cyan",
+        JobState.CHECKED_OUT: "bright_cyan",
+        JobState.UPLOADED: "deep_sky_blue1",
+        JobState.SUBMITTED: "blue",
+        JobState.RUNNING: "green",
+        JobState.TERMINATED: "red",
+        JobState.DOWNLOADED: "blue_violet",
+        JobState.REMOTE_ERROR: "yellow",
+        JobState.COMPLETED: "green",
+        JobState.FAILED: "red",
+        JobState.PAUSED: "magenta",
+        JobState.STOPPED: "dark_orange",
+        JobState.USER_STOPPED: "orange4",
+        JobState.BATCH_SUBMITTED: "light_slate_blue",
+        JobState.BATCH_RUNNING: "chartreuse3",
+    }
+
+    newline = ""
+    for state, color in state_colors.items():
+        if state not in state_counts:
+            continue
+        count = state_counts[state]
+        percentage = round((count / total_count) * 100)
+        bar = create_bar(count, max_count, color=color)
+        components.extend(
+            [f"{newline}{state.name:15} [{count:>3}] ({percentage:>3}%):", bar]
+        )
+        newline = "\n"
+
+    # Longest Running Jobs
+    if report.longest_running:
+        longest_running_table = get_job_info_table(report.longest_running, verbosity=1)
+        longest_running_table.title = "Longest running jobs"
+        longest_running_table.title_style = "bold green"
+        components.append(longest_running_table)
+
+    # Worker Utilization
+    if report.worker_utilization:
+        worker_table = Table(title="Worker Jobs Distribution", title_style="bold green")
+        worker_table.add_column("Worker", style="cyan", justify="center")
+        worker_table.add_column("Job Count", style="green", justify="center")
+
+        for worker, count in report.worker_utilization.items():
+            worker_table.add_row(worker, str(count))
+
+        components.append(worker_table)
+
+    # Job Trends
+    if report.trends:
+        trends = report.trends
+        trends_table = Table(
+            title=f"Job Trends ({trends.num_intervals} {trends.interval}) [{trends.timezone}]",
+            title_style="bold green",
+        )
+        trends_table.add_column("Date", justify="center", style="cyan", no_wrap=True)
+        trends_table.add_column("Completed", justify="center", style="green")
+        trends_table.add_column("Failed", justify="center", style="red")
+        trends_table.add_column("Remote Error", justify="center", style="yellow")
+
+        for i in range(trends.num_intervals):
+            trends_table.add_row(
+                trends.dates[i],
+                f"{trends.completed[i]}",
+                f"{trends.failed[i]}",
+                f"{trends.remote_error[i]}",
+            )
+
+        components.append(trends_table)
+
+    return components
+
+
+def get_flow_report_components(report: FlowsReport) -> list[RenderableType]:
+    components = []
+
+    # Summary of Key Metrics
+    summary_table = Table(title="Flow Summary", title_style="bold green")
+    summary_table.add_column("Metric", style="cyan", justify="right")
+    summary_table.add_column("Count", style="green", justify="center")
+
+    summary_table.add_row("Completed Flows", str(report.completed))
+    summary_table.add_row("Running Flows", str(report.running))
+    summary_table.add_row("Error Flows", str(report.error))
+
+    components.append(summary_table)
+
+    # Job State Distribution
+    components.append(
+        Panel("[bold green]Flow State Distribution[/bold green]", expand=False)
+    )
+
+    # Remove COMPLETED, as this will likely account for most of the jobs present in the DB
+    state_counts = dict(report.state_counts)
+    state_counts.pop(FlowState.COMPLETED)
+
+    # Find the max count to normalize the histograms
+    max_count = max(*state_counts.values(), 1)
+
+    total_count = sum(state_counts.values()) or 1
+
+    # Display job states in a histogram
+    state_colors = {
+        FlowState.WAITING: "grey39",
+        FlowState.READY: "cyan",
+        FlowState.RUNNING: "green",
+        FlowState.COMPLETED: "green",
+        FlowState.FAILED: "red",
+        FlowState.PAUSED: "magenta",
+        FlowState.STOPPED: "dark_orange",
+    }
+
+    newline = ""
+    for state, color in state_colors.items():
+        if state not in state_counts:
+            continue
+        count = state_counts[state]
+        percentage = round((count / total_count) * 100)
+        bar = create_bar(count, max_count, color=color)
+        components.extend(
+            [f"{newline}{state.name:15} [{count:>3}] ({percentage:>3}%):", bar]
+        )
+        newline = "\n"
+
+    # Job Trends
+    if report.trends:
+        trends = report.trends
+        trends_table = Table(
+            title=f"Flow Trends ({trends.num_intervals} {trends.interval}) [{trends.timezone}]",
+            title_style="bold green",
+        )
+        trends_table.add_column("Date", justify="center", style="cyan", no_wrap=True)
+        trends_table.add_column("Completed", justify="center", style="green")
+        trends_table.add_column("Failed", justify="center", style="red")
+
+        for i in range(trends.num_intervals):
+            trends_table.add_row(
+                trends.dates[i],
+                f"{trends.completed[i]}",
+                f"{trends.failed[i]}",
+            )
+
+        components.append(trends_table)
+
+    return components
+
+
+def format_upgrade_actions(actions: list[UpgradeAction]):
+    msg = ""
+    for action in actions:
+        msg += f"* {action.description}\n"
+
+    return Markdown(msg)
+
+
+def get_batch_processes_table(
+    batch_processes: dict,
+    workers: dict[str, WorkerBase],
+    running_jobs: dict[str, list[tuple[str, int, str]]],
+    verbosity: int = 0,
+):
+    table = Table(title="Flows info")
+    table.add_column("Process ID")
+    table.add_column("Process UUID")
+    table.add_column("Worker")
+    table.add_column("Process folder")
+    if verbosity > 0:
+        table.add_column("Running Job ids (Index)")
+
+    for worker_name, processes_data in batch_processes.items():
+        worker = workers[worker_name]
+        for process_id, process_uuid in processes_data.items():
+            row = [
+                process_id,
+                process_uuid,
+                worker_name,
+                get_job_path(process_uuid, None, worker.batch.work_dir),
+            ]
+
+            if verbosity > 0:
+                jobs_data = running_jobs.get(worker_name, [])
+                process_jobs = [
+                    f"{job_data[0]} ({job_data[1]})"
+                    for job_data in jobs_data
+                    if job_data[2] == process_uuid
+                ]
+
+                row.append("\n".join(process_jobs))
+
+            table.add_row(*row)
 
     return table

@@ -122,8 +122,8 @@ class BatchConfig(BaseModel):
         description="Absolute path to a folder where the batch jobs will be executed. This refers to the jobs submitted"
         "to the queue. Jobflow's Job will still be executed in the standard folders."
     )
-    max_jobs: Optional[int] = Field(
-        None, description="Maximum number of jobs executed in a single run in the queue"
+    max_jobs_per_batch: Optional[int] = Field(
+        None, description="Maximum number of jobs executed in a single batch process"
     )
     max_wait: Optional[int] = Field(
         60,
@@ -131,7 +131,10 @@ class BatchConfig(BaseModel):
     )
     max_time: Optional[int] = Field(
         None,
-        description="Maximum time after which a job will not submit more jobs (seconds). To help avoid hitting the walltime",
+        description="Maximum time after which a job will not start more jobs (seconds). To help avoid hitting the walltime",
+    )
+    parallel_jobs: Optional[int] = Field(
+        None, description="Number of jobs executed in parallel in the same process"
     )
     model_config = ConfigDict(extra="forbid")
 
@@ -182,6 +185,11 @@ class WorkerBase(BaseModel):
         description="If defined, the list of jobs running on the worker will be fetched based on the"
         "username instead that from the list of job ids. May be necessary for some "
         "scheduler_type (e.g. SGE)",
+    )
+    sanitize_command: bool = Field(
+        default=False,
+        description="Sanitize the output of commands in case of failures due to spurious text produced"
+        "by the worker shell.",
     )
     model_config = ConfigDict(extra="forbid")
 
@@ -252,7 +260,9 @@ class LocalWorker(WorkerBase):
         -------
         The LocalHost.
         """
-        return LocalHost(timeout_execute=self.timeout_execute)
+        return LocalHost(
+            timeout_execute=self.timeout_execute, sanitize=self.sanitize_command
+        )
 
     @property
     def cli_info(self) -> dict:
@@ -402,6 +412,7 @@ class RemoteWorker(WorkerBase):
             shell_cmd=self.shell_cmd,
             login_shell=self.login_shell,
             interactive_login=self.interactive_login,
+            sanitize=self.sanitize_command,
         )
 
     @property

@@ -16,7 +16,9 @@ from click import ClickException
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.prompt import Confirm
-from rich.text import Text
+from rich.text import Text, TextType
+from rich.tree import Tree
+from typer.core import TyperCommand, TyperGroup
 
 from jobflow_remote import ConfigManager, JobController
 from jobflow_remote.config.base import ProjectUndefinedError
@@ -121,6 +123,14 @@ class IndexDirection(str, Enum):
         }[self]
 
 
+class ReportInterval(str, Enum):
+    HOURS = "hours"
+    DAYS = "days"
+    WEEKS = "weeks"
+    MONTHS = "months"
+    YEARS = "years"
+
+
 class ReprStr(str):
     r"""
     Helper class that overrides the standard __repr__ to return the string itself
@@ -135,19 +145,19 @@ class ReprStr(str):
         return self
 
 
-def exit_with_error_msg(message: str, code: int = 1, **kwargs) -> NoReturn:
+def exit_with_error_msg(message: TextType, code: int = 1, **kwargs) -> NoReturn:
     kwargs.setdefault("style", "red")
     err_console.print(message, **kwargs)
     raise typer.Exit(code)
 
 
-def exit_with_warning_msg(message: str, code: int = 0, **kwargs) -> NoReturn:
+def exit_with_warning_msg(message: TextType, code: int = 0, **kwargs) -> NoReturn:
     kwargs.setdefault("style", "gold1")
     err_console.print(message, **kwargs)
     raise typer.Exit(code)
 
 
-def print_success_msg(message: str = "operation completed", **kwargs) -> None:
+def print_success_msg(message: TextType = "operation completed", **kwargs) -> None:
     kwargs.setdefault("style", "green")
     out_console.print(message, **kwargs)
 
@@ -474,11 +484,21 @@ def check_stopped_runner(error: bool = True) -> None:
         exit_with_error_msg(
             f"Error while checking the status of the daemon: {getattr(e, 'message', str(e))}"
         )
-    if current_status not in (DaemonStatus.STOPPED, DaemonStatus.SHUT_DOWN):
+
+    # the current status is only local. Also check that the DB does not contain
+    # a running_runner document that does not match the current machine.
+    runner_stopped = False
+    if current_status in (DaemonStatus.STOPPED, DaemonStatus.SHUT_DOWN):
+        matching_error = dm.check_matching_runner(allow_missing=True)
+        if matching_error:
+            logger.warning(matching_error)
+        else:
+            runner_stopped = True
+    if not runner_stopped:
         if error:
             exit_with_error_msg(
                 f"The status of the daemon is {current_status.value}. "
-                "The daemon should not be running while resetting the database"
+                "The daemon should not be running while performing this operation"
             )
         else:
             text = Text.from_markup(
@@ -489,3 +509,146 @@ def check_stopped_runner(error: bool = True) -> None:
             confirmed = Confirm.ask(text, default=False)
             if not confirmed:
                 raise typer.Exit(0)
+
+
+def get_command_tree(
+    app: TyperGroup,
+    tree: Tree,
+    show_options: bool,
+    show_docs: bool,
+    show_hidden: bool,
+    max_depth: int | None,
+    current_depth: int = 0,
+    max_doc_lines: int | None = None,
+) -> Tree:
+    """
+    Recursively build a tree representation of the command structure.
+
+    Parameters
+    ----------
+    app
+        The Typer app or command group to process.
+    tree
+        The Rich Tree object to add nodes to.
+    show_options
+        Whether to display command options.
+    show_docs
+        Whether to display command and option documentation.
+    show_hidden
+        Whether to display hidden commands.
+    max_depth
+        Maximum depth of the tree to display.
+    current_depth
+        Current depth in the tree (used for recursion).
+    max_doc_lines
+        If show_docs is True, the maximum number of lines showed from the
+        documentation of each command/option.
+
+    Returns
+    -------
+    Tree
+        The populated Rich Tree object.
+    """
+    if max_depth is not None and current_depth >= max_depth:
+        return tree
+
+    for command_name, command in sorted(app.commands.items()):
+        if not show_hidden and getattr(command, "hidden", False):
+            continue
+
+        command_str = f"[bold green]{command_name}[/bold green]"
+        if (
+            show_docs
+            and isinstance(command, (TyperCommand, TyperGroup))
+            and command.help
+        ):
+            command_str += f": {command.help}"
+            if max_doc_lines:
+                lines = command_str.splitlines()
+                command_str = "\n".join(lines[:max_doc_lines])
+                if len(lines) > max_doc_lines:
+                    command_str += " ..."
+        branch = tree.add(command_str)
+
+        if isinstance(command, TyperGroup):
+            get_command_tree(
+                command,
+                branch,
+                show_options,
+                show_docs,
+                show_hidden,
+                max_depth,
+                current_depth + 1,
+                max_doc_lines,
+            )
+        elif show_options:
+            for param in command.params:
+                param_str = f"[blue]{param.name}[/blue]"
+                if param.default is not None:
+                    default_value = param.default if param.default != "" else '""'
+                    param_str += f" (default: {default_value})"
+                if param.required:
+                    param_str += " [red](required)[/red]"
+                if show_docs and param.help:
+                    param_str += f": {param.help}"
+                if max_doc_lines:
+                    lines = param_str.splitlines()
+                    param_str = "\n".join(lines[:max_doc_lines])
+                    if len(lines) > max_doc_lines:
+                        param_str += " ..."
+                branch.add(param_str)
+    return tree
+
+
+def tree_callback(
+    ctx: typer.Context,
+    value: bool,
+):
+    if value:
+        main_app = ctx.command
+        tree_title = f"[bold red]{ctx.command.name}[/bold red]"
+
+        tree = Tree(tree_title)
+        command_tree = get_command_tree(
+            main_app,
+            tree,
+            show_options=False,
+            show_docs=True,
+            show_hidden=False,
+            max_depth=None,
+            max_doc_lines=1,
+        )
+
+        out_console.print(command_tree)
+        raise typer.Exit(0)
+
+
+def confirm_project_name(style: str | None = "red", exit_on_error: bool = True) -> bool:
+    """
+    Ask the user to insert the name of the current project to confirm that a specific operation
+    should be performed.
+
+    Parameters
+    ----------
+    style
+        The style to use for the message. If None, no style is used.
+    exit_on_error
+        If True, exit the program with an error message if the user does not insert the correct
+        project name. Otherwise, return False.
+
+    Returns
+    -------
+    bool
+        True if the user inserted the correct project name, False otherwise.
+    """
+    cm = get_config_manager()
+    project = cm.get_project()
+    msg = f"Insert the name of the project ({project.name}) to confirm that you want to proceed "
+    if style:
+        msg = f"[{style}]{msg}[/]"
+    user_project_name = out_console.input(msg)
+    if user_project_name.strip() != project.name:
+        if exit_on_error:
+            exit_with_error_msg("The input does not match the current project name")
+        return False
+    return True

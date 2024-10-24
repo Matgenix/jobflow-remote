@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import importlib.metadata
+import json
 import logging
 import traceback
 from typing import TYPE_CHECKING
@@ -150,32 +152,43 @@ def _check_workdir(worker: WorkerBase, host: BaseHost) -> str | None:
         host.execute(f"rm {str(canary_file)!r}")
 
 
-def check_worker(worker: WorkerBase) -> str | None:
+def check_worker(
+    worker: WorkerBase, full_check: bool = False
+) -> tuple[str | None, str | None]:
     """Check that a connection to the configured worker can be made."""
     host = worker.get_host()
+    worker_warn = None
     try:
         host.connect()
         host_error = host.test()
         if host_error:
-            return host_error
+            return host_error, None
 
         from jobflow_remote.remote.queue import QueueManager
 
         qm = QueueManager(scheduler_io=worker.get_scheduler_io(), host=host)
         qm.get_jobs_list()
 
-        _check_workdir(worker=worker, host=host)
+        workdir_err = _check_workdir(worker=worker, host=host)
+        if workdir_err:
+            return workdir_err, None
+
+        # don't perform the environment check, as they will be equivalent
+        if worker.type != "local":
+            worker_warn = _check_environment(
+                worker=worker, host=host, full_check=full_check
+            )
 
     except Exception:
         exc = traceback.format_exc()
-        return f"Error while testing worker:\n {exc}"
+        return f"Error while testing worker:\n {exc}", worker_warn
     finally:
         try:
             host.close()
         except Exception:
             logger.warning(f"error while closing connection to host {host}")
 
-    return None
+    return None, worker_warn
 
 
 def _check_store(store: Store) -> str | None:
@@ -206,3 +219,64 @@ def check_jobstore(jobstore: JobStore) -> str | None:
         if err:
             return f"Error while checking additional store {store_name}:\n{err}"
     return None
+
+
+def _check_environment(
+    worker: WorkerBase, host: BaseHost, full_check: bool = False
+) -> str | None:
+    """Check that the worker has a python environment with the same versions of libraries.
+
+    Parameters
+    ----------
+        host: A connected host.
+        full_check: Whether to check the entire environment and not just jobflow and jobflow-remote.
+
+    Returns
+    -------
+    str | None
+        A message describing the environment mismatches. None if no mismatch is found.
+    """
+    installed_packages = importlib.metadata.distributions()
+    local_package_versions = {
+        package.metadata["Name"]: package.version for package in installed_packages
+    }
+    cmd = "pip list --format=json"
+    if worker.pre_run:
+        cmd = "; ".join(worker.pre_run.strip().splitlines()) + "; " + cmd
+
+    stdout, stderr, errcode = host.execute(cmd)
+    if errcode != 0:
+        return f"Error while checking the compatibility of the environments: {stderr}"
+    host_package_versions = {
+        package_dict["name"]: package_dict["version"]
+        for package_dict in json.loads(stdout)
+    }
+    if full_check:
+        packages_to_check = list(local_package_versions.keys())
+    else:
+        packages_to_check = ["jobflow", "jobflow-remote"]
+    missing = []
+    mismatch = []
+    for package in packages_to_check:
+        if package not in host_package_versions:
+            missing.append((package, local_package_versions[package]))
+            continue
+        if local_package_versions[package] != host_package_versions[package]:
+            mismatch.append(
+                (
+                    package,
+                    local_package_versions[package],
+                    host_package_versions[package],
+                )
+            )
+    msg = None
+    if mismatch or missing:
+        msg = "Note: inconsistencies may be due to the proper python environment not being correctly loaded.\n"
+    if missing:
+        missing_str = [f"{m[0]} - {m[1]}" for m in missing]
+        msg += f"Missing packages: {', '.join(missing_str)}. "
+    if mismatch:
+        mismatch_str = [f"{m[0]} - {m[1]} vs {m[2]}" for m in mismatch]
+        msg += f"Mismatching versions: {', '.join(mismatch_str)}"
+
+    return msg

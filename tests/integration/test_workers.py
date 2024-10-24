@@ -47,12 +47,20 @@ def test_project_check(job_controller, capsys) -> None:
 
     expected = [
         "✓ Worker test_local_worker",
+        "✓ Worker test_sanitize_local_worker",
         "✓ Worker test_remote_slurm_worker",
         "✓ Worker test_remote_sge_worker",
+        "✓ Worker test_remote_limited_worker",
+        "✓ Worker test_batch_remote_worker",
+        "✓ Worker test_max_jobs_worker",
+        "✓ Worker test_sanitize_remote_worker",
         "✓ Jobstore",
         "✓ Queue store",
     ]
-    run_check_cli(["project", "check", "--errors"], required_out=expected)
+    # Here there will be "errors" reported as there likely be a mismatch of the
+    # jobflow-remote version between the local environment and the one in the
+    # container
+    run_check_cli(["project", "check", "-e"], required_out=expected)
 
 
 @pytest.mark.parametrize(
@@ -413,3 +421,26 @@ def test_priority(worker, job_controller) -> None:
     jobs_info = sorted(jobs_info, key=lambda x: x.priority, reverse=True)
     for i in range(len(jobs_info) - 1):
         assert jobs_info[i].end_time < jobs_info[i + 1].start_time
+
+
+@pytest.mark.parametrize(
+    "worker",
+    ["test_sanitize_local_worker", "test_sanitize_remote_worker"],
+)
+def test_sanitize(worker, job_controller):
+    from jobflow import Flow
+
+    from jobflow_remote import submit_flow
+    from jobflow_remote.jobs.runner import Runner
+    from jobflow_remote.jobs.state import JobState
+    from jobflow_remote.testing import add
+
+    assert job_controller.project.workers[worker].get_host().sanitize is True
+
+    flow = Flow([add(1, 2)])
+    submit_flow(flow, worker=worker)
+
+    runner = Runner()
+    runner.run_one_job()
+
+    assert job_controller.count_jobs(states=JobState.COMPLETED) == 1

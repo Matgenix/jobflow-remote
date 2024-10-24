@@ -2,27 +2,39 @@ import os
 from typing import Annotated
 
 import typer
+from rich.prompt import Confirm
 from rich.table import Table
 from rich.text import Text
 
 from jobflow_remote.cli.jf import app
 from jobflow_remote.cli.jfr_typer import JFRTyper
-from jobflow_remote.cli.types import log_level_opt
+from jobflow_remote.cli.types import break_lock_opt, force_opt, log_level_opt
 from jobflow_remote.cli.utils import (
     exit_with_error_msg,
     exit_with_warning_msg,
     get_config_manager,
+    get_job_controller,
     loading_spinner,
     out_console,
 )
 from jobflow_remote.config.base import LogLevel
-from jobflow_remote.jobs.daemon import DaemonError, DaemonManager, DaemonStatus
+from jobflow_remote.jobs.daemon import (
+    DaemonError,
+    DaemonManager,
+    DaemonStatus,
+    RunningDaemonError,
+)
 from jobflow_remote.jobs.runner import Runner
 
 app_runner = JFRTyper(
     name="runner", help="Commands for handling the Runner", no_args_is_help=True
 )
 app.add_typer(app_runner)
+
+
+_running_daemon_error_msg = (
+    "\nIf no runner is active on that machine clean the DB with `jf runner reset`"
+)
 
 
 @app_runner.command()
@@ -152,6 +164,10 @@ def start(
                 raise_on_error=True,
                 connect_interactive=connect_interactive,
             )
+        except RunningDaemonError as e:
+            exit_with_error_msg(
+                f"Error while starting the daemon: {getattr(e, 'message', e)}{_running_daemon_error_msg}"
+            )
         except DaemonError as e:
             exit_with_error_msg(
                 f"Error while starting the daemon: {getattr(e, 'message', e)}"
@@ -192,6 +208,10 @@ def stop(
         progress.add_task(description="Stopping the daemon...", total=None)
         try:
             dm.stop(wait=wait, raise_on_error=True)
+        except RunningDaemonError as e:
+            exit_with_error_msg(
+                f"Error while stopping the daemon: {getattr(e, 'message', e)}{_running_daemon_error_msg}"
+            )
         except DaemonError as e:
             exit_with_error_msg(
                 f"Error while stopping the daemon: {getattr(e, 'message', e)}"
@@ -217,6 +237,10 @@ def kill() -> None:
         progress.add_task(description="Killing the daemon...", total=None)
         try:
             dm.kill(raise_on_error=True)
+        except RunningDaemonError as e:
+            exit_with_error_msg(
+                f"Error while killing the daemon: {getattr(e, 'message', e)}{_running_daemon_error_msg}"
+            )
         except DaemonError as e:
             exit_with_error_msg(
                 f"Error while killing the daemon: {getattr(e, 'message', e)}"
@@ -235,6 +259,10 @@ def shutdown() -> None:
         progress.add_task(description="Shutting down supervisor...", total=None)
         try:
             dm.shut_down(raise_on_error=True)
+        except RunningDaemonError as e:
+            exit_with_error_msg(
+                f"Error while shutting down supervisor: {getattr(e, 'message', e)}{_running_daemon_error_msg}"
+            )
         except DaemonError as e:
             exit_with_error_msg(
                 f"Error while shutting down supervisor: {getattr(e, 'message', e)}"
@@ -322,3 +350,43 @@ def foreground() -> None:
     if not procs_info_dict:
         exit_with_warning_msg("Daemon is not running")
     dm.foreground_processes(print_function=out_console.print)
+
+
+@app_runner.command()
+def reset(
+    force: force_opt = False,
+    break_lock: break_lock_opt = False,
+) -> None:
+    """
+    Reset the value of the machine executing the runner from the database.
+    Should be executed only if it is certain that the runner is not active on that
+    machine anymore.
+    """
+    jc = get_job_controller()
+
+    running_runner = jc.get_running_runner()
+    if running_runner in ("NO_DOCUMENT", None):
+        exit_with_warning_msg("No running runner present in the database")
+        raise typer.Exit(0)
+    if not force:
+        text = Text.from_markup(
+            "[red]This operation will remove the information about the current "
+            "running runner from the database:[/red]\n"
+            f"- hostname: {running_runner['hostname']}\n"
+            f"- project_name: {running_runner['project_name']}\n"
+            f"- start_time: {running_runner['start_time']}\n"
+            f"- last_pinged: {running_runner['last_pinged']}\n"
+            f"- daemon_dir: {running_runner['daemon_dir']}\n"
+            f"- user: {running_runner['user']}\n"
+            "[red]Do you want to proceed?[\red]"
+        )
+
+        confirmed = Confirm.ask(text, default=False)
+        if not confirmed:
+            raise typer.Exit(0)
+
+    with loading_spinner(processing=False) as progress:
+        progress.add_task(description="Resetting runner information...", total=None)
+        jc.clean_running_runner(break_lock=break_lock)
+
+    out_console.print("The running runner document was reset")

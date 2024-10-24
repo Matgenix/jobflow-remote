@@ -2,23 +2,29 @@ from __future__ import annotations
 
 import contextlib
 import fnmatch
+import importlib.metadata
 import logging
 import traceback
 import warnings
 from collections import defaultdict
 from contextlib import ExitStack
 from datetime import datetime, timedelta, timezone
+from functools import cached_property
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, cast
 
 import jobflow
 import pymongo
+from dateutil.tz import gettz
 from jobflow import JobStore, OnMissing
 from monty.dev import deprecated
 from monty.json import MontyDecoder
 from monty.serialization import loadfn
+from packaging.version import Version
+from packaging.version import parse as parse_version
 from qtoolkit.core.data_objects import CancelStatus, QResources
 
+import jobflow_remote
 from jobflow_remote.config.base import ConfigError, ExecutionConfig, Project
 from jobflow_remote.config.manager import ConfigManager
 from jobflow_remote.jobs.data import (
@@ -46,10 +52,16 @@ from jobflow_remote.jobs.state import (
 )
 from jobflow_remote.remote.data import get_remote_store, update_store
 from jobflow_remote.remote.queue import QueueManager
-from jobflow_remote.utils.data import deep_merge_dict
+from jobflow_remote.utils.data import (
+    deep_merge_dict,
+    get_past_time_rounded,
+    get_utc_offset,
+)
 from jobflow_remote.utils.db import (
     FlowLockedError,
     JobLockedError,
+    LockedDocumentError,
+    MissingDocumentError,
     MongoLock,
     mongodump_from_store,
     mongorestore_to_store,
@@ -58,7 +70,7 @@ from jobflow_remote.utils.db import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Generator
+    from collections.abc import Generator, Sequence
 
     from maggma.stores import MongoStore
 
@@ -2530,6 +2542,26 @@ class JobController:
         )
         return result.modified_count
 
+    def unlock_runner(self) -> tuple[int, int]:
+        """
+        Forcibly remove the lock on a locked Runner document.
+        This should be used only if a lock is a leftover of a process that is not
+        running anymore. Should also be done only when no daemon is running.
+        Doing otherwise may result in inconsistencies.
+
+        Returns
+        -------
+        tuple
+            Number of runner documents and modified runner documents.
+        """
+        query = {"running_runner": {"$exists": True}}
+
+        result = self.auxiliary.update_many(
+            filter=query,
+            update={"$set": {"lock_id": None, "lock_time": None}},
+        )
+        return result.matched_count, result.modified_count
+
     def reset(
         self,
         reset_output: bool = False,
@@ -2541,6 +2573,10 @@ class JobController:
         Optionally deletes the content of the JobStore with the outputs.
         In this case all the data contained in the JobStore will be removed,
         not just those associated to the data in the queue.
+
+        Notes
+        -----
+        This method will not check whether there is a daemon running.
 
         Parameters
         ----------
@@ -2580,7 +2616,10 @@ class JobController:
         self.flows.drop()
         self.auxiliary.drop()
         self.auxiliary.insert_one({"next_id": 1})
+        self.auxiliary.insert_one({"running_runner": None})
+        self.update_version_information()
         self.build_indexes(drop=True)
+
         return True
 
     def build_indexes(
@@ -2882,6 +2921,159 @@ class JobController:
                 name=name,
             )
         return self.flows.count_documents(query)
+
+    def count_jobs_states(self, states: list[JobState]) -> dict[JobState, int]:
+        """
+        Count the number of jobs in each of the given states.
+
+        Parameters
+        ----------
+        states
+            List of JobState to count.
+
+        Returns
+        -------
+        dict[JobState, int]
+            A dictionary with the count of jobs in each state.
+        """
+        pipeline = [
+            {"$match": {"state": {"$in": [s.value for s in states]}}},
+            {"$group": {"_id": "$state", "count": {"$sum": 1}}},
+        ]
+        result = self.jobs.aggregate(pipeline) or []
+        out = {}
+        for r in result:
+            out[JobState(r["_id"])] = r["count"]
+
+        for state in states:
+            out[state] = out.get(state, 0)
+
+        return out
+
+    def count_flows_states(self, states: list[FlowState]) -> dict[FlowState, int]:
+        """
+        Count the number of flows in each of the given states.
+
+        Parameters
+        ----------
+        states
+            List of FlowState to count.
+
+        Returns
+        -------
+        dict[FlowState, int]
+            A dictionary with the count of flows in each state.
+        """
+        pipeline = [
+            {"$match": {"state": {"$in": [s.value for s in states]}}},
+            {"$group": {"_id": "$state", "count": {"$sum": 1}}},
+        ]
+        result = self.flows.aggregate(pipeline) or []
+        out = {}
+        for r in result:
+            out[FlowState(r["_id"])] = r["count"]
+
+        for state in states:
+            out[state] = out.get(state, 0)
+
+        return out
+
+    def get_trends(
+        self,
+        states: Sequence[JobState | FlowState],
+        interval: str = "days",
+        num_intervals: int | None = None,
+        interval_timezone: str = "UTC",
+    ) -> dict[str, dict[JobState | FlowState, int]]:
+        """
+        Generates a pipeline to retrieve trends of job states over time for the given interval.
+
+        Parameters
+        ----------
+        states
+            A list of JobStates or FlowStates to be considered in the trend.
+        interval
+            One of 'hours', 'days', 'weeks', 'months', or 'years' to define the grouping period.
+        num_intervals
+            The number of intervals to consider. If not provided, it will be set to a default
+            value based on the interval.
+        interval_timezone
+            The timezone to use for the date aggregation.
+
+        Returns
+        -------
+        dict[str, dict[JobState | FlowState, int]]
+            A dictionary with the date in the local timezone as key, and another dictionary as value.
+            The inner dictionary contains the state as key and the number of jobs in that state as value.
+        """
+
+        tz = gettz(interval_timezone)
+        utc_now = datetime.now(timezone.utc)
+        tznow = utc_now.astimezone(tz)
+        num_intervals = (
+            num_intervals
+            or {"hours": 12, "days": 7, "weeks": 4, "months": 12, "years": 3}[interval]
+        )
+
+        # Map the interval to a MongoDB date format
+        date_format = {
+            "hours": "%Y-%m-%d %H",
+            "days": "%Y-%m-%d",
+            "weeks": "%Y-%U",  # Week number of the year
+            "months": "%Y-%m",
+            "years": "%Y",
+        }[interval]
+
+        start = get_past_time_rounded(
+            interval=interval, num_intervals=num_intervals, reference=tznow
+        )
+        start.replace(tzinfo=tz)
+        start_utc = start.astimezone(timezone.utc)
+
+        date_to_string = {"format": date_format, "date": "$updated_on"}
+        if interval_timezone != "UTC":
+            date_to_string["timezone"] = get_utc_offset(interval_timezone)
+        pipeline = [
+            {"$match": {"updated_on": {"$gte": start_utc}}},
+            {
+                "$group": {
+                    "_id": {"$dateToString": date_to_string},
+                    **{
+                        state.value.lower(): {
+                            "$sum": {"$cond": [{"$eq": ["$state", state.value]}, 1, 0]}
+                        }
+                        for state in states
+                    },
+                }
+            },
+            {"$sort": {"_id": 1}},
+        ]
+
+        if isinstance(states[0], JobState):
+            collection = self.jobs
+            state_cls: type = JobState
+        elif isinstance(states[0], FlowState):
+            collection = self.flows
+            state_cls = FlowState
+        else:
+            raise TypeError(f"Wrong type of state passed: {states}")
+
+        results = list(collection.aggregate(pipeline))
+
+        result_dict = {}
+        for r in results:
+            result_dict[r["_id"]] = {
+                state_cls(s.upper()): n for s, n in r.items() if s != "_id"
+            }
+
+        for i in range(1, num_intervals + 1):
+            expected_date = get_past_time_rounded(
+                interval=interval, num_intervals=i, reference=tznow
+            ).strftime(date_format)
+            if expected_date not in result_dict:
+                result_dict[expected_date] = {state: 0 for state in states}
+
+        return result_dict
 
     def get_jobs_info_by_flow_uuid(
         self, flow_uuid, projection: list | dict | None = None
@@ -3498,6 +3690,28 @@ class JobController:
 
         return list(self.flows.aggregate(pipeline))
 
+    def get_running_runner(self) -> dict | str:
+        """Get the running runner information from the auxiliary collection."""
+        rr_doc = self.auxiliary.find_one({"running_runner": {"$exists": True}})
+        if rr_doc:
+            return rr_doc["running_runner"]
+        return "NO_DOCUMENT"
+
+    def clean_running_runner(self, break_lock: bool = False) -> None:
+        db_filter = {"running_runner": {"$exists": True}}
+        with self.lock_auxiliary(
+            filter=db_filter, break_lock=break_lock, get_locked_doc=True
+        ) as lock:
+            if not lock.locked_document:
+                if lock.unavailable_document:
+                    raise LockedDocumentError(
+                        "Document for the running runner in the auxiliary collection is locked"
+                    )
+                raise MissingDocumentError(
+                    "Runner document missing from auxiliary collection"
+                )
+            lock.update_on_release = {"$set": {"running_runner": None}}
+
     def update_flow_state(
         self,
         flow_uuid: str,
@@ -3789,6 +4003,26 @@ class JobController:
 
                 yield job_lock, flow_lock
 
+    @contextlib.contextmanager
+    def lock_auxiliary(self, **lock_kwargs) -> Generator[MongoLock, None, None]:
+        """
+        Lock a document in the auxiliary collection.
+
+        See MongoLock context manager for more details about the locking options.
+
+        Parameters
+        ----------
+        lock_kwargs
+            Kwargs passed to the MongoLock context manager.
+
+        Returns
+        -------
+        MongoLock
+            An instance of MongoLock.
+        """
+        with MongoLock(collection=self.auxiliary, **lock_kwargs) as lock:
+            yield lock
+
     def ping_flow_doc(self, uuid: str) -> None:
         """
         Ping a Flow document to update its "updated_on" value.
@@ -3832,7 +4066,9 @@ class JobController:
                     f"The connection to host {host} could not be closed.", exc_info=True
                 )
 
-    def get_batch_processes(self, worker: str) -> dict[str, str]:
+    def get_batch_processes(
+        self, worker: str | None = None
+    ) -> dict[str, dict[str, str]]:
         """
         Get the batch processes associated with a given worker.
 
@@ -3847,9 +4083,14 @@ class JobController:
             A dictionary with the {process_id: process_uuid} of the batch
             jobs running on the selected worker.
         """
-        result = self.auxiliary.find_one({"batch_processes": {"$exists": True}})
+        if worker:
+            query = {f"batch_processes.{worker}": {"$exists": True}}
+        else:
+            query = {"batch_processes": {"$exists": True}}
+
+        result = self.auxiliary.find_one(query)
         if result:
-            return result["batch_processes"].get(worker, {})
+            return result["batch_processes"] or {}
         return {}
 
     def add_batch_process(
@@ -3878,7 +4119,7 @@ class JobController:
         """
         return self.auxiliary.find_one_and_update(
             {"batch_processes": {"$exists": True}},
-            {"$push": {f"batch_processes.{worker}.{process_id}": process_uuid}},
+            {"$set": {f"batch_processes.{worker}.{process_id}": process_uuid}},
             upsert=True,
         )
 
@@ -4289,6 +4530,159 @@ class JobController:
                     compress=compress,
                     mongo_bin_path=mongo_bin_path,
                 )
+
+    def upgrade_check_jobflow(self):
+        """
+        Check if the jobflow version in the database matches the current one.
+        Returns an empty string if they match, an error message otherwise.
+
+        Returns
+        -------
+        str
+            An empty string if configurations match, an error message otherwise.
+        """
+        environment_doc = self.auxiliary.find_one(
+            {"jobflow_remote_version": {"$exists": True}}
+        )
+        if environment_doc is None:
+            return (
+                "No information about jobflow version in the database.\n"
+                "The database is likely from before version 0.1.5 of jobflow-remote.\n"
+            )
+
+        previous_jobflow_version = environment_doc["jobflow_version"]
+        current_jobflow_version = jobflow.__version__
+        if jobflow.__version__ != previous_jobflow_version:
+            return (
+                f"The previous jobflow version ({previous_jobflow_version}) "
+                f"is not the same as the current one ({current_jobflow_version}).\n"
+            )
+        return ""
+
+    def upgrade_full_check(self):
+        """
+        Check if the packages used to generate the database match the current ones.
+        Returns an empty string if they match, an error message otherwise.
+
+        Returns
+        -------
+        str
+            An empty string if configurations match, an error message otherwise.
+        """
+        environment_doc = self.auxiliary.find_one(
+            {"jobflow_remote_version": {"$exists": True}}
+        )
+        if environment_doc is None:
+            return (
+                "No information about environment (all packages versions) in the database.\n"
+                "The database is likely from before version 0.1.5 of jobflow-remote.\n"
+            )
+
+        previous_package_versions = environment_doc["full_environment"]
+        installed_packages = importlib.metadata.distributions()
+        package_versions = {
+            package.metadata["Name"]: package.version for package in installed_packages
+        }
+        missing_packages = set(previous_package_versions.keys()) - set(
+            package_versions.keys()
+        )
+        common_packages = set(previous_package_versions.keys()) & set(
+            package_versions.keys()
+        )
+        different_version_packages = [
+            (package, previous_package_versions[package], package_versions[package])
+            for package in common_packages
+            if previous_package_versions[package] != package_versions[package]
+        ]
+        if missing_packages or different_version_packages:
+            msg = "Packages differ between the previous environment and the current one.\n"
+            if missing_packages:
+                missing_str = "\n- ".join(sorted(missing_packages))
+                msg += (
+                    f"The following {len(missing_packages)} packages "
+                    f"are missing in the current environment:\n "
+                    f"{missing_str}\n"
+                )
+            if different_version_packages:
+                different_str = "\n- ".join(
+                    [
+                        f"{pkg[0]}-{pkg[2]} (previous version: {pkg[1]})"
+                        for pkg in sorted(
+                            different_version_packages, key=lambda x: x[0]
+                        )
+                    ]
+                )
+                msg += (
+                    f"The following {len(missing_packages)} packages "
+                    f"have different versions:\n "
+                    f"{different_str}\n"
+                )
+            return msg
+        return ""
+
+    def update_version_information(
+        self, jobflow_remote_version: str | Version | None = None
+    ):
+        """
+        Update the version information in the database.
+
+        This method will update the version information of jobflow-remote and jobflow,
+        as well as the versions of all packages in the environment.
+
+        Parameters
+        ----------
+        jobflow_remote_version
+            The version of jobflow-remote to use. If ``None`` the current version of
+            jobflow-remote is used.
+        """
+        installed_packages = importlib.metadata.distributions()
+        jobflow_remote_version = jobflow_remote_version or jobflow_remote.__version__
+        self.auxiliary.find_one_and_update(
+            filter={"jobflow_remote_version": {"$exists": True}},
+            update={
+                "$set": {
+                    "jobflow_remote_version": str(jobflow_remote_version),
+                    "jobflow_version": jobflow.__version__,
+                    "full_environment": {
+                        package.metadata["Name"]: package.version
+                        for package in installed_packages
+                    },
+                }
+            },
+            upsert=True,
+        )
+
+    def get_current_db_version(self) -> Version:
+        """Get the current database version"""
+        version_doc = self.auxiliary.find_one(
+            {"jobflow_remote_version": {"$exists": True}}
+        )
+        if not version_doc:
+            return parse_version("0.1.0")  # Default for old DBs
+        return parse_version(version_doc["jobflow_remote_version"])
+
+    @cached_property
+    def queue_supports_transactions(self) -> bool:
+        """
+        Check if the version of MongoDB defined in the queue Store supports transactions.
+        It explicitly tries to open a session and use it to verify.
+        Cached property.
+
+        Returns
+        -------
+        bool
+            True if transactions are supported.
+        """
+        # note: there could be cheaper methods to check if it is supported,
+        # but this should be 100% sure to give the right answer and should be
+        # called only on rare events. If this becomes a more common requirement
+        # a benchmark of different options will be required
+        try:
+            with self.db.client.start_session() as session, session.start_transaction():
+                self.auxiliary.find_one({}, projection=[], session=session)
+                return True
+        except Exception:
+            return False
 
 
 def get_flow_leafs(job_docs: list[dict]) -> list[dict]:

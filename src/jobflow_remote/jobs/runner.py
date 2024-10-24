@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import shutil
 import signal
 import time
@@ -264,19 +265,28 @@ class Runner:
         # run a first call for each case, since schedule will wait for the delay
         # to make the first execution.
         if checkout:
-            self.checkout()
+            try:
+                self.checkout()
+            except Exception:
+                logger.exception("Error during initial checkout")
             scheduler.every(self.runner_options.delay_checkout).seconds.do(
                 self.checkout
             )
 
         if transfer or queue or complete:
-            self.advance_state(states)
+            try:
+                self.advance_state(states)
+            except Exception:
+                logger.exception("Error during initial advance_state")
             scheduler.every(self.runner_options.delay_advance_status).seconds.do(
                 self.advance_state, states=states
             )
 
         if queue:
-            self.check_run_status()
+            try:
+                self.check_run_status()
+            except Exception:
+                logger.exception("Error during initial check_run_status")
             scheduler.every(self.runner_options.delay_check_run_status).seconds.do(
                 self.check_run_status
             )
@@ -288,12 +298,18 @@ class Runner:
             # account for actions from the user (e.g. rerun, cancel), that can alter
             # the number of submitted/running jobs.
             if self.limited_workers:
-                self.refresh_num_current_jobs()
+                try:
+                    self.refresh_num_current_jobs()
+                except Exception:
+                    logger.exception("Error during initial refresh_num_current_jobs")
                 scheduler.every(self.runner_options.delay_refresh_limited).seconds.do(
                     self.refresh_num_current_jobs
                 )
             if self.batch_workers:
-                self.update_batch_jobs()
+                try:
+                    self.update_batch_jobs()
+                except Exception:
+                    logger.exception("Error during initial update_batch_jobs")
                 scheduler.every(self.runner_options.delay_update_batch).seconds.do(
                     self.update_batch_jobs
                 )
@@ -457,7 +473,7 @@ class Runner:
             if max_seconds and time.time() - t0 > max_seconds:
                 if raise_at_timeout:
                     raise RuntimeError(
-                        "Could execute the job within the selected amount of time"
+                        "Could not execute the job within the selected amount of time"
                     )
                 return False
 
@@ -971,8 +987,16 @@ class Runner:
         for worker_name, batch_manager in self.batch_workers.items():
             worker = self.get_worker(worker_name)
             # first check the processes that are running from the folder
-            #  and set them to running if needed
-            running_jobs = batch_manager.get_running()
+            # and set them to running if needed
+            running_jobs = []
+            try:
+                running_jobs = batch_manager.get_running()
+            except Exception:
+                logger.warning(
+                    f"error trying to get the list of batch running jobs for worker: {worker_name}",
+                    exc_info=True,
+                )
+
             for job_id, job_index, process_running_uuid in running_jobs:
                 lock_filter = {
                     "uuid": job_id,
@@ -996,17 +1020,28 @@ class Runner:
 
             # Check the processes that should be running on the remote queue
             # and update the state in the DB if something changed
-            batch_processes_data = self.job_controller.get_batch_processes(worker_name)
+            batch_processes_data = self.job_controller.get_batch_processes(
+                worker_name
+            ).get(worker_name, {})
             processes = list(batch_processes_data)
             queue_manager = self.get_queue_manager(worker_name)
             if processes:
-                qjobs = queue_manager.get_jobs_list(
-                    jobs=processes, user=worker.scheduler_username
-                )
-                running_processes = {
-                    qjob.job_id for qjob in qjobs if qjob.job_id in processes
-                }
-                stopped_processes = set(processes) - running_processes
+                stopped_processes = set()
+                running_processes = set()
+                try:
+                    qjobs = queue_manager.get_jobs_list(
+                        jobs=processes, user=worker.scheduler_username
+                    )
+                    running_processes = {
+                        qjob.job_id for qjob in qjobs if qjob.job_id in processes
+                    }
+                    stopped_processes = set(processes) - running_processes
+                except Exception:
+                    logger.warning(
+                        f"error trying to get the list of batch processes for worker: {worker_name}",
+                        exc_info=True,
+                    )
+
                 for pid in stopped_processes:
                     self.job_controller.remove_batch_process(pid, worker_name)
                     # check if there are jobs that were in the running folder of a
@@ -1030,31 +1065,42 @@ class Runner:
                             ) as lock:
                                 if lock.locked_document:
                                     err_msg = f"The batch process that was running the job (process_id: {pid}, uuid: {process_running_uuid} was likely killed before terminating the job execution"
-                                    raise RuntimeError(err_msg)
+                                    raise RemoteError(err_msg, no_retry=True)
 
                 processes = list(running_processes)
 
             # check that enough processes are submitted and submit the required
             # amount to reach max_jobs, if needed.
-            n_jobs = self.job_controller.count_jobs(
-                {
-                    "state": {
-                        "$in": (
-                            JobState.BATCH_SUBMITTED.value,
-                            JobState.BATCH_RUNNING.value,
-                        )
-                    },
-                    "worker": worker_name,
-                }
+
+            dict_n_jobs = self.job_controller.count_jobs_states(
+                [JobState.BATCH_SUBMITTED, JobState.BATCH_RUNNING]
             )
+            n_jobs_submitted = dict_n_jobs[JobState.BATCH_SUBMITTED]
+            n_jobs_running = dict_n_jobs[JobState.BATCH_RUNNING]
+
             n_processes = len(processes)
-            n_jobs_to_submit = min(
-                max(worker.max_jobs - n_processes, 0), max(n_jobs - n_processes, 0)
+            n_parallel = worker.batch.parallel_jobs or 1
+            # TODO for n_parallel > 1 here a new job is submitted to the queue even if only
+            # one jobflow Job is available to run. This may result in the submitted job
+            # be partially empty. Would it be better to submit only if more jobs need to be run?
+            # (in that case a single job may remain dangling in the queue)
+
+            # The purpose of dealing with running and submitted jobs separately is to avoid
+            # submitting processes if a job remains stuck in a SBATCH_RUNNING state.
+            # In principle it should not happen but if happening it will keep submitting
+            # batch processes to the queue.
+            available_jobs = max(
+                n_jobs_submitted - max((n_processes * n_parallel) - n_jobs_running, 0),
+                0,
+            )
+            n_processes_to_submit = min(
+                max(worker.max_jobs - n_processes, 0),
+                math.ceil(available_jobs / n_parallel),
             )
             logger.debug(
-                f"submitting {n_jobs_to_submit} batch jobs for worker {worker_name}"
+                f"submitting {n_processes_to_submit} batch jobs for worker {worker_name}"
             )
-            for _ in range(n_jobs_to_submit):
+            for _ in range(n_processes_to_submit):
                 resources = worker.resources or {}
                 process_running_uuid = suuid()
                 remote_path = Path(
@@ -1072,12 +1118,14 @@ class Runner:
                 # note that here the worker.work_dir needs to be passed,
                 # not the worker.batch.work_dir
                 command = f"jf -fe execution run-batch {worker.work_dir} {worker.batch.jobs_handle_dir} {process_running_uuid}"
-                if worker.batch.max_jobs:
-                    command += f" -mj {worker.batch.max_jobs}"
+                if worker.batch.max_jobs_per_batch:
+                    command += f" -mj {worker.batch.max_jobs_per_batch}"
                 if worker.batch.max_time:
                     command += f" -mt {worker.batch.max_time}"
                 if worker.batch.max_wait:
                     command += f" -mw {worker.batch.max_wait}"
+                if worker.batch.parallel_jobs:
+                    command += f" -pj {worker.batch.parallel_jobs}"
 
                 submit_result = queue_manager.submit(
                     commands=[command],
@@ -1096,6 +1144,9 @@ class Runner:
                     )
 
                 elif submit_result.status == SubmissionStatus.SUCCESSFUL:
+                    logger.debug(
+                        f"Batch job submitted to worker {worker_name} in folder {remote_path}. Queue id: {submit_result.job_id}"
+                    )
                     self.job_controller.add_batch_process(
                         submit_result.job_id, process_running_uuid, worker_name
                     )
@@ -1104,7 +1155,14 @@ class Runner:
 
             # check for jobs that have terminated in the batch runner and
             # update the DB state accordingly
-            terminated_jobs = batch_manager.get_terminated()
+            terminated_jobs = []
+            try:
+                terminated_jobs = batch_manager.get_terminated()
+            except Exception:
+                logger.warning(
+                    f"error trying to get the list of terminated batch jobs for worker: {worker_name}",
+                    exc_info=True,
+                )
             for job_id, job_index, process_running_uuid in terminated_jobs:
                 lock_filter = {
                     "uuid": job_id,
