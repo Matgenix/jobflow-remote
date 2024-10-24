@@ -48,10 +48,10 @@ def test_project_check(job_controller, capsys) -> None:
         "✓ Jobstore",
         "✓ Queue store",
     ]
-    excluded = ["Errors:"]
-    run_check_cli(
-        ["project", "check", "-e"], required_out=expected, excluded_out=excluded
-    )
+    # Here there will be "errors" reported as there likely be a mismatch of the
+    # jobflow-remote version between the local environment and the one in the
+    # container
+    run_check_cli(["project", "check", "-e"], required_out=expected)
 
 
 @pytest.mark.parametrize(
