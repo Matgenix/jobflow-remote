@@ -152,14 +152,17 @@ def _check_workdir(worker: WorkerBase, host: BaseHost) -> str | None:
         host.execute(f"rm {str(canary_file)!r}")
 
 
-def check_worker(worker: WorkerBase, full_check: bool = False) -> str | None:
+def check_worker(
+    worker: WorkerBase, full_check: bool = False
+) -> tuple[str | None, str | None]:
     """Check that a connection to the configured worker can be made."""
     host = worker.get_host()
+    worker_warn = None
     try:
         host.connect()
         host_error = host.test()
         if host_error:
-            return host_error
+            return host_error, None
 
         from jobflow_remote.remote.queue import QueueManager
 
@@ -167,18 +170,22 @@ def check_worker(worker: WorkerBase, full_check: bool = False) -> str | None:
         qm.get_jobs_list()
 
         _check_workdir(worker=worker, host=host)
-        _check_environment(worker=worker, host=host, full_check=full_check)
+        # don't perform the environment check, as they will be equivalent
+        if worker.type != "local":
+            worker_warn = _check_environment(
+                worker=worker, host=host, full_check=full_check
+            )
 
     except Exception:
         exc = traceback.format_exc()
-        return f"Error while testing worker:\n {exc}"
+        return f"Error while testing worker:\n {exc}", worker_warn
     finally:
         try:
             host.close()
         except Exception:
             logger.warning(f"error while closing connection to host {host}")
 
-    return None
+    return None, worker_warn
 
 
 def _check_store(store: Store) -> str | None:
@@ -218,26 +225,25 @@ def _check_environment(
 
     Parameters
     ----------
-        worker: The worker configuration.
         host: A connected host.
         full_check: Whether to check the entire environment and not just jobflow and jobflow-remote.
 
+    Returns
+    -------
+    str | None
+        A message describing the environment mismatches. None if no mismatch is found.
     """
-    # TODO: not sure about this test here but I based this check function on the _check_worker function
-    #  which does the same.
-    try:
-        host_error = host.test()
-        if host_error:
-            return host_error
-    except Exception:
-        exc = traceback.format_exc()
-        return f"Error while testing worker:\n {exc}"
-
     installed_packages = importlib.metadata.distributions()
     local_package_versions = {
         package.metadata["Name"]: package.version for package in installed_packages
     }
-    stdout, stderr, errcode = host.execute("pip list --format=json")
+    cmd = "pip list --format=json"
+    if worker.pre_run:
+        cmd = "; ".join(worker.pre_run.strip().splitlines()) + "; " + cmd
+
+    stdout, stderr, errcode = host.execute(cmd)
+    if errcode != 0:
+        return f"Error while checking the compatibility of the environments: {stderr}"
     host_package_versions = {
         package_dict["name"]: package_dict["version"]
         for package_dict in json.loads(stdout)
@@ -260,6 +266,14 @@ def _check_environment(
                     host_package_versions[package],
                 )
             )
-    if missing or mismatch:
-        raise ValueError("Version mismatch")
-    return None
+    msg = None
+    if mismatch or missing:
+        msg = "Note: inconsistencies may be due to the proper python environment not being correctly loaded.\n"
+    if missing:
+        missing_str = [f"{m[0]} - {m[1]}" for m in missing]
+        msg += f"Missing packages: {', '.join(missing_str)}. "
+    if mismatch:
+        mismatch_str = [f"{m[0]} - {m[1]} vs {m[2]}" for m in mismatch]
+        msg += f"Mismatching versions: {', '.join(mismatch_str)}"
+
+    return msg
