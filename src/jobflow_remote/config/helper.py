@@ -169,7 +169,10 @@ def check_worker(
         qm = QueueManager(scheduler_io=worker.get_scheduler_io(), host=host)
         qm.get_jobs_list()
 
-        _check_workdir(worker=worker, host=host)
+        workdir_err = _check_workdir(worker=worker, host=host)
+        if workdir_err:
+            return workdir_err, None
+
         # don't perform the environment check, as they will be equivalent
         if worker.type != "local":
             worker_warn = _check_environment(
