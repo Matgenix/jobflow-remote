@@ -52,7 +52,13 @@ def _get_random_name(length=6):
 
 @pytest.fixture(scope="session")
 def slurm_ssh_port():
-    """The exposed local port for SSH connections to the Slurm container."""
+    """The exposed local port for SSH connections to the queue container."""
+    return _get_free_port()
+
+
+@pytest.fixture(scope="session")
+def sge_ssh_port():
+    """The exposed local port for SSH connections to the queue container."""
     return _get_free_port()
 
 
@@ -72,6 +78,7 @@ def build_and_launch_container(
     dockerfile: Path | None = None,
     image_name: str | None = None,
     ports: dict[str, int] | None = None,
+    buildargs: dict[str, str] | None = None,
 ):
     """Builds and/or launches a container, returning the container object.
 
@@ -93,6 +100,7 @@ def build_and_launch_container(
         _, logs = docker_client.images.build(
             path=str(Path(__file__).parent.parent.parent.resolve()),
             dockerfile=dockerfile,
+            buildargs=buildargs,
             tag=image_name,
             rm=True,
             quiet=False,
@@ -107,27 +115,50 @@ def build_and_launch_container(
         container = docker_client.containers.run(
             image_name,
             detach=True,
-            remove=True,
-            auto_remove=True,
+            remove=False,
+            auto_remove=False,
             tty=True,
             ports=ports,
         )
         assert isinstance(container, Container)
         print(" * Waiting for container to be ready...", end="")
-        time.sleep(1)
-        while container.status != "running":
+        max_retries = 30
+        while (retries := 0) < max_retries:
+            if container.status == "running":
+                print(f"\n{container.logs().decode()}\n")
+                print(f"\n * Container {container.id} launched.")
+                break
+            if container.status == "exited":
+                logs = f"\n{container.logs().decode()}\n"
+                pytest.fail(
+                    f"Container {container.name!r} ({container.image}) exited before being ready.\nFull logs: {logs}"
+                )
             print(".", end="")
             time.sleep(1)
+            retries += 1
             container.reload()
-        print("")
-        print(f" * Container {container.id} launched.")
-        print(f"{container.logs().decode()}\n")
+        else:
+            logs = f"\n{container.logs().decode()}\n"
+            pytest.fail(
+                f"Container {container.name!r} ({container.image}) did not start in time. Full\nlogs: {logs}"
+            )
 
         yield container
     finally:
         try:
             print(f"\n * Stopping container {container.id}...")
-            container.stop()
+            try:
+                container.stop()
+            except (docker.errors.APIError, docker.errors.NotFound):
+                pass
+            try:
+                container.kill()
+            except (docker.errors.APIError, docker.errors.NotFound):
+                pass
+            try:
+                container.remove()
+            except (docker.errors.APIError, docker.errors.NotFound):
+                pass
             print(" * Done!")
         except Exception as exc:
             print(f" x Failed to stop container: {exc}")
@@ -135,14 +166,29 @@ def build_and_launch_container(
 
 @pytest.fixture(scope="session", autouse=True)
 def slurm_container(docker_client, slurm_ssh_port):
-    """Build and launch a container running Slurm + SSH, exposed on a random available
+    """Build and launch a container running Slurm and SSH, exposed on a random available
     port."""
     ports = {"22/tcp": slurm_ssh_port}
     yield from build_and_launch_container(
         docker_client,
-        Path("./tests/integration/dockerfiles/Dockerfile.slurm"),
-        "jobflow-slurm:latest",
+        Path("./tests/integration/dockerfiles/Dockerfile"),
+        "jobflow-remote-slurm:latest",
         ports=ports,
+        buildargs={"QUEUE_SYSTEM": "slurm"},
+    )
+
+
+@pytest.fixture(scope="session", autouse=True)
+def sge_container(docker_client, sge_ssh_port):
+    """Build and launch a container running SGE and SSH, exposed on a random available
+    port."""
+    ports = {"22/tcp": sge_ssh_port}
+    yield from build_and_launch_container(
+        docker_client,
+        Path("./tests/integration/dockerfiles/Dockerfile"),
+        "jobflow-remote-sge:latest",
+        ports=ports,
+        buildargs={"QUEUE_SYSTEM": "sge"},
     )
 
 
@@ -169,12 +215,16 @@ def write_tmp_settings(
     random_project_name,
     store_database_name,
     slurm_ssh_port,
+    sge_ssh_port,
     db_port,
 ):
     """Collects the various sub-configs and writes them to a temporary file in a
     temporary directory."""
     tmp_dir: Path = Path(tempfile.mkdtemp())
 
+    original_jf_remote_projects_folder = os.environ.get("JFREMOTE_PROJECTS_FOLDER")
+    original_jf_remote_project = os.environ.get("JFREMOTE_PROJECT")
+    original_config_file = os.environ.get("JFREMOTE_CONFIG_FILE")
     os.environ["JFREMOTE_PROJECTS_FOLDER"] = str(tmp_dir.resolve())
     workdir = tmp_dir / "jfr"
     workdir.mkdir(exist_ok=True)
@@ -230,7 +280,7 @@ def write_tmp_settings(
                 resources={},
                 sanitize_command=True,
             ),
-            "test_remote_worker": dict(
+            "test_remote_slurm_worker": dict(
                 type="remote",
                 host="localhost",
                 port=slurm_ssh_port,
@@ -254,6 +304,17 @@ def write_tmp_settings(
                 resources={"partition": "debug", "ntasks": 1, "time": "00:01:00"},
                 connect_kwargs={"allow_agent": False, "look_for_keys": False},
                 max_jobs=1,
+            ),
+            "test_remote_sge_worker": dict(
+                type="remote",
+                host="localhost",
+                port=sge_ssh_port,
+                scheduler_type="sge",
+                work_dir="/home/jobflow/jfr",
+                user="jobflow",
+                password="jobflow",
+                pre_run="source /home/jobflow/.bashrc && source /home/jobflow/.venv/bin/activate",
+                connect_kwargs={"allow_agent": False, "look_for_keys": False},
             ),
             "test_batch_remote_worker": dict(
                 type="remote",
@@ -326,8 +387,16 @@ def write_tmp_settings(
     with open(tmp_dir / f"{random_project_name}.json", "w") as f:
         f.write(project_json)
 
-    yield
+    yield project
+
     shutil.rmtree(tmp_dir)
+    # Reset environment variables if they were set elsewhere
+    if original_jf_remote_projects_folder is not None:
+        os.environ["JFREMOTE_PROJECTS_FOLDER"] = original_jf_remote_projects_folder
+    if original_jf_remote_project is not None:
+        os.environ["JFREMOTE_PROJECT"] = original_jf_remote_project
+    if original_config_file is not None:
+        os.environ["JFREMOTE_CONFIG_FILE"] = original_config_file
 
 
 @pytest.fixture()
