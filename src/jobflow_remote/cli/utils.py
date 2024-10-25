@@ -440,20 +440,20 @@ def execute_multi_jobs_cmd(
         workers,
         custom_query,
     ]
+    # if potentially interactive do not start the spinner.
+    cm = get_config_manager()
+    spinner_cm: contextlib.AbstractContextManager
+    if interactive and cm.get_project().has_interactive_workers:
+        spinner_cm = contextlib.nullcontext()
+        out_console.print("Processing...")
+    else:
+        spinner_cm = loading_spinner()
     try:
         if job_db_id is not None:
             if any(query_values):
                 msg = "If job_db_id is defined all the other query options should be disabled"
                 exit_with_error_msg(msg)
             db_id, job_id = get_job_db_ids(job_db_id, job_index)
-            # if potentially interactive do not start the spinner.
-            cm = get_config_manager()
-            spinner_cm: contextlib.AbstractContextManager
-            if interactive and cm.get_project().has_interactive_workers:
-                spinner_cm = contextlib.nullcontext()
-                out_console.print("Processing...")
-            else:
-                spinner_cm = loading_spinner()
             with spinner_cm:
                 modified_ids = single_cmd(
                     job_id=job_id, job_index=job_index, db_id=db_id, **kwargs
@@ -510,7 +510,7 @@ def execute_multi_jobs_cmd(
                 if not confirmed:
                     raise typer.Exit(0)  # noqa: TRY301
 
-            with loading_spinner():
+            with spinner_cm:
                 modified_ids = multi_cmd(
                     job_ids=job_ids_indexes,
                     db_ids=db_ids,
