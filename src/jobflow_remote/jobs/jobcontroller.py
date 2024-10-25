@@ -2467,7 +2467,7 @@ class JobController:
         return result.modified_count
 
     def _safe_delete_files(
-        self, jobs_info: list[JobInfo | dict]
+        self, jobs_info: Sequence[JobInfo | dict]
     ) -> list[JobInfo | dict]:
         """
         Delete the files associated to the selected Jobs.
