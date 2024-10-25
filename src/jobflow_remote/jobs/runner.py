@@ -637,7 +637,8 @@ class Runner:
 
         remote_path = Path(doc["run_dir"])
 
-        script_commands = [f"jf -fe execution run {remote_path}"]
+        execution_cmd = worker.execution_cmd or "jf -fe execution run {}"
+        script_commands = [execution_cmd.format(remote_path)]
 
         queue_manager = self.get_queue_manager(worker_name)
         qout_fpath = remote_path / OUT_FNAME

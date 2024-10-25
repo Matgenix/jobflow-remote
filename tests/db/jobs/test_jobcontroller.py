@@ -120,6 +120,8 @@ def test_queries(job_controller, runner) -> None:
 
 
 def test_rerun_completed(job_controller, runner) -> None:
+    from pathlib import Path
+
     from jobflow import Flow
 
     from jobflow_remote import submit_flow
@@ -138,6 +140,7 @@ def test_rerun_completed(job_controller, runner) -> None:
     j1_info = job_controller.get_job_info(job_id=j1.uuid, job_index=j1.index)
     j2_info = job_controller.get_job_info(job_id=j2.uuid, job_index=j2.index)
     j3_info = job_controller.get_job_info(job_id=j3.uuid, job_index=j3.index)
+    j1_path = Path(j1_info.run_dir)
     assert j1_info.state == JobState.COMPLETED
     assert j2_info.state == JobState.READY
     assert j3_info.state == JobState.WAITING
@@ -145,6 +148,8 @@ def test_rerun_completed(job_controller, runner) -> None:
     # try rerunning the second job. Wrong state
     with pytest.raises(ValueError, match="The Job is in the READY state"):
         job_controller.rerun_job(job_id=j2.uuid, job_index=j2.index)
+
+    assert len(list(j1_path.iterdir())) > 0
 
     # since the first job is completed, the force option is required
     with pytest.raises(ValueError, match="Job in state COMPLETED cannot be rerun"):
@@ -156,6 +161,9 @@ def test_rerun_completed(job_controller, runner) -> None:
         j1_info.db_id,
         j2_info.db_id,
     }
+
+    assert not j1_path.exists()
+
     assert (
         job_controller.get_job_info(job_id=j1.uuid, job_index=j1.index).state
         == JobState.READY
@@ -172,10 +180,20 @@ def test_rerun_completed(job_controller, runner) -> None:
     with pytest.raises(ValueError, match="Job in state COMPLETED cannot be rerun"):
         job_controller.rerun_job(job_id=j3.uuid, job_index=j3.index)
 
-    # The last job can be rerun, but still needs the "force" option
+    j3_info = job_controller.get_job_info(job_id=j3.uuid, job_index=j3.index)
+    j3_path = Path(j3_info.run_dir)
+
+    assert len(list(j3_path.iterdir())) > 0
+
+    # The last job can be rerun, but still needs the "force" option.
+    # Don't delete files
     assert set(
-        job_controller.rerun_job(job_id=j3.uuid, job_index=j3.index, force=True)
+        job_controller.rerun_job(
+            job_id=j3.uuid, job_index=j3.index, force=True, delete_files=False
+        )
     ) == {j3_info.db_id}
+
+    assert len(list(j3_path.iterdir())) > 0
 
     # The remaining tests are to verify that everything is correct with locked jobs
     # as well
@@ -231,6 +249,8 @@ def test_rerun_completed(job_controller, runner) -> None:
 
 
 def test_rerun_failed(job_controller, runner) -> None:
+    from pathlib import Path
+
     from jobflow import Flow, OnMissing
 
     from jobflow_remote import submit_flow
@@ -282,12 +302,24 @@ def test_rerun_failed(job_controller, runner) -> None:
     ):
         job_controller.rerun_job(job_id=j1.uuid, job_index=j1.index)
 
+    j1_info = job_controller.get_job_info(job_id=j1.uuid, job_index=j1.index)
+    j3_info = job_controller.get_job_info(job_id=j3.uuid, job_index=j3.index)
+    j1_path = Path(j1_info.run_dir)
+    j3_path = Path(j3_info.run_dir)
+
+    assert len(list(j1_path.iterdir())) > 0
+    assert len(list(j3_path.iterdir())) > 0
+
     # can be rerun with the "force" option
     assert set(
         job_controller.rerun_job(job_id=j1.uuid, job_index=j1.index, force=True)
     ) == {j1_info.db_id, j3_info.db_id, j4_info.db_id}
 
     assert job_controller.count_jobs(states=JobState.READY) == 1
+
+    # check that also the folder of the complete child was removed
+    assert not j1_path.exists()
+    assert not j3_path.exists()
 
     # run again the jobs with j4. This generates a replace
     assert runner.run_one_job(max_seconds=10, job_id=[j1.uuid, j1.index])
@@ -319,6 +351,8 @@ def test_rerun_failed(job_controller, runner) -> None:
 
 
 def test_rerun_remote_error(job_controller, monkeypatch, runner) -> None:
+    from pathlib import Path
+
     from jobflow import Flow
 
     from jobflow_remote import submit_flow
@@ -333,11 +367,11 @@ def test_rerun_remote_error(job_controller, monkeypatch, runner) -> None:
     submit_flow(flow, worker="test_local_worker")
 
     # patch the upload method of the runner to trigger a remote error
-    def upload_error(self, lock) -> NoReturn:
+    def submit_error(self, lock) -> NoReturn:
         raise RuntimeError("FAKE ERROR")
 
     with monkeypatch.context() as m:
-        m.setattr(Runner, "upload", upload_error)
+        m.setattr(Runner, "submit", submit_error)
         # patch this to 1 to avoid retrying multiple times
         m.setattr(runner.runner_options, "max_step_attempts", 1)
         with pytest.warns(match="FAKE ERROR"):
@@ -349,6 +383,8 @@ def test_rerun_remote_error(job_controller, monkeypatch, runner) -> None:
         job_controller.get_flows_info(job_ids=[j1.uuid])[0].state == FlowState.RUNNING
     )
 
+    assert len(list(Path(j1_info.run_dir).iterdir())) > 0
+
     # can rerun without "force"
     assert job_controller.rerun_job(job_id=j1.uuid, job_index=j1.index, force=True) == [
         j1_info.db_id
@@ -358,6 +394,9 @@ def test_rerun_remote_error(job_controller, monkeypatch, runner) -> None:
         == JobState.READY
     )
     assert job_controller.get_flows_info(job_ids=[j1.uuid])[0].state == FlowState.READY
+
+    # check that files are being deleted also in case of remote_error
+    assert not Path(j1_info.run_dir).exists()
 
 
 def test_retry(job_controller, monkeypatch, runner) -> None:

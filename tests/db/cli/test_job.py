@@ -1,3 +1,6 @@
+import os
+
+
 def test_jobs_list(job_controller, two_flows_four_jobs) -> None:
     from jobflow_remote.jobs.state import JobState
     from jobflow_remote.testing.cli import run_check_cli
@@ -96,18 +99,56 @@ def test_set_state(job_controller, two_flows_four_jobs) -> None:
 
 
 def test_rerun(job_controller, two_flows_four_jobs) -> None:
+    from pathlib import Path
+
+    from jobflow_remote.jobs.runner import Runner
     from jobflow_remote.jobs.state import JobState
     from jobflow_remote.testing.cli import run_check_cli
 
+    runner = Runner()
+    runner.run_one_job(db_id="1")
+
+    job_info = job_controller.get_job_info(db_id="1")
+    assert job_info.state == JobState.COMPLETED
+    assert len(os.listdir(job_info.run_dir)) > 0
+
+    # rerun without deleting files
+    run_check_cli(
+        ["job", "rerun", "-did", "1", "-f", "-nd"],
+        required_out="Operation completed: 2 jobs modified",
+    )
+
+    assert len(os.listdir(job_info.run_dir)) > 0
+    assert job_controller.get_job_info(db_id="1").state == JobState.READY
+
+    # fails because already READY
+    run_check_cli(["job", "rerun", "-did", "1"], required_out="Error while rerunning")
+
+    # set the job back to completed to try deleting the files as well
     assert job_controller.set_job_state(JobState.COMPLETED, db_id="1")
 
+    # note: here only 1 job is modified, since the child was not set to READY
     run_check_cli(
         ["job", "rerun", "-did", "1", "-f"],
         required_out="Operation completed: 1 jobs modified",
     )
+
+    assert not os.path.isdir(job_info.run_dir)
     assert job_controller.get_job_info(db_id="1").state == JobState.READY
-    # fails because already READY
-    run_check_cli(["job", "rerun", "-did", "1"], required_out="Error while rerunning")
+
+    # set the job back to completed but create the folder without the
+    # jfremote_in.json file, so get the warning that the files are not deleted
+    assert job_controller.set_job_state(JobState.COMPLETED, db_id="1")
+    os.mkdir(job_info.run_dir)
+    (Path(job_info.run_dir) / "file.json").touch()
+    run_check_cli(
+        ["job", "rerun", "-did", "1", "-f"],
+        required_out=[
+            "Operation completed: 1 jobs modified",
+            "WARNING",
+            "it may not contain a jobflow-remote execution",
+        ],
+    )
 
 
 def test_retry(job_controller, two_flows_four_jobs) -> None:

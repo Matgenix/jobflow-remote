@@ -305,6 +305,14 @@ def rerun(
         ),
     ] = False,
     raise_on_error: raise_on_error_opt = False,
+    no_delete: Annotated[
+        bool,
+        typer.Option(
+            "--no-delete",
+            "-nd",
+            help=("Skip the delete of the files on the worker."),
+        ),
+    ] = False,
 ) -> None:
     """
     Rerun a Job. By default, this is limited to jobs that failed and children did
@@ -313,6 +321,8 @@ def rerun(
     will be cancelled. Most of the limitations can be overridden by the 'force'
     option. This could lead to inconsistencies in the overall state of the Jobs of
     the Flow.
+    All the folders of the Jobs whose state are modified will also be deleted on
+    the worker.
     """
     if force or break_lock:
         check_stopped_runner(error=False)
@@ -341,6 +351,8 @@ def rerun(
         break_lock=break_lock,
         force=force,
         raise_on_error=raise_on_error,
+        interactive=True,
+        delete_files=not no_delete,
     )
 
 
@@ -600,6 +612,7 @@ def delete(
         verbosity=verbosity,
         wait=wait,
         raise_on_error=raise_on_error,
+        interactive=True,
         delete_output=delete_output,
         delete_files=delete_files,
     )

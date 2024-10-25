@@ -166,6 +166,13 @@ class WorkerBase(BaseModel):
         None,
         description="String with commands that will be executed after the execution of the Job",
     )
+    execution_cmd: Optional[str] = Field(
+        None,
+        description="String with commands to execute the Job on the worker. By default will be "
+        "set to `jf -fe execution run {}`. The `{}` part will be used to insert the path to "
+        "the execution directory and it is mandatory. Change only for specific needs (e.g. the"
+        "jf command needs to be executed in a container).",
+    )
     timeout_execute: int = Field(
         60,
         description="Timeout for the execution of the commands in the worker "
@@ -637,6 +644,16 @@ class Project(BaseModel):
                     f"error while converting jobstore to JobStore. Error: {traceback.format_exc()}"
                 ) from e
         return jobstore
+
+    @property
+    def has_interactive_workers(self) -> bool:
+        """
+        True if any of the workers have interactive_login set to True.
+        """
+        for worker in self.workers.values():
+            if isinstance(worker, RemoteWorker) and worker.interactive_login:
+                return True
+        return False
 
     model_config = ConfigDict(extra="forbid")
 

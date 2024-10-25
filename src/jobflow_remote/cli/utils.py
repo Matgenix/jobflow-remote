@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import functools
 import json
 import logging
@@ -370,8 +371,61 @@ def execute_multi_jobs_cmd(
     custom_query: dict | None = None,
     verbosity: int = 0,
     raise_on_error: bool = False,
+    interactive: bool = True,
     **kwargs,
 ) -> None:
+    """
+    Utility function to execute a command on a single job or on a set of jobs.
+    Checks the query options, determine whether the command is single or multi
+    and call the corresponding function.
+
+    Parameters
+    ----------
+    single_cmd
+        A function that takes the job_id and job_index as arguments and performs an
+        action on a single job.
+    multi_cmd
+        A function that takes a set of standard arguments and performs an
+        action on multiple jobs.
+    job_db_id
+        The job id or db_id of a job to be considered. If specified, all the other
+        query options should be disabled.
+    job_index
+        The index of the job in the DB.
+    job_ids
+        A list of job ids to be considered.
+    db_ids
+        A list of db ids to be considered.
+    flow_ids
+        A list of flow ids to be considered.
+    states
+        The states of the jobs to be considered.
+    start_date
+        The start date of the jobs to be considered.
+    end_date
+        The end date of the jobs to be considered.
+    name
+        The name of the jobs to be considered.
+    metadata
+        The metadata of the jobs to be considered.
+    days
+        Set the start_date based on the number of past days.
+    hours
+        Set the start_date based on the number of past hours.
+    workers
+        Workers associated with the jobs to be considered.
+    custom_query
+        A custom query to be used to filter the jobs.
+    verbosity
+        The verbosity of the output.
+    raise_on_error
+        If True, an error will be raised if the operation fails.
+    interactive
+        If True, a spinner will be shown even if the operation is not interactive while
+        the operation is being performed.
+    **kwargs : dict
+        Additional arguments to be passed to the single_cmd and multi_cmd functions.
+    """
     query_values = [
         job_ids,
         db_ids,
@@ -392,7 +446,15 @@ def execute_multi_jobs_cmd(
                 msg = "If job_db_id is defined all the other query options should be disabled"
                 exit_with_error_msg(msg)
             db_id, job_id = get_job_db_ids(job_db_id, job_index)
-            with loading_spinner():
+            # if potentially interactive do not start the spinner.
+            cm = get_config_manager()
+            spinner_cm: contextlib.AbstractContextManager
+            if interactive and cm.get_project().has_interactive_workers:
+                spinner_cm = contextlib.nullcontext()
+                out_console.print("Processing...")
+            else:
+                spinner_cm = loading_spinner()
+            with spinner_cm:
                 modified_ids = single_cmd(
                     job_id=job_id, job_index=job_index, db_id=db_id, **kwargs
                 )

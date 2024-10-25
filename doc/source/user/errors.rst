@@ -158,6 +158,10 @@ the ``READY`` state, this can be achieved by running::
     list of options available.
 
 .. warning::
+    Rerunning by default also deletes the folder on the worker where the Job was
+    executed. To avoid it use the ``--no-delete`` option.
+
+.. warning::
     It is impossible to provide an exhaustive list of potential issues that could lead to
     a ``REMOTE_ERROR`` state. So except in some well defined cases, the error messages will be
     mainly given by the stack trace of the error.
@@ -247,6 +251,11 @@ job with::
     jf job rerun 5
 
 will solve the issue.
+
+.. warning::
+    Rerunning by default also deletes the folder on the worker where the Job was
+    executed. If, as effect of a rerun children Jobs are also rerun, their folders
+    will be deleted as well. To avoid it use the ``--no-delete`` option.
 
 .. note::
 

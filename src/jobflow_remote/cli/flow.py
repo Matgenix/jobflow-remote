@@ -1,3 +1,4 @@
+import contextlib
 from datetime import datetime
 from typing import Annotated, Optional
 
@@ -194,8 +195,17 @@ def delete(
             raise typer.Exit(0)
 
     to_delete = [fi.flow_id for fi in flows_info]
-    with loading_spinner(processing=False) as progress:
-        progress.add_task(description="Deleting flows...", total=None)
+
+    # if potentially interactive do not start the spinner.
+    spinner_cm: contextlib.AbstractContextManager
+    if delete_files and jc.project.has_interactive_workers:
+        spinner_cm = contextlib.nullcontext()
+        out_console.print("Deleting flows...")
+    else:
+        spinner_cm = loading_spinner(processing=False)
+    with spinner_cm as progress:
+        if progress:
+            progress.add_task(description="Deleting flows...", total=None)
 
         jc.delete_flows(
             flow_ids=to_delete,
