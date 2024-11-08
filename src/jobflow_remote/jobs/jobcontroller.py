@@ -910,6 +910,7 @@ class JobController:
             anymore. Doing otherwise will likely lead to inconsistencies in the DB.
         delete_files
             Delete all the files in the worker folder of the rerun Job.
+            Note that the deletion will not be performed directly but only when the job effectively restarts.
 
         Returns
         -------
