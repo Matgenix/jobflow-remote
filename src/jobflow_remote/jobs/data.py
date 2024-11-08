@@ -119,6 +119,7 @@ class RemoteInfo(BaseModel):
     process_id: Optional[str] = None
     retry_time_limit: Optional[datetime] = None
     error: Optional[str] = None
+    cleanup: bool = False
 
 
 class JobInfo(BaseModel):

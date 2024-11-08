@@ -43,6 +43,7 @@ from jobflow_remote.remote.data import (
 from jobflow_remote.remote.queue import ERR_FNAME, OUT_FNAME, QueueManager, set_name_out
 from jobflow_remote.utils.data import suuid
 from jobflow_remote.utils.log import initialize_runner_logger
+from jobflow_remote.utils.remote import UnsafeDeletionError, safe_remove_job_files
 from jobflow_remote.utils.schedule import SafeScheduler
 
 if TYPE_CHECKING:
@@ -574,6 +575,31 @@ class Runner:
 
         worker = self.get_worker(doc["worker"])
         host = self.get_host(doc["worker"])
+
+        # if cleanup is specified (job was likely rerun) delete the folder before
+        # reuploading the data
+        run_dir = doc["run_dir"]
+        if doc.get("remote", {}).get("cleanup", False):
+            try:
+                deleted = safe_remove_job_files(
+                    host=host, run_dir=run_dir, raise_on_error=True
+                )
+                # Log as debug. If deletion failed because of an error it will raise.
+                not_string = "" if deleted else "not "
+                logger.debug(
+                    f"Folder for job {db_id} ({run_dir}) was {not_string}deleted"
+                )
+            except UnsafeDeletionError as e:
+                raise RemoteError(
+                    f"Error while performing cleanup of the run_dir folder for job {db_id}: {run_dir}",
+                    no_retry=True,
+                ) from e
+            except Exception as e:
+                raise RemoteError(
+                    f"Error while performing cleanup of the run_dir folder for job {db_id}: {run_dir}",
+                    no_retry=False,
+                ) from e
+
         store = self.jobstore
         # TODO would it be better/feasible to keep a pool of the required
         # Stores already connected, to avoid opening and closing them?
@@ -610,7 +636,11 @@ class Runner:
         host.put(serialized_input, str(path_file))
 
         set_output = {
-            "$set": {"run_dir": remote_path, "state": JobState.UPLOADED.value}
+            "$set": {
+                "run_dir": remote_path,
+                "state": JobState.UPLOADED.value,
+                "remote.cleanup": False,
+            }
         }
         lock.update_on_release = set_output
 

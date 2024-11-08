@@ -6,6 +6,8 @@ from typing import TYPE_CHECKING, ClassVar
 from jobflow_remote import ConfigManager
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from jobflow_remote.config.base import Project
     from jobflow_remote.remote.host.base import BaseHost
 
@@ -102,3 +104,38 @@ class SharedHosts:
         # Cleanup only when the last context exits
         if self.__class__._ref_count == 0:
             self.close_hosts()
+
+
+class UnsafeDeletionError(Exception):
+    """
+    Error to signal that Job files could not be deleted as the safety check
+    did not pass.
+    """
+
+
+def safe_remove_job_files(
+    host: BaseHost, run_dir: str | Path | None, raise_on_error: bool = False
+) -> bool:
+    if not run_dir:
+        return False
+
+    remote_files = host.listdir(run_dir)
+    # safety measure to avoid mistakenly deleting other folders
+    if not remote_files:
+        return False
+    if any(fn in remote_files for fn in ("jfremote_in.json", "jfremote_in.json.gz")):
+        return host.rmtree(path=run_dir, raise_on_error=raise_on_error)
+
+    if raise_on_error:
+        raise UnsafeDeletionError(
+            f"Could not delete folder {run_dir} "
+            "since it may not contain a jobflow-remote execution. Some files are present, "
+            "but jfremote_in.json is missing",
+        )
+
+    logger.warning(
+        f"Did not delete folder {run_dir} "
+        "since it may not contain a jobflow-remote executionSome files are present, "
+        "but jfremote_in.json is missing",
+    )
+    return False

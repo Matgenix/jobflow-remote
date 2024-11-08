@@ -215,6 +215,16 @@ class WorkerBase(BaseModel):
             raise ValueError("`work_dir` must be an absolute path")
         return v
 
+    @field_validator("execution_cmd")
+    @classmethod
+    def check_execution_cmd(cls, v) -> Optional[str]:
+        if v is not None and "{}" not in v:
+            raise ValueError(
+                "`execution_cmd` must contain a '{}' part to allow setting "
+                "the execution folder at runtime"
+            )
+        return v
+
     def get_scheduler_io(self) -> BaseSchedulerIO:
         """
         Get the BaseSchedulerIO from QToolKit depending on scheduler_type.

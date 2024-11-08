@@ -158,8 +158,10 @@ the ``READY`` state, this can be achieved by running::
     list of options available.
 
 .. warning::
-    Rerunning by default also deletes the folder on the worker where the Job was
-    executed. To avoid it use the ``--no-delete`` option.
+    Rerunning by default also marks the Job so that the folder on the worker where it
+    was executed will be deleted. The deletion is performed by the Runner before
+    reuploading the inputs, i.e. before the Job gets to the `UPLOADED` state.
+    To avoid it use the ``--no-delete`` option.
 
 .. warning::
     It is impossible to provide an exhaustive list of potential issues that could lead to
@@ -253,9 +255,11 @@ job with::
 will solve the issue.
 
 .. warning::
-    Rerunning by default also deletes the folder on the worker where the Job was
-    executed. If, as effect of a rerun children Jobs are also rerun, their folders
-    will be deleted as well. To avoid it use the ``--no-delete`` option.
+    Rerunning by default also marks the Job so that the folder on the worker where it
+    was executed will be deleted. The deletion is performed by the Runner before
+    reuploading the inputs, i.e. before the Job gets to the `UPLOADED` state. If, as effect
+    of a rerun children Jobs are also rerun, their folders will be marked for deletion as
+    well. To avoid it use the ``--no-delete`` option.
 
 .. note::
 

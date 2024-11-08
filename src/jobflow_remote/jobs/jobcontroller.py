@@ -68,7 +68,7 @@ from jobflow_remote.utils.db import (
     pymongo_dump,
     pymongo_restore,
 )
-from jobflow_remote.utils.remote import SharedHosts
+from jobflow_remote.utils.remote import SharedHosts, safe_remove_job_files
 
 if TYPE_CHECKING:
     from collections.abc import Generator, Sequence
@@ -839,27 +839,25 @@ class JobController:
         list
             List of db_ids of the updated Jobs.
         """
-        # Open the SharedHosts so that hosts will be shared for all the Jobs
-        with SharedHosts(self.project):
-            return self._many_jobs_action(
-                method=self.rerun_job,
-                action_description="rerunning",
-                job_ids=job_ids,
-                db_ids=db_ids,
-                flow_ids=flow_ids,
-                states=states,
-                start_date=start_date,
-                end_date=end_date,
-                name=name,
-                metadata=metadata,
-                workers=workers,
-                custom_query=custom_query,
-                raise_on_error=raise_on_error,
-                force=force,
-                wait=wait,
-                break_lock=break_lock,
-                delete_files=delete_files,
-            )
+        return self._many_jobs_action(
+            method=self.rerun_job,
+            action_description="rerunning",
+            job_ids=job_ids,
+            db_ids=db_ids,
+            flow_ids=flow_ids,
+            states=states,
+            start_date=start_date,
+            end_date=end_date,
+            name=name,
+            metadata=metadata,
+            workers=workers,
+            custom_query=custom_query,
+            raise_on_error=raise_on_error,
+            force=force,
+            wait=wait,
+            break_lock=break_lock,
+            delete_files=delete_files,
+        )
 
     def rerun_job(
         self,
@@ -923,60 +921,54 @@ class JobController:
         if wait:
             sleep = 10
 
-        # Open the SharedHosts so that hosts will be shared in case the rerun
-        # modifies children as well
-        with SharedHosts(self.project):
-            modified_jobs: list[str] = []
-            # the job to rerun is the last to be released since this prevents
-            # a checkout of the job while the flow is still locked
-            with self.lock_job(
-                filter=lock_filter,
-                break_lock=break_lock,
-                sort=sort,
-                projection=["uuid", "index", "db_id", "state", "worker", "run_dir"],
-                sleep=sleep,
-                max_wait=wait,
-                get_locked_doc=True,
-            ) as job_lock:
-                job_doc_dict = job_lock.locked_document
-                if not job_doc_dict:
-                    if job_lock.unavailable_document:
-                        raise JobLockedError.from_job_doc(job_lock.unavailable_document)
-                    raise ValueError(f"No Job document matching criteria {lock_filter}")
-                job_state = JobState(job_doc_dict["state"])
+        modified_jobs: list[str] = []
+        # the job to rerun is the last to be released since this prevents
+        # a checkout of the job while the flow is still locked
+        with self.lock_job(
+            filter=lock_filter,
+            break_lock=break_lock,
+            sort=sort,
+            projection=["uuid", "index", "db_id", "state", "worker", "run_dir"],
+            sleep=sleep,
+            max_wait=wait,
+            get_locked_doc=True,
+        ) as job_lock:
+            job_doc_dict = job_lock.locked_document
+            if not job_doc_dict:
+                if job_lock.unavailable_document:
+                    raise JobLockedError.from_job_doc(job_lock.unavailable_document)
+                raise ValueError(f"No Job document matching criteria {lock_filter}")
+            job_state = JobState(job_doc_dict["state"])
 
-                if job_state in [JobState.READY]:
-                    raise ValueError("The Job is in the READY state. No need to rerun.")
-                if job_state in RESETTABLE_STATES:
-                    # if in one of the resettable states no need to lock the flow or
-                    # update children.
-                    doc_update = self._reset_remote(job_doc_dict)
-                    if delete_files:
-                        self._safe_delete_files([job_doc_dict])
-                    modified_jobs = []
-                elif (
-                    job_state not in [JobState.FAILED, JobState.REMOTE_ERROR]
-                    and not force
-                ):
-                    raise ValueError(
-                        f"Job in state {job_doc_dict['state']} cannot be rerun. "
-                        "Use the 'force' option to override this check."
-                    )
-                else:
-                    # full restart required
-                    doc_update, modified_jobs = self._full_rerun(
-                        job_doc_dict,
-                        sleep=sleep,
-                        wait=wait,
-                        break_lock=break_lock,
-                        force=force,
-                        delete_files=delete_files,
-                    )
+            if job_state in [JobState.READY]:
+                raise ValueError("The Job is in the READY state. No need to rerun.")
+            if job_state in RESETTABLE_STATES:
+                # if in one of the resettable states no need to lock the flow or
+                # update children.
+                doc_update = self._reset_remote(job_doc_dict, delete_files=delete_files)
+                modified_jobs = []
+            elif (
+                job_state not in [JobState.FAILED, JobState.REMOTE_ERROR] and not force
+            ):
+                raise ValueError(
+                    f"Job in state {job_doc_dict['state']} cannot be rerun. "
+                    "Use the 'force' option to override this check."
+                )
+            else:
+                # full restart required
+                doc_update, modified_jobs = self._full_rerun(
+                    job_doc_dict,
+                    sleep=sleep,
+                    wait=wait,
+                    break_lock=break_lock,
+                    force=force,
+                    delete_files=delete_files,
+                )
 
-                modified_jobs.append(job_doc_dict["db_id"])
+            modified_jobs.append(job_doc_dict["db_id"])
 
-                set_doc = {"$set": doc_update}
-                job_lock.update_on_release = set_doc
+            set_doc = {"$set": doc_update}
+            job_lock.update_on_release = set_doc
 
         return modified_jobs
 
@@ -1131,12 +1123,12 @@ class JobController:
                 # Set the new state for all of them.
                 for child_lock in children_locks:
                     child_doc = child_lock.locked_document
+                    child_doc_update = get_reset_job_base_dict()
+                    child_doc_update["state"] = JobState.WAITING.value
                     if child_doc["state"] != JobState.WAITING.value:
                         modified_jobs.append(child_doc["db_id"])
                         if delete_files:
-                            self._safe_delete_files([child_doc])
-                    child_doc_update = get_reset_job_base_dict()
-                    child_doc_update["state"] = JobState.WAITING.value
+                            child_doc_update["remote.cleanup"] = True
                     child_lock.update_on_release = {"$set": child_doc_update}
                     updated_states[child_doc["uuid"]][child_doc["index"]] = (
                         JobState.WAITING
@@ -1154,11 +1146,11 @@ class JobController:
             job_doc_update = get_reset_job_base_dict()
             job_doc_update["state"] = JobState.READY.value
             if delete_files:
-                self._safe_delete_files([doc])
+                job_doc_update["remote.cleanup"] = True
 
         return job_doc_update, modified_jobs
 
-    def _reset_remote(self, doc: dict) -> dict:
+    def _reset_remote(self, doc: dict, delete_files: bool = True) -> dict:
         """
         Simple reset of a Job in a running state or REMOTE_ERROR.
         Does not require additional locking on the Flow or other Jobs.
@@ -1168,6 +1160,8 @@ class JobController:
         doc
             The dict of the JobDoc associated to the Job to rerun.
             Just the "uuid", "index", "state" values are required.
+        delete_files
+            Delete all the files in the worker folder of the rerun Job.
 
         Returns
         -------
@@ -1186,6 +1180,8 @@ class JobController:
 
         job_doc_update = get_reset_job_base_dict()
         job_doc_update["state"] = JobState.CHECKED_OUT.value
+        if delete_files:
+            job_doc_update["remote.cleanup"] = True
 
         return job_doc_update
 
@@ -2496,23 +2492,10 @@ class JobController:
                     worker = job_info["worker"]
                 if run_dir:
                     host = shared_hosts.get_host(worker)
-                    remote_files = host.listdir(run_dir)
-                    # safety measure to avoid mistakenly deleting other folders
-                    # maybe too much?
-                    if not remote_files:
-                        continue
-                    if any(
-                        fn in remote_files
-                        for fn in ("jfremote_in.json", "jfremote_in.json.gz")
+                    if safe_remove_job_files(
+                        host=host, run_dir=run_dir, raise_on_error=False
                     ):
-                        if host.rmtree(path=run_dir, raise_on_error=False):
-                            deleted.append(job_info)
-                    else:
-                        logger.warning(
-                            f"Did not delete folder {run_dir} "
-                            f"since it may not contain a jobflow-remote execution",
-                        )
-
+                        deleted.append(job_info)
         return deleted
 
     def unlock_flows(
@@ -3898,6 +3881,9 @@ class JobController:
                 no_retry = True
             except RemoteError as e:
                 error = f"Remote error: {e.msg}"
+                if e.__cause__:
+                    trace = traceback.format_exception(e.__cause__)
+                    error += "\ncaused by:\n" + "".join(trace)
                 no_retry = e.no_retry
             except Exception:
                 error = traceback.format_exc()

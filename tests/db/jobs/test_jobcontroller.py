@@ -162,7 +162,13 @@ def test_rerun_completed(job_controller, runner) -> None:
         j2_info.db_id,
     }
 
-    assert not j1_path.exists()
+    # the folder should still exist
+    # create a file there so that it will be checked after the execution. It should
+    # be deleted by the runner.
+    assert j1_path.exists()
+    check_file_j1 = j1_path / "test_test.json"
+    check_file_j1.touch(exist_ok=True)
+    assert check_file_j1.exists()
 
     assert (
         job_controller.get_job_info(job_id=j1.uuid, job_index=j1.index).state
@@ -179,6 +185,8 @@ def test_rerun_completed(job_controller, runner) -> None:
     assert job_controller.count_jobs(states=JobState.COMPLETED) == 3
     with pytest.raises(ValueError, match="Job in state COMPLETED cannot be rerun"):
         job_controller.rerun_job(job_id=j3.uuid, job_index=j3.index)
+
+    assert not check_file_j1.exists()
 
     j3_info = job_controller.get_job_info(job_id=j3.uuid, job_index=j3.index)
     j3_path = Path(j3_info.run_dir)
@@ -317,14 +325,38 @@ def test_rerun_failed(job_controller, runner) -> None:
 
     assert job_controller.count_jobs(states=JobState.READY) == 1
 
-    # check that also the folder of the complete child was removed
-    assert not j1_path.exists()
-    assert not j3_path.exists()
+    # check that also the cleanup of the child was set
+    j1_info = job_controller.get_job_info(job_id=j1.uuid, job_index=j1.index)
+    j3_info = job_controller.get_job_info(job_id=j3.uuid, job_index=j3.index)
+    assert j1_path.exists()
+    assert j3_path.exists()
+    assert j1_info.remote.cleanup
+    assert j3_info.remote.cleanup
+
+    # create a file in the folders, to be sure that in the meanwhile the folders have been removed
+    # during the upload phase
+    check_file_j1 = j1_path / "test_test.json"
+    check_file_j1.touch(exist_ok=True)
+    assert check_file_j1.exists()
+    check_file_j3 = j3_path / "test_test.json"
+    check_file_j3.touch(exist_ok=True)
+    assert check_file_j3.exists()
 
     # run again the jobs with j4. This generates a replace
+    # check that the fake additional files are not present, meaning the
+    # folder was deleted by the cleanup
     assert runner.run_one_job(max_seconds=10, job_id=[j1.uuid, j1.index])
+    assert not check_file_j1.exists()
     assert runner.run_one_job(max_seconds=10, job_id=[j3.uuid, j3.index])
+    assert not check_file_j3.exists()
     assert runner.run_one_job(max_seconds=10, job_id=[j4.uuid, j4.index])
+
+    j1_info = job_controller.get_job_info(job_id=j1.uuid, job_index=j1.index)
+    j3_info = job_controller.get_job_info(job_id=j3.uuid, job_index=j3.index)
+
+    # also check that the cleanup has be set to False
+    assert not j1_info.remote.cleanup
+    assert not j3_info.remote.cleanup
 
     assert job_controller.count_jobs(job_ids=(j4.uuid, 2)) == 1
 
@@ -395,8 +427,11 @@ def test_rerun_remote_error(job_controller, monkeypatch, runner) -> None:
     )
     assert job_controller.get_flows_info(job_ids=[j1.uuid])[0].state == FlowState.READY
 
-    # check that files are being deleted also in case of remote_error
-    assert not Path(j1_info.run_dir).exists()
+    # check that files are marked for deletion also in case of remote_error.
+    # do not run the job explicitly, as it is already checked in other tests
+    j1_info = job_controller.get_job_info(job_id=j1.uuid, job_index=j1.index)
+    assert Path(j1_info.run_dir).exists()
+    assert j1_info.remote.cleanup
 
 
 def test_retry(job_controller, monkeypatch, runner) -> None:

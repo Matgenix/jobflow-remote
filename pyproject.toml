@@ -155,6 +155,9 @@ filterwarnings = [
     "ignore:.*magmom.*:UserWarning",
     "ignore::DeprecationWarning",
 ]
+addopts = [
+    "--import-mode=importlib",
+]
 
 [tool.coverage.run]
 include = ["src/*"]

@@ -99,8 +99,6 @@ def test_set_state(job_controller, two_flows_four_jobs) -> None:
 
 
 def test_rerun(job_controller, two_flows_four_jobs) -> None:
-    from pathlib import Path
-
     from jobflow_remote.jobs.runner import Runner
     from jobflow_remote.jobs.state import JobState
     from jobflow_remote.testing.cli import run_check_cli
@@ -133,22 +131,21 @@ def test_rerun(job_controller, two_flows_four_jobs) -> None:
         required_out="Operation completed: 1 jobs modified",
     )
 
-    assert not os.path.isdir(job_info.run_dir)
-    assert job_controller.get_job_info(db_id="1").state == JobState.READY
+    assert os.path.isdir(job_info.run_dir)
+    ji = job_controller.get_job_info(db_id="1")
+    assert ji.state == JobState.READY
+    assert ji.remote.cleanup
 
-    # set the job back to completed but create the folder without the
-    # jfremote_in.json file, so get the warning that the files are not deleted
+    # set the job back to completed and set remote.cleanup=False. rerun with --no-delete
     assert job_controller.set_job_state(JobState.COMPLETED, db_id="1")
-    os.mkdir(job_info.run_dir)
-    (Path(job_info.run_dir) / "file.json").touch()
+    assert job_controller.set_job_doc_properties({"remote.cleanup": False}, db_id="1")
     run_check_cli(
-        ["job", "rerun", "-did", "1", "-f"],
-        required_out=[
-            "Operation completed: 1 jobs modified",
-            "WARNING",
-            "it may not contain a jobflow-remote execution",
-        ],
+        ["job", "rerun", "-did", "1", "-f", "-nd"],
     )
+
+    ji = job_controller.get_job_info(db_id="1")
+    assert ji.state == JobState.READY
+    assert not ji.remote.cleanup
 
 
 def test_retry(job_controller, two_flows_four_jobs) -> None:

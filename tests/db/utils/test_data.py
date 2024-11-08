@@ -56,7 +56,7 @@ def test_get_utc_offset():
     from jobflow_remote.utils.data import get_utc_offset
 
     assert get_utc_offset("America/Los_Angeles") == "-07:00"
-    assert get_utc_offset("Europe/Paris") == "+02:00"
+    assert get_utc_offset("Europe/Moscow") == "+03:00"
     assert get_utc_offset("UTC") == "+00:00"
     assert get_utc_offset("Asia/Shanghai") == "+08:00"
     with pytest.raises(ValueError, match="Could not determine the timezone for XXX"):

@@ -1068,7 +1068,7 @@ def output(
         ),
     ] = False,
 ) -> None:
-    """Detailed information on a specific job."""
+    """Fetch the output of a Job from the output Store."""
     db_id, job_id = get_job_db_ids(job_db_id, job_index)
 
     with loading_spinner():
