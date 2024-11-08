@@ -330,8 +330,8 @@ def test_rerun_failed(job_controller, runner) -> None:
     j3_info = job_controller.get_job_info(job_id=j3.uuid, job_index=j3.index)
     assert j1_path.exists()
     assert j3_path.exists()
-    assert j1_info.remote.cleanup
-    assert j3_info.remote.cleanup
+    assert j1_info.remote.prerun_cleanup
+    assert j3_info.remote.prerun_cleanup
 
     # create a file in the folders, to be sure that in the meanwhile the folders have been removed
     # during the upload phase
@@ -355,8 +355,8 @@ def test_rerun_failed(job_controller, runner) -> None:
     j3_info = job_controller.get_job_info(job_id=j3.uuid, job_index=j3.index)
 
     # also check that the cleanup has be set to False
-    assert not j1_info.remote.cleanup
-    assert not j3_info.remote.cleanup
+    assert not j1_info.remote.prerun_cleanup
+    assert not j3_info.remote.prerun_cleanup
 
     assert job_controller.count_jobs(job_ids=(j4.uuid, 2)) == 1
 
@@ -431,7 +431,7 @@ def test_rerun_remote_error(job_controller, monkeypatch, runner) -> None:
     # do not run the job explicitly, as it is already checked in other tests
     j1_info = job_controller.get_job_info(job_id=j1.uuid, job_index=j1.index)
     assert Path(j1_info.run_dir).exists()
-    assert j1_info.remote.cleanup
+    assert j1_info.remote.prerun_cleanup
 
 
 def test_retry(job_controller, monkeypatch, runner) -> None:

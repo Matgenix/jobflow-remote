@@ -1128,7 +1128,7 @@ class JobController:
                     if child_doc["state"] != JobState.WAITING.value:
                         modified_jobs.append(child_doc["db_id"])
                         if delete_files:
-                            child_doc_update["remote.cleanup"] = True
+                            child_doc_update["remote.prerun_cleanup"] = True
                     child_lock.update_on_release = {"$set": child_doc_update}
                     updated_states[child_doc["uuid"]][child_doc["index"]] = (
                         JobState.WAITING
@@ -1146,7 +1146,7 @@ class JobController:
             job_doc_update = get_reset_job_base_dict()
             job_doc_update["state"] = JobState.READY.value
             if delete_files:
-                job_doc_update["remote.cleanup"] = True
+                job_doc_update["remote.prerun_cleanup"] = True
 
         return job_doc_update, modified_jobs
 
@@ -1181,7 +1181,7 @@ class JobController:
         job_doc_update = get_reset_job_base_dict()
         job_doc_update["state"] = JobState.CHECKED_OUT.value
         if delete_files:
-            job_doc_update["remote.cleanup"] = True
+            job_doc_update["remote.prerun_cleanup"] = True
 
         return job_doc_update
 

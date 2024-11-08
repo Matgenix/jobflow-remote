@@ -134,18 +134,20 @@ def test_rerun(job_controller, two_flows_four_jobs) -> None:
     assert os.path.isdir(job_info.run_dir)
     ji = job_controller.get_job_info(db_id="1")
     assert ji.state == JobState.READY
-    assert ji.remote.cleanup
+    assert ji.remote.prerun_cleanup
 
     # set the job back to completed and set remote.cleanup=False. rerun with --no-delete
     assert job_controller.set_job_state(JobState.COMPLETED, db_id="1")
-    assert job_controller.set_job_doc_properties({"remote.cleanup": False}, db_id="1")
+    assert job_controller.set_job_doc_properties(
+        {"remote.prerun_cleanup": False}, db_id="1"
+    )
     run_check_cli(
         ["job", "rerun", "-did", "1", "-f", "-nd"],
     )
 
     ji = job_controller.get_job_info(db_id="1")
     assert ji.state == JobState.READY
-    assert not ji.remote.cleanup
+    assert not ji.remote.prerun_cleanup
 
 
 def test_retry(job_controller, two_flows_four_jobs) -> None:

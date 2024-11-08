@@ -576,10 +576,10 @@ class Runner:
         worker = self.get_worker(doc["worker"])
         host = self.get_host(doc["worker"])
 
-        # if cleanup is specified (job was likely rerun) delete the folder before
+        # if prerun_cleanup is specified (job was likely rerun) delete the folder before
         # reuploading the data
         run_dir = doc["run_dir"]
-        if doc.get("remote", {}).get("cleanup", False):
+        if doc.get("remote", {}).get("prerun_cleanup", False):
             try:
                 deleted = safe_remove_job_files(
                     host=host, run_dir=run_dir, raise_on_error=True
@@ -639,7 +639,7 @@ class Runner:
             "$set": {
                 "run_dir": remote_path,
                 "state": JobState.UPLOADED.value,
-                "remote.cleanup": False,
+                "remote.prerun_cleanup": False,
             }
         }
         lock.update_on_release = set_output
