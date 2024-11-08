@@ -3881,8 +3881,14 @@ class JobController:
                 no_retry = True
             except RemoteError as e:
                 error = f"Remote error: {e.msg}"
-                if e.__cause__:
-                    trace = traceback.format_exception(e.__cause__)
+                cause = e.__cause__
+                if cause:
+                    # this is required for support of python 3.9. In 3.10 the API
+                    # changed and format_exception(e) could be used instead.
+                    # Do that if/when support for 3.9 is dropped.
+                    trace = traceback.format_exception(
+                        type(cause), cause, cause.__traceback__
+                    )
                     error += "\ncaused by:\n" + "".join(trace)
                 no_retry = e.no_retry
             except Exception:
