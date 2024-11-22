@@ -326,7 +326,13 @@ def test_undefined_additional_stores(worker, job_controller) -> None:
     )
 
 
-def test_submit_flow_with_scheduler_username(monkeypatch, job_controller) -> None:
+@pytest.mark.parametrize(
+    "remote_worker_name",
+    [w for w in WORKERS if "remote" in w],
+)
+def test_submit_flow_with_scheduler_username(
+    remote_worker_name, monkeypatch, job_controller
+) -> None:
     from jobflow import Flow
 
     from jobflow_remote import submit_flow
@@ -334,8 +340,6 @@ def test_submit_flow_with_scheduler_username(monkeypatch, job_controller) -> Non
     from jobflow_remote.jobs.state import FlowState, JobState
     from jobflow_remote.remote.queue import QueueManager
     from jobflow_remote.testing import add
-
-    remote_worker_name = "test_remote_worker"
 
     job = add(1, 1)
     flow = Flow([job])
