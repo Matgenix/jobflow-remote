@@ -3,7 +3,7 @@ ARG QUEUE_SYSTEM=slurm
 ARG USERNAME=jobflow
 
 # Install jobflow-remote in its own layer with uv
-FROM ubuntu:22.04 as jobflow-remote-install
+FROM --platform=linux/amd64 ubuntu:22.04 as jobflow-remote-install
 
 ARG USERNAME=jobflow
 ENV USERNAME=${USERNAME}
@@ -41,13 +41,13 @@ RUN uv venv /home/${USERNAME}/.venv && \
 # the jobflow user's permissions.
 
 # -== SLURM ==-
-FROM nathanhess/slurm:full AS slurm
+FROM --platform=linux/amd64 nathanhess/slurm:full AS slurm
 USER root
 COPY ./tests/integration/dockerfiles/slurm_startup.sh /etc/startup.sh
 HEALTHCHECK CMD sinfo || exit 1
 
 # -== SGE ==-
-FROM ubuntu:22.04 as sge
+FROM --platform=linux/amd64 ubuntu:22.04 as sge
 
 ARG USERNAME=jobflow
 ENV USERNAME=${USERNAME}
@@ -112,7 +112,7 @@ RUN echo "export SGE_ROOT=/opt/sge" >> /etc/profile && \
 #HEALTHCHECK CMD qstat -f || exit 1
 
 # 2) Add common options from ubuntu server
-FROM ${QUEUE_SYSTEM} as jobflow
+FROM --platform=linux/amd64 ${QUEUE_SYSTEM} as jobflow
 
 ARG USERNAME=jobflow
 ENV USERNAME=${USERNAME}
