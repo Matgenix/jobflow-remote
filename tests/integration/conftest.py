@@ -294,6 +294,7 @@ def write_tmp_settings(
                     work_dir="/home/jobflow/jfr",
                     user="jobflow",
                     password="jobflow",
+                    scheduler_username="jobflow",
                     pre_run="source /home/jobflow/.venv/bin/activate",
                     resources={"partition": "debug", "ntasks": 1, "time": "00:01:00"},
                     connect_kwargs={"allow_agent": False, "look_for_keys": False},

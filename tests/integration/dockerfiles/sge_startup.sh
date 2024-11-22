@@ -31,6 +31,44 @@ fshare       0
 delete_time 1728730547
 default_project NONE" > jobflow_user.txt
 
+# Create global scheduler configuration file
+echo "algorithm                         default
+schedule_interval                   0:0:1
+maxujobs                           0
+queue_sort_method                  load
+job_load_adjustments              NONE
+load_adjustment_decay_time         0:7:30
+load_formula                      np_load_avg
+schedd_job_info                   true
+flush_submit_sec                  0
+flush_finish_sec                  0
+params                            none
+reprioritize_interval             0:0:0
+halftime                          168
+usage_weight_list                 cpu=1.000000,mem=0.000000,io=0.000000
+compensation_factor               5.000000
+weight_user                       0.250000
+weight_project                    0.250000
+weight_department                 0.250000
+weight_job                        0.250000
+weight_tickets_functional         0
+weight_tickets_share              0
+share_override_tickets           TRUE
+share_functional_shares          TRUE
+max_functional_jobs_to_schedule  200
+report_pjob_tickets             TRUE
+max_pending_tasks_per_job       50
+halflife_decay_list             none
+policy_hierarchy                OFS
+weight_ticket                   0
+weight_waiting_time             0
+weight_deadline                 3600000
+weight_urgency                  0
+weight_priority                 1" > scheduler.conf
+
+# Apply the configuration
+qconf -Msconf scheduler.conf
+
 # Add user
 qconf -Auser jobflow_user.txt
 
@@ -49,7 +87,7 @@ suspend_thresholds    NONE
 nsuspend              1
 suspend_interval      00:05:00
 priority              0
-min_cpu_interval      00:05:00
+min_cpu_interval      00:00:01
 processors            UNDEFINED
 qtype                 BATCH INTERACTIVE
 ckpt_list             NONE
@@ -65,7 +103,7 @@ starter_method        NONE
 suspend_method        NONE
 resume_method         NONE
 terminate_method      NONE
-notify                00:00:60
+notify                00:00:01
 owner_list            jobflow
 user_lists            default
 xuser_lists           NONE
