@@ -9,6 +9,8 @@ pytestmark = pytest.mark.skipif(
 
 WORKERS = ["test_local_worker", "test_remote_slurm_worker", "test_remote_sge_worker"]
 
+MAX_TRY_SECONDS = 120
+
 
 def test_project_init(random_project_name, write_tmp_settings) -> None:
     from jobflow_remote.config import ConfigManager
@@ -84,7 +86,7 @@ def test_submit_flow(worker, job_controller) -> None:
     submit_flow(flow, worker=worker)
 
     runner = Runner()
-    runner.run(ticks=10)
+    runner.run_all_jobs(max_seconds=MAX_TRY_SECONDS)
 
     assert len(job_controller.get_jobs({})) == 2
     job_1, job_2 = job_controller.get_jobs({})
@@ -124,7 +126,7 @@ def test_submit_flow_with_dependencies(worker, job_controller) -> None:
     submit_flow(flow, worker=worker)
 
     runner = Runner()
-    runner.run(ticks=20)
+    runner.run_all_jobs(max_seconds=MAX_TRY_SECONDS)
 
     assert len(job_controller.get_jobs({})) == 4
     job_1, job_2, job_3, job_4 = job_controller.get_jobs({})
@@ -175,7 +177,7 @@ def test_job_with_callable_kwarg(worker, job_controller) -> None:
     submit_flow(flow, worker=worker)
 
     runner = Runner()
-    runner.run(ticks=12)
+    runner.run_all_jobs(max_seconds=MAX_TRY_SECONDS)
 
     assert job_controller.count_jobs({}) == 3
     assert len(job_controller.get_jobs({})) == 3
@@ -216,7 +218,7 @@ def test_expected_failure(worker, job_controller) -> None:
     assert job_controller.count_flows({}) == 1
 
     runner = Runner()
-    runner.run(ticks=10)
+    runner.run_all_jobs(max_seconds=MAX_TRY_SECONDS)
 
     assert job_controller.count_jobs(states=JobState.FAILED) == 2
     assert job_controller.count_flows(states=FlowState.FAILED) == 1
@@ -243,7 +245,7 @@ def test_exec_config(worker, job_controller, random_project_name) -> None:
     assert job_controller.count_flows({}) == 1
 
     runner = Runner()
-    runner.run(ticks=5)
+    runner.run_all_jobs(max_seconds=MAX_TRY_SECONDS)
 
     job = job_controller.get_jobs({})[0]
     output = job_controller.jobstore.get_output(uuid=job["uuid"])
@@ -270,7 +272,7 @@ def test_additional_stores(worker, job_controller) -> None:
     assert job_controller.count_flows({}) == 1
 
     runner = Runner()
-    runner.run(ticks=10)
+    runner.run_all_jobs(max_seconds=MAX_TRY_SECONDS)
 
     doc = job_controller.get_jobs({})[0]
     fs = job_controller.jobstore.additional_stores["big_data"]
@@ -314,7 +316,7 @@ def test_undefined_additional_stores(worker, job_controller) -> None:
     assert job_controller.count_flows({}) == 1
 
     runner = Runner()
-    runner.run(ticks=10)
+    runner.run_all_jobs(max_seconds=MAX_TRY_SECONDS)
 
     assert job_controller.count_jobs({}) == 2
 
@@ -419,7 +421,7 @@ def test_priority(worker, job_controller) -> None:
     submit_flow(flow5, worker=worker, priority=2)
 
     runner = Runner()
-    runner.run_all_jobs(max_seconds=120)
+    runner.run_all_jobs(max_seconds=MAX_TRY_SECONDS)
 
     assert job_controller.count_jobs(states=[JobState.COMPLETED]) == 5
     # check that the jobs were executed according to the priority
