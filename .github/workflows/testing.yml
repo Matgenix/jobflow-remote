@@ -98,10 +98,20 @@ jobs:
           pip install .[tests]
 
       - name: Unit tests
-        run: COVERAGE_FILE=.coverage.1 pytest --cov=jobflow_remote --cov-report= --cov-config pyproject.toml --ignore tests/integration
+        run: |
+          COVERAGE_FILE=.coverage.1 \
+          pytest \
+            --pytest-durations-min=1 \
+            --cov=jobflow_remote --cov-report= --cov-config pyproject.toml \
+            --ignore tests/integration \
 
       - name: Integration tests
-        run: COVERAGE_FILE=.coverage.2 pytest --cov=jobflow_remote --cov-report= --cov-config pyproject.toml tests/integration
+        run: |
+          COVERAGE_FILE=.coverage.2 \
+          pytest \
+          --pytest-durations-min=1 \
+          --cov=jobflow_remote --cov-report= --cov-config pyproject.toml \
+          tests/integration
 
       # combining the reports with --cov-append did not seem to work
       - name: Generate coverage report
