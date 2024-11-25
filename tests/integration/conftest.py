@@ -115,8 +115,8 @@ def build_and_launch_container(
         container = docker_client.containers.run(
             image_name,
             detach=True,
-            remove=False,
-            auto_remove=False,
+            remove=True,
+            auto_remove=True,
             tty=True,
             ports=ports,
         )
