@@ -95,7 +95,7 @@ pe_list               make smp mpi
 rerun                 FALSE
 slots                 4
 tmpdir                /tmp
-shell                 /bin/sh
+shell                 /bin/bash
 prolog                NONE
 epilog                NONE
 shell_start_mode      posix_compliant
