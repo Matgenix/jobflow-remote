@@ -99,24 +99,26 @@ jobs:
 
       - name: Unit tests
         run: |
-          COVERAGE_FILE=.coverage-unit.xml \
+          COVERAGE_FILE=.coverage-unit \
           pytest \
             --pytest-durations-min=1 \
-            --cov=jobflow_remote --cov-report=xml --cov-config pyproject.toml \
+            --cov=jobflow_remote --cov-report= --cov-config pyproject.toml \
             --ignore tests/integration \
 
       - name: Integration tests
         run: |
-          COVERAGE_FILE=.coverage-integration.xml \
+          COVERAGE_FILE=.coverage-integration \
           pytest \
           --pytest-durations-min=1 \
-          --cov=jobflow_remote --cov-report=xml --cov-config pyproject.toml \
+          --cov=jobflow_remote --cov-report= --cov-config pyproject.toml \
           tests/integration
 
       # combining the reports with --cov-append did not seem to work
-      - name: Generate coverage report
+      - name: Generate coverage reports
         run: |
-          coverage combine .coverage-unit.xml .coverage-integration.xml
+          coverage xml --data-file=.coverage-unit -o .coverage-unit.xml
+          coverage xml --data-file=.coverage-integration -o .coverage-integration.xml
+          coverage combine .coverage-unit .coverage-integration
           coverage xml -o .coverage-all.xml
 
       - name: Upload unit tests coverage report to Codecov
