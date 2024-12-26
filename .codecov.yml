@@ -6,7 +6,7 @@ comment:
   require_head: true
 flag_management:
   default_rules:
-    carryforward: true
+    carryforward: false
     paths:
       - src/jobflow_remote
     statuses:
