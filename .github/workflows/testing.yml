@@ -99,30 +99,52 @@ jobs:
 
       - name: Unit tests
         run: |
-          COVERAGE_FILE=.coverage.1 \
+#          COVERAGE_FILE=.coverage.1 \
           pytest \
             --pytest-durations-min=1 \
-            --cov=jobflow_remote --cov-report= --cov-config pyproject.toml \
+            --cov=jobflow_remote --cov-report=xml:.coverage-unit.xml --cov-config pyproject.toml \
             --ignore tests/integration \
 
       - name: Integration tests
         run: |
-          COVERAGE_FILE=.coverage.2 \
+#          COVERAGE_FILE=.coverage.2 \
           pytest \
           --pytest-durations-min=1 \
-          --cov=jobflow_remote --cov-report= --cov-config pyproject.toml \
+          --cov=jobflow_remote --cov-report=xml:.coverage-integration.xml --cov-config pyproject.toml \
           tests/integration
 
       # combining the reports with --cov-append did not seem to work
       - name: Generate coverage report
         run: |
-          coverage combine .coverage.1 .coverage.2
-          coverage xml
+          coverage combine .coverage-unit.xml .coverage-integration.xml
+          coverage xml -o .coverage-all.xml
 
-      - name: Upload coverage reports to Codecov
+      - name: Upload unit tests coverage report to Codecov
         uses: codecov/codecov-action@v4
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        with:
+          file: .coverage-unit.xml
+          flags: unit_tests
+          name: unit_tests
+
+      - name: Upload integration tests coverage report to Codecov
+        uses: codecov/codecov-action@v4
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        with:
+          file: .coverage-integration.xml
+          flags: integration_tests
+          name: integration_tests
+
+      - name: Upload all (unit+integration) tests coverage report to Codecov
+        uses: codecov/codecov-action@v4
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        with:
+          file: .coverage-all.xml
+          flags: all_tests
+          name: all_tests
 
   docs:
     name: Build documentation

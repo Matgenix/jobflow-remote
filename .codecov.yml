@@ -1,12 +1,45 @@
 comment:
-  layout: "diff, files"
+  layout: "diff, flags, files"
   behavior: default
   require_changes: false
-  require_base: no
-  require_head: yes
+  require_base: false
+  require_head: true
+flag_management:
+  default_rules:
+    carryforward: true
+    paths:
+      - src/jobflow_remote
+    statuses:
+      - type: project
+        target: auto
+        threshold: 1%
+      - type: patch
+        target: 95%
+  individual_flags:
+    - name: unit_tests
+      statuses:
+        - type: project
+          target: 50%
+        - type: patch
+          target: 100%
+    - name: integration_tests
+      statuses:
+        - type: project
+          target: 50%
+        - type: patch
+          target: 90%
+    - name: all_tests
+      statuses:
+        - type: project
+          target: 50%
+        - type: patch
+          target: 90%
 coverage:
-  status:
-    project: off
-    patch:
-      default:
-        only_pulls: true
+  precision: 2
+  round: down
+  range: 80..95
+#  status:
+#    project: off
+#    patch:
+#      default:
+#        only_pulls: true
