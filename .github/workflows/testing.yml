@@ -113,32 +113,38 @@ jobs:
             --cov=jobflow_remote --cov-report= --cov-config pyproject.toml \
             tests/integration
 
-      - name: Generate coverage report for unit and integration tests
+      - name: Move .coverage-unit file
         run: |
-          coverage combine .coverage-unit
-          mv .coverage .coverage-unit
-          coverage combine .coverage-integration
-          mv .coverage .coverage-integration
+          mv .coverage-unit .coverage
 
       - name: Upload unit tests coverage report to Codecov
         uses: codecov/codecov-action@v5
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
         with:
-          files: .coverage-unit
+          files: .coverage
           flags: unit_tests
           name: unit_tests
+
+      - name: Move back .coverage-unit file and move .coverage-integration file
+        run: |
+          mv .coverage .coverage-unit
+          mv .coverage-integration .coverage
 
       - name: Upload integration tests coverage report to Codecov
         uses: codecov/codecov-action@v5
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
         with:
-          files: .coverage-integration
+          files: .coverage
           flags: integration_tests
           name: integration_tests
 
-      - name: Generate coverage reports
+      - name: Move back .coverage-integration file
+        run: |
+          mv .coverage .coverage-integration
+
+      - name: Generate combined coverage report for unit and integration tests
         run: |
           coverage combine .coverage-unit .coverage-integration
 
