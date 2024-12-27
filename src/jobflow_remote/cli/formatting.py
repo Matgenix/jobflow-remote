@@ -26,79 +26,93 @@ if TYPE_CHECKING:
     from jobflow_remote.jobs.upgrade import UpgradeAction
 
 
-def get_job_info_table(jobs_info: list[JobInfo], verbosity: int) -> Table:
-    time_zone_str = f" [{time.tzname[0]}]"
+def format_state(ji: JobInfo) -> Text:
+    state = ji.state.name
+    if ji.state in (JobState.REMOTE_ERROR, JobState.FAILED):
+        state = f"[bold red]{state}[/]"
+    elif ji.remote.retry_time_limit is not None:
+        state = f"[bold orange3]{state}[/]"
+    return Text.from_markup(state)
+
+
+def format_run_time(ji: JobInfo) -> str:
+    prefix = ""
+    if ji.state == JobState.RUNNING:
+        run_time = ji.estimated_run_time
+        prefix = "~"
+    else:
+        run_time = ji.run_time
+    if not run_time:
+        return ""
+    m, s = divmod(run_time, 60)
+    h, m = divmod(m, 60)
+    return prefix + f"{h:g}:{m:02g}"
+
+
+time_zone_str = f" [{time.tzname[0]}]"
+header_name_data_getter_map = {
+    "db_id": ("DB id", lambda ji: str(ji.db_id)),
+    "name": ("Name", lambda ji: ji.name),
+    "state": ("State", format_state),
+    "job_id": ("Job id (Index)", lambda ji: f"{ji.uuid}  ({ji.index})"),
+    "worker": ("Worker", lambda ji: ji.worker),
+    "last_updated": (
+        "Last updated" + time_zone_str,
+        lambda ji: convert_utc_time(ji.updated_on).strftime(fmt_datetime),
+    ),
+    "queue_id": ("Queue id", lambda ji: ji.remote.process_id),
+    "run_time": (Text("Run time [h:mm]", no_wrap=True), format_run_time),
+    "retry_time": (
+        "Retry time" + time_zone_str,
+        lambda ji: convert_utc_time(ji.remote.retry_time_limit).strftime(fmt_datetime)
+        if ji.remote.retry_time_limit
+        else None,
+    ),
+    "prev_state": (
+        "Prev state",
+        lambda ji: ji.previous_state.name if ji.previous_state else None,
+    ),
+    "locked": ("Locked", lambda ji: "*" if ji.lock_id is not None else None),
+    "lock_id": ("Lock id", lambda ji: str(ji.lock_id)),
+    "lock_time": (
+        "Lock time" + time_zone_str,
+        lambda ji: convert_utc_time(ji.lock_time).strftime(fmt_datetime)
+        if ji.lock_time
+        else None,
+    ),
+}
+
+
+def get_job_info_table(
+    jobs_info: list[JobInfo],
+    verbosity: int,
+    output_keys: list[str] | None = None,
+    stored_data_keys: list[str] | None = None,
+) -> Table:
+    stored_data_keys = stored_data_keys or []
+    if not output_keys or verbosity > 0:
+        all_output_keys = list(header_name_data_getter_map)
+        output_keys = all_output_keys[:6]
+        if verbosity >= 1:
+            output_keys += all_output_keys[6:10]
+        if verbosity == 1:
+            output_keys.append(all_output_keys[10])
+        if verbosity >= 2:
+            output_keys += all_output_keys[11:13]
+    all_display_keys = output_keys + stored_data_keys
+
+    sdk_map = {
+        k: (k, lambda x, k=k: x.stored_data.get(k) if x.stored_data else None)
+        for k in stored_data_keys
+    }
+    full_map = header_name_data_getter_map | sdk_map
 
     table = Table(title="Jobs info")
-    table.add_column("DB id")
-    table.add_column("Name")
-    table.add_column("State")
-    table.add_column("Job id  (Index)")
-
-    table.add_column("Worker")
-    table.add_column("Last updated" + time_zone_str)
-
-    if verbosity >= 1:
-        table.add_column("Queue id")
-        table.add_column("Run time")
-        table.add_column("Retry time" + time_zone_str)
-        table.add_column("Prev state")
-        if verbosity < 2:
-            table.add_column("Locked")
-
-    if verbosity >= 2:
-        table.add_column("Lock id")
-        table.add_column("Lock time" + time_zone_str)
+    for key in all_display_keys:
+        table.add_column(full_map[key][0])
 
     for ji in jobs_info:
-        state = ji.state.name
-
-        if ji.state in (JobState.REMOTE_ERROR, JobState.FAILED):
-            state = f"[bold red]{state}[/]"
-        elif ji.remote.retry_time_limit is not None:
-            state = f"[bold orange3]{state}[/]"
-
-        row = [
-            str(ji.db_id),
-            ji.name,
-            Text.from_markup(state),
-            f"{ji.uuid}  ({ji.index})",
-            ji.worker,
-            convert_utc_time(ji.updated_on).strftime(fmt_datetime),
-        ]
-
-        if verbosity >= 1:
-            row.append(ji.remote.process_id)
-            prefix = ""
-            if ji.state == JobState.RUNNING:
-                run_time = ji.estimated_run_time
-                prefix = "~"
-            else:
-                run_time = ji.run_time
-            if run_time:
-                m, s = divmod(run_time, 60)
-                h, m = divmod(m, 60)
-                row.append(prefix + f"{h:g}:{m:02g}")
-            else:
-                row.append("")
-            row.append(
-                convert_utc_time(ji.remote.retry_time_limit).strftime(fmt_datetime)
-                if ji.remote.retry_time_limit
-                else None
-            )
-            row.append(ji.previous_state.name if ji.previous_state else None)
-            if verbosity < 2:
-                row.append("*" if ji.lock_id is not None else None)
-
-        if verbosity >= 2:
-            row.append(str(ji.lock_id))
-            row.append(
-                convert_utc_time(ji.lock_time).strftime(fmt_datetime)
-                if ji.lock_time
-                else None
-            )
-
-        table.add_row(*row)
+        table.add_row(*(full_map[key][1](ji) for key in all_display_keys))
 
     return table
 

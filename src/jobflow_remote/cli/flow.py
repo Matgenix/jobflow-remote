@@ -74,7 +74,7 @@ def flows_list(
     sort: sort_opt = SortOption.UPDATED_ON,
     reverse_sort: reverse_sort_flag_opt = False,
 ) -> None:
-    """Get the list of Jobs in the database."""
+    """Get the list of Flows in the database."""
     check_incompatible_opt({"start_date": start_date, "days": days, "hours": hours})
     check_incompatible_opt({"end_date": end_date, "days": days, "hours": hours})
 

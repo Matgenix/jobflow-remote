@@ -15,6 +15,7 @@ from jobflow_remote.cli.formatting import (
     format_job_info,
     get_job_info_table,
     get_job_report_components,
+    header_name_data_getter_map,
 )
 from jobflow_remote.cli.jf import app
 from jobflow_remote.cli.jfr_typer import JFRTyper
@@ -105,13 +106,32 @@ def jobs_list(
             help="Select the jobs in FAILED and REMOTE_ERROR state. Incompatible with the --state option",
         ),
     ] = False,
+    stored_data_keys: Annotated[
+        Optional[list[str]],
+        typer.Option(
+            "--stored-data-key",
+            "-sdk",
+            help="Key to be shown from the stored_data field.",
+        ),
+    ] = None,
+    cli_output_keys: Annotated[
+        Optional[str],
+        typer.Option(
+            "--output",
+            "-o",
+            help=f"Table columns to be shown. Needs to be specified as string with comma separated keys, e.g."
+            f"'state,db_id,name'. Overrides the verbosity option. Can also be set in the config file. "
+            f"Available options are: {', '.join(header_name_data_getter_map)}",
+        ),
+    ] = None,
 ):
     """
-    Get the list of Jobs in the database
+    Get the list of Jobs in the database.
     """
     check_incompatible_opt({"start_date": start_date, "days": days, "hours": hours})
     check_incompatible_opt({"end_date": end_date, "days": days, "hours": hours})
     check_incompatible_opt({"state": state, "error": error})
+    check_incompatible_opt({"output": cli_output_keys, "verbosity": verbosity})
     check_query_incompatibility(
         custom_query,
         [
@@ -128,6 +148,19 @@ def jobs_list(
             worker_name,
         ],
     )
+    output_keys = (
+        cli_output_keys.split(",")
+        if cli_output_keys
+        else SETTINGS.cli_job_list_columns or []
+    )
+    if not set(output_keys).issubset(header_name_data_getter_map):
+        exit_with_error_msg(
+            f"Header keys not supported: {set(output_keys).difference(header_name_data_getter_map)}"
+        )
+    if stored_data_keys and not set(output_keys).isdisjoint(stored_data_keys):
+        exit_with_error_msg(
+            "Specifying a stored data key which is a standard column is disallowed."
+        )
 
     job_ids_indexes = get_job_ids_indexes(job_id)
 
@@ -163,7 +196,12 @@ def jobs_list(
                 sort=db_sort,
             )
 
-        table = get_job_info_table(jobs_info, verbosity=verbosity)
+        table = get_job_info_table(
+            jobs_info,
+            verbosity=verbosity,
+            output_keys=output_keys,
+            stored_data_keys=stored_data_keys,
+        )
 
     out_console.print(table)
     if SETTINGS.cli_suggestions:

@@ -147,6 +147,7 @@ class JobInfo(BaseModel):
     end_time: Optional[datetime] = None
     priority: int = 0
     metadata: Optional[dict] = None
+    stored_data: Optional[dict] = None
 
     @property
     def is_locked(self) -> bool:
