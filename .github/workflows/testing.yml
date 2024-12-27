@@ -114,20 +114,20 @@ jobs:
             tests/integration
 
       - name: Upload unit tests coverage report to Codecov
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v5
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
         with:
-          file: .coverage-unit
+          files: .coverage-unit
           flags: unit_tests
           name: unit_tests
 
       - name: Upload integration tests coverage report to Codecov
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v5
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
         with:
-          file: .coverage-integration
+          files: .coverage-integration
           flags: integration_tests
           name: integration_tests
 
@@ -136,11 +136,11 @@ jobs:
           coverage combine .coverage-unit .coverage-integration
 
       - name: Upload all (unit+integration) tests coverage report to Codecov
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v5
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
         with:
-          file: .coverage
+          files: .coverage
           flags: all_tests
           name: all_tests
 
