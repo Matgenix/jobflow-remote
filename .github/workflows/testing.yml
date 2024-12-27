@@ -103,7 +103,7 @@ jobs:
           pytest \
             --pytest-durations-min=1 \
             --cov=jobflow_remote --cov-report= --cov-config pyproject.toml \
-            --ignore tests/integration \
+            --ignore tests/integration
 
       - name: Integration tests
         run: |
@@ -113,20 +113,12 @@ jobs:
             --cov=jobflow_remote --cov-report= --cov-config pyproject.toml \
             tests/integration
 
-      # combining the reports with --cov-append did not seem to work
-      - name: Generate coverage reports
-        run: |
-          coverage xml --data-file=.coverage-unit -o .coverage-unit.xml
-          coverage xml --data-file=.coverage-integration -o .coverage-integration.xml
-          coverage combine .coverage-unit .coverage-integration
-          coverage xml -o .coverage-all.xml
-
       - name: Upload unit tests coverage report to Codecov
         uses: codecov/codecov-action@v4
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
         with:
-          file: .coverage-unit.xml
+          file: .coverage-unit
           flags: unit_tests
           name: unit_tests
 
@@ -135,16 +127,20 @@ jobs:
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
         with:
-          file: .coverage-integration.xml
+          file: .coverage-integration
           flags: integration_tests
           name: integration_tests
+
+      - name: Generate coverage reports
+        run: |
+          coverage combine .coverage-unit .coverage-integration
 
       - name: Upload all (unit+integration) tests coverage report to Codecov
         uses: codecov/codecov-action@v4
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
         with:
-          file: .coverage-all.xml
+          file: .coverage
           flags: all_tests
           name: all_tests
 
