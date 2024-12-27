@@ -113,6 +113,13 @@ jobs:
             --cov=jobflow_remote --cov-report= --cov-config pyproject.toml \
             tests/integration
 
+      - name: Generate coverage report for unit and integration tests
+        run: |
+          coverage combine .coverage-unit
+          mv .coverage .coverage-unit
+          coverage combine .coverage-integration
+          mv .coverage .coverage-integration
+
       - name: Upload unit tests coverage report to Codecov
         uses: codecov/codecov-action@v5
         env:
