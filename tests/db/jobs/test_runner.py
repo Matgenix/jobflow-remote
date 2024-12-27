@@ -66,3 +66,23 @@ def test_upload_cleanup_error(job_controller, runner, monkeypatch):
         in j1_info.remote.error
     )
     assert "FAKE ERROR" in j1_info.remote.error
+
+
+def test_delay_download(job_controller, runner, monkeypatch, one_job):
+    from datetime import datetime
+
+    from jobflow_remote.jobs.state import JobState
+
+    j = one_job.jobs[0]
+    # since this is a local worker the state after RUNNING is DOWNLOADED, not TERMINATED
+    with monkeypatch.context() as m:
+        m.setattr(runner.workers["test_local_worker"], "delay_download", 5)
+        assert runner.run_one_job(
+            max_seconds=10, job_id=[j.uuid, j.index], target_state=JobState.DOWNLOADED
+        )
+    j_info = job_controller.get_job_info(job_id=j.uuid, job_index=j.index)
+    assert j_info.remote.retry_time_limit is not None
+    assert j_info.remote.retry_time_limit > datetime.utcnow()
+
+    # verify that it can properly complete after waiting
+    assert runner.run_one_job(max_seconds=20, job_id=[j.uuid, j.index])

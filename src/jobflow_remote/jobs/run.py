@@ -49,8 +49,8 @@ def run_remote_job(run_dir: str | Path = ".") -> None:
             try:
                 response = job.run(store=store)
             finally:
-                # some jobs may have compressed the FW files while being executed,
-                # try to decompress them if that is the case and files need to be
+                # some jobs may have compressed the jfremote and store files while being
+                # executed, try to decompress them if that is the case and files need to be
                 # decompressed.
                 decompress_files(store)
 
@@ -65,7 +65,7 @@ def run_remote_job(run_dir: str | Path = ".") -> None:
 
             # Convert to Flow the dynamic responses before dumping the output.
             # This is required so that the response does not need to be
-            # deserialized and converted by to Flows by the runner.
+            # deserialized and converted to Flows by the runner.
             if response.addition:
                 response.addition = get_flow(response.addition)
             if response.detour:

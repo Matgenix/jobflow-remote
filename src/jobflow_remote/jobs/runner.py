@@ -408,6 +408,7 @@ class Runner:
         job_id: tuple[str, int] | None = None,
         max_seconds: int | None = None,
         raise_at_timeout: bool = True,
+        target_state: JobState | None = None,
     ) -> bool:
         """
         Use the runner to run a single Job until it reaches a terminal state.
@@ -469,7 +470,17 @@ class Runner:
             job_info = self.job_controller.get_job_info(
                 job_id=job_data[0], job_index=job_data[1]
             )
+            if target_state and job_info.state == target_state:
+                return True
             if job_info.state.value not in running_states:
+                # if the target state is defined and the code got
+                # here, it means it missed the target state, so
+                # the target was not achieved.
+                if target_state:
+                    raise RuntimeError(
+                        f"The target state {target_state.value} was not achieved. "
+                        f"Final state: {job_info.state.value}"
+                    )
                 return True
             if max_seconds and time.time() - t0 > max_seconds:
                 if raise_at_timeout:
@@ -795,24 +806,32 @@ class Runner:
 
             makedirs_p(local_path)
 
-            fnames = [OUT_FILENAME]
-            fnames.extend(
-                get_remote_store_filenames(
-                    store, config_dict=self.project.remote_jobstore
-                )
-            )
-
-            for fname in fnames:
+            def download_file(fname: str, mandatory: bool):
                 # in principle fabric should work by just passing the
                 # destination folder, but it fails
                 remote_file_path = str(Path(remote_path, fname))
                 try:
                     host.get(remote_file_path, str(Path(local_path, fname)))
                 except FileNotFoundError as exc:
-                    # if files are missing it should not retry
                     err_msg = f"file {remote_file_path} for job {job_dict['uuid']} does not exist"
-                    logger.exception(err_msg)
-                    raise RemoteError(err_msg, no_retry=True) from exc
+                    if mandatory:
+                        logger.exception(err_msg)
+                        # if files are missing it should not retry
+                        raise RemoteError(err_msg, no_retry=True) from exc
+
+                    err_msg += ". Allow continuing to the next state"
+                    logger.warning(err_msg)
+
+            # only the output file is mandatory. If the others are missing
+            # it will be dealt with by the complete. The output file may contain
+            # an error and the fact that they are missing could be expected.
+            # The analysis of the output file is left to the completion procedure.
+            download_file(OUT_FILENAME, mandatory=True)
+
+            for fn in get_remote_store_filenames(
+                store, config_dict=self.project.remote_jobstore
+            ):
+                download_file(fn, mandatory=False)
 
         lock.update_on_release = {"$set": {"state": JobState.DOWNLOADED.value}}
 
@@ -917,6 +936,7 @@ class Runner:
                 qstate = qjob.state if qjob else None
                 next_state = None
                 start_time = None
+                next_step_delay = None
                 if (
                     qstate == QState.RUNNING
                     and doc["state"] == JobState.SUBMITTED.value
@@ -933,6 +953,8 @@ class Runner:
                         next_state = JobState.TERMINATED
                     else:
                         next_state = JobState.DOWNLOADED
+                    # the delay is applied if the job is finished on the worker
+                    next_step_delay = worker.delay_download
                     logger.debug(
                         f"terminated remote job with id {remote_doc['process_id']}"
                     )
@@ -951,10 +973,12 @@ class Runner:
                         "index": doc["index"],
                         "state": doc["state"],
                     }
+
                     with self.job_controller.lock_job_for_update(
                         query=lock_filter,
                         max_step_attempts=self.runner_options.max_step_attempts,
                         delta_retry=self.runner_options.delta_retry,
+                        next_step_delay=next_step_delay,
                     ) as lock:
                         if lock.locked_document:
                             if error:

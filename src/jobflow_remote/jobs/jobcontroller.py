@@ -50,7 +50,11 @@ from jobflow_remote.jobs.state import (
     FlowState,
     JobState,
 )
-from jobflow_remote.remote.data import get_remote_store, update_store
+from jobflow_remote.remote.data import (
+    get_remote_store,
+    get_remote_store_filenames,
+    update_store,
+)
 from jobflow_remote.remote.queue import QueueManager
 from jobflow_remote.utils.data import (
     deep_merge_dict,
@@ -3371,6 +3375,8 @@ class JobController:
                 local_path = Path(local_path)
                 out_path = local_path / OUT_FILENAME
                 host_flow_id = job_doc["job"]["hosts"][-1]
+                # This check needs to be present because if the worker is "local"
+                # the download phase is skipped and the check is not done earlier.
                 if not out_path.exists():
                     msg = (
                         f"The output file {OUT_FILENAME} was not present in the download "
@@ -3420,6 +3426,29 @@ class JobController:
                     )
                     self.update_flow_state(host_flow_id)
                     return True
+
+                # Files associated with the store may not have been downloaded.
+                # First check if they exist and then try to get the store
+                required_store_files = get_remote_store_filenames(
+                    store, config_dict=self.project.remote_jobstore
+                )
+                for store_file in required_store_files:
+                    if not (local_path / store_file).exists():
+                        msg = (
+                            "No explicit error raised during the remote execution, but the output "
+                            f"store file {store_file} is missing in the downloaded folder {local_path}. "
+                            "The file was probably not created in the remote folder during the "
+                            "execution but is needed to proceed."
+                        )
+                        self.checkin_job(
+                            job_doc,
+                            flow_lock.locked_document,
+                            response=None,
+                            error=msg,
+                            doc_update=doc_update,
+                        )
+                        self.update_flow_state(host_flow_id)
+                        return True
 
                 remote_store = get_remote_store(
                     store, local_path, self.project.remote_jobstore
@@ -3829,9 +3858,10 @@ class JobController:
     @contextlib.contextmanager
     def lock_job_for_update(
         self,
-        query,
-        max_step_attempts,
-        delta_retry,
+        query: dict,
+        max_step_attempts: int,
+        delta_retry: tuple[int, ...],
+        next_step_delay: int | None = None,
         **kwargs,
     ) -> Generator[MongoLock, None, None]:
         """
@@ -3849,6 +3879,9 @@ class JobController:
         delta_retry
             List of increasing delay between subsequent attempts when the
             advancement of a remote step fails. Used to set the retry time.
+        next_step_delay
+            An amount of seconds that sets the delay for the next step to
+            start even in case there are no errors.
         kwargs
             Kwargs passed to the MongoLock context manager.
 
@@ -3900,10 +3933,15 @@ class JobController:
 
             if lock.locked_document:
                 if not error:
+                    next_step_time_limit = None
+                    if next_step_delay:
+                        next_step_time_limit = datetime.utcnow() + timedelta(
+                            seconds=next_step_delay
+                        )
                     succeeded_update = {
                         "$set": {
                             "remote.step_attempts": 0,
-                            "remote.retry_time_limit": None,
+                            "remote.retry_time_limit": next_step_time_limit,
                             "remote.error": None,
                         }
                     }

@@ -198,6 +198,12 @@ class WorkerBase(BaseModel):
         description="Sanitize the output of commands in case of failures due to spurious text produced"
         "by the worker shell.",
     )
+    delay_download: Optional[int] = Field(
+        default=None,
+        description="Amount of seconds to wait to start the download after the Runner marked a Job "
+        "as TERMINATED. To account for delays in the writing of the file on the worker file system"
+        " (e.g. NFS).",
+    )
     model_config = ConfigDict(extra="forbid")
 
     @field_validator("scheduler_type")
