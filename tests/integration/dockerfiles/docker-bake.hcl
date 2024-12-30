@@ -24,3 +24,13 @@ target "sge" {
         "jobflow-remote-testing-sge:latest"
     ]
 }
+
+target "pbs" {
+    dockerfile = "./tests/integration/dockerfiles/Dockerfile"
+    args = {
+        QUEUE_SYSTEM = "pbs"
+    }
+    tags = [
+        "jobflow-remote-testing-pbs:latest"
+    ]
+}
