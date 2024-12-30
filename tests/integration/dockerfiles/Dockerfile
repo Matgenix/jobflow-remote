@@ -4,6 +4,7 @@ ARG USERNAME=jobflow
 
 # Install jobflow-remote in its own layer with uv
 FROM --platform=linux/amd64 ubuntu:22.04 as jobflow-remote-install
+# FROM ubuntu:22.04 as jobflow-remote-install
 
 ARG USERNAME=jobflow
 ENV USERNAME=${USERNAME}
@@ -111,8 +112,70 @@ RUN echo "export SGE_ROOT=/opt/sge" >> /etc/profile && \
 
 #HEALTHCHECK CMD qstat -f || exit 1
 
+# -== PBS ==-
+FROM ubuntu:22.04 as pbs
+
+ARG USERNAME=jobflow
+ENV USERNAME=${USERNAME}
+USER root
+
+ENV DEBIAN_FRONTEND noninteractive
+
+RUN apt update && \
+    apt install -y \
+        gcc \
+        make \
+        libtool \
+        libhwloc-dev \
+        libx11-dev \
+        libxt-dev \
+        libedit-dev \
+        libical-dev \
+        ncurses-dev \
+        perl \
+        postgresql-server-dev-all \
+        postgresql-contrib \
+        unzip \
+        tcl-dev \
+        tk-dev \
+        swig \
+        libexpat-dev \
+        libssl-dev \
+        libxext-dev \
+        libxft-dev \
+        autoconf \
+        automake \
+        g++ \
+        expat \
+        libedit2 \
+        postgresql \
+        sendmail-bin \
+        libical3 \
+        libcjson-dev \
+        curl \
+        python3-dev && \
+    apt clean && \
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /tmp
+RUN cd /tmp &&\
+    curl -L https://github.com/openpbs/openpbs/archive/refs/tags/v23.06.06.tar.gz -o src.tgz&&\
+    tar xfz src.tgz &&\
+    cd openpbs-* &&\
+    ./autogen.sh &&\
+    ./configure --prefix=/opt/pbs &&\
+    make &&\
+    make install &&\
+    /opt/pbs/libexec/pbs_postinstall &&\
+    chmod 04755 /opt/pbs/sbin/pbs_iff /opt/pbs/sbin/pbs_rcp &&\
+    chmod 0700 /opt/pbs/bin/pbs_topologyinfo /opt/pbs/sbin/pbs_mom /opt/pbs/sbin/pbs_sched /opt/pbs/sbin/pbs_server
+
+COPY ./tests/integration/dockerfiles/pbs_startup.sh /etc/startup.sh
+
+
 # 2) Add common options from ubuntu server
 FROM --platform=linux/amd64 ${QUEUE_SYSTEM} as jobflow
+# FROM ${QUEUE_SYSTEM} as jobflow
 
 ARG USERNAME=jobflow
 ENV USERNAME=${USERNAME}
@@ -157,4 +220,5 @@ RUN chown -R ${USERNAME} /home/${USERNAME} && \
     chmod -R 755 /home/${USERNAME}
 USER ${USERNAME}
 
+# HEALTHCHECK --interval=1s  \
 CMD sudo /etc/startup.sh ; /bin/bash -l

@@ -7,6 +7,7 @@ pytestmark = pytest.mark.skipif(
     reason="Only run integration tests in CI, unless forced with 'CI' env var",
 )
 
+# WORKERS = ["test_local_worker", "test_remote_slurm_worker", "test_remote_sge_worker", "test_remote_pbs_worker"]
 WORKERS = ["test_local_worker", "test_remote_slurm_worker", "test_remote_sge_worker"]
 
 MAX_TRY_SECONDS = 120
