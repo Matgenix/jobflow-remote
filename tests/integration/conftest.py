@@ -74,24 +74,20 @@ def db_port():
     return _get_free_port()
 
 
-@pytest.fixture(scope="session")
-def docker_client():
-    return docker_pow
-
-
-# @pytest.fixture(scope="session", autouse=True)
+@pytest.fixture(scope="session", autouse=True)
 def bake_containers():
     hcl_path = Path(__file__).parent.resolve() / "dockerfiles/docker-bake.hcl"
     docker_pow.buildx.bake(
-        targets=["slurm", "sge"],
-        # targets=["slurm", "sge", "pbs"],
+        targets=["slurm", "sge", "pbs"],
         files=hcl_path,
         set={"*.context": str(Path(__file__).parent.parent.parent.resolve())},
     )
 
 
 @pytest.fixture(scope="session", autouse=True)
-def compose_containers(slurm_ssh_port, sge_ssh_port, pbs_ssh_port, db_port):
+def compose_containers(
+    slurm_ssh_port, sge_ssh_port, pbs_ssh_port, db_port, bake_containers
+):
     compose_yaml = f"""
 name: jobflow_remote_testing
 services:
@@ -127,6 +123,20 @@ services:
     container_name: jobflow_testing_sge
     ports:
       - "{sge_ssh_port}:22"
+    stdin_open: true
+    tty: true
+    healthcheck:
+      test: ["CMD", "bash", "-c", "</dev/tcp/localhost/22"]
+      interval: 1s
+      timeout: 1s
+      retries: 30
+      start_period: 2s
+
+  jobflow_remote_testing_pbs:
+    image: jobflow-remote-testing-pbs:latest
+    container_name: jobflow_testing_pbs
+    ports:
+      - "{pbs_ssh_port}:22"
     stdin_open: true
     tty: true
     healthcheck:
@@ -307,19 +317,18 @@ def write_tmp_settings(
                 pre_run="source /home/jobflow/.venv/bin/activate",
                 connect_kwargs={"allow_agent": False, "look_for_keys": False},
             ),
-            # "test_remote_pbs_worker": dict(
-            #     type="remote",
-            #     host="localhost",
-            #     port=pbs_ssh_port,
-            #     scheduler_type="pbs",
-            #     work_dir="/home/jobflow/jfr",
-            #     user="jobflow",
-            #     password="jobflow",
-            #     scheduler_username="jobflow",
-            #     pre_run="source /home/jobflow/.venv/bin/activate",
-            #     connect_kwargs={"allow_agent": False, "look_for_keys": False},
-            #     resources={"walltime": "00:05:00", "select": "select=1:1"},
-            # ),
+            "test_remote_pbs_worker": dict(
+                type="remote",
+                host="localhost",
+                port=pbs_ssh_port,
+                scheduler_type="pbs",
+                work_dir="/home/jobflow/jfr",
+                user="jobflow",
+                password="jobflow",
+                pre_run="source /home/jobflow/.venv/bin/activate",
+                connect_kwargs={"allow_agent": False, "look_for_keys": False},
+                resources={"walltime": "00:05:00", "select": "nodes=1:ppn=1"},
+            ),
             "test_remote_limited_worker": dict(
                 type="remote",
                 host="localhost",

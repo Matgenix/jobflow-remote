@@ -113,7 +113,7 @@ RUN echo "export SGE_ROOT=/opt/sge" >> /etc/profile && \
 #HEALTHCHECK CMD qstat -f || exit 1
 
 # -== PBS ==-
-FROM ubuntu:22.04 as pbs
+FROM --platform=linux/amd64 ubuntu:22.04 as pbs
 
 ARG USERNAME=jobflow
 ENV USERNAME=${USERNAME}
@@ -220,5 +220,4 @@ RUN chown -R ${USERNAME} /home/${USERNAME} && \
     chmod -R 755 /home/${USERNAME}
 USER ${USERNAME}
 
-# HEALTHCHECK --interval=1s  \
 CMD sudo /etc/startup.sh ; /bin/bash -l

@@ -7,8 +7,12 @@ pytestmark = pytest.mark.skipif(
     reason="Only run integration tests in CI, unless forced with 'CI' env var",
 )
 
-# WORKERS = ["test_local_worker", "test_remote_slurm_worker", "test_remote_sge_worker", "test_remote_pbs_worker"]
-WORKERS = ["test_local_worker", "test_remote_slurm_worker", "test_remote_sge_worker"]
+WORKERS = [
+    "test_local_worker",
+    "test_remote_slurm_worker",
+    "test_remote_sge_worker",
+    "test_remote_pbs_worker",
+]
 
 MAX_TRY_SECONDS = 120
 
@@ -329,9 +333,10 @@ def test_undefined_additional_stores(worker, job_controller) -> None:
     )
 
 
+# openpbs + qtk does not work the -u option at the moment
 @pytest.mark.parametrize(
     "remote_worker_name",
-    [w for w in WORKERS if "remote" in w],
+    ["test_remote_slurm_worker", "test_remote_sge_worker"],
 )
 def test_submit_flow_with_scheduler_username(
     remote_worker_name, monkeypatch, job_controller
