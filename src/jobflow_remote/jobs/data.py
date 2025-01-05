@@ -106,6 +106,7 @@ def get_initial_flow_doc_dict(flow: Flow, job_dicts: list[dict]) -> dict:
         name=flow.name,
         ids=ids,
         parents=parents,
+        metadata=flow.metadata or {},
     )
 
     return flow_doc.as_db_dict()

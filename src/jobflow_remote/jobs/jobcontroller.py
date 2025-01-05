@@ -308,6 +308,7 @@ class JobController:
         start_date: datetime | None = None,
         end_date: datetime | None = None,
         name: str | None = None,
+        metadata: dict | None = None,
         locked: bool = False,
     ) -> dict:
         """
@@ -333,6 +334,9 @@ class JobController:
         name
             Pattern matching the name of Flow. Default is an exact match, but all
             conventions from python fnmatch can be used (e.g. *test*)
+        metadata
+            A dictionary of the values of the metadata to match. Should be an
+            exact match for all the values provided.
         locked
             If True only locked Flows will be selected.
 
@@ -376,6 +380,10 @@ class JobController:
         if name:
             mongo_regex = "^" + fnmatch.translate(name).replace("\\\\", "\\")
             query["name"] = {"$regex": mongo_regex}
+
+        if metadata:
+            metadata_dict = {f"metadata.{k}": v for k, v in metadata.items()}
+            query.update(metadata_dict)
 
         if locked:
             query["lock_id"] = {"$ne": None}
@@ -2239,6 +2247,7 @@ class JobController:
         start_date: datetime | None = None,
         end_date: datetime | None = None,
         name: str | None = None,
+        metadata: dict | None = None,
         locked: bool = False,
         sort: list[tuple] | None = None,
         limit: int = 0,
@@ -2266,6 +2275,9 @@ class JobController:
         name
             Pattern matching the name of Flow. Default is an exact match, but all
             conventions from python fnmatch can be used (e.g. *test*)
+        metadata
+            A dictionary of the values of the metadata to match. Should be an
+            exact match for all the values provided.
         locked
             If True only locked Flows will be selected.
         sort
@@ -2291,6 +2303,7 @@ class JobController:
             start_date=start_date,
             end_date=end_date,
             name=name,
+            metadata=metadata,
             locked=locked,
         )
 
