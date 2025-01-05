@@ -995,9 +995,9 @@ def test_get_trends(job_controller, one_job):
         list(JobState), interval="weeks", interval_timezone="UTC"
     )
     assert len(job_trends) == 4
-    assert utcnow.strftime("%Y-%U") in job_trends
-    assert job_trends[utcnow.strftime("%Y-%U")][JobState.READY] == 1
-    assert job_trends[utcnow.strftime("%Y-%U")][JobState.COMPLETED] == 0
+    assert utcnow.strftime("%Y-%V") in job_trends
+    assert job_trends[utcnow.strftime("%Y-%V")][JobState.READY] == 1
+    assert job_trends[utcnow.strftime("%Y-%V")][JobState.COMPLETED] == 0
 
     job_trends = job_controller.get_trends(
         list(JobState), interval="years", num_intervals=2, interval_timezone=tzname

@@ -3037,7 +3037,7 @@ class JobController:
         date_format = {
             "hours": "%Y-%m-%d %H",
             "days": "%Y-%m-%d",
-            "weeks": "%Y-%U",  # Week number of the year
+            "weeks": "%Y-%m-%d",  # use days and group by week in python
             "months": "%Y-%m",
             "years": "%Y",
         }[interval]
@@ -3078,18 +3078,49 @@ class JobController:
 
         results = list(collection.aggregate(pipeline))
 
+        # MongoDB uses an approach in grouping by weeks that may lead to
+        # more intervals than those specified, based on the number of
+        # weeks. To avoid inconsistencies "weeks" are handled separately:
+        # jobs are grouped by day in the query and regrouped by week
+        # using the ISO calendar convention
         result_dict = {}
-        for r in results:
-            result_dict[r["_id"]] = {
-                state_cls(s.upper()): n for s, n in r.items() if s != "_id"
-            }
+        if interval == "weeks":
+            # first prepare the full dictionary with all the expected values
+            for i in range(1, num_intervals + 1):
+                # Calculate the expected date rounded to the interval
+                expected_date = get_past_time_rounded(
+                    interval=interval, num_intervals=i, reference=tznow
+                )
 
-        for i in range(1, num_intervals + 1):
-            expected_date = get_past_time_rounded(
-                interval=interval, num_intervals=i, reference=tznow
-            ).strftime(date_format)
-            if expected_date not in result_dict:
-                result_dict[expected_date] = {state: 0 for state in states}
+                # Convert expected_date to ISO year-week (as a string)
+                iso_year, iso_week, _ = expected_date.isocalendar()
+                iso_id = f"{iso_year}-{iso_week:02d}"
+
+                # Fill result_dict with zero counts
+                result_dict[iso_id] = {state: 0 for state in states}
+
+            # add the number for each day in the corresponding week
+            for entry in results:
+                raw_date = datetime.strptime(entry["_id"], "%Y-%m-%d")
+                iso_year, iso_week, _ = raw_date.isocalendar()
+                iso_id = f"{iso_year}-{iso_week:02d}"
+
+                for state, count in entry.items():
+                    if state != "_id":
+                        result_dict[iso_id][state_cls(state.upper())] += count
+
+        else:
+            for r in results:
+                result_dict[r["_id"]] = {
+                    state_cls(s.upper()): n for s, n in r.items() if s != "_id"
+                }
+
+            for i in range(1, num_intervals + 1):
+                expected_date = get_past_time_rounded(
+                    interval=interval, num_intervals=i, reference=tznow
+                ).strftime(date_format)
+                if expected_date not in result_dict:
+                    result_dict[expected_date] = {state: 0 for state in states}
 
         return result_dict
 
