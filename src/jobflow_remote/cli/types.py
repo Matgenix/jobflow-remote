@@ -275,6 +275,16 @@ locked_opt = Annotated[
 ]
 
 
+locked_flow_opt = Annotated[
+    bool,
+    typer.Option(
+        "--locked",
+        "-l",
+        help="Select locked Flows",
+    ),
+]
+
+
 serialize_file_format_opt = Annotated[
     SerializeFileFormat,
     typer.Option(

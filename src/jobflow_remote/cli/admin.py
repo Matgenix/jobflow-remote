@@ -212,6 +212,7 @@ def unlock(
 ) -> None:
     """
     Forcibly removes the lock from the documents of the selected jobs.
+    If no criteria is specified all the locked jobs will be selected.
     WARNING: can lead to inconsistencies if the processes is actually running.
     """
     job_ids_indexes = get_job_ids_indexes(job_id)
@@ -270,6 +271,7 @@ def unlock_flow(
 ) -> None:
     """
     Forcibly removes the lock from the documents of the selected jobs.
+    If no criteria is specified all the locked flows will be selected.
     WARNING: can lead to inconsistencies if the processes is actually running.
     """
     job_ids_indexes = get_job_ids_indexes(job_id)
