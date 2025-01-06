@@ -132,6 +132,29 @@ def test_unlock_runner(job_controller) -> None:
     )
 
 
+def test_upgrade(job_controller, upgrade_test_dir, random_project_name) -> None:
+    from jobflow_remote.testing.cli import run_check_cli
+
+    # Test upgrading from development version. Explicitly pass such a target version
+    # This is the case if the target version is not specified and the code installed
+    # from source. No upgrade performed here.
+    run_check_cli(
+        [
+            "admin",
+            "upgrade",
+            "--test-version-upgrade",
+            "0.1.4.post95+gc325f4e.d20250103",
+        ],
+        cli_input="wrong_project_name",
+        required_out=[
+            "Target version 0.1.4.post95+gc325f4e.d20250103 is likely a development version. "
+            "Explicitly specify the target version if this is the case. Available "
+            "upgrades larger than 0.1.4: 0.1.5",
+            "No upgrade required for target version 0.1.4.post95+gc325f4e.d20250103",
+        ],
+    )
+
+
 def test_upgrade_to_0_1_5(
     job_controller, upgrade_test_dir, random_project_name
 ) -> None:

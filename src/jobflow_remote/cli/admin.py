@@ -78,7 +78,28 @@ def upgrade(
 
     jc = get_job_controller()
     upgrader = DatabaseUpgrader(jc)
-    target_version = parse_version(test_version_upgrade) or upgrader.current_version
+    target_version = (
+        parse_version(test_version_upgrade)
+        if test_version_upgrade
+        else upgrader.current_version
+    )
+    if target_version.local or target_version.post:
+        # this is likely a developer version installed from source.
+        # get the available upgrades for version higher than the developer one
+        base_version = parse_version(target_version.base_version)
+        upgrades_available = upgrader.collect_upgrades(
+            base_version, upgrader.registered_upgrades[-1]
+        )
+        msg = (
+            f"Target version {target_version} is likely a development version. Explicitly "
+            f"specify the target version if this is the case."
+        )
+        if upgrades_available:
+            msg += (
+                f" Available upgrades larger than {base_version}: "
+                f"{','.join(str(v) for v in upgrades_available)}"
+            )
+        out_console.print(msg, style="gold1")
     db_version = jc.get_current_db_version()
     if db_version >= target_version:
         exit_with_warning_msg(

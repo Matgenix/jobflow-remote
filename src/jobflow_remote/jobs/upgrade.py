@@ -76,14 +76,24 @@ class DatabaseUpgrader:
 
         return decorator
 
+    @property
+    def registered_upgrades(self):
+        return sorted(self._upgrade_registry.keys())
+
     def collect_upgrades(
         self, from_version: Version, target_version: Version
     ) -> list[Version]:
         """
         Determines the upgrades that need to be performed.
+
+        from_version
+            The version using as a starting point for the list of upgrades.
+        target_version
+            The final version up to which the upgrades should be listed.
         """
-        registered_versions = sorted(self._upgrade_registry.keys())
-        return [v for v in registered_versions if from_version < v <= target_version]
+        return [
+            v for v in self.registered_upgrades if from_version < v <= target_version
+        ]
 
     def update_db_version(self, version: Version, session: ClientSession | None = None):
         """
