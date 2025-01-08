@@ -425,6 +425,7 @@ class JobController:
         locked: bool = False,
         sort: list[tuple[str, int]] | None = None,
         limit: int = 0,
+        skip: int = 0,
     ) -> list[JobInfo]:
         """
         Query for Jobs based on standard parameters and return a list of JobInfo.
@@ -479,7 +480,7 @@ class JobController:
             metadata=metadata,
             workers=workers,
         )
-        return self.get_jobs_info_query(query=query, sort=sort, limit=limit)
+        return self.get_jobs_info_query(query=query, sort=sort, limit=limit, skip=skip)
 
     def get_jobs_doc_query(self, query: dict = None, **kwargs) -> list[JobDoc]:
         """
@@ -2259,6 +2260,7 @@ class JobController:
         locked: bool = False,
         sort: list[tuple] | None = None,
         limit: int = 0,
+        skip: int = 0,
         full: bool = False,
     ) -> list[FlowInfo]:
         """
@@ -2329,7 +2331,7 @@ class JobController:
                 projection_job=projection_job,
             )
         else:
-            data = list(self.flows.find(query, sort=sort, limit=limit))
+            data = list(self.flows.find(query, sort=sort, limit=limit, skip=skip))
 
         return [FlowInfo.from_query_dict(d) for d in data]
 
