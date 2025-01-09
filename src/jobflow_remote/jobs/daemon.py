@@ -972,6 +972,11 @@ class DaemonManager:
             user = os.getlogin()
         except OSError:
             user = os.environ.get("USER", None)
+        # Note that this approach may give a different MAC address for the
+        # same machine, if more than one network device is present (this
+        # may also include local virtual machines). Consider replacing this
+        # with a more stable choice (e.g. the first one in alphabetical order,
+        # excluding virtual interfaces)
         mac_address = None
         found = False
         for addrs in psutil.net_if_addrs().values():
@@ -1063,11 +1068,13 @@ class DaemonManager:
         db_data = doc["running_runner"]
 
         local_data = self._get_runner_info()
+        # not testing on the MAC address as it may change due to identifying
+        # different network devices on the same machine or changing in
+        # cloud VMs.
         data_to_check = [
             "hostname",
             "project_name",
             "user",
-            "mac_address",
             "daemon_dir",
         ]
         for data in data_to_check:
