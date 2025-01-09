@@ -41,9 +41,7 @@ exception_handlers = {500: error_handler}
 app, rt = fast_app(
     pico=False,  # Disable Pico CSS to use custom styles
     hdrs=(Link(rel='stylesheet', href='./style.css', type='text/css'),
-        #Style(custom_css),
           Script(mermaid_js, type="module"),),  # Add custom CSS as a header
-    #hdrs=(ShadHead(tw_cdn=True))
     exception_handlers=exception_handlers,
     )
 
@@ -87,7 +85,6 @@ def set_job_controller_deamon(project_name):
 
     if project_name not in job_controllers:
         job_controllers[project_name] = JobController.from_project_name(project_name=project_name)
-        #job_controllers[project_name].connect()
         daemon_managers[project_name] = DaemonManager.from_project(cm.get_project(project_name))
 
     daemon_manager = daemon_managers[project_name]
@@ -122,13 +119,9 @@ def projectbar(proj_name: str = "", what: str = ""):
     if proj_name:
         status, color = get_runner_status(proj_name)
     return Div(
-        #Img(src="./logo_jfr.png",height=30),
         Ul(
             A(Img(src="./logo_jfr.png",height=30), href="/"),
             Li("Projects:"),
-            # *[Li(A(prj, href=f"/{prj}",
-            #      cls=f"{'active' if current_prj == prj else ''}"))
-            #       for prj in list_projects],
             Select(Option("Pick one"),
             *[Option(prj,
                      value=prj,
@@ -138,28 +131,20 @@ def projectbar(proj_name: str = "", what: str = ""):
                    hx_push_url="true",
                    hx_get=f"/projects",
                    hx_target="body",
-                   #cls="[&>.select-trigger]:w-[180px]",
-                   #id="select-prj"
                    ),
             Li(A("Report", hx_get=f"/projects?proj_name={proj_name}",
-                 #hx_target="#prj-container",
                  hx_push_url="true",
                  hx_target="body",                 
-                 #cls=f"{'active' if what == 'report' else ''}"
                  )) if proj_name else None,
             Li("Query: ") if proj_name else None,
             Ul( 
                  Li(A("Jobs", hx_get=f"/{proj_name}/jobs/query",
                       hx_target="#prj-container",
                       hx_push_url="true",
-                      cls=f"{'active' if what == 'jobs' else ''}",
-                      _="on click remove .active from .navbar a then add .active to me",
                       )),
                  Li(A("Flows", hx_get=f"/{proj_name}/flows/query",
                       hx_target="#prj-container",
                       hx_push_url="true",
-                      cls=f"{'active' if what == 'flows' else ''}",
-                      _="on click remove .active from .navbar a then add .active to me",                      
                       )),
              ) if proj_name else None,
             Li("Runner:") if proj_name else None,
@@ -251,7 +236,6 @@ def run_action(action: str ="", what: str = "", kwargs: dict = {}):
         H3(f"Action Selected: {action}"),
         P(f"Applied on {response} {what}"),
         P(f"{delete_options}"),        
-        #P(f"ERROR: your db has been wiped out!"),
         Button("Cancel", hx_get="/test/close_dialog",hx_target="#dialog-container",
                    style="font-weight: bold"),
         cls="card"),
@@ -331,7 +315,6 @@ def get_proj_home(proj_name: str = ""):
             Div(
                 H1(f"The project: {proj_name} does not exists"),
                 P("Select an available project from the navigation bar above."),
-                #cls="container",
                 id="prj-container"
             ))
     
@@ -388,7 +371,6 @@ def get_proj_home(proj_name: str = ""):
                 ),
                 Div(id="flows-report"),
                 id="buttons-flows-report",cls="card"),
-            #cls="container",
             id="prj-container"))
             
 
@@ -396,7 +378,6 @@ def get_proj_home(proj_name: str = ""):
 
 @rt("/{proj_name}/{what}/sum_report")
 def sum_report(proj_name: str, what: str):
-    # job_controller = JobController.from_project_name(project)
 
     if not jfreport:
         update_jfreport()
@@ -418,7 +399,6 @@ def sum_report(proj_name: str, what: str):
     
     # Create the report
     report = Div(
-            #Li(H3(f"Summary {what.capitalize()} Report")),
         Button("Update",
                hx_get=f"/{proj_name}/{what}/sum_report",
                hx_target=f"#{what}-report"),
@@ -499,7 +479,6 @@ def state_distro(proj_name: str, what: str):
         Button("Update",
                hx_get=f"/{proj_name}/{what}/sum_report",
                hx_target=f"#{what}-report"),
-        #H3(f"{what.capitalize()} State Distribution:"),
         report,
         cls="container")
 
@@ -619,11 +598,9 @@ def get(proj_name: str, what: str):
     
     return Div(
                H3(f"{what.capitalize()} Query"),
-               #toolbar(proj_name,what),
                H3(f"Total number of {what}: {total_entries}"),
                form,
                Div(id="query-results"),
-               #cls="container",
                id="prj-container")
 
 @rt("/{proj_name}/{what}/query")
@@ -677,7 +654,6 @@ def post(
         else:
             query['start_date'] = datetime.strptime(start_date, "%Y-%m-%d")
 
-        # query['start_date'] = query['start_date'].replace(tzinfo=tz)
         
     if end_time and not end_date:
         end_date = datetime.now().strftime("%Y-%m-%d")
@@ -687,8 +663,6 @@ def post(
             query['end_date'] = datetime.strptime(end_date, "%Y-%m-%d %H:%M")
         else:
             query['end_date'] = datetime.strptime(end_date, "%Y-%m-%d")
-
-        # query['end_date'] = query['end_date'].replace(tzinfo=tz)
 
     skip = (page - 1) * entries_per_page
 
@@ -770,20 +744,17 @@ def post(
             *[Tr(
                 Td(A(entry.db_id,
                    hx_get=f"/{proj_name}/{what}/dialog/{entry.db_id}",
-                   #hx_target=f"#job-details-{entry.db_id  if what=='jobs' else entry.flow_id}",
                    hx_target="#dialog-container",
                    hx_swap="innerHTML",
                    )) if what=="jobs" else None,
                 Td(entry.uuid) if what=="jobs" else Td(A(entry.flow_id,
                    hx_get=f"/{proj_name}/{what}/dialog/{entry.flow_id}",
-                   #hx_target=f"#job-details-{entry.db_id  if what=='jobs' else entry.flow_id}",
                    hx_target="#dialog-container",
                    hx_swap="innerHTML",
                    )),
                 Td(entry.name),
                 Td(entry.state.value),
                 Td(entry.worker) if what=="jobs" else None,
-                #Td(entry.created_on.replace(tzinfo=timezone.utc).astimezone(tz).strftime("%Y-%m-%d %H:%M:%S")),
                 Td(entry.updated_on.replace(tzinfo=timezone.utc).astimezone(tz).strftime("%Y-%m-%d %H:%M:%S")),
                 Td(Input(type="checkbox",
                          name="ckbx_action",                         
@@ -791,7 +762,6 @@ def post(
                          id=f"{entry.db_id if what=='jobs' else entry.flow_id}",
                          ),
                    style="text-align: right"),
-                #cls="job-row"
                 style="background-color: #f5f5f5;" if i%2==0 else ""
             )
                for i,entry in enumerate(all_entries)],
@@ -807,10 +777,10 @@ def post(
 
     if what == "jobs":
         all_job_flow_ids = [entry.db_id for entry in all_entries]
-        action_btns_lbl = ("Rerun","Play","Pause","Stop","Retry") #,"Delete")
+        action_btns_lbl = ("Rerun","Play","Pause","Stop","Retry") 
     elif what=="flows":
         all_job_flow_ids = [entry.flow_id for entry in all_entries]
-        action_btns_lbl = ("Delete",) #,"Rerun","Play","Pause","Stop","Retry")
+        action_btns_lbl = ("Delete",)
 
     
     action_btns = Group(Label("Actions:   "),
