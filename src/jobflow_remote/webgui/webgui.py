@@ -152,12 +152,14 @@ def projectbar(proj_name: str = "", what: str = ""):
                  Li(A("Jobs", hx_get=f"/{proj_name}/jobs/query",
                       hx_target="#prj-container",
                       hx_push_url="true",
-                      cls=f"{'active' if what == 'jobs' else ''}"
+                      cls=f"{'active' if what == 'jobs' else ''}",
+                      _="on click remove .active from .navbar a then add .active to me",
                       )),
                  Li(A("Flows", hx_get=f"/{proj_name}/flows/query",
                       hx_target="#prj-container",
                       hx_push_url="true",
-                      cls=f"{'active' if what == 'flows' else ''}"
+                      cls=f"{'active' if what == 'flows' else ''}",
+                      _="on click remove .active from .navbar a then add .active to me",                      
                       )),
              ) if proj_name else None,
             Li("Runner:") if proj_name else None,
@@ -284,7 +286,8 @@ def start_runner_route(proj_name: str):
             P(f"{getattr(e, 'message', e)}"),
             Button("Cancel", hx_get="/test/close_dialog",
                    hx_target="#dialog-container",
-                   style="font-weight: bold"),
+                   style="font-weight: bold"
+                   ),
             cls="card"),
             id="my-dialog",
             open="open",  # This attribute opens the dialog
@@ -293,7 +296,7 @@ def start_runner_route(proj_name: str):
 @rt("/runner/{proj_name}/stop", methods=["POST"])
 def stop_runner_route(proj_name: str):
     dm = daemon_managers[proj_name]
-    try:
+try:
         dm = daemon_managers[proj_name]
         dm.shut_down()
         return Group(Ul(Li("STOPPING",style=f"color: gold",)),
@@ -310,7 +313,8 @@ def stop_runner_route(proj_name: str):
             P(f"{getattr(e, 'message', e)}"),
             Button("Cancel", hx_get="/test/close_dialog",
                    hx_target="#dialog-container",
-                   style="font-weight: bold"),
+                   style="font-weight: bold"
+                   ),
             cls="card"),
             id="my-dialog",
             open="open",  # This attribute opens the dialog
