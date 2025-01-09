@@ -269,57 +269,28 @@ def close_dialog():
 # Add these new routes to handle starting and stopping the runner
 @rt("/runner/{proj_name}/start", methods=["POST"])
 def start_runner_route(proj_name: str):
-    try:
-        dm = daemon_managers[proj_name]
-        dm.start()
-        return Group(Ul(Li("STARTING",style=f"color: gold")),
-                id="runner-status",
-                hx_get=f"/runner/{proj_name}/status",
-                hx_trigger="every 5s",
-                hx_swap="outerHTML",
-                cls="group",
-            )
-
-    except DaemonError as e:
-        return Dialog(Div(
-            H3(f"Error starting the Deamon Runner:"),
-            P(f"{getattr(e, 'message', e)}"),
-            Button("Cancel", hx_get="/test/close_dialog",
-                   hx_target="#dialog-container",
-                   style="font-weight: bold"
-                   ),
-            cls="card"),
-            id="my-dialog",
-            open="open",  # This attribute opens the dialog
-            cls="dialog")
+    dm = daemon_managers[proj_name]
+    dm.start()
+    return Group(Ul(Li("STARTING",style=f"color: gold")),
+                 id="runner-status",
+                 hx_get=f"/runner/{proj_name}/status",
+                 hx_trigger="every 5s",
+                 hx_swap="outerHTML",
+                 cls="group",
+                 )
 
 @rt("/runner/{proj_name}/stop", methods=["POST"])
 def stop_runner_route(proj_name: str):
+
     dm = daemon_managers[proj_name]
-try:
-        dm = daemon_managers[proj_name]
-        dm.shut_down()
-        return Group(Ul(Li("STOPPING",style=f"color: gold",)),
-                id="runner-status",
-                hx_get=f"/runner/{proj_name}/status",
-                hx_trigger="every 5s",
-                hx_swap="outerHTML",
-                cls="group",
-            )
-
-    except DaemonError as e:
-        return Dialog(Div(
-            H3(f"Error shutting down the Deamon Runner:"),
-            P(f"{getattr(e, 'message', e)}"),
-            Button("Cancel", hx_get="/test/close_dialog",
-                   hx_target="#dialog-container",
-                   style="font-weight: bold"
-                   ),
-            cls="card"),
-            id="my-dialog",
-            open="open",  # This attribute opens the dialog
-            cls="dialog")
-
+    dm.shut_down()
+    return Group(Ul(Li("STOPPING",style=f"color: gold",)),
+                 id="runner-status",
+                 hx_get=f"/runner/{proj_name}/status",
+                 hx_trigger="every 5s",
+                 hx_swap="outerHTML",
+                 cls="group",
+                 )
 
 # Modify the existing route to update the runner status
 @rt("/runner/{proj_name}/status")
