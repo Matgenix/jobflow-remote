@@ -1,11 +1,11 @@
-jobflow==0.1.18
-pydantic==2.9.2
+jobflow==0.1.19
+pydantic==2.10.5
 fabric==3.2.2
 tomlkit==0.13.2
 qtoolkit==0.1.5
-typer==0.12.5
-rich==13.9.3
-psutil==6.1.0
+typer==0.15.1
+rich==13.9.4
+psutil==6.1.1
 supervisor==4.2.5
 ruamel.yaml==0.17.35
 schedule==1.2.2
