@@ -3137,11 +3137,11 @@ class JobController:
                 }
 
             for i in range(1, num_intervals + 1):
-                expected_date = get_past_time_rounded(
+                expected_date_str = get_past_time_rounded(
                     interval=interval, num_intervals=i, reference=tznow
                 ).strftime(date_format)
-                if expected_date not in result_dict:
-                    result_dict[expected_date] = {state: 0 for state in states}
+                if expected_date_str not in result_dict:
+                    result_dict[expected_date_str] = {state: 0 for state in states}
 
         return result_dict
 
