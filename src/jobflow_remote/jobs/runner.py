@@ -35,6 +35,7 @@ from jobflow_remote.jobs.data import IN_FILENAME, OUT_FILENAME, RemoteError
 from jobflow_remote.jobs.state import JobState
 from jobflow_remote.remote.data import (
     get_job_path,
+    get_local_data_path,
     get_remote_in_file,
     get_remote_store,
     get_remote_store_filenames,
@@ -799,9 +800,12 @@ class Runner:
             store = self.jobstore
 
             remote_path = doc["run_dir"]
-            local_base_dir = Path(self.project.tmp_dir, "download")
-            local_path = get_job_path(
-                job_dict["uuid"], job_dict["index"], local_base_dir
+            local_path = get_local_data_path(
+                project=self.project,
+                worker=worker,
+                job_id=doc["uuid"],
+                index=doc["index"],
+                run_dir=remote_path,
             )
 
             makedirs_p(local_path)
@@ -810,9 +814,14 @@ class Runner:
                 # in principle fabric should work by just passing the
                 # destination folder, but it fails
                 remote_file_path = str(Path(remote_path, fname))
+                local_file_path = Path(local_path, fname)
                 try:
-                    host.get(remote_file_path, str(Path(local_path, fname)))
+                    host.get(remote_file_path, str(local_file_path))
                 except FileNotFoundError as exc:
+                    # fabric may still create an empty local file even if the remote
+                    # file does not exist. Remove it to avoid errors when checking
+                    # the file existence
+                    local_file_path.unlink(missing_ok=True)
                     err_msg = f"file {remote_file_path} for job {job_dict['uuid']} does not exist"
                     if mandatory:
                         logger.exception(err_msg)
@@ -821,6 +830,11 @@ class Runner:
 
                     err_msg += ". Allow continuing to the next state"
                     logger.warning(err_msg)
+
+            # download the queue files first, so if an error is triggered
+            # afterwards they can be inserted in the DB
+            for fn in ("queue.out", "queue.err"):
+                download_file(fn, mandatory=False)
 
             # only the output file is mandatory. If the others are missing
             # it will be dealt with by the complete. The output file may contain
@@ -849,13 +863,15 @@ class Runner:
         logger.debug(f"complete job db_id: {doc['db_id']}")
 
         # if the worker is local the files were not copied to the temporary
-        # folder, but the files could be directly updated
+        # folder, but the files could be directly accessed
         worker = self.get_worker(doc["worker"])
-        if worker.is_local:
-            local_path = doc["run_dir"]
-        else:
-            local_base_dir = Path(self.project.tmp_dir, "download")
-            local_path = get_job_path(doc["uuid"], doc["index"], local_base_dir)
+        local_path = get_local_data_path(
+            project=self.project,
+            worker=worker,
+            job_id=doc["uuid"],
+            index=doc["index"],
+            run_dir=doc["run_dir"],
+        )
 
         try:
             store = self.jobstore

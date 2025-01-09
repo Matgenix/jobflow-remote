@@ -376,7 +376,11 @@ def write_tmp_settings(
                 sanitize_command=True,
             ),
         },
-        exec_config={"test": {"export": {"TESTING_ENV_VAR": random_project_name}}},
+        exec_config={
+            "test": {"export": {"TESTING_ENV_VAR": random_project_name}},
+            "some_pre_run": {"pre_run": "echo 'This is a pre_run' | tee /dev/stderr"},
+            "long_pre_run": {"pre_run": f"echo {'X'*4000} | tee /dev/stderr"},
+        },
         runner=dict(
             delay_checkout=1,
             delay_check_run_status=1,

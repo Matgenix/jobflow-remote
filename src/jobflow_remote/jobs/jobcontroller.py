@@ -4,6 +4,7 @@ import contextlib
 import fnmatch
 import importlib.metadata
 import logging
+import shutil
 import traceback
 import warnings
 from collections import defaultdict
@@ -51,6 +52,7 @@ from jobflow_remote.jobs.state import (
     JobState,
 )
 from jobflow_remote.remote.data import (
+    get_local_data_path,
     get_remote_store,
     get_remote_store_filenames,
     update_store,
@@ -1004,7 +1006,7 @@ class JobController:
         ----------
         doc
             The dict of the JobDoc associated to the Job to rerun.
-            Just the "uuid", "index", "db_id", "state" values are required.
+            Just the "uuid", "index", "db_id", "state", "worker" values are required.
         sleep
             Amounts of seconds to wait between checks that the lock has been released.
         wait
@@ -1146,6 +1148,7 @@ class JobController:
                     updated_states[child_doc["uuid"]][child_doc["index"]] = (
                         JobState.WAITING
                     )
+                    self._delete_tmp_folder(child_doc)
 
             # if everything is fine here, update the state of the flow
             # before releasing its lock and set the update for the original job
@@ -1156,6 +1159,9 @@ class JobController:
                 flow_uuid=flow_doc.uuid, updated_states=updated_states
             )
 
+            # delete local temporary folder to avoid parsing
+            # previously downloaded files.
+            self._delete_tmp_folder(doc)
             job_doc_update = get_reset_job_base_dict()
             job_doc_update["state"] = JobState.READY.value
             if delete_files:
@@ -1548,6 +1554,8 @@ class JobController:
                     "remote.step_attempts": 0,
                     "remote.retry_time_limit": None,
                     "remote.error": None,
+                    "remote.queue_out": None,
+                    "remote.queue_err": None,
                 }
                 lock.update_on_release = {"$set": set_dict}
             else:
@@ -3527,7 +3535,11 @@ class JobController:
         doc_update: dict | None = None,
     ):
         stored_data = None
+        queue_out = None
+        queue_err = None
         if response is None:
+            # set queue_out and queue_err here in case of failure
+            queue_out, queue_err = self._get_downloaded_queue_files(job_doc)
             new_state = JobState.FAILED.value
         # handle response
         else:
@@ -3580,7 +3592,13 @@ class JobController:
         if not doc_update:
             doc_update = {}
         doc_update.update(
-            {"state": new_state, "stored_data": stored_data, "error": error}
+            {
+                "state": new_state,
+                "stored_data": stored_data,
+                "error": error,
+                "remote.queue_out": queue_out,
+                "remote.queue_err": queue_err,
+            }
         )
 
         result = self.jobs.update_one(
@@ -3982,6 +4000,9 @@ class JobController:
                         next_step_time_limit = datetime.utcnow() + timedelta(
                             seconds=next_step_delay
                         )
+                    # When succeeded don't set remote.queue_out/remote.queue_err to
+                    # None, otherwise it overwrites values that may be written if the
+                    # completion fails.
                     succeeded_update = {
                         "$set": {
                             "remote.step_attempts": 0,
@@ -3995,12 +4016,15 @@ class JobController:
                 else:
                     step_attempts = doc["remote"]["step_attempts"]
                     no_retry = no_retry or step_attempts >= max_step_attempts
+                    queue_out, queue_err = self._get_downloaded_queue_files(doc)
                     if no_retry:
                         update_on_release = {
                             "$set": {
                                 "state": JobState.REMOTE_ERROR.value,
                                 "previous_state": doc["state"],
                                 "remote.error": error,
+                                "remote.queue_out": queue_out,
+                                "remote.queue_err": queue_err,
                             }
                         }
                     else:
@@ -4013,6 +4037,8 @@ class JobController:
                                 "remote.step_attempts": step_attempts,
                                 "remote.retry_time_limit": retry_time_limit,
                                 "remote.error": error,
+                                "remote.queue_out": queue_out,
+                                "remote.queue_err": queue_err,
                             }
                         }
                 if "$set" in update_on_release:
@@ -4127,6 +4153,57 @@ class JobController:
         """
         with MongoLock(collection=self.auxiliary, **lock_kwargs) as lock:
             yield lock
+
+    def _get_downloaded_queue_files(
+        self, job_doc: dict
+    ) -> tuple[str | None, str | None]:
+        local_path_str = get_local_data_path(
+            project=self.project,
+            worker=job_doc["worker"],
+            job_id=job_doc["uuid"],
+            index=job_doc["index"],
+            run_dir=job_doc["run_dir"],
+        )
+        if not local_path_str:
+            return None, None
+        local_path = Path(local_path_str)
+        queue_out_path = local_path / "queue.out"
+        queue_err_path = local_path / "queue.err"
+        queue_out = None
+        queue_err = None
+        length_limit = 3000
+        if queue_out_path.exists():
+            with queue_out_path.open(mode="rt") as f:
+                queue_out = f.read()
+                if len(queue_out) > length_limit:
+                    queue_out = queue_out[:length_limit]
+                    queue_out += " ...\nThe content was cut. Check the content of the actual file"
+        if queue_err_path.exists():
+            with queue_err_path.open(mode="rt") as f:
+                queue_err = f.read()
+                if len(queue_err) > length_limit:
+                    queue_err = queue_err[:length_limit]
+                    queue_err += " ...\nThe content was cut. Check the content of the actual file"
+
+        return queue_out, queue_err
+
+    def _delete_tmp_folder(self, job_doc: dict):
+        worker = self.project.workers[job_doc["worker"]]
+        if not worker.is_local:
+            local_path = get_local_data_path(
+                project=self.project,
+                worker=worker,
+                job_id=job_doc["uuid"],
+                index=job_doc["index"],
+                run_dir=job_doc["run_dir"],
+            )
+            if Path(local_path).exists():
+                try:
+                    shutil.rmtree(local_path)
+                except Exception as e:
+                    logger.warning(
+                        f"Could not delete the temporary local folder {local_path}: {getattr(e, 'message', e)}"
+                    )
 
     def ping_flow_doc(self, uuid: str) -> None:
         """

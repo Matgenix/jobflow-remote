@@ -25,6 +25,10 @@ from jobflow_remote.utils.data import uuid_to_path
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
+    from jobflow_remote.config import Project
+    from jobflow_remote.config.base import WorkerBase
+
+
 JOB_INIT_ARGS = {k for k in inspect.signature(Job).parameters if k != "kwargs"}
 """A set of the arguments of the Job constructor which
 can be used to detect additional custom arguments
@@ -38,6 +42,18 @@ def get_job_path(
 
     relative_path = uuid_to_path(job_id, index)
     return str(base_path / relative_path)
+
+
+def get_local_data_path(
+    project: Project, worker: str | WorkerBase, job_id: str, index: int, run_dir: str
+) -> str:
+    if isinstance(worker, str):
+        worker = project.workers[worker]
+    if worker.is_local:
+        return run_dir
+
+    local_base_dir = Path(project.tmp_dir, "download")
+    return get_job_path(job_id, index, local_base_dir)
 
 
 def get_remote_in_file(job, remote_store):
