@@ -172,7 +172,7 @@ def projectbar(proj_name: str = "", what: str = ""):
                style=f"color: {color}; background-color: black; padding: 3px 5px; border-radius: 4px;"),
             Li(Button(f"{start_stop_btn_lbl[status]}", 
                       hx_post=f"/runner/{proj_name}/{start_stop_btn_lbl[status].lower()}",
-                      hx_target="#runner-status")),cls="ul2"),
+                      hx_target="#runner-status"))),
             hx_get=f"/runner/{proj_name}/status",
             hx_trigger="every 30s",
             hx_swap="outerHTML",
