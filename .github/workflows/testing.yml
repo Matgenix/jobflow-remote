@@ -127,6 +127,13 @@ jobs:
         with:
           codecov-token: ${{ secrets.CODECOV_TOKEN }}
 
+      - name: Upload DB dump
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: db_dump
+          path: test_folder
+
   docs:
     name: Build documentation
     runs-on: ubuntu-latest
