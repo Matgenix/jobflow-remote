@@ -29,7 +29,7 @@ def error_handler(req,exc):
         Button("Cancel", hx_get="/test/close_dialog",
                hx_target="#dialog-container",
                    style="font-weight: bold"),
-        cls="card"),
+        cls="card-dialog"),
         id="my-dialog",
         open="open",  # This attribute opens the dialog
         cls="dialog",
@@ -52,6 +52,18 @@ js_timezone = """
 document.getElementById('timezone_in').value = Intl.DateTimeFormat().resolvedOptions().timeZone;
 """
 
+# change color on click
+js_set_color = """
+  function setActiveLink(clickedLink) {
+    // Remove active class from all links
+    document.querySelectorAll('.navbar-link').forEach(link => {
+      link.classList.remove('active');
+    });
+    
+    // Add active class to clicked link
+    clickedLink.classList.add('active');
+  }
+"""
 
 start_stop_btn_lbl = {
     "RUNNING": "Stop",
@@ -61,11 +73,11 @@ start_stop_btn_lbl = {
 
 status_colors = {
     DaemonStatus.STOPPED: "red",
-    DaemonStatus.STOPPING: "gold",
+    DaemonStatus.STOPPING: "aqua",
     DaemonStatus.SHUT_DOWN: "red",
-    DaemonStatus.PARTIALLY_RUNNING: "gold",
-    DaemonStatus.STARTING: "gold",
-    DaemonStatus.RUNNING: "green",
+    DaemonStatus.PARTIALLY_RUNNING: "lawngreen",
+    DaemonStatus.STARTING: "aqua",
+    DaemonStatus.RUNNING: "limegreen",
 }
 
 cm = ConfigManager()
@@ -118,11 +130,11 @@ def projectbar(proj_name: str = "", what: str = ""):
     
     if proj_name:
         status, color = get_runner_status(proj_name)
-    return Div(
+    return Div(Script(js_set_color),
         Ul(
-            A(Img(src="./logo_jfr.png",height=30), href="/"),
+            A(Img(src="./logo_jfr.png",height=70), href="/"),
             Li("Projects:"),
-            Select(Option("Pick one"),
+            Li(Select(Option("Pick one"),
             *[Option(prj,
                      value=prj,
                      selected=(proj_name==prj))
@@ -131,35 +143,42 @@ def projectbar(proj_name: str = "", what: str = ""):
                    hx_push_url="true",
                    hx_get=f"/projects",
                    hx_target="body",
-                   ),
-            Li(A("Report", hx_get=f"/projects?proj_name={proj_name}",
+                   )),
+            (Li(A("Report", hx_get=f"/projects?proj_name={proj_name}",
                  hx_push_url="true",
-                 hx_target="body",                 
-                 )) if proj_name else None,
-            Li("Query: ") if proj_name else None,
-            Ul( 
-                 Li(A("Jobs", hx_get=f"/{proj_name}/jobs/query",
-                      hx_target="#prj-container",
-                      hx_push_url="true",
-                      )),
-                 Li(A("Flows", hx_get=f"/{proj_name}/flows/query",
-                      hx_target="#prj-container",
-                      hx_push_url="true",
-                      )),
-             ) if proj_name else None,
-            Li("Runner:") if proj_name else None,
-            Group(Ul(
+                 hx_target="body",
+                 #_="on click remove .active from .navbar a then add .active to me",
+                 onclick="setActiveLink(this)",
+                 cls="navbar-link"
+                  )),
+             Group(Ul(
+             Li("Query: "),
+             Li(A("Jobs", hx_get=f"/{proj_name}/jobs/query",
+                  hx_target="#prj-container",
+                  hx_push_url="true",
+                  #_="on click remove .active from .navbar a then add .active to me",
+                  onclick="setActiveLink(this)",
+                  cls="navbar-link"
+                  )),
+             Li(A("Flows", hx_get=f"/{proj_name}/flows/query",
+                  hx_target="#prj-container",
+                  hx_push_url="true",
+                  #_="on click remove .active from .navbar a then add .active to me",
+                  onclick="setActiveLink(this)",
+                  cls="navbar-link"
+                  ))),cls="group"),
+            Group(Ul(Li("Runner:"),
             Li(f"{status}",
-               style=f"color: {color}"),
+               style=f"color: {color}; background-color: black; padding: 3px 5px; border-radius: 4px;"),
             Li(Button(f"{start_stop_btn_lbl[status]}", 
                       hx_post=f"/runner/{proj_name}/{start_stop_btn_lbl[status].lower()}",
-                      hx_target="#runner-status"))),
+                      hx_target="#runner-status")),cls="ul2"),
             hx_get=f"/runner/{proj_name}/status",
             hx_trigger="every 30s",
             hx_swap="outerHTML",
             id="runner-status",
             cls="group",
-            ) if proj_name else None,
+            )) if proj_name else None,
         ),
         cls="navbar"
     )
@@ -211,7 +230,7 @@ def open_dialog(action: str ="", what: str = "", kwargs: dict = {}):
                hx_target="#dialog-container",
                hx_swap="innerHTML",
                style="font-weight: bold") if selected else None,
-        cls="card"),
+        cls="card-dialog"),
         id="my-dialog",
         open="open",  # This attribute opens the dialog
         cls="dialog",
@@ -238,7 +257,7 @@ def run_action(action: str ="", what: str = "", kwargs: dict = {}):
         P(f"{delete_options}"),        
         Button("Cancel", hx_get="/test/close_dialog",hx_target="#dialog-container",
                    style="font-weight: bold"),
-        cls="card"),
+        cls="card-dialog"),
         id="my-dialog",
         open="open",  # This attribute opens the dialog
         cls="dialog",
@@ -255,7 +274,10 @@ def close_dialog():
 def start_runner_route(proj_name: str):
     dm = daemon_managers[proj_name]
     dm.start()
-    return Group(Ul(Li("STARTING",style=f"color: gold")),
+    status = "STARTING"
+    color = status_colors[DaemonStatus(status)]
+    return Group(Ul(Li("Runner:"),
+                    Li(status,style=f"color: {color}; background-color: black; padding-right: 10px; border-radius: 4px;")),
                  id="runner-status",
                  hx_get=f"/runner/{proj_name}/status",
                  hx_trigger="every 5s",
@@ -268,7 +290,10 @@ def stop_runner_route(proj_name: str):
 
     dm = daemon_managers[proj_name]
     dm.shut_down()
-    return Group(Ul(Li("STOPPING",style=f"color: gold",)),
+    status = "STOPPING"
+    color = status_colors[DaemonStatus(status)]    
+    return Group(Ul(Li("Runner:"),
+                    Li(status,style=f"color: {color}; background-color: black; padding-right: 10px; border-radius: 4px;",)),
                  id="runner-status",
                  hx_get=f"/runner/{proj_name}/status",
                  hx_trigger="every 5s",
@@ -280,10 +305,9 @@ def stop_runner_route(proj_name: str):
 @rt("/runner/{proj_name}/status")
 def get_runner_status_update(proj_name: str):
     status, color = get_runner_status(proj_name)
-    print(status, start_stop_btn_lbl[status])
-    return Group(Ul(
+    return Group(Ul(Li("Runner:"),
         Li(f"{status}",
-           style=f"color: {color}"),
+           style=f"color: {color}; background-color: black; padding-right: 10px; border-radius: 4px;"),
         Li(Button(f"{start_stop_btn_lbl[status]}", 
                   hx_post=f"/runner/{proj_name}/{start_stop_btn_lbl[status].lower()}",
                   hx_target="#runner-status"))),
@@ -498,7 +522,7 @@ def get_info_job_flow(jf_id: str, what: str, proj_name: str):
             H3(f"Job name: {info.pop('name')}"),
             ScrollableArea(*[Ul(Li(f"{k}:",style="font-weight: bold"),Li(f"{v}",style="margin-left: 10px; al"))
                              for k,v in info.items()]),
-            cls="card active",
+            cls="card-dialog active",
         )
 
         #return  job_details
@@ -518,7 +542,7 @@ def get_graph_job_flow(jf_id: str, proj_name: str):
 @rt("/{proj_name}/{what}/dialog/{jf_id}")
 def get_info_graph_dialog(jf_id: str, what: str, proj_name: str):
     return Dialog(Card(
-        Button("X", hx_get="/test/close_dialog",hx_target="#dialog-container",
+        Button("Close", hx_get="/test/close_dialog",hx_target="#dialog-container",
                    style="float: right; font-weight: bold", cls="btn"),
         Div(
             Button(f"Details {what}", 
