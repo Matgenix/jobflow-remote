@@ -155,3 +155,87 @@ def upgrade_test_dir(test_dir):
     """
 
     return test_dir / "upgrade"
+
+
+@pytest.hookimpl(tryfirst=True, hookwrapper=True)
+def pytest_runtest_makereport(item, call):
+    """
+    Hook to set the report of the test. Needed to check if a test failed.
+    """
+    outcome = yield
+    report = outcome.get_result()
+    if report.when == "call":
+        item.rep_call = report
+
+
+@pytest.fixture(scope="session")
+def shared_test_out_dir(tmp_path_factory):
+    """
+    Fixture to lazily create a shared temporary directory to store the dump
+    of MongoDB for failed tests and move them to store as an artifact is
+    running on github.
+    """
+    import os
+
+    _tmp_dir = None
+
+    def get_or_create():
+        nonlocal _tmp_dir
+        if _tmp_dir is None:
+            _tmp_dir = Path(tmp_path_factory.mktemp("shared_test_dir"))
+        return _tmp_dir
+
+    yield get_or_create
+
+    # If on github and the folder was created (i.e., some test failed), move
+    # it so that it can be uploaded as an artifact.
+    if os.getenv("GITHUB_WORKSPACE") and _tmp_dir:
+        artifact_path = Path(os.getenv("GITHUB_WORKSPACE")) / "test_folder"
+        os.rename(_tmp_dir, artifact_path)
+
+        print(f"Database dump saved as artifact: {artifact_path}")
+
+
+@pytest.fixture()
+def job_controller(random_project_name, request, shared_test_out_dir):
+    """Yields a jobcontroller instance for the test suite that also sets up the
+    jobstore, resetting it after every test.
+    """
+    from monty.serialization import dumpfn
+
+    from jobflow_remote.jobs.jobcontroller import JobController
+
+    jc = JobController.from_project_name(random_project_name)
+    assert jc.reset(max_limit=0)
+    yield jc
+
+    if hasattr(request.node, "rep_call") and request.node.rep_call.failed:
+        target_dir = shared_test_out_dir()
+
+        # use the test name (including parameters) as a target folder
+        test_name = request.node.name
+        sanitized_test_name = "".join(c if c.isalnum() else "_" for c in test_name)
+
+        test_dump_dir = target_dir / sanitized_test_name
+        test_dump_dir.mkdir(parents=True, exist_ok=True)
+
+        # don't use the backup to create indented json files for easier access
+
+        for coll in [jc.jobs, jc.flows, jc.auxiliary]:
+            dump_file_path = test_dump_dir / f"{coll.name}.json"
+            dumpfn(list(coll.find()), dump_file_path, indent=2)
+
+        print(f"Data dumped to {test_dump_dir}")
+
+
+@pytest.fixture()
+def job_controller_drop(random_project_name, job_controller):
+    """Yields a jobcontroller instance for the test suite that also sets up the
+    jobstore. Drops the database at the end of the test.
+    Useful for tests that may leave entries in the DB that are not cleaned with
+    a reset.
+    """
+    try:
+        yield job_controller
+    finally:
+        job_controller.db.client.drop_database(job_controller.db)
