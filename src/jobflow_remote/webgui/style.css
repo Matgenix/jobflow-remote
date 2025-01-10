@@ -9,7 +9,7 @@ body {
     font-family: 'Arial', sans-serif;
     background-color: var(--background-color);
     color: var(--text-color);
-    line-height: 1.6;
+    line-height: 1;
     margin-top: 0px;
     padding-top: 0px;
 }
@@ -22,7 +22,7 @@ body {
 
 .navbar {
     background-color: var(--primary-color);
-    height: 70px;
+    height: 50px;
 }
 
 
@@ -35,7 +35,7 @@ body {
 
 .navbar-link {
     color: white;
-    padding: 10px 12px;
+    padding: 0px 10px;
     text-decoration: none;
 }
 
@@ -52,11 +52,6 @@ ul {
     padding-left: 0px;
 }
 
-ul2 {
-    list-style-type: none;
-    float: right;
-    padding-left: 10px;
-}
 
 .pagination a, span {
     padding-right: 2px;
@@ -91,8 +86,8 @@ button {
     display: inline-block;
     background-color: #2980b9;;
     color: white;
-    padding: 2px 5px;
-    border-radius: 3px;
+    padding: 5px 5px;
+    border-radius: 5px;
     text-decoration: none;
     transition: background-color 0.3s;
 }

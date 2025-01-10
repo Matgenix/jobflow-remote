@@ -132,7 +132,7 @@ def projectbar(proj_name: str = "", what: str = ""):
         status, color = get_runner_status(proj_name)
     return Div(Script(js_set_color),
         Ul(
-            A(Img(src="./logo_jfr.png",height=70), href="/"),
+            A(Img(src="./logo_jfr.png",height=50), href="/"),
             Li("Projects:"),
             Li(Select(Option("Pick one"),
             *[Option(prj,
