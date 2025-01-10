@@ -1,0 +1,226 @@
+:root {
+    --primary-color: #3498db;
+    --secondary-color: #2ecc71;
+    --background-color: #f4f4f4;
+    --text-color: #333;
+}
+
+body {
+    font-family: 'Arial', sans-serif;
+    background-color: var(--background-color);
+    color: var(--text-color);
+    line-height: 1.6;
+    margin-top: 0px;
+    padding-top: 0px;
+}
+
+.container {
+    max-width: 1200px;
+    margin-top: 0px;
+    padding-top: 0px;
+}
+
+.navbar {
+    background-color: var(--primary-color);
+    height: 70px;
+}
+
+
+.navbar li {
+    font-size: 80%;
+    color: gold;
+    align-content: center;
+    padding-left: 10px;
+}
+
+.navbar-link {
+    color: white;
+    padding: 10px 12px;
+    text-decoration: none;
+}
+
+.navbar-link.active {
+    color: white;    
+    background-color: #86ce4c;
+    border-radius: 4px;
+}
+
+ul {
+    list-style-type: none;
+    display: flex;
+    justify-content: left;
+    padding-left: 0px;
+}
+
+ul2 {
+    list-style-type: none;
+    float: right;
+    padding-left: 10px;
+}
+
+.pagination a, span {
+    padding-right: 2px;
+}
+
+.card-dialog {
+    background-color: white;
+    border-radius: 5px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    padding: 20px;
+    margin-bottom: 0px;
+}
+
+.card {
+    background-color: white;
+    border-radius: 5px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.card button {
+    margin-right: 10px;
+}
+
+.card input {
+    margin-right: 10px;
+}
+
+
+button {
+    display: inline-block;
+    background-color: #2980b9;;
+    color: white;
+    padding: 2px 5px;
+    border-radius: 3px;
+    text-decoration: none;
+    transition: background-color 0.3s;
+}
+
+button:hover {
+    background-color: #86ce4c;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: auto;
+    max-width: 1200px;
+}
+
+th, td {
+    text-align: left;
+    padding: 8px;
+    text-align: left;
+    white-space: nowrap;
+    width: auto;
+    text-overflow: ellipsis;
+    overflow: hidden;
+}
+
+th {
+    background-color: var(--primary-color);
+    color: white;
+}
+
+@media (max-width: 768px) {
+    .navbar ul {
+        flex-direction: column;
+    }
+    
+    .navbar li {
+        margin: 10px 0;
+    }
+}
+
+.job-details-content {
+    padding: 30px;
+    background-color: #f9f9f9;
+    border-top: 1px solid #ddd;
+}
+
+.job-row {
+    cursor: pointer;
+}
+
+.job-row:hover {
+    background-color: #f5f5f5;
+}
+
+.group {
+    border: 0px;
+    padding: 2px 2px;
+    align-content: center;
+}
+
+.group2 {
+    border: 0px;
+    padding: 2px 2px;
+    align-content: center;
+    display: flex;
+    justify-content: left;
+
+    
+}
+
+.group label {
+    padding-right: 5px;
+}
+
+
+dialog {
+    /* Underlay covers entire screen. */
+    position: fixed;
+    top:0px;
+    bottom: 0px;
+    left:0px;
+    right:0px;
+    background-color:rgba(0,0,0,0.5);
+    z-index:1000;
+    border-radius: 5px;
+    max-width: 1200px;
+    ///margin: 0 auto;
+    padding: 0px;
+    
+    /* Flexbox centers the .modal-content vertically and horizontally */
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+}
+
+.scrollable-area {
+    height: 300px;  /* Set a fixed height */
+    overflow-y: auto;  /* Enable vertical scrolling */
+    border: 1px solid #ccc;
+    padding: 10px;
+    border-radius: 5px;
+
+
+.tabbed-card {
+border: 0px solid #ddd;
+border-radius: 4px;
+overflow: hidden;
+}
+
+.tab-buttons {
+    display: flex;
+    background-color: white;
+}
+
+.tab {
+    background-color: inherit;
+    border: none;
+    outline: none;
+    cursor: pointer; 
+    padding: 14px 10px;
+    transition: 0.3s;
+    font-size: 17px; flex: 1;
+}
+
+.tab:hover { background-color: white; }
+
+.tab.active { background-color: white; }
+
+.tab-content { padding: 10px; }
+}
+
