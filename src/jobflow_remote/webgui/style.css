@@ -63,6 +63,7 @@ ul {
     box-shadow: 0 2px 5px rgba(0,0,0,0.1);
     padding: 20px;
     margin-bottom: 0px;
+    min-width: 200px;
 }
 
 .card {
@@ -174,6 +175,7 @@ dialog {
     z-index:1000;
     border-radius: 5px;
     max-width: 1200px;
+    min-width: 200px;
     ///margin: 0 auto;
     padding: 0px;
     
@@ -192,9 +194,9 @@ dialog {
 
 
 .tabbed-card {
-border: 0px solid #ddd;
-border-radius: 4px;
-overflow: hidden;
+    border: 0px solid #ddd;
+    border-radius: 4px;
+    overflow: hidden;
 }
 
 .tab-buttons {

@@ -1,4 +1,3 @@
-from sys import exception
 from fastcore.meta import method
 from fasthtml.common import *
 from jobflow_remote.jobs.jobcontroller import JobController
@@ -17,8 +16,12 @@ id_curr = 'current-info'
 id_list = 'info-list'
 
 
+PAGE_TITLE = Title("Jobflow remote manager")
+
 mermaid_js = """
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+mermaid.initialize({ startOnLoad: false });
+window.mermaid = mermaid;
 """
 
 def error_handler(req,exc):
@@ -41,7 +44,8 @@ exception_handlers = {500: error_handler}
 app, rt = fast_app(
     pico=False,  # Disable Pico CSS to use custom styles
     hdrs=(Link(rel='stylesheet', href='./style.css', type='text/css'),
-          Script(mermaid_js, type="module"),),  # Add custom CSS as a header
+          Script(mermaid_js, type="module"), Favicon("logo_jfr.png", "logo_jfr.png")
+          ),  # Add custom CSS as a header
     exception_handlers=exception_handlers,
     )
 
@@ -193,7 +197,7 @@ def ScrollableArea(*content, height="300px"):
 
 @rt("/")
 def get_home():
-    return Titled(
+    return PAGE_TITLE, Main(
             projectbar(),
             Div(
                 H4("Select project from the navigation bar above to view and query Jobs and Flows."),
@@ -334,7 +338,7 @@ def get_runner_status(proj_name: str):
 @rt("/projects")
 def get_proj_home(proj_name: str = ""):
     if proj_name not in list_projects:
-        return Titled(
+        return PAGE_TITLE, Main(
             projectbar(),
             Div(
                 H1(f"The project: {proj_name} does not exists"),
@@ -352,7 +356,8 @@ def get_proj_home(proj_name: str = ""):
         interval = "days"
         ni = 7
         
-    return Titled(
+    return PAGE_TITLE, Main(
+            Script(mermaid_js, type="module"),
             projectbar(proj_name),
             Div(
             H3(f"Report for the Project: {proj_name}"),
@@ -501,7 +506,7 @@ def state_distro(proj_name: str, what: str):
     )
     return Div(
         Button("Update",
-               hx_get=f"/{proj_name}/{what}/sum_report",
+               hx_get=f"/{proj_name}/{what}/state_distro",
                hx_target=f"#{what}-report"),
         report,
         cls="container")
@@ -531,12 +536,29 @@ def get_info_job_flow(jf_id: str, what: str, proj_name: str):
     return (P("Job not found"))
 
 
+# @rt("/{proj_name}/flows/graph/{jf_id}")
+# def get_graph_job_flow(jf_id: str, proj_name: str):
+#     flowinfo = job_controller.get_flows_info(limit=1,full=True)[0]
+#     graph = get_mermaid(flowinfo)
+#     # return Div(ScrollableArea(Pre(graph,cls="mermaid"), Script("await mermaid.run()")),cls="card")
+#     # return Div(ScrollableArea(Pre(graph,cls="mermaid"), Script("await mermaid.init()")),cls="card")
+#     return Div(ScrollableArea(Pre(graph,cls="mermaid"), Script("await mermaid.run({nodes: document.querySelectorAll('.mermaid'),})")),cls="card")
+            
+
+
 @rt("/{proj_name}/flows/graph/{jf_id}")
 def get_graph_job_flow(jf_id: str, proj_name: str):
     flowinfo = job_controller.get_flows_info(limit=1,full=True)[0]
     graph = get_mermaid(flowinfo)
-    return (Div(ScrollableArea(Pre(graph,cls="mermaid")),cls="card"),
-            Script("mermaid.run()",type="module"))
+    m_script = f"""
+(async function() {{
+    const container = document.getElementById('flow-graph');
+    const {{ svg }} = await window.mermaid.render('graphDiv', `{graph}`);
+    container.innerHTML = svg;
+}})();
+"""
+    return Div(ScrollableArea(Div(id="flow-graph"), Script(m_script)),cls="card-dialog")
+
 
 
 @rt("/{proj_name}/{what}/dialog/{jf_id}")
