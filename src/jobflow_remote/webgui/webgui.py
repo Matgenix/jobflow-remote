@@ -168,7 +168,7 @@ def set_job_controller_deamon(project_name):
     }
 
 
-jfreport: JobsReport | None = None
+jfreport = None
 
 
 def update_jfreport(interval: str = "days", ni: int = 7):
