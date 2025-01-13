@@ -3,7 +3,6 @@ from __future__ import annotations
 from collections import Counter
 from datetime import datetime, timezone
 from math import ceil
-from typing import Callable
 from zoneinfo import ZoneInfo
 
 from fasthtml.common import (
@@ -130,11 +129,16 @@ cm = ConfigManager()
 
 list_projects = list(cm.projects.keys())
 
-job_controllers: dict[str, JobController] = {}
-daemon_managers: dict[str, DaemonManager] = {}
-job_controller: JobController | None = None
-job_controller_actions: dict[str, dict[str, Callable]] | None = None
-daemon_manager: DaemonManager | None = None
+# job_controllers: dict[str, JobController] = {}
+# daemon_managers: dict[str, DaemonManager] = {}
+# job_controller: JobController | None = None
+# job_controller_actions: dict[str, dict[str, Callable]] | None = None
+# daemon_manager: DaemonManager | None = None
+job_controllers = {}
+daemon_managers = {}
+job_controller = None
+job_controller_actions = None
+daemon_manager = None
 
 
 def set_job_controller_deamon(project_name):
