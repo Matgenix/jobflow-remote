@@ -976,8 +976,6 @@ def test_count_states(job_controller):
     assert flows_states[FlowState.READY] == 0
     assert flows_states[FlowState.RUNNING] == 1
 
-    raise RuntimeError("FAKE ERROR, TESTING")
-
 
 def test_get_trends(job_controller, one_job):
     from datetime import datetime
