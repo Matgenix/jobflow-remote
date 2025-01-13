@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections import Counter
 from datetime import datetime, timezone
 from math import ceil
+from typing import Callable
 from zoneinfo import ZoneInfo
 
 from fasthtml.common import (
@@ -129,11 +130,11 @@ cm = ConfigManager()
 
 list_projects = list(cm.projects.keys())
 
-job_controllers = {}
-daemon_managers = {}
-job_controller = None
-job_controller_actions = None
-daemon_manager = None
+job_controllers: dict[str, JobController] = {}
+daemon_managers: dict[str, DaemonManager] = {}
+job_controller: JobController | None = None
+job_controller_actions: dict[str, dict[str, Callable]] | None = None
+daemon_manager: DaemonManager | None = None
 
 
 def set_job_controller_deamon(project_name):
@@ -163,7 +164,7 @@ def set_job_controller_deamon(project_name):
     }
 
 
-jfreport = None
+jfreport: JobsReport | None = None
 
 
 def update_jfreport(interval: str = "days", ni: int = 7):
@@ -577,7 +578,7 @@ def sum_report(proj_name: str, what: str):
     if not jfreport:
         update_jfreport()
 
-    state_counts = Counter(jfreport.state_counts)
+    state_counts: Counter = Counter(jfreport.state_counts)
 
     # Find the most common state
     most_common_state, most_common_count = state_counts.most_common(1)[0]
@@ -659,7 +660,7 @@ def state_distro(proj_name: str, what: str):
     if not jfreport:
         update_jfreport()
 
-    state_counts = Counter(jfreport.state_counts)
+    state_counts: Counter = Counter(jfreport.state_counts)
 
     # Calculate percentages
     total_jobs = state_counts.total()
