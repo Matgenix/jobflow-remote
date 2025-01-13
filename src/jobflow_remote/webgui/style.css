@@ -40,7 +40,7 @@ body {
 }
 
 .navbar-link.active {
-    color: white;    
+    color: white;
     background-color: #86ce4c;
     border-radius: 4px;
 }
@@ -123,7 +123,7 @@ th {
     .navbar ul {
         flex-direction: column;
     }
-    
+
     .navbar li {
         margin: 10px 0;
     }
@@ -156,7 +156,7 @@ th {
     display: flex;
     justify-content: left;
 
-    
+
 }
 
 .group label {
@@ -178,7 +178,7 @@ dialog {
     min-width: 200px;
     ///margin: 0 auto;
     padding: 0px;
-    
+
     /* Flexbox centers the .modal-content vertically and horizontally */
     display:flex;
     flex-direction:column;
@@ -208,7 +208,7 @@ dialog {
     background-color: inherit;
     border: none;
     outline: none;
-    cursor: pointer; 
+    cursor: pointer;
     padding: 14px 10px;
     transition: 0.3s;
     font-size: 17px; flex: 1;
@@ -220,4 +220,3 @@ dialog {
 
 .tab-content { padding: 10px; }
 }
-
