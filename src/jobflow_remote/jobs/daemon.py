@@ -697,13 +697,17 @@ class DaemonManager:
         bool
             True if the daemon was stopped successfully, False otherwise.
         """
-        with self.lock_runner_doc() as lock:
-            doc_error = self._check_running_runner(
-                lock.locked_document, raise_on_error=raise_on_error
-            )
-            if doc_error:
-                logger.error(doc_error)
-                return False
+        with self.lock_runner_doc(allow_missing=True) as lock:
+            # This check is done to allow users to switch off the runner
+            # even if the running_runner document is not present.
+            # If the document is locked the error will be raised by lock_runner_doc
+            if lock.locked_document:
+                doc_error = self._check_running_runner(
+                    lock.locked_document, raise_on_error=raise_on_error
+                )
+                if doc_error:
+                    logger.error(doc_error)
+                    return False
             status = self.check_status()
             if status in (
                 DaemonStatus.STOPPED,
@@ -826,13 +830,17 @@ class DaemonManager:
         bool
             True if the daemon is shut down correctly, False otherwise.
         """
-        with self.lock_runner_doc() as lock:
-            doc_error = self._check_running_runner(
-                lock.locked_document, raise_on_error=raise_on_error
-            )
-            if doc_error:
-                logger.error(doc_error)
-                return False
+        with self.lock_runner_doc(allow_missing=True) as lock:
+            # This check is done to allow users to switch off the runner
+            # even if the running_runner document is not present.
+            # If the document is locked the error will be raised by lock_runner_doc
+            if lock.locked_document:
+                doc_error = self._check_running_runner(
+                    lock.locked_document, raise_on_error=raise_on_error
+                )
+                if doc_error:
+                    logger.error(doc_error)
+                    return False
             status = self.check_status()
             if status == DaemonStatus.SHUT_DOWN:
                 logger.info("supervisord is already shut down.")
