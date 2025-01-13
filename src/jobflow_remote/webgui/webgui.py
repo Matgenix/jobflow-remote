@@ -582,7 +582,7 @@ def sum_report(proj_name: str, what: str):
     if not jfreport:
         update_jfreport()
 
-    state_counts: Counter = Counter(jfreport.state_counts)
+    state_counts = Counter(jfreport.state_counts)
 
     # Find the most common state
     most_common_state, most_common_count = state_counts.most_common(1)[0]
@@ -664,7 +664,7 @@ def state_distro(proj_name: str, what: str):
     if not jfreport:
         update_jfreport()
 
-    state_counts: Counter = Counter(jfreport.state_counts)
+    state_counts = Counter(jfreport.state_counts)
 
     # Calculate percentages
     total_jobs = state_counts.total()
