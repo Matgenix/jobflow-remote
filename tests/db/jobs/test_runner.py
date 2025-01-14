@@ -91,8 +91,6 @@ def test_delay_download(job_controller, runner, monkeypatch, one_job):
 def test_ping_runner_runner(job_controller, runner, monkeypatch, caplog):
     from datetime import datetime
 
-    from jobflow_remote.jobs import runner as runner_module
-
     assert not job_controller.ping_running_runner()
     runner.ping_running_runner()
     # check that the ping does not create the document
@@ -110,7 +108,7 @@ def test_ping_runner_runner(job_controller, runner, monkeypatch, caplog):
         < 0.1
     )
     with monkeypatch.context() as m:
-        m.setattr(runner_module, "PING_RUNNER_DELAY", 3)
+        m.setattr(runner.runner_options, "delay_ping_db", 3)
         runner.run(ticks=5)
 
     assert (

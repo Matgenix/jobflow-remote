@@ -42,6 +42,10 @@ class RunnerOptions(BaseModel):
         description="Delay between subsequent refresh from the DB of the number of submitted "
         "and running jobs (seconds). Only used if a batch worker is present",
     )
+    delay_ping_db: int = Field(
+        7200,
+        description="Delay between subsequent pings to the running runner document.",
+    )
     lock_timeout: Optional[int] = Field(
         86400,
         description="Time to consider the lock on a document expired and can be overridden (seconds)",

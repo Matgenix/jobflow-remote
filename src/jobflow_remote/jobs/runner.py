@@ -54,9 +54,6 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-PING_RUNNER_DELAY = 7200
-
-
 class Runner:
     """
     Object orchestrating the execution of all the Jobs.
@@ -321,7 +318,9 @@ class Runner:
 
         # all the processes will ping the running_runner document to signal
         # that at least one is still active.
-        scheduler.every(PING_RUNNER_DELAY).seconds.do(self.ping_running_runner)
+        scheduler.every(self.project.runner.delay_ping_db).seconds.do(
+            self.ping_running_runner
+        )
 
         ticks_remaining: int | bool = True
         if ticks is not None:
