@@ -21,7 +21,7 @@ def submit_flow(
     resources: dict | QResources | None = None,
     priority: int = 0,
     allow_external_references: bool = False,
-) -> list[int]:
+) -> list[str]:
     """
     Submit a flow for calculation to the selected Worker.
 
@@ -52,7 +52,7 @@ def submit_flow(
 
     Returns
     -------
-    List of int
+    List of str
         The list of db_ids of the submitted Jobs.
     """
     config_manager = ConfigManager()
