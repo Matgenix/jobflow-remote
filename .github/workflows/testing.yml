@@ -44,7 +44,7 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Build test bench container
-        uses: docker/bake-action@v5
+        uses: docker/bake-action@v6
         with:
           load: true
           files: tests/integration/dockerfiles/docker-bake.hcl
@@ -84,7 +84,7 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Load test bench containers
-        uses: docker/bake-action@v5
+        uses: docker/bake-action@v6
         with:
           load: true
           files: tests/integration/dockerfiles/docker-bake.hcl
