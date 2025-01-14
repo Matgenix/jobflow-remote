@@ -1,5 +1,9 @@
 def test_std_operations(
-    wait_daemon_started, wait_daemon_stopped, wait_daemon_shutdown, daemon_manager
+    wait_daemon_started,
+    wait_daemon_stopped,
+    wait_daemon_shutdown,
+    daemon_manager,
+    job_controller,
 ):
     from jobflow_remote.testing.cli import run_check_cli
 
@@ -7,6 +11,12 @@ def test_std_operations(
         ["runner", "status"],
         required_out="Daemon status: shut_down",
     )
+
+    run_check_cli(
+        ["runner", "info"],
+        required_out=["Daemon is not running", "No running runner defined in the DB"],
+    )
+
     run_check_cli(
         ["runner", "start"],
     )
@@ -34,7 +44,7 @@ def test_std_operations(
     ]
     run_check_cli(
         ["runner", "info"],
-        required_out=info_required,
+        required_out=[*info_required, "hostname", "last_pinged"],
     )
 
     run_check_cli(
@@ -47,6 +57,7 @@ def test_std_operations(
     run_check_cli(
         ["runner", "info"],
         required_out=[*info_required, "EXITED"],
+        excluded_out=["hostname", "last_pinged"],
     )
 
     run_check_cli(
@@ -58,6 +69,22 @@ def test_std_operations(
     run_check_cli(
         ["runner", "status"],
         required_out="Daemon status: shut_down",
+    )
+
+    run_check_cli(
+        ["runner", "info"],
+        required_out=["Daemon is not running", "No running runner defined in the DB"],
+    )
+
+    # add a fake running runner document to the DB and check that it is still shown
+    job_controller.auxiliary.find_one_and_update(
+        {"running_runner": {"$exists": True}},
+        {"$set": {"running_runner": {"hostname": "test_hostname"}}},
+    )
+    run_check_cli(
+        ["runner", "info"],
+        required_out=["Daemon is not running", "hostname"],
+        excluded_out="No running runner defined in the DB",
     )
 
 

@@ -1,17 +1,25 @@
+import datetime
 import os
 from typing import Annotated
 
 import typer
 from rich.prompt import Confirm
+from rich.scope import render_scope
 from rich.table import Table
 from rich.text import Text
 
 from jobflow_remote.cli.jf import app
 from jobflow_remote.cli.jfr_typer import JFRTyper
-from jobflow_remote.cli.types import break_lock_opt, force_opt, log_level_opt
+from jobflow_remote.cli.types import (
+    break_lock_opt,
+    force_opt,
+    log_level_opt,
+    verbosity_opt,
+)
 from jobflow_remote.cli.utils import (
     exit_with_error_msg,
     exit_with_warning_msg,
+    fmt_datetime,
     get_config_manager,
     get_job_controller,
     loading_spinner,
@@ -25,6 +33,7 @@ from jobflow_remote.jobs.daemon import (
     RunningDaemonError,
 )
 from jobflow_remote.jobs.runner import Runner
+from jobflow_remote.utils.data import convert_utc_time
 
 app_runner = JFRTyper(
     name="runner", help="Commands for handling the Runner", no_args_is_help=True
@@ -306,7 +315,7 @@ def status() -> None:
 
 
 @app_runner.command()
-def info() -> None:
+def info(verbosity: verbosity_opt = 0) -> None:
     """
     Fetch the information about the process of the daemon.
     Contain the supervisord process and the processes running the Runner.
@@ -322,16 +331,35 @@ def info() -> None:
             f"Error while fetching information from the daemon: {getattr(e, 'message', e)}"
         )
     if not procs_info_dict:
-        exit_with_warning_msg("Daemon is not running")
-    table = Table()
-    table.add_column("Process")
-    table.add_column("PID")
-    table.add_column("State")
+        out_console.print("Daemon is not running", style="gold1")
+    else:
+        table = Table()
+        table.add_column("Process")
+        table.add_column("PID")
+        table.add_column("State")
 
-    for name, proc_info in procs_info_dict.items():
-        table.add_row(name, str(proc_info["pid"]), str(proc_info["statename"]))
+        for name, proc_info in procs_info_dict.items():
+            table.add_row(name, str(proc_info["pid"]), str(proc_info["statename"]))
 
-    out_console.print(table)
+        out_console.print(table)
+
+    # add the information about the running_runner according to the DB
+    jc = get_job_controller()
+    running_runner_doc = jc.get_running_runner()
+
+    # empty line
+    out_console.print("")
+    if running_runner_doc:
+        out_console.print("Data about running runner in the DB:")
+        if verbosity == 0:
+            running_runner_doc.pop("processes_info", None)
+        # convert dates at the first level and for the remote error
+        for k, v in running_runner_doc.items():
+            if isinstance(v, datetime.datetime):
+                running_runner_doc[k] = convert_utc_time(v).strftime(fmt_datetime)
+        out_console.print(render_scope(running_runner_doc))
+    else:
+        out_console.print("No running runner defined in the DB")
 
 
 @app_runner.command()

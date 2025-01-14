@@ -86,3 +86,34 @@ def test_delay_download(job_controller, runner, monkeypatch, one_job):
 
     # verify that it can properly complete after waiting
     assert runner.run_one_job(max_seconds=20, job_id=[j.uuid, j.index])
+
+
+def test_ping_runner_runner(job_controller, runner, monkeypatch, caplog):
+    from datetime import datetime
+
+    from jobflow_remote.jobs import runner as runner_module
+
+    assert not job_controller.ping_running_runner()
+    runner.ping_running_runner()
+    # check that the ping does not create the document
+    assert job_controller.get_running_runner() is None
+
+    # create a fake running runner document
+    t0 = datetime.now()
+    job_controller.auxiliary.find_one_and_update(
+        {"running_runner": {"$exists": True}},
+        {"$set": {"running_runner": {"last_pinged": t0}}},
+    )
+    # Here there could be a small difference in timings, even if the runner is not started
+    assert (
+        abs((job_controller.get_running_runner()["last_pinged"] - t0).total_seconds())
+        < 0.1
+    )
+    with monkeypatch.context() as m:
+        m.setattr(runner_module, "PING_RUNNER_DELAY", 3)
+        runner.run(ticks=5)
+
+    assert (
+        abs((job_controller.get_running_runner()["last_pinged"] - t0).total_seconds())
+        > 2
+    )

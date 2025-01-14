@@ -54,6 +54,9 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+PING_RUNNER_DELAY = 7200
+
+
 class Runner:
     """
     Object orchestrating the execution of all the Jobs.
@@ -315,6 +318,10 @@ class Runner:
                 scheduler.every(self.runner_options.delay_update_batch).seconds.do(
                     self.update_batch_jobs
                 )
+
+        # all the processes will ping the running_runner document to signal
+        # that at least one is still active.
+        scheduler.every(PING_RUNNER_DELAY).seconds.do(self.ping_running_runner)
 
         ticks_remaining: int | bool = True
         if ticks is not None:
@@ -1265,6 +1272,11 @@ class Runner:
                 batch_manager.delete_terminated(
                     [(job_id, job_index, process_running_uuid)]
                 )
+
+    def ping_running_runner(self):
+        ping_result = self.job_controller.ping_running_runner()
+        if not ping_result:
+            logger.info("Could not ping the running_runner document")
 
     def cleanup(self) -> None:
         """Close all the connections after stopping the Runner."""

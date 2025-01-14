@@ -3819,6 +3819,23 @@ class JobController:
                 )
             lock.update_on_release = {"$set": {"running_runner": None}}
 
+    def ping_running_runner(self) -> bool:
+        """
+        Ping the running_runner document, if exists and has been activated as a daemon.
+
+        Returns
+        -------
+        bool
+            True if the ping was successful.
+        """
+        ping_result = self.auxiliary.find_one_and_update(
+            {"running_runner.last_pinged": {"$exists": True}},
+            {"$set": {"running_runner.last_pinged": datetime.utcnow()}},
+            upsert=False,
+        )
+
+        return ping_result is not None
+
     def update_flow_state(
         self,
         flow_uuid: str,

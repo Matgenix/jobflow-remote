@@ -242,6 +242,7 @@ def wait_daemon_status(
     if not acceptable_states:
         acceptable_states = [target_status]
 
+    state = None
     for _i in range(max_wait):
         time.sleep(1)
         # if the state cannot be determined keep waiting
@@ -253,7 +254,7 @@ def wait_daemon_status(
         if state == target_status:
             return True
     raise RuntimeError(
-        f"The daemon did not start {target_status.value} within the expected time ({max_wait})"
+        f"The daemon did not reach {target_status.value} within the expected time ({max_wait}). Last state: {state}"
     )
 
 
@@ -288,4 +289,16 @@ def wait_daemon_stopped():
 def wait_daemon_shutdown():
     from jobflow_remote.jobs.daemon import DaemonStatus
 
-    return partial(wait_daemon_status, target_status=DaemonStatus.SHUT_DOWN)
+    acceptable_states = [
+        DaemonStatus.STOPPING,
+        DaemonStatus.STOPPED,
+        DaemonStatus.RUNNING,
+        DaemonStatus.PARTIALLY_RUNNING,
+        DaemonStatus.SHUT_DOWN,
+    ]
+
+    return partial(
+        wait_daemon_status,
+        target_status=DaemonStatus.SHUT_DOWN,
+        acceptable_states=acceptable_states,
+    )

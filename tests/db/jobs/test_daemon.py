@@ -119,12 +119,12 @@ def test_kill_supervisord(
     time.sleep(2)
     assert daemon_manager.check_status() == DaemonStatus.SHUT_DOWN
     # check that the warning message is present among the logged messages
-    # TODO if run alone the check below passes. If run among all the others
-    # the log message is not present.
-    # log_msg = caplog.messages
-    # assert len(log_msg) > 0
-    # assert f"Process with pid {supervisord_pid} is not running but daemon files are
-    # present" in log_msg[-1]
+    log_msg = caplog.messages
+    assert len(log_msg) > 0
+    assert (
+        f"Process with pid {supervisord_pid} is not running but daemon files are present"
+        in log_msg[-1]
+    )
 
 
 def test_kill_one_process(job_controller, daemon_manager, wait_daemon_started) -> None:
@@ -272,3 +272,64 @@ def test_stop_restart_diff(daemon_manager, caplog, wait_daemon_started):
         in caplog.text
     )
     assert daemon_manager.check_status() == DaemonStatus.RUNNING
+
+
+def test_missing_running_runner_doc(
+    daemon_manager,
+    job_controller,
+    wait_daemon_started,
+    wait_daemon_stopped,
+    wait_daemon_shutdown,
+):
+    from jobflow_remote.jobs.daemon import DaemonStatus
+
+    # remote the running_runner document
+    assert (
+        job_controller.auxiliary.delete_one(
+            {"running_runner": {"$exists": True}}
+        ).deleted_count
+        == 1
+    )
+
+    error = (
+        "No daemon runner document.\nThe auxiliary collection does"
+        " not contain information about running daemon. Your database was "
+        "likely set up or reset using an old version of Jobflow Remote. You can "
+        'upgrade the database using the command "jf admin upgrade"'
+    )
+
+    # the runner cannot start
+    with pytest.raises(ValueError, match=error):
+        daemon_manager.start(raise_on_error=True, single=False)
+
+    # recreate the document
+    job_controller.reset()
+
+    assert daemon_manager.check_status() == DaemonStatus.SHUT_DOWN
+
+    assert daemon_manager.start(raise_on_error=True, single=False)
+    wait_daemon_started(daemon_manager)
+
+    # remote the running_runner document
+    assert (
+        job_controller.auxiliary.delete_one(
+            {"running_runner": {"$exists": True}}
+        ).deleted_count
+        == 1
+    )
+
+    # daemon can be stopped
+    daemon_manager.stop(raise_on_error=True)
+    wait_daemon_stopped(daemon_manager)
+
+    assert daemon_manager.check_status() == DaemonStatus.STOPPED
+
+    # daemon can be shut-down
+    daemon_manager.shut_down(raise_on_error=True)
+    wait_daemon_shutdown(daemon_manager)
+
+    assert daemon_manager.check_status() == DaemonStatus.SHUT_DOWN
+
+    # still cannot start
+    with pytest.raises(ValueError, match=error):
+        daemon_manager.start(raise_on_error=True, single=False)
