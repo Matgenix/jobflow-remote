@@ -283,7 +283,7 @@ def test_missing_running_runner_doc(
 ):
     from jobflow_remote.jobs.daemon import DaemonStatus
 
-    # remote the running_runner document
+    # remove the running_runner document
     assert (
         job_controller.auxiliary.delete_one(
             {"running_runner": {"$exists": True}}
@@ -310,7 +310,7 @@ def test_missing_running_runner_doc(
     assert daemon_manager.start(raise_on_error=True, single=False)
     wait_daemon_started(daemon_manager)
 
-    # remote the running_runner document
+    # remove the running_runner document
     assert (
         job_controller.auxiliary.delete_one(
             {"running_runner": {"$exists": True}}
