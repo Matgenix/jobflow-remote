@@ -45,6 +45,12 @@ def test_std_operations(
     run_check_cli(
         ["runner", "info"],
         required_out=[*info_required, "hostname", "last_pinged"],
+        excluded_out="processes_info",
+    )
+
+    run_check_cli(
+        ["runner", "info", "-v"],
+        required_out=[*info_required, "hostname", "last_pinged", "processes_info"],
     )
 
     run_check_cli(
