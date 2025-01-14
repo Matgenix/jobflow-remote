@@ -593,7 +593,7 @@ def sum_report(proj_name: str, what: str):
     active_count = jfreport.active
 
     # Calculate percentages
-    total_jobs = state_counts.total()
+    total_jobs = state_counts.total()  # type: ignore
     state_percentages = {
         state: (count / total_jobs) * 100 for state, count in state_counts.items()
     }
@@ -667,7 +667,7 @@ def state_distro(proj_name: str, what: str):
     state_counts = Counter(jfreport.state_counts)
 
     # Calculate percentages
-    total_jobs = state_counts.total()
+    total_jobs = state_counts.total()  # type: ignore
     state_percentages = {
         state: (count / total_jobs) * 100 for state, count in state_counts.items()
     }
