@@ -96,3 +96,10 @@ def ignore_input(a: int) -> int:
     Allows to test flows with failed parents
     """
     return 1
+
+
+@job
+def current_jobdoc():
+    from jobflow_remote.jobs.run import CURRENT_JOBDOC
+
+    return CURRENT_JOBDOC.job_doc
