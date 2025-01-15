@@ -56,9 +56,18 @@ def get_local_data_path(
     return get_job_path(job_id, index, local_base_dir)
 
 
-def get_remote_in_file(job, remote_store):
+def get_remote_in_file(job, remote_store, job_doc=None):
+    # remove the job from the job_doc, if present.
+    # Create the copy from scratch to avoid allocating the job multiple
+    # times if it is big
+    job_doc_copy = None
+    if job_doc is not None:
+        job_doc_copy = {k: v for k, v in job_doc.items() if k not in ("job", "_id")}
+        # the document is likely locked when getting here.
+        job_doc_copy["lock_id"] = None
+        job_doc_copy["lock_time"] = None
     d = jsanitize(
-        {"job": job, "store": remote_store},
+        {"job": job, "store": remote_store, "job_doc": job_doc_copy},
         strict=True,
         allow_bson=True,
         enum_values=True,

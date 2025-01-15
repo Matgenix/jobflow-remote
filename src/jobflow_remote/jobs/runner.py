@@ -648,7 +648,7 @@ class Runner:
             logger.error(err_msg)
             raise RemoteError(err_msg, no_retry=False)
 
-        serialized_input = get_remote_in_file(job_dict, remote_store)
+        serialized_input = get_remote_in_file(job_dict, remote_store, doc)
 
         path_file = Path(remote_path, IN_FILENAME)
         host.put(serialized_input, str(path_file))
