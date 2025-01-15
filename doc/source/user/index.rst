@@ -22,6 +22,7 @@ details are found in :ref:`reference`.
    advancedoptions
    backup
    cli
+   gui
 
 .. toctree::
    :hidden:

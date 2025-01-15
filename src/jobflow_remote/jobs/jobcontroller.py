@@ -462,6 +462,8 @@ class JobController:
             query. Follows pymongo conventions.
         limit
             Maximum number of entries to retrieve. 0 means no limit.
+        skip
+            The number of documents to omit (from the start of the result set).
 
         Returns
         -------
@@ -2299,6 +2301,8 @@ class JobController:
             If True data is fetched from both the Flow collection and Job collection
             with an aggregate. Otherwise, only the Job information in the Flow
             document will be used.
+        skip
+            The number of documents to omit (from the start of the result set).
 
         Returns
         -------
