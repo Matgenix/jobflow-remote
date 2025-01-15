@@ -101,7 +101,6 @@ table {
     width: 100%;
     border-collapse: collapse;
     table-layout: auto;
-    max-width: 1200px;
 }
 
 th, td {

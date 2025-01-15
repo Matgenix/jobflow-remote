@@ -4,6 +4,7 @@ import jobflow_remote.cli.backup
 import jobflow_remote.cli.batch
 import jobflow_remote.cli.execution
 import jobflow_remote.cli.flow
+import jobflow_remote.cli.gui
 import jobflow_remote.cli.job
 import jobflow_remote.cli.project
 import jobflow_remote.cli.runner

@@ -4,40 +4,63 @@ from collections import Counter
 from datetime import datetime, timezone
 from math import ceil
 from zoneinfo import ZoneInfo
+from pathlib import Path
 
-from fasthtml.common import (
-    H1,
-    H3,
-    H4,
-    A,
-    Button,
-    Card,
-    CheckboxX,
-    Dialog,
-    Div,
-    Favicon,
-    Form,
-    Group,
-    Img,
-    Input,
-    Label,
-    Li,
-    Link,
-    Main,
-    Option,
-    P,
-    Script,
-    Select,
-    Span,
-    Table,
-    Td,
-    Th,
-    Title,
-    Tr,
-    Ul,
-    fast_app,
-    serve,
-)
+from monty.dev import requires
+
+try:
+    import fasthtml
+    from fasthtml.common import (
+        H1,
+        H3,
+        H4,
+        A,
+        Button,
+        Card,
+        CheckboxX,
+        Dialog,
+        Div,
+        Favicon,
+        Form,
+        Group,
+        Img,
+        Input,
+        Label,
+        Li,
+        Link,
+        Main,
+        Option,
+        P,
+        Script,
+        Select,
+        Span,
+        Table,
+        Td,
+        Th,
+        Title,
+        Tr,
+        Ul,
+        fast_app,
+        serve,
+    )
+except ImportError:
+    fasthtml = None
+
+    # fake rt decorator
+    def rt_fake(*args, **kwargs):
+        def wrapper(func):
+            return func
+
+        return wrapper
+
+    def fast_app(*args, **kwargs):
+        return lambda x: x, rt_fake
+
+    def fake_function(*args, **kwargs):
+        return None
+
+    Title = Link = Script = Favicon = fake_function
+
 
 from jobflow_remote import ConfigManager
 from jobflow_remote.jobs.daemon import DaemonManager, DaemonStatus
@@ -86,9 +109,10 @@ app, rt = fast_app(
     hdrs=(
         Link(rel="stylesheet", href="./style.css", type="text/css"),
         Script(mermaid_js, type="module"),
-        Favicon("logo_jfr.png", "logo_jfr.png"),
+        Favicon("jfr_favicon.ico", "jfr_favicon.ico"),
     ),  # Add custom CSS as a header
     exception_handlers=exception_handlers,
+    static_path=Path(__file__).parent,
 )
 
 
@@ -129,11 +153,6 @@ cm = ConfigManager()
 
 list_projects = list(cm.projects.keys())
 
-# job_controllers: dict[str, JobController] = {}
-# daemon_managers: dict[str, DaemonManager] = {}
-# job_controller: JobController | None = None
-# job_controller_actions: dict[str, dict[str, Callable]] | None = None
-# daemon_manager: DaemonManager | None = None
 job_controllers = {}
 daemon_managers = {}
 job_controller = None
@@ -384,7 +403,7 @@ def close_dialog():
     return ""
 
 
-# Add these new routes to handle starting and stopping the runner
+# handle starting and stopping the runner
 @rt("/runner/{proj_name}/start", methods=["POST"])
 def start_runner_route(proj_name: str):
     dm = daemon_managers[proj_name]
@@ -429,7 +448,6 @@ def stop_runner_route(proj_name: str):
     )
 
 
-# Modify the existing route to update the runner status
 @rt("/runner/{proj_name}/status")
 def get_runner_status_update(proj_name: str):
     status, color = get_runner_status(proj_name)
@@ -458,7 +476,6 @@ def get_runner_status_update(proj_name: str):
 
 def get_runner_status(proj_name: str):
     dm = daemon_managers[proj_name]
-    current_status = None
     current_status = dm.check_status()
     color = status_colors[current_status]
 
@@ -725,15 +742,6 @@ def get_info_job_flow(jf_id: str, what: str, proj_name: str):
         )
 
     return P("Job not found")
-
-
-# @rt("/{proj_name}/flows/graph/{jf_id}")
-# def get_graph_job_flow(jf_id: str, proj_name: str):
-#     flowinfo = job_controller.get_flows_info(limit=1,full=True)[0]
-#     graph = get_mermaid(flowinfo)
-#     # return Div(ScrollableArea(Pre(graph,cls="mermaid"), Script("await mermaid.run()")),cls="card")
-#     # return Div(ScrollableArea(Pre(graph,cls="mermaid"), Script("await mermaid.init()")),cls="card")
-#     return Div(ScrollableArea(Pre(graph,cls="mermaid"), Script("await mermaid.run({nodes: document.querySelectorAll('.mermaid'),})")),cls="card")
 
 
 @rt("/{proj_name}/flows/graph/{jf_id}")
@@ -1158,6 +1166,11 @@ def post(
         id="query-results",
         cls="card",
     ), Div(Script(mermaid_js, type="module"), id="dialog-container")
+
+
+@requires(fasthtml is not None, "The 'python-fasthtml' package is required to run the gui.")
+def start_gui(port: int | None = None):
+    serve(appname="jobflow_remote.webgui.webgui", port=port, reload_includes=[Path(__file__).parent],)
 
 
 if __name__ == "__main__":
