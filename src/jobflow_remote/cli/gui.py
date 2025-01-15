@@ -1,6 +1,7 @@
 from typing import Annotated, Optional
 
 import typer
+
 from jobflow_remote.cli.jf import app
 
 
@@ -19,4 +20,5 @@ def gui(
     Start the server for the GUI
     """
     from jobflow_remote.webgui.webgui import start_gui
+
     start_gui(port=port)

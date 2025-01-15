@@ -3,8 +3,8 @@ from __future__ import annotations
 from collections import Counter
 from datetime import datetime, timezone
 from math import ceil
-from zoneinfo import ZoneInfo
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from monty.dev import requires
 
@@ -1168,9 +1168,15 @@ def post(
     ), Div(Script(mermaid_js, type="module"), id="dialog-container")
 
 
-@requires(fasthtml is not None, "The 'python-fasthtml' package is required to run the gui.")
+@requires(
+    fasthtml is not None, "The 'python-fasthtml' package is required to run the gui."
+)
 def start_gui(port: int | None = None):
-    serve(appname="jobflow_remote.webgui.webgui", port=port, reload_includes=[Path(__file__).parent],)
+    serve(
+        appname="jobflow_remote.webgui.webgui",
+        port=port,
+        reload_includes=[Path(__file__).parent],
+    )
 
 
 if __name__ == "__main__":

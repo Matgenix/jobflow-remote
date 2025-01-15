@@ -124,9 +124,12 @@ def test_queries(job_controller, runner) -> None:
     )
 
     # test skip
-    skipped_flows= job_controller.get_flows_info(sort=["updated_on"], skip=1)
+    skipped_flows = job_controller.get_flows_info(sort=["updated_on"], skip=1)
     assert len(skipped_flows) == job_controller.count_flows() - 1
-    assert skipped_flows[0].updated_on == job_controller.get_flows_info(sort=["updated_on"])[1].updated_on
+    assert (
+        skipped_flows[0].updated_on
+        == job_controller.get_flows_info(sort=["updated_on"])[1].updated_on
+    )
 
 
 def test_rerun_completed(job_controller, runner) -> None:
