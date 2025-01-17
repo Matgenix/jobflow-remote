@@ -102,7 +102,7 @@ jobs:
         id: failure
         run: |
           echo "Forcing a failure in this step"
-          exit 1
+#          exit 1
         continue-on-error: true
 
       - name: Make sure the previous step has failed
