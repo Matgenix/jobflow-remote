@@ -10,6 +10,10 @@ requires the installation of the ``python-fasthtml`` package::
 
     pip install python-fasthtml
 
+The package can also be installed when setting up jobflow-remote with::
+
+    pip install jobflow-remote[gui]
+
 .. warning::
 
     The web GUI is an experimental feature and in addition does not
