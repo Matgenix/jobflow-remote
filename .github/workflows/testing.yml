@@ -102,12 +102,13 @@ jobs:
         id: failure
         run: |
           echo "Forcing a failure in this step"
-#          exit 1
+          exit 1
         continue-on-error: true
 
       - name: Make sure the previous step has failed
         if: ${{ steps.failure.outcome == 'success' }}
         run: |
+          echo "The previous step with an explicit failure should have failed while it succeeded"
           exit 1
 
       - name: Check the dump of the db
