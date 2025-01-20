@@ -1,0 +1,24 @@
+name: "Testing save db artifact"
+description: "This action ensures that the save db artifact works properly"
+runs:
+  using: "composite"
+  steps:
+    - name: Testing the save db artifact in case a test fails
+      id: failure
+      run: |
+        echo "Forcing a failure in this step"
+        exit 1
+      continue-on-error: true
+
+    # Ensure previous test indeed failed (it continues on error but also continues on success ...)
+    - name: Make sure the previous step has failed
+      if: ${{ steps.failure.outcome == 'success' }}
+      run: |
+        echo "The previous step with an explicit failure should have failed while it succeeded"
+        exit 1
+
+    # This should check that a dump has been created in the github workspace, check its content (?)
+    # and then remove it
+    - name: Check the dump of the db
+      run: |
+        echo "Checking db dump"
