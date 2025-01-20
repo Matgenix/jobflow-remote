@@ -57,9 +57,6 @@ jobs:
             *.cache-to=type=gha,scope=global,mode=max
             *.cache-from=type=gha,scope=global
 
-      - name: List images
-        run: docker images
-
   test:
     services:
       local_mongodb:
@@ -98,8 +95,11 @@ jobs:
         uses: docker/bake-action@v6
         with:
           load: true
+          push: false
           files: tests/integration/dockerfiles/docker-bake.hcl
-          set: "*.cache-from=type=gha,scope=global"
+          set: |
+            *.cache-to=type=gha,scope=global,mode=max
+            *.cache-from=type=gha,scope=global
 
       - name: List images
         run: docker images
