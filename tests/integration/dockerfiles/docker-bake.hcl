@@ -60,7 +60,7 @@ target "pbs" {
         QUEUE_SYSTEM = "pbs"
     }
     cache-from = [
-        "type=registry,ref=${IMAGE_BASE}:${IMAGE_TAG}",
+        "type=registry,ref=${IMAGE_BASE}-pbs:${IMAGE_TAG}",
         "type=registry,ref=${IMAGE_BASE}-pbs:cache",
         "type=gha",
     ]
