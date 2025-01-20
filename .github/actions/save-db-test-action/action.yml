@@ -8,6 +8,7 @@ runs:
       run: |
         echo "Forcing a failure in this step"
         exit 1
+      shell: bash
       continue-on-error: true
 
     # Ensure previous test indeed failed (it continues on error but also continues on success ...)
@@ -16,9 +17,11 @@ runs:
       run: |
         echo "The previous step with an explicit failure should have failed while it succeeded"
         exit 1
+      shell: bash
 
     # This should check that a dump has been created in the github workspace, check its content (?)
     # and then remove it
     - name: Check the dump of the db
       run: |
         echo "Checking db dump"
+      shell: bash
