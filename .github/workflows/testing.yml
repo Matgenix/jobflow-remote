@@ -34,32 +34,32 @@ jobs:
       - name: Lint
         run: pre-commit run --all-files --show-diff-on-failure
 
-#  build-test-bench:
-#    name: "Build test bench containers"
-#    runs-on: ubuntu-latest
-#    steps:
-#      - uses: actions/checkout@v4
-#
-#      - name: Set up Docker Buildx
-#        uses: docker/setup-buildx-action@v3
-#
-#      - name: Build test bench container
-#        uses: docker/bake-action@v6
-#        with:
-#          load: true
-#          files: tests/integration/dockerfiles/docker-bake.hcl
-#          set: |
-#            *.cache-to=type=gha,scope=global,mode=max
-#            *.cache-from=type=gha,scope=global
+  build-test-bench:
+    name: "Build test bench containers"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build test bench container
+        uses: docker/bake-action@v6
+        with:
+          load: true
+          files: tests/integration/dockerfiles/docker-bake.hcl
+          set: |
+            *.cache-to=type=gha,scope=global,mode=max
+            *.cache-from=type=gha,scope=global
 
   test:
-#    services:
-#      local_mongodb:
-#        image: mongo:5.0
-#        ports:
-#          - 27017:27017
-#
-#    needs: [build-test-bench]
+    services:
+      local_mongodb:
+        image: mongo:5.0
+        ports:
+          - 27017:27017
+
+    needs: [build-test-bench]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -69,92 +69,92 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-#      - uses: actions/setup-python@v5
-#        with:
-#          python-version: ${{ matrix.python-version }}
-#          cache: pip
-#          cache-dependency-path: pyproject.toml
-#
-#      - name: Install mongo-tools
-#        run: |
-#          wget https://fastdl.mongodb.org/tools/db/mongodb-database-tools-ubuntu2204-x86_64-100.10.0.deb
-#          sudo apt install ./mongodb-database-tools-*-100.10.0.deb
-#
-#      - name: Set up Docker Buildx
-#        uses: docker/setup-buildx-action@v3
-#
-#      - name: Load test bench containers
-#        uses: docker/bake-action@v6
-#        with:
-#          load: true
-#          files: tests/integration/dockerfiles/docker-bake.hcl
-#          set: |
-#            *.cache-from=type=gha,scope=global
-#
-#      - name: Install dependencies
-#        run: |
-#          python -m pip install --upgrade pip
-#          pip install -r requirements/requirements.txt
-#          pip install .[tests]
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install mongo-tools
+        run: |
+          wget https://fastdl.mongodb.org/tools/db/mongodb-database-tools-ubuntu2204-x86_64-100.10.0.deb
+          sudo apt install ./mongodb-database-tools-*-100.10.0.deb
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Load test bench containers
+        uses: docker/bake-action@v6
+        with:
+          load: true
+          files: tests/integration/dockerfiles/docker-bake.hcl
+          set: |
+            *.cache-from=type=gha,scope=global
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements/requirements.txt
+          pip install .[tests]
 
       - name: Testing save db artifact
         uses: ./.github/actions/save-db-test-action
 
-#      - name: Unit tests
-#        run: |
-#          COVERAGE_FILE=.coverage.1 \
-#          pytest \
-#            --pytest-durations-min=1 \
-#            --cov=jobflow_remote --cov-report= --cov-config pyproject.toml \
-#            --ignore tests/integration \
-#
-#      - name: Integration tests
-#        run: |
-#          COVERAGE_FILE=.coverage.2 \
-#          pytest \
-#          --pytest-durations-min=1 \
-#          --cov=jobflow_remote --cov-report= --cov-config pyproject.toml \
-#          tests/integration
-#
-#      # combining the reports with --cov-append did not seem to work
-#      - name: Generate coverage report
-#        run: |
-#          coverage combine .coverage.1 .coverage.2
-#          coverage xml
-#
-#      - name: Upload coverage reports to Codecov
-#        uses: codecov/codecov-action@v5
-#        env:
-#          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-#
-#  docs:
-#    name: Build documentation
-#    runs-on: ubuntu-latest
-#
-#    steps:
-#    - name: Checkout repository
-#      uses: actions/checkout@v4
-#      with:
-#        submodules: true
-#        fetch-depth: 0
-#
-#    - name: Set up Python 3.11
-#      uses: actions/setup-python@v5
-#      with:
-#        python-version: '3.11'
-#
-#    - name: Install docs dependencies
-#      run: |
-#        python -m pip install -U pip
-#        pip install -U setuptools wheel
-#        # Required to generate rst files from markdown
-#        sudo apt install pandoc
-#        pip install -r requirements/requirements.txt
-#        pip install .[docs]
-#
-#    - name: Build Sphinx docs
-#      working-directory: doc
-#      run: |
-#        # cannot use sphinx build directly as the makefile handles generation
-#        # of some rst files
-#        make html
+      - name: Unit tests
+        run: |
+          COVERAGE_FILE=.coverage.1 \
+          pytest \
+            --pytest-durations-min=1 \
+            --cov=jobflow_remote --cov-report= --cov-config pyproject.toml \
+            --ignore tests/integration \
+
+      - name: Integration tests
+        run: |
+          COVERAGE_FILE=.coverage.2 \
+          pytest \
+          --pytest-durations-min=1 \
+          --cov=jobflow_remote --cov-report= --cov-config pyproject.toml \
+          tests/integration
+
+      # combining the reports with --cov-append did not seem to work
+      - name: Generate coverage report
+        run: |
+          coverage combine .coverage.1 .coverage.2
+          coverage xml
+
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v5
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+  docs:
+    name: Build documentation
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        submodules: true
+        fetch-depth: 0
+
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Install docs dependencies
+      run: |
+        python -m pip install -U pip
+        pip install -U setuptools wheel
+        # Required to generate rst files from markdown
+        sudo apt install pandoc
+        pip install -r requirements/requirements.txt
+        pip install .[docs]
+
+    - name: Build Sphinx docs
+      working-directory: doc
+      run: |
+        # cannot use sphinx build directly as the makefile handles generation
+        # of some rst files
+        make html
