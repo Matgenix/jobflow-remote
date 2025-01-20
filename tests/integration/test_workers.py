@@ -333,10 +333,9 @@ def test_undefined_additional_stores(worker, job_controller) -> None:
     )
 
 
-# openpbs + qtk does not work the -u option at the moment
 @pytest.mark.parametrize(
     "remote_worker_name",
-    ["test_remote_slurm_worker", "test_remote_sge_worker"],
+    ["test_remote_slurm_worker", "test_remote_sge_worker", "test_remote_pbs_worker"],
 )
 def test_submit_flow_with_scheduler_username(
     remote_worker_name, monkeypatch, job_controller
