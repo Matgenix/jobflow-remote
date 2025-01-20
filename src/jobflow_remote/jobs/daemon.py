@@ -697,13 +697,17 @@ class DaemonManager:
         bool
             True if the daemon was stopped successfully, False otherwise.
         """
-        with self.lock_runner_doc() as lock:
-            doc_error = self._check_running_runner(
-                lock.locked_document, raise_on_error=raise_on_error
-            )
-            if doc_error:
-                logger.error(doc_error)
-                return False
+        with self.lock_runner_doc(allow_missing=True) as lock:
+            # This check is done to allow users to switch off the runner
+            # even if the running_runner document is not present.
+            # If the document is locked the error will be raised by lock_runner_doc
+            if lock.locked_document:
+                doc_error = self._check_running_runner(
+                    lock.locked_document, raise_on_error=raise_on_error
+                )
+                if doc_error:
+                    logger.error(doc_error)
+                    return False
             status = self.check_status()
             if status in (
                 DaemonStatus.STOPPED,
@@ -826,13 +830,17 @@ class DaemonManager:
         bool
             True if the daemon is shut down correctly, False otherwise.
         """
-        with self.lock_runner_doc() as lock:
-            doc_error = self._check_running_runner(
-                lock.locked_document, raise_on_error=raise_on_error
-            )
-            if doc_error:
-                logger.error(doc_error)
-                return False
+        with self.lock_runner_doc(allow_missing=True) as lock:
+            # This check is done to allow users to switch off the runner
+            # even if the running_runner document is not present.
+            # If the document is locked the error will be raised by lock_runner_doc
+            if lock.locked_document:
+                doc_error = self._check_running_runner(
+                    lock.locked_document, raise_on_error=raise_on_error
+                )
+                if doc_error:
+                    logger.error(doc_error)
+                    return False
             status = self.check_status()
             if status == DaemonStatus.SHUT_DOWN:
                 logger.info("supervisord is already shut down.")
@@ -972,6 +980,11 @@ class DaemonManager:
             user = os.getlogin()
         except OSError:
             user = os.environ.get("USER", None)
+        # Note that this approach may give a different MAC address for the
+        # same machine, if more than one network device is present (this
+        # may also include local virtual machines). Consider replacing this
+        # with a more stable choice (e.g. the first one in alphabetical order,
+        # excluding virtual interfaces)
         mac_address = None
         found = False
         for addrs in psutil.net_if_addrs().values():
@@ -1063,11 +1076,13 @@ class DaemonManager:
         db_data = doc["running_runner"]
 
         local_data = self._get_runner_info()
+        # not testing on the MAC address as it may change due to identifying
+        # different network devices on the same machine or changing in
+        # cloud VMs.
         data_to_check = [
             "hostname",
             "project_name",
             "user",
-            "mac_address",
             "daemon_dir",
         ]
         for data in data_to_check:

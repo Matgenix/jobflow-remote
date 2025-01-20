@@ -25,6 +25,10 @@ from jobflow_remote.utils.data import uuid_to_path
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
+    from jobflow_remote.config import Project
+    from jobflow_remote.config.base import WorkerBase
+
+
 JOB_INIT_ARGS = {k for k in inspect.signature(Job).parameters if k != "kwargs"}
 """A set of the arguments of the Job constructor which
 can be used to detect additional custom arguments
@@ -40,9 +44,30 @@ def get_job_path(
     return str(base_path / relative_path)
 
 
-def get_remote_in_file(job, remote_store):
+def get_local_data_path(
+    project: Project, worker: str | WorkerBase, job_id: str, index: int, run_dir: str
+) -> str:
+    if isinstance(worker, str):
+        worker = project.workers[worker]
+    if worker.is_local:
+        return run_dir
+
+    local_base_dir = Path(project.tmp_dir, "download")
+    return get_job_path(job_id, index, local_base_dir)
+
+
+def get_remote_in_file(job, remote_store, job_doc=None):
+    # remove the job from the job_doc, if present.
+    # Create the copy from scratch to avoid allocating the job multiple
+    # times if it is big
+    job_doc_copy = None
+    if job_doc is not None:
+        job_doc_copy = {k: v for k, v in job_doc.items() if k not in ("job", "_id")}
+        # the document is likely locked when getting here.
+        job_doc_copy["lock_id"] = None
+        job_doc_copy["lock_time"] = None
     d = jsanitize(
-        {"job": job, "store": remote_store},
+        {"job": job, "store": remote_store, "job_doc": job_doc_copy},
         strict=True,
         allow_bson=True,
         enum_values=True,

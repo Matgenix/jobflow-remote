@@ -42,6 +42,10 @@ class RunnerOptions(BaseModel):
         description="Delay between subsequent refresh from the DB of the number of submitted "
         "and running jobs (seconds). Only used if a batch worker is present",
     )
+    delay_ping_db: int = Field(
+        7200,
+        description="Delay between subsequent pings to the running runner document.",
+    )
     lock_timeout: Optional[int] = Field(
         86400,
         description="Time to consider the lock on a document expired and can be overridden (seconds)",
@@ -197,6 +201,12 @@ class WorkerBase(BaseModel):
         default=False,
         description="Sanitize the output of commands in case of failures due to spurious text produced"
         "by the worker shell.",
+    )
+    delay_download: Optional[int] = Field(
+        default=None,
+        description="Amount of seconds to wait to start the download after the Runner marked a Job "
+        "as TERMINATED. To account for delays in the writing of the file on the worker file system"
+        " (e.g. NFS).",
     )
     model_config = ConfigDict(extra="forbid")
 

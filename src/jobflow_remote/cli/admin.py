@@ -44,13 +44,6 @@ app.add_typer(app_admin)
 
 @app_admin.command()
 def upgrade(
-    test_version_upgrade: Annotated[
-        Optional[str],
-        typer.Option(
-            help="Explicitly sets the target version for upgrade. For testing purposes only",
-            hidden=True,
-        ),
-    ] = None,
     no_dry_run: Annotated[
         bool,
         typer.Option(
@@ -68,6 +61,15 @@ def upgrade(
             "proceeding with the upgrade",
         ),
     ] = False,
+    target: Annotated[
+        Optional[str],
+        typer.Option(
+            "--target",
+            "-t",
+            help="Explicitly sets the target version for upgrade. For testing purposes or development"
+            " versions. Not for standard updates.",
+        ),
+    ] = None,
 ) -> None:
     """
     Upgrade the jobflow database.
@@ -78,7 +80,24 @@ def upgrade(
 
     jc = get_job_controller()
     upgrader = DatabaseUpgrader(jc)
-    target_version = parse_version(test_version_upgrade) or upgrader.current_version
+    target_version = parse_version(target) if target else upgrader.current_version
+    if target_version.local or target_version.post:
+        # this is likely a developer version installed from source.
+        # get the available upgrades for version higher than the developer one
+        base_version = parse_version(target_version.base_version)
+        upgrades_available = upgrader.collect_upgrades(
+            base_version, upgrader.registered_upgrades[-1]
+        )
+        msg = (
+            f"Target version {target_version} is likely a development version. Explicitly "
+            f"specify the target version with the --target option if this is the case."
+        )
+        if upgrades_available:
+            msg += (
+                f" Available upgrades larger than {base_version}: "
+                f"{','.join(str(v) for v in upgrades_available)}"
+            )
+        out_console.print(msg, style="gold1")
     db_version = jc.get_current_db_version()
     if db_version >= target_version:
         exit_with_warning_msg(
@@ -100,7 +119,7 @@ def upgrade(
             out_console.print(text)
 
     if not no_dry_run:
-        actions = upgrader.dry_run(target_version=test_version_upgrade)
+        actions = upgrader.dry_run(target_version=target)
         if not actions:
             out_console.print(
                 f"No actions will be required for upgrading to version {target_version}"
@@ -121,7 +140,7 @@ def upgrade(
     with loading_spinner(processing=False) as progress:
         progress.add_task(description="Upgrading the DB...", total=None)
 
-        done = upgrader.upgrade(target_version=test_version_upgrade)
+        done = upgrader.upgrade(target_version=target)
     not_text = "" if done else "[bold]NOT [/bold]"
     out_console.print(f"The database has {not_text}been upgraded")
 
@@ -191,6 +210,7 @@ def unlock(
 ) -> None:
     """
     Forcibly removes the lock from the documents of the selected jobs.
+    If no criteria is specified all the locked jobs will be selected.
     WARNING: can lead to inconsistencies if the processes is actually running.
     """
     job_ids_indexes = get_job_ids_indexes(job_id)
@@ -249,6 +269,7 @@ def unlock_flow(
 ) -> None:
     """
     Forcibly removes the lock from the documents of the selected jobs.
+    If no criteria is specified all the locked flows will be selected.
     WARNING: can lead to inconsistencies if the processes is actually running.
     """
     job_ids_indexes = get_job_ids_indexes(job_id)

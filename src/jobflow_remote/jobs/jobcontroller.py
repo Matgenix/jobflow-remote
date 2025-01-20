@@ -4,6 +4,7 @@ import contextlib
 import fnmatch
 import importlib.metadata
 import logging
+import shutil
 import traceback
 import warnings
 from collections import defaultdict
@@ -50,7 +51,12 @@ from jobflow_remote.jobs.state import (
     FlowState,
     JobState,
 )
-from jobflow_remote.remote.data import get_remote_store, update_store
+from jobflow_remote.remote.data import (
+    get_local_data_path,
+    get_remote_store,
+    get_remote_store_filenames,
+    update_store,
+)
 from jobflow_remote.remote.queue import QueueManager
 from jobflow_remote.utils.data import (
     deep_merge_dict,
@@ -304,6 +310,7 @@ class JobController:
         start_date: datetime | None = None,
         end_date: datetime | None = None,
         name: str | None = None,
+        metadata: dict | None = None,
         locked: bool = False,
     ) -> dict:
         """
@@ -329,6 +336,9 @@ class JobController:
         name
             Pattern matching the name of Flow. Default is an exact match, but all
             conventions from python fnmatch can be used (e.g. *test*)
+        metadata
+            A dictionary of the values of the metadata to match. Should be an
+            exact match for all the values provided.
         locked
             If True only locked Flows will be selected.
 
@@ -373,6 +383,10 @@ class JobController:
             mongo_regex = "^" + fnmatch.translate(name).replace("\\\\", "\\")
             query["name"] = {"$regex": mongo_regex}
 
+        if metadata:
+            metadata_dict = {f"metadata.{k}": v for k, v in metadata.items()}
+            query.update(metadata_dict)
+
         if locked:
             query["lock_id"] = {"$ne": None}
 
@@ -411,6 +425,7 @@ class JobController:
         locked: bool = False,
         sort: list[tuple[str, int]] | None = None,
         limit: int = 0,
+        skip: int = 0,
     ) -> list[JobInfo]:
         """
         Query for Jobs based on standard parameters and return a list of JobInfo.
@@ -447,6 +462,8 @@ class JobController:
             query. Follows pymongo conventions.
         limit
             Maximum number of entries to retrieve. 0 means no limit.
+        skip
+            The number of documents to omit (from the start of the result set).
 
         Returns
         -------
@@ -465,7 +482,7 @@ class JobController:
             metadata=metadata,
             workers=workers,
         )
-        return self.get_jobs_info_query(query=query, sort=sort, limit=limit)
+        return self.get_jobs_info_query(query=query, sort=sort, limit=limit, skip=skip)
 
     def get_jobs_doc_query(self, query: dict = None, **kwargs) -> list[JobDoc]:
         """
@@ -992,7 +1009,7 @@ class JobController:
         ----------
         doc
             The dict of the JobDoc associated to the Job to rerun.
-            Just the "uuid", "index", "db_id", "state" values are required.
+            Just the "uuid", "index", "db_id", "state", "worker" values are required.
         sleep
             Amounts of seconds to wait between checks that the lock has been released.
         wait
@@ -1134,6 +1151,7 @@ class JobController:
                     updated_states[child_doc["uuid"]][child_doc["index"]] = (
                         JobState.WAITING
                     )
+                    self._delete_tmp_folder(child_doc)
 
             # if everything is fine here, update the state of the flow
             # before releasing its lock and set the update for the original job
@@ -1144,6 +1162,9 @@ class JobController:
                 flow_uuid=flow_doc.uuid, updated_states=updated_states
             )
 
+            # delete local temporary folder to avoid parsing
+            # previously downloaded files.
+            self._delete_tmp_folder(doc)
             job_doc_update = get_reset_job_base_dict()
             job_doc_update["state"] = JobState.READY.value
             if delete_files:
@@ -1536,6 +1557,8 @@ class JobController:
                     "remote.step_attempts": 0,
                     "remote.retry_time_limit": None,
                     "remote.error": None,
+                    "remote.queue_out": None,
+                    "remote.queue_err": None,
                 }
                 lock.update_on_release = {"$set": set_dict}
             else:
@@ -2235,9 +2258,11 @@ class JobController:
         start_date: datetime | None = None,
         end_date: datetime | None = None,
         name: str | None = None,
+        metadata: dict | None = None,
         locked: bool = False,
         sort: list[tuple] | None = None,
         limit: int = 0,
+        skip: int = 0,
         full: bool = False,
     ) -> list[FlowInfo]:
         """
@@ -2262,6 +2287,9 @@ class JobController:
         name
             Pattern matching the name of Flow. Default is an exact match, but all
             conventions from python fnmatch can be used (e.g. *test*)
+        metadata
+            A dictionary of the values of the metadata to match. Should be an
+            exact match for all the values provided.
         locked
             If True only locked Flows will be selected.
         sort
@@ -2273,6 +2301,8 @@ class JobController:
             If True data is fetched from both the Flow collection and Job collection
             with an aggregate. Otherwise, only the Job information in the Flow
             document will be used.
+        skip
+            The number of documents to omit (from the start of the result set).
 
         Returns
         -------
@@ -2287,6 +2317,7 @@ class JobController:
             start_date=start_date,
             end_date=end_date,
             name=name,
+            metadata=metadata,
             locked=locked,
         )
 
@@ -2304,7 +2335,7 @@ class JobController:
                 projection_job=projection_job,
             )
         else:
-            data = list(self.flows.find(query, sort=sort, limit=limit))
+            data = list(self.flows.find(query, sort=sort, limit=limit, skip=skip))
 
         return [FlowInfo.from_query_dict(d) for d in data]
 
@@ -3033,7 +3064,7 @@ class JobController:
         date_format = {
             "hours": "%Y-%m-%d %H",
             "days": "%Y-%m-%d",
-            "weeks": "%Y-%U",  # Week number of the year
+            "weeks": "%Y-%m-%d",  # use days and group by week in python
             "months": "%Y-%m",
             "years": "%Y",
         }[interval]
@@ -3074,18 +3105,49 @@ class JobController:
 
         results = list(collection.aggregate(pipeline))
 
+        # MongoDB uses an approach in grouping by weeks that may lead to
+        # more intervals than those specified, based on the number of
+        # weeks. To avoid inconsistencies "weeks" are handled separately:
+        # jobs are grouped by day in the query and regrouped by week
+        # using the ISO calendar convention
         result_dict = {}
-        for r in results:
-            result_dict[r["_id"]] = {
-                state_cls(s.upper()): n for s, n in r.items() if s != "_id"
-            }
+        if interval == "weeks":
+            # first prepare the full dictionary with all the expected values
+            for i in range(1, num_intervals + 1):
+                # Calculate the expected date rounded to the interval
+                expected_date = get_past_time_rounded(
+                    interval=interval, num_intervals=i, reference=tznow
+                )
 
-        for i in range(1, num_intervals + 1):
-            expected_date = get_past_time_rounded(
-                interval=interval, num_intervals=i, reference=tznow
-            ).strftime(date_format)
-            if expected_date not in result_dict:
-                result_dict[expected_date] = {state: 0 for state in states}
+                # Convert expected_date to ISO year-week (as a string)
+                iso_year, iso_week, _ = expected_date.isocalendar()
+                iso_id = f"{iso_year}-{iso_week:02d}"
+
+                # Fill result_dict with zero counts
+                result_dict[iso_id] = {state: 0 for state in states}
+
+            # add the number for each day in the corresponding week
+            for entry in results:
+                raw_date = datetime.strptime(entry["_id"], "%Y-%m-%d")
+                iso_year, iso_week, _ = raw_date.isocalendar()
+                iso_id = f"{iso_year}-{iso_week:02d}"
+
+                for state, count in entry.items():
+                    if state != "_id":
+                        result_dict[iso_id][state_cls(state.upper())] += count
+
+        else:
+            for r in results:
+                result_dict[r["_id"]] = {
+                    state_cls(s.upper()): n for s, n in r.items() if s != "_id"
+                }
+
+            for i in range(1, num_intervals + 1):
+                expected_date_str = get_past_time_rounded(
+                    interval=interval, num_intervals=i, reference=tznow
+                ).strftime(date_format)
+                if expected_date_str not in result_dict:
+                    result_dict[expected_date_str] = {state: 0 for state in states}
 
         return result_dict
 
@@ -3371,6 +3433,8 @@ class JobController:
                 local_path = Path(local_path)
                 out_path = local_path / OUT_FILENAME
                 host_flow_id = job_doc["job"]["hosts"][-1]
+                # This check needs to be present because if the worker is "local"
+                # the download phase is skipped and the check is not done earlier.
                 if not out_path.exists():
                     msg = (
                         f"The output file {OUT_FILENAME} was not present in the download "
@@ -3421,6 +3485,29 @@ class JobController:
                     self.update_flow_state(host_flow_id)
                     return True
 
+                # Files associated with the store may not have been downloaded.
+                # First check if they exist and then try to get the store
+                required_store_files = get_remote_store_filenames(
+                    store, config_dict=self.project.remote_jobstore
+                )
+                for store_file in required_store_files:
+                    if not (local_path / store_file).exists():
+                        msg = (
+                            "No explicit error raised during the remote execution, but the output "
+                            f"store file {store_file} is missing in the downloaded folder {local_path}. "
+                            "The file was probably not created in the remote folder during the "
+                            "execution but is needed to proceed."
+                        )
+                        self.checkin_job(
+                            job_doc,
+                            flow_lock.locked_document,
+                            response=None,
+                            error=msg,
+                            doc_update=doc_update,
+                        )
+                        self.update_flow_state(host_flow_id)
+                        return True
+
                 remote_store = get_remote_store(
                     store, local_path, self.project.remote_jobstore
                 )
@@ -3454,7 +3541,11 @@ class JobController:
         doc_update: dict | None = None,
     ):
         stored_data = None
+        queue_out = None
+        queue_err = None
         if response is None:
+            # set queue_out and queue_err here in case of failure
+            queue_out, queue_err = self._get_downloaded_queue_files(job_doc)
             new_state = JobState.FAILED.value
         # handle response
         else:
@@ -3507,7 +3598,13 @@ class JobController:
         if not doc_update:
             doc_update = {}
         doc_update.update(
-            {"state": new_state, "stored_data": stored_data, "error": error}
+            {
+                "state": new_state,
+                "stored_data": stored_data,
+                "error": error,
+                "remote.queue_out": queue_out,
+                "remote.queue_err": queue_err,
+            }
         )
 
         result = self.jobs.update_one(
@@ -3726,6 +3823,23 @@ class JobController:
                 )
             lock.update_on_release = {"$set": {"running_runner": None}}
 
+    def ping_running_runner(self) -> bool:
+        """
+        Ping the running_runner document, if exists and has been activated as a daemon.
+
+        Returns
+        -------
+        bool
+            True if the ping was successful.
+        """
+        ping_result = self.auxiliary.find_one_and_update(
+            {"running_runner.last_pinged": {"$exists": True}},
+            {"$set": {"running_runner.last_pinged": datetime.utcnow()}},
+            upsert=False,
+        )
+
+        return ping_result is not None
+
     def update_flow_state(
         self,
         flow_uuid: str,
@@ -3829,9 +3943,10 @@ class JobController:
     @contextlib.contextmanager
     def lock_job_for_update(
         self,
-        query,
-        max_step_attempts,
-        delta_retry,
+        query: dict,
+        max_step_attempts: int,
+        delta_retry: tuple[int, ...],
+        next_step_delay: int | None = None,
         **kwargs,
     ) -> Generator[MongoLock, None, None]:
         """
@@ -3849,6 +3964,9 @@ class JobController:
         delta_retry
             List of increasing delay between subsequent attempts when the
             advancement of a remote step fails. Used to set the retry time.
+        next_step_delay
+            An amount of seconds that sets the delay for the next step to
+            start even in case there are no errors.
         kwargs
             Kwargs passed to the MongoLock context manager.
 
@@ -3900,10 +4018,18 @@ class JobController:
 
             if lock.locked_document:
                 if not error:
+                    next_step_time_limit = None
+                    if next_step_delay:
+                        next_step_time_limit = datetime.utcnow() + timedelta(
+                            seconds=next_step_delay
+                        )
+                    # When succeeded don't set remote.queue_out/remote.queue_err to
+                    # None, otherwise it overwrites values that may be written if the
+                    # completion fails.
                     succeeded_update = {
                         "$set": {
                             "remote.step_attempts": 0,
-                            "remote.retry_time_limit": None,
+                            "remote.retry_time_limit": next_step_time_limit,
                             "remote.error": None,
                         }
                     }
@@ -3913,12 +4039,15 @@ class JobController:
                 else:
                     step_attempts = doc["remote"]["step_attempts"]
                     no_retry = no_retry or step_attempts >= max_step_attempts
+                    queue_out, queue_err = self._get_downloaded_queue_files(doc)
                     if no_retry:
                         update_on_release = {
                             "$set": {
                                 "state": JobState.REMOTE_ERROR.value,
                                 "previous_state": doc["state"],
                                 "remote.error": error,
+                                "remote.queue_out": queue_out,
+                                "remote.queue_err": queue_err,
                             }
                         }
                     else:
@@ -3931,6 +4060,8 @@ class JobController:
                                 "remote.step_attempts": step_attempts,
                                 "remote.retry_time_limit": retry_time_limit,
                                 "remote.error": error,
+                                "remote.queue_out": queue_out,
+                                "remote.queue_err": queue_err,
                             }
                         }
                 if "$set" in update_on_release:
@@ -4045,6 +4176,57 @@ class JobController:
         """
         with MongoLock(collection=self.auxiliary, **lock_kwargs) as lock:
             yield lock
+
+    def _get_downloaded_queue_files(
+        self, job_doc: dict
+    ) -> tuple[str | None, str | None]:
+        local_path_str = get_local_data_path(
+            project=self.project,
+            worker=job_doc["worker"],
+            job_id=job_doc["uuid"],
+            index=job_doc["index"],
+            run_dir=job_doc["run_dir"],
+        )
+        if not local_path_str:
+            return None, None
+        local_path = Path(local_path_str)
+        queue_out_path = local_path / "queue.out"
+        queue_err_path = local_path / "queue.err"
+        queue_out = None
+        queue_err = None
+        length_limit = 3000
+        if queue_out_path.exists():
+            with queue_out_path.open(mode="rt") as f:
+                queue_out = f.read()
+                if len(queue_out) > length_limit:
+                    queue_out = queue_out[:length_limit]
+                    queue_out += " ...\nThe content was cut. Check the content of the actual file"
+        if queue_err_path.exists():
+            with queue_err_path.open(mode="rt") as f:
+                queue_err = f.read()
+                if len(queue_err) > length_limit:
+                    queue_err = queue_err[:length_limit]
+                    queue_err += " ...\nThe content was cut. Check the content of the actual file"
+
+        return queue_out, queue_err
+
+    def _delete_tmp_folder(self, job_doc: dict):
+        worker = self.project.workers[job_doc["worker"]]
+        if not worker.is_local:
+            local_path = get_local_data_path(
+                project=self.project,
+                worker=worker,
+                job_id=job_doc["uuid"],
+                index=job_doc["index"],
+                run_dir=job_doc["run_dir"],
+            )
+            if Path(local_path).exists():
+                try:
+                    shutil.rmtree(local_path)
+                except Exception as e:
+                    logger.warning(
+                        f"Could not delete the temporary local folder {local_path}: {getattr(e, 'message', e)}"
+                    )
 
     def ping_flow_doc(self, uuid: str) -> None:
         """

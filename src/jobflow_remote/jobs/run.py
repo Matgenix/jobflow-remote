@@ -12,12 +12,13 @@ from typing import TYPE_CHECKING
 
 from jobflow import JobStore, initialize_logger
 from jobflow.core.flow import get_flow
+from monty.design_patterns import singleton
 from monty.os import cd
 from monty.serialization import dumpfn, loadfn
 from monty.shutil import decompress_file
 
 from jobflow_remote.jobs.batch import LocalBatchManager
-from jobflow_remote.jobs.data import IN_FILENAME, OUT_FILENAME
+from jobflow_remote.jobs.data import IN_FILENAME, OUT_FILENAME, JobDoc
 from jobflow_remote.remote.data import get_job_path, get_store_file_paths
 from jobflow_remote.utils.log import initialize_remote_run_log
 
@@ -27,6 +28,20 @@ if TYPE_CHECKING:
     from jobflow.core.job import Job
 
 logger = logging.getLogger(__name__)
+
+
+@singleton
+class JfrState:
+    """State of the current job being executed."""
+
+    job_doc: JobDoc = None
+
+    def reset(self):
+        """Reset the current state."""
+        self.job_doc = None
+
+
+CURRENT_JOBDOC: JfrState = JfrState()
 
 
 def run_remote_job(run_dir: str | Path = ".") -> None:
@@ -42,6 +57,10 @@ def run_remote_job(run_dir: str | Path = ".") -> None:
 
             job: Job = in_data["job"]
             store = in_data["store"]
+            job_doc_dict = in_data.get("job_doc", None)
+            if job_doc_dict:
+                job_doc_dict["job"] = job
+                JfrState().job_doc = JobDoc.model_validate(job_doc_dict)
 
             store.connect()
 
@@ -49,8 +68,8 @@ def run_remote_job(run_dir: str | Path = ".") -> None:
             try:
                 response = job.run(store=store)
             finally:
-                # some jobs may have compressed the FW files while being executed,
-                # try to decompress them if that is the case and files need to be
+                # some jobs may have compressed the jfremote and store files while being
+                # executed, try to decompress them if that is the case and files need to be
                 # decompressed.
                 decompress_files(store)
 
@@ -65,7 +84,7 @@ def run_remote_job(run_dir: str | Path = ".") -> None:
 
             # Convert to Flow the dynamic responses before dumping the output.
             # This is required so that the response does not need to be
-            # deserialized and converted by to Flows by the runner.
+            # deserialized and converted to Flows by the runner.
             if response.addition:
                 response.addition = get_flow(response.addition)
             if response.detour:
@@ -91,6 +110,8 @@ def run_remote_job(run_dir: str | Path = ".") -> None:
                 "end_time": datetime.datetime.utcnow(),
             }
             dumpfn(output, OUT_FILENAME)
+        finally:
+            JfrState().reset()
 
 
 def run_batch_jobs(

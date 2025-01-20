@@ -106,6 +106,7 @@ def get_initial_flow_doc_dict(flow: Flow, job_dicts: list[dict]) -> dict:
         name=flow.name,
         ids=ids,
         parents=parents,
+        metadata=flow.metadata or {},
     )
 
     return flow_doc.as_db_dict()
@@ -120,6 +121,8 @@ class RemoteInfo(BaseModel):
     retry_time_limit: Optional[datetime] = None
     error: Optional[str] = None
     prerun_cleanup: bool = False
+    queue_out: Optional[str] = None
+    queue_err: Optional[str] = None
 
 
 class JobInfo(BaseModel):
@@ -508,6 +511,8 @@ def get_reset_job_base_dict() -> dict:
         "previous_state": None,
         "remote.queue_state": None,
         "remote.error": None,
+        "remote.queue_out": None,
+        "remote.queue_err": None,
         "error": None,
         "updated_on": datetime.utcnow(),
         "start_time": None,

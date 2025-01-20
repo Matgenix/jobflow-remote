@@ -210,6 +210,17 @@ def format_job_info(
     if remote_error:
         d["remote"]["error"] = ReprStr(remote_error)
 
+    if verbosity == 0:
+        d["remote"].pop("queue_out", None)
+        d["remote"].pop("queue_err", None)
+    else:
+        queue_out = d["remote"].get("queue_out")
+        if queue_out:
+            d["remote"]["queue_out"] = ReprStr(queue_out)
+        queue_err = d["remote"].get("queue_err")
+        if queue_err:
+            d["remote"]["queue_err"] = ReprStr(queue_err)
+
     # reorder the keys
     # Do not check here that all the keys in JobInfo are in JOB_INFO_ORDER. Check in the tests
     sorted_d = {}

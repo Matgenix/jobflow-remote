@@ -1,4 +1,8 @@
-# jobflow-remote
+<div align="center">
+
+# ![Jobflow remote](doc/source/_static/img/jfr_logo.svg)
+
+</div>
 
 [![tests](https://img.shields.io/github/actions/workflow/status/Matgenix/jobflow-remote/testing.yml?branch=develop&label=tests)](https://github.com/Matgenix/jobflow-remote/actions?query=workflow%3Atesting)
 [![code coverage](https://img.shields.io/codecov/c/gh/Matgenix/jobflow-remote)](https://codecov.io/gh/Matgenix/jobflow-remote)

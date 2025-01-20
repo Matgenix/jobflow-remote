@@ -104,6 +104,11 @@ def test_queries(job_controller, runner) -> None:
         == 2
     )
 
+    # test skip
+    skipped_jobs = job_controller.get_jobs_info(sort=["db_id"], skip=1)
+    assert len(skipped_jobs) == job_controller.count_jobs() - 1
+    assert skipped_jobs[0].db_id == "2"
+
     assert job_controller.count_flows(states=FlowState.READY) == 1
     assert job_controller.count_flows(states=FlowState.RUNNING) == 1
     assert job_controller.count_flows(job_ids=add_first.uuid) == 1
@@ -116,6 +121,14 @@ def test_queries(job_controller, runner) -> None:
     assert (
         job_controller.count_flows(query={"uuid": {"$in": (flow.uuid, flow2.uuid)}})
         == 2
+    )
+
+    # test skip
+    skipped_flows = job_controller.get_flows_info(sort=["updated_on"], skip=1)
+    assert len(skipped_flows) == job_controller.count_flows() - 1
+    assert (
+        skipped_flows[0].updated_on
+        == job_controller.get_flows_info(sort=["updated_on"])[1].updated_on
     )
 
 
@@ -995,9 +1008,9 @@ def test_get_trends(job_controller, one_job):
         list(JobState), interval="weeks", interval_timezone="UTC"
     )
     assert len(job_trends) == 4
-    assert utcnow.strftime("%Y-%U") in job_trends
-    assert job_trends[utcnow.strftime("%Y-%U")][JobState.READY] == 1
-    assert job_trends[utcnow.strftime("%Y-%U")][JobState.COMPLETED] == 0
+    assert utcnow.strftime("%Y-%V") in job_trends
+    assert job_trends[utcnow.strftime("%Y-%V")][JobState.READY] == 1
+    assert job_trends[utcnow.strftime("%Y-%V")][JobState.COMPLETED] == 0
 
     job_trends = job_controller.get_trends(
         list(JobState), interval="years", num_intervals=2, interval_timezone=tzname

@@ -66,3 +66,52 @@ def test_upload_cleanup_error(job_controller, runner, monkeypatch):
         in j1_info.remote.error
     )
     assert "FAKE ERROR" in j1_info.remote.error
+
+
+def test_delay_download(job_controller, runner, monkeypatch, one_job):
+    from datetime import datetime
+
+    from jobflow_remote.jobs.state import JobState
+
+    j = one_job.jobs[0]
+    # since this is a local worker the state after RUNNING is DOWNLOADED, not TERMINATED
+    with monkeypatch.context() as m:
+        m.setattr(runner.workers["test_local_worker"], "delay_download", 5)
+        assert runner.run_one_job(
+            max_seconds=10, job_id=[j.uuid, j.index], target_state=JobState.DOWNLOADED
+        )
+    j_info = job_controller.get_job_info(job_id=j.uuid, job_index=j.index)
+    assert j_info.remote.retry_time_limit is not None
+    assert j_info.remote.retry_time_limit > datetime.utcnow()
+
+    # verify that it can properly complete after waiting
+    assert runner.run_one_job(max_seconds=20, job_id=[j.uuid, j.index])
+
+
+def test_ping_runner_runner(job_controller, runner, monkeypatch, caplog):
+    from datetime import datetime
+
+    assert not job_controller.ping_running_runner()
+    runner.ping_running_runner()
+    # check that the ping does not create the document
+    assert job_controller.get_running_runner() is None
+
+    # create a fake running runner document
+    t0 = datetime.now()
+    job_controller.auxiliary.find_one_and_update(
+        {"running_runner": {"$exists": True}},
+        {"$set": {"running_runner": {"last_pinged": t0}}},
+    )
+    # Here there could be a small difference in timings, even if the runner is not started
+    assert (
+        abs((job_controller.get_running_runner()["last_pinged"] - t0).total_seconds())
+        < 0.1
+    )
+    with monkeypatch.context() as m:
+        m.setattr(runner.runner_options, "delay_ping_db", 3)
+        runner.run(ticks=5)
+
+    assert (
+        abs((job_controller.get_running_runner()["last_pinged"] - t0).total_seconds())
+        > 2
+    )

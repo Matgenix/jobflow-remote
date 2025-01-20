@@ -24,7 +24,7 @@ requires-python = ">=3.9"
 dependencies = [
     "fabric ~= 3.2",
     "flufl.lock ~= 8.0",
-    "jobflow >= 0.1.14",
+    "jobflow >= 0.1.19",
     "psutil >= 5.9,< 7.0",
     "pydantic ~= 2.4",
     "python-dateutil>=2.8.2",
@@ -49,6 +49,9 @@ docs = [
     "sphinxcontrib-mermaid",
     "sphinxcontrib-typer[html]",
 ]
+gui = [
+    "python-fasthtml>=0.12.0"
+]
 
 [project.scripts]
 jf = "jobflow_remote.cli.jf:app"
@@ -61,6 +64,7 @@ changelog = "https://matgenix.github.io/jobflow-remote/changelog"
 
 [tool.setuptools.package-data]
 jobflow_remote = ["py.typed"]
+"jobflow_remote.webgui" = ["*.png", "*.css"]
 
 [build-system]
 requires = ["setuptools >= 42", "versioningit  ~=  1.0", "wheel"]
@@ -161,7 +165,6 @@ addopts = [
 ]
 
 [tool.coverage.run]
-include = ["src/*"]
 parallel = true
 branch = true
 

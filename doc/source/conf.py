@@ -95,17 +95,17 @@ pygments_style = "sphinx"
 #
 # html_theme = 'sphinx_book_theme'
 html_theme = "pydata_sphinx_theme"
-# html_favicon = '_static/favicon/favicon.ico'
+html_favicon = "_static/favicon/jfr_favicon.ico"
 
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
 # documentation.
 #
 html_theme_options = {
-    # "logo": {
-    #       "image_light": "index-image/api.svg",
-    #       "image_dark": "index-image/contributor.svg",
-    #   },
+    "logo": {
+        "image_light": "_static/img/jfr_logo.svg",
+        "image_dark": "_static/img/jfr_logo.svg",
+    },
     "collapse_navigation": True,
     "announcement": (
         "<p>"

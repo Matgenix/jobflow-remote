@@ -35,6 +35,7 @@ from jobflow_remote.jobs.data import IN_FILENAME, OUT_FILENAME, RemoteError
 from jobflow_remote.jobs.state import JobState
 from jobflow_remote.remote.data import (
     get_job_path,
+    get_local_data_path,
     get_remote_in_file,
     get_remote_store,
     get_remote_store_filenames,
@@ -315,6 +316,12 @@ class Runner:
                     self.update_batch_jobs
                 )
 
+        # all the processes will ping the running_runner document to signal
+        # that at least one is still active.
+        scheduler.every(self.project.runner.delay_ping_db).seconds.do(
+            self.ping_running_runner
+        )
+
         ticks_remaining: int | bool = True
         if ticks is not None:
             ticks_remaining = ticks
@@ -408,6 +415,7 @@ class Runner:
         job_id: tuple[str, int] | None = None,
         max_seconds: int | None = None,
         raise_at_timeout: bool = True,
+        target_state: JobState | None = None,
     ) -> bool:
         """
         Use the runner to run a single Job until it reaches a terminal state.
@@ -469,7 +477,17 @@ class Runner:
             job_info = self.job_controller.get_job_info(
                 job_id=job_data[0], job_index=job_data[1]
             )
+            if target_state and job_info.state == target_state:
+                return True
             if job_info.state.value not in running_states:
+                # if the target state is defined and the code got
+                # here, it means it missed the target state, so
+                # the target was not achieved.
+                if target_state:
+                    raise RuntimeError(
+                        f"The target state {target_state.value} was not achieved. "
+                        f"Final state: {job_info.state.value}"
+                    )
                 return True
             if max_seconds and time.time() - t0 > max_seconds:
                 if raise_at_timeout:
@@ -630,7 +648,7 @@ class Runner:
             logger.error(err_msg)
             raise RemoteError(err_msg, no_retry=False)
 
-        serialized_input = get_remote_in_file(job_dict, remote_store)
+        serialized_input = get_remote_in_file(job_dict, remote_store, doc)
 
         path_file = Path(remote_path, IN_FILENAME)
         host.put(serialized_input, str(path_file))
@@ -788,31 +806,52 @@ class Runner:
             store = self.jobstore
 
             remote_path = doc["run_dir"]
-            local_base_dir = Path(self.project.tmp_dir, "download")
-            local_path = get_job_path(
-                job_dict["uuid"], job_dict["index"], local_base_dir
+            local_path = get_local_data_path(
+                project=self.project,
+                worker=worker,
+                job_id=doc["uuid"],
+                index=doc["index"],
+                run_dir=remote_path,
             )
 
             makedirs_p(local_path)
 
-            fnames = [OUT_FILENAME]
-            fnames.extend(
-                get_remote_store_filenames(
-                    store, config_dict=self.project.remote_jobstore
-                )
-            )
-
-            for fname in fnames:
+            def download_file(fname: str, mandatory: bool):
                 # in principle fabric should work by just passing the
                 # destination folder, but it fails
                 remote_file_path = str(Path(remote_path, fname))
+                local_file_path = Path(local_path, fname)
                 try:
-                    host.get(remote_file_path, str(Path(local_path, fname)))
+                    host.get(remote_file_path, str(local_file_path))
                 except FileNotFoundError as exc:
-                    # if files are missing it should not retry
+                    # fabric may still create an empty local file even if the remote
+                    # file does not exist. Remove it to avoid errors when checking
+                    # the file existence
+                    local_file_path.unlink(missing_ok=True)
                     err_msg = f"file {remote_file_path} for job {job_dict['uuid']} does not exist"
-                    logger.exception(err_msg)
-                    raise RemoteError(err_msg, no_retry=True) from exc
+                    if mandatory:
+                        logger.exception(err_msg)
+                        # if files are missing it should not retry
+                        raise RemoteError(err_msg, no_retry=True) from exc
+
+                    err_msg += ". Allow continuing to the next state"
+                    logger.warning(err_msg)
+
+            # download the queue files first, so if an error is triggered
+            # afterwards they can be inserted in the DB
+            for fn in ("queue.out", "queue.err"):
+                download_file(fn, mandatory=False)
+
+            # only the output file is mandatory. If the others are missing
+            # it will be dealt with by the complete. The output file may contain
+            # an error and the fact that they are missing could be expected.
+            # The analysis of the output file is left to the completion procedure.
+            download_file(OUT_FILENAME, mandatory=True)
+
+            for fn in get_remote_store_filenames(
+                store, config_dict=self.project.remote_jobstore
+            ):
+                download_file(fn, mandatory=False)
 
         lock.update_on_release = {"$set": {"state": JobState.DOWNLOADED.value}}
 
@@ -830,13 +869,15 @@ class Runner:
         logger.debug(f"complete job db_id: {doc['db_id']}")
 
         # if the worker is local the files were not copied to the temporary
-        # folder, but the files could be directly updated
+        # folder, but the files could be directly accessed
         worker = self.get_worker(doc["worker"])
-        if worker.is_local:
-            local_path = doc["run_dir"]
-        else:
-            local_base_dir = Path(self.project.tmp_dir, "download")
-            local_path = get_job_path(doc["uuid"], doc["index"], local_base_dir)
+        local_path = get_local_data_path(
+            project=self.project,
+            worker=worker,
+            job_id=doc["uuid"],
+            index=doc["index"],
+            run_dir=doc["run_dir"],
+        )
 
         try:
             store = self.jobstore
@@ -917,6 +958,7 @@ class Runner:
                 qstate = qjob.state if qjob else None
                 next_state = None
                 start_time = None
+                next_step_delay = None
                 if (
                     qstate == QState.RUNNING
                     and doc["state"] == JobState.SUBMITTED.value
@@ -933,6 +975,8 @@ class Runner:
                         next_state = JobState.TERMINATED
                     else:
                         next_state = JobState.DOWNLOADED
+                    # the delay is applied if the job is finished on the worker
+                    next_step_delay = worker.delay_download
                     logger.debug(
                         f"terminated remote job with id {remote_doc['process_id']}"
                     )
@@ -951,10 +995,12 @@ class Runner:
                         "index": doc["index"],
                         "state": doc["state"],
                     }
+
                     with self.job_controller.lock_job_for_update(
                         query=lock_filter,
                         max_step_attempts=self.runner_options.max_step_attempts,
                         delta_retry=self.runner_options.delta_retry,
+                        next_step_delay=next_step_delay,
                     ) as lock:
                         if lock.locked_document:
                             if error:
@@ -1225,6 +1271,11 @@ class Runner:
                 batch_manager.delete_terminated(
                     [(job_id, job_index, process_running_uuid)]
                 )
+
+    def ping_running_runner(self):
+        ping_result = self.job_controller.ping_running_runner()
+        if not ping_result:
+            logger.info("Could not ping the running_runner document")
 
     def cleanup(self) -> None:
         """Close all the connections after stopping the Runner."""

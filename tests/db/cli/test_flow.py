@@ -4,6 +4,10 @@ import pytest
 
 
 def test_flows_list(job_controller, two_flows_four_jobs) -> None:
+    from jobflow import Flow
+
+    from jobflow_remote import submit_flow
+    from jobflow_remote.testing import add
     from jobflow_remote.testing.cli import run_check_cli
 
     columns = ["DB id", "Name", "State", "Flow id", "Num Jobs", "Last updated"]
@@ -21,6 +25,20 @@ def test_flows_list(job_controller, two_flows_four_jobs) -> None:
     outputs = ["READY"]
     run_check_cli(
         ["flow", "list", "-fid", two_flows_four_jobs[0].uuid], required_out=outputs
+    )
+
+    # test metadata query
+    j = add(1, 2)
+    flow = Flow([j])
+    flow.update_metadata({"test": "x"})
+    submit_flow(flow, worker="test_local_worker")
+
+    outputs = [flow.uuid[:5]]
+    excluded = [two_flows_four_jobs[0].uuid[:5], two_flows_four_jobs[1].uuid[:5]]
+    run_check_cli(
+        ["flow", "list", "--metadata", "test=x"],
+        required_out=outputs,
+        excluded_out=excluded,
     )
 
 
