@@ -105,7 +105,7 @@ services:
       start_period: 2s
 
   jobflow_remote_testing_slurm:
-    image: jobflow-remote-testing-slurm:latest
+    image: ghcr.io/matgenix/jobflow-remote-testing-slurm:latest
     container_name: jobflow_testing_slurm
     ports:
       - "{slurm_ssh_port}:22"
@@ -119,7 +119,7 @@ services:
       start_period: 2s
 
   jobflow_remote_testing_sge:
-    image: jobflow-remote-testing-sge:latest
+    image: ghcr.io/matgenix/jobflow-remote-testing-sge:latest
     container_name: jobflow_testing_sge
     ports:
       - "{sge_ssh_port}:22"
@@ -133,7 +133,7 @@ services:
       start_period: 2s
 
   jobflow_remote_testing_pbs:
-    image: jobflow-remote-testing-pbs:latest
+    image: ghcr.io/matgenix/jobflow-remote-testing-pbs:latest
     container_name: jobflow_testing_pbs
     ports:
       - "{pbs_ssh_port}:22"
