@@ -102,15 +102,23 @@ jobs:
           COVERAGE_FILE=.coverage-unit \
           pytest \
             --pytest-durations-min=1 \
-            --cov=jobflow_remote --cov-report= --cov-config pyproject.toml \
-            --ignore tests/integration
+            --cov=jobflow_remote --cov-report= --cov-config=pyproject.toml \
+            tests/unit
 
-      - name: Integration tests
+      - name: Database tests
+        run: |
+          COVERAGE_FILE=.coverage-db \
+          pytest \
+            --pytest-durations-min=1 \
+            --cov=jobflow_remote --cov-report= --cov-config=pyproject.toml \
+            tests/db
+
+      - name: Full integration tests
         run: |
           COVERAGE_FILE=.coverage-integration \
           pytest \
             --pytest-durations-min=1 \
-            --cov=jobflow_remote --cov-report= --cov-config pyproject.toml \
+            --cov=jobflow_remote --cov-report= --cov-config=pyproject.toml \
             tests/integration
 
       - name: Codecov upload
