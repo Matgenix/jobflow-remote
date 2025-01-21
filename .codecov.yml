@@ -22,6 +22,12 @@ flag_management:
           target: 50%
         - type: patch
           target: 100%
+    - name: db_tests
+      statuses:
+        - type: project
+          target: 50%
+        - type: patch
+          target: 100%
     - name: integration_tests
       statuses:
         - type: project
