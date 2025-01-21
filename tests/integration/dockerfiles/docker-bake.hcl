@@ -1,7 +1,8 @@
 group "default" {
     targets = [
         "slurm",
-        "sge"
+        "sge",
+        "pbs"
     ]
 }
 
@@ -13,6 +14,7 @@ target "slurm" {
     tags = [
         "jobflow-remote-testing-slurm:latest"
     ]
+    platforms = ["linux/amd64"]
 }
 
 target "sge" {
@@ -23,4 +25,16 @@ target "sge" {
     tags = [
         "jobflow-remote-testing-sge:latest"
     ]
+    platforms = ["linux/amd64"]
+}
+
+target "pbs" {
+    dockerfile = "./tests/integration/dockerfiles/Dockerfile"
+    args = {
+        QUEUE_SYSTEM = "pbs"
+    }
+    tags = [
+        "jobflow-remote-testing-pbs:latest"
+    ]
+    platforms = ["linux/amd64"]
 }
