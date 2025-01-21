@@ -115,6 +115,8 @@ jobs:
 
       - name: Codecov upload
         uses: ./.github/actions/codecov-upload-action
+        with:
+          codecov-token: ${{ secrets.CODECOV_TOKEN }}
 
 #      # For some reason, the codecov update fails when passing the name of the file (e.g. ".coverage-unit")
 #      # so we use the standard name and do some silly moving of files ...
