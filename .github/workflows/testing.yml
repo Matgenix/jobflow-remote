@@ -113,55 +113,58 @@ jobs:
             --cov=jobflow_remote --cov-report= --cov-config pyproject.toml \
             tests/integration
 
-      # For some reason, the codecov update fails when passing the name of the file (e.g. ".coverage-unit")
-      # so we use the standard name and do some silly moving of files ...
-      - name: Move .coverage-unit file
-        run: |
-          mv .coverage-unit .coverage
+      - name: Codecov upload
+        uses: ./.github/actions/codecov-upload-action
 
-      - name: Upload unit tests coverage report to Codecov
-        uses: codecov/codecov-action@v5
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-        with:
-          files: .coverage  # Here for some reason, we need to have .coverage as a filename
-          flags: unit_tests
-          name: unit_tests
-
-      # For some reason, the codecov update fails when passing the name of the file (e.g. ".coverage-unit")
-      # so we use the standard name and do some silly moving of files ...
-      - name: Move back .coverage-unit file and move .coverage-integration file
-        run: |
-          mv .coverage .coverage-unit
-          mv .coverage-integration .coverage
-
-      - name: Upload integration tests coverage report to Codecov
-        uses: codecov/codecov-action@v5
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-        with:
-          files: .coverage  # Here for some reason, we need to have .coverage as a filename
-          flags: integration_tests
-          name: integration_tests
-
-      # For some reason, the codecov update fails when passing the name of the file (e.g. ".coverage-unit")
-      # so we use the standard name and do some silly moving of files ...
-      - name: Move back .coverage-integration file
-        run: |
-          mv .coverage .coverage-integration
-
-      - name: Generate combined coverage report for unit and integration tests
-        run: |
-          coverage combine .coverage-unit .coverage-integration
-
-      - name: Upload all (unit+integration) tests coverage report to Codecov
-        uses: codecov/codecov-action@v5
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-        with:
-          files: .coverage  # Here for some reason, we need to have .coverage as a filename
-          flags: all_tests
-          name: all_tests
+#      # For some reason, the codecov update fails when passing the name of the file (e.g. ".coverage-unit")
+#      # so we use the standard name and do some silly moving of files ...
+#      - name: Move .coverage-unit file
+#        run: |
+#          mv .coverage-unit .coverage
+#
+#      - name: Upload unit tests coverage report to Codecov
+#        uses: codecov/codecov-action@v5
+#        env:
+#          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+#        with:
+#          files: .coverage  # Here for some reason, we need to have .coverage as a filename
+#          flags: unit_tests
+#          name: unit_tests
+#
+#      # For some reason, the codecov update fails when passing the name of the file (e.g. ".coverage-unit")
+#      # so we use the standard name and do some silly moving of files ...
+#      - name: Move back .coverage-unit file and move .coverage-integration file
+#        run: |
+#          mv .coverage .coverage-unit
+#          mv .coverage-integration .coverage
+#
+#      - name: Upload integration tests coverage report to Codecov
+#        uses: codecov/codecov-action@v5
+#        env:
+#          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+#        with:
+#          files: .coverage  # Here for some reason, we need to have .coverage as a filename
+#          flags: integration_tests
+#          name: integration_tests
+#
+#      # For some reason, the codecov update fails when passing the name of the file (e.g. ".coverage-unit")
+#      # so we use the standard name and do some silly moving of files ...
+#      - name: Move back .coverage-integration file
+#        run: |
+#          mv .coverage .coverage-integration
+#
+#      - name: Generate combined coverage report for unit and integration tests
+#        run: |
+#          coverage combine .coverage-unit .coverage-integration
+#
+#      - name: Upload all (unit+integration) tests coverage report to Codecov
+#        uses: codecov/codecov-action@v5
+#        env:
+#          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+#        with:
+#          files: .coverage  # Here for some reason, we need to have .coverage as a filename
+#          flags: all_tests
+#          name: all_tests
 
   docs:
     name: Build documentation

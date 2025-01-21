@@ -1,0 +1,61 @@
+name: "Upload coverage reports"
+description: "This action uploads coverage reports for the different flags"
+runs:
+  using: "composite"
+  steps:
+    # For some reason, the codecov update fails when passing the name of the file (e.g. ".coverage-unit")
+    # so we use the standard name and do some silly moving of files ...
+    - name: Move .coverage-unit file
+      run: |
+        mv .coverage-unit .coverage
+      shell: bash
+
+    - name: Upload unit tests coverage report to Codecov
+      uses: codecov/codecov-action@v5
+      env:
+        CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+      with:
+        files: .coverage  # Here for some reason, we need to have .coverage as a filename
+        flags: unit_tests
+        name: unit_tests
+      shell: bash
+
+    # For some reason, the codecov update fails when passing the name of the file (e.g. ".coverage-unit")
+    # so we use the standard name and do some silly moving of files ...
+    - name: Move back .coverage-unit file and move .coverage-integration file
+      run: |
+        mv .coverage .coverage-unit
+        mv .coverage-integration .coverage
+      shell: bash
+
+    - name: Upload integration tests coverage report to Codecov
+      uses: codecov/codecov-action@v5
+      env:
+        CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+      with:
+        files: .coverage  # Here for some reason, we need to have .coverage as a filename
+        flags: integration_tests
+        name: integration_tests
+      shell: bash
+
+    # For some reason, the codecov update fails when passing the name of the file (e.g. ".coverage-unit")
+    # so we use the standard name and do some silly moving of files ...
+    - name: Move back .coverage-integration file
+      run: |
+        mv .coverage .coverage-integration
+      shell: bash
+
+    - name: Generate combined coverage report for unit and integration tests
+      run: |
+        coverage combine .coverage-unit .coverage-integration
+      shell: bash
+
+    - name: Upload all (unit+integration) tests coverage report to Codecov
+      uses: codecov/codecov-action@v5
+      env:
+        CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+      with:
+        files: .coverage  # Here for some reason, we need to have .coverage as a filename
+        flags: all_tests
+        name: all_tests
+      shell: bash
