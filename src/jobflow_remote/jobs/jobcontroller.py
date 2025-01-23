@@ -2847,6 +2847,9 @@ class JobController:
     def get_jobs(self, query, projection: list | dict | None = None):
         return list(self.jobs.find(query, projection=projection))
 
+    def get_flows(self, query, projection: list | dict | None = None):
+        return list(self.flows.find(query, projection=projection))
+
     def count_jobs(
         self,
         query: dict | None = None,
