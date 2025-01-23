@@ -39,7 +39,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pre-commit>=3.0.0"]
-tests = ["docker ~= 7.0", "pytest ~= 8.0", "pytest-cov >= 4,< 6", "pytest-durations ~= 1.3", "pytest-mock ~= 3.14", "python-on-whales ~=0.75"]
+tests = ["docker ~= 7.0", "pytest ~= 8.0", "pytest-cov >= 4,< 7", "pytest-durations ~= 1.3", "pytest-mock ~= 3.14", "python-on-whales ~=0.75"]
 docs = [
     "autodoc_pydantic>=2.0.0",
     "pydata-sphinx-theme",
@@ -67,7 +67,7 @@ jobflow_remote = ["py.typed"]
 "jobflow_remote.webgui" = ["*.png", "*.css"]
 
 [build-system]
-requires = ["setuptools >= 42", "versioningit  ~=  1.0", "wheel"]
+requires = ["setuptools >= 42", "versioningit  >= 1,< 4", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.versioningit.vcs]

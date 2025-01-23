@@ -429,15 +429,3 @@ def write_tmp_settings(
         os.environ["JFREMOTE_PROJECT"] = original_jf_remote_project
     if original_config_file is not None:
         os.environ["JFREMOTE_CONFIG_FILE"] = original_config_file
-
-
-@pytest.fixture()
-def job_controller(random_project_name):
-    """Yields a jobcontroller instance for the test suite that also sets up the
-    jobstore, resetting it after every test.
-    """
-    from jobflow_remote.jobs.jobcontroller import JobController
-
-    jc = JobController.from_project_name(random_project_name)
-    assert jc.reset(max_limit=0)
-    return jc
