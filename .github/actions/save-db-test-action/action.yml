@@ -48,3 +48,4 @@ runs:
 
         echo "Checking unzipped artifact contents..."
         ls -l unzipped_artifact
+      shell: bash
