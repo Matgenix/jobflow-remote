@@ -36,8 +36,6 @@ runs:
 
     - name: Download and inspect the artifact
       if: ${{ steps.failure.outcome == 'failure' }}
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         echo "Downloading artifact directly using gh CLI..."
         gh api --method GET \
