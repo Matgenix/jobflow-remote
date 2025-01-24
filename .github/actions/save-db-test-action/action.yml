@@ -18,6 +18,13 @@ runs:
         exit 1
       shell: bash
 
+    - name: Upload DB dump
+      if: ${{ steps.failure.outcome == 'failure' }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: db_dump_${{ matrix.python-version }}
+        path: test_folder
+
     # This should check that a dump has been created in the github workspace, check its content (?)
     # and then remove it
     - name: Check the dump of the db
