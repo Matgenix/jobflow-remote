@@ -46,10 +46,10 @@ runs:
         echo "Downloading artifact directly using gh CLI..."
         gh api --method GET \
           -H "Accept: application/vnd.github+json" \
-          repos/matgenix/jobflow-remote/actions/artifacts/${{ steps.artifact-upload-test.outputs.artifact-id }}/zip
+          repos/matgenix/jobflow-remote/actions/artifacts/${{ steps.artifact-upload-test.outputs.artifact-id }}/zip > artifact.zip
 
         echo "Unzipping artifact..."
-        unzip db_dump_${{ inputs.python-version }}.zip -d unzipped_artifact
+        unzip artifact.zip -d unzipped_artifact
 
         echo "Checking unzipped artifact contents..."
         ls -l unzipped_artifact
