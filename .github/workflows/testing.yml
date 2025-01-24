@@ -99,6 +99,8 @@ jobs:
 
       - name: Testing save db artifact
         uses: ./.github/actions/save-db-test-action
+        with:
+          python-version: ${{ matrix.python-version }}
 
 #      - name: Unit tests
 #        run: |

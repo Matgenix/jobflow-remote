@@ -1,5 +1,9 @@
 name: "Testing save db artifact"
 description: "This action ensures that the save db artifact works properly"
+inputs:
+  python-version:
+    description: 'Python version used'
+    required: true
 runs:
   using: "composite"
   steps:
@@ -40,11 +44,10 @@ runs:
         echo "Downloading artifact directly using gh CLI..."
         gh api --method GET \
           -H "Accept: application/vnd.github+json" \
-          -o artifact.zip \
           repos/matgenix/jobflow-remote/actions/artifacts/${{ steps.artifact-upload-test.outputs.artifact-id }}/zip
 
         echo "Unzipping artifact..."
-        unzip artifact.zip -d unzipped_artifact
+        unzip db_dump_${{ inputs.python-version }}.zip -d unzipped_artifact
 
         echo "Checking unzipped artifact contents..."
         ls -l unzipped_artifact
