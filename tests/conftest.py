@@ -172,7 +172,7 @@ def pytest_runtest_makereport(item, call):
 def shared_test_out_dir(tmp_path_factory):
     """
     Fixture to lazily create a shared temporary directory to store the dump
-    of MongoDB for failed tests and move them to store as an artifact is
+    of MongoDB for failed tests and move them to store as an artifact if
     running on github.
     """
     import os

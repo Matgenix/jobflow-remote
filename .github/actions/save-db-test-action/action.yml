@@ -21,9 +21,11 @@ runs:
     - name: Upload DB dump
       if: ${{ steps.failure.outcome == 'failure' }}
       uses: actions/upload-artifact@v4
+      id: artifact-upload-test
       with:
         name: db_dump_${{ matrix.python-version }}
         path: test_folder
+        if-no-files-found: error
 
     # This should check that a dump has been created in the github workspace, check its content (?)
     # and then remove it
@@ -31,3 +33,20 @@ runs:
       run: |
         echo "Checking db dump"
       shell: bash
+
+    - name: Download and inspect the artifact
+      if: ${{ steps.failure.outcome == 'failure' }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        echo "Downloading artifact directly using gh CLI..."
+        gh api --method GET \
+          -H "Accept: application/vnd.github+json" \
+          -o artifact.zip \
+          repos/matgenix/jobflow-remote/actions/artifacts/${{ steps.artifact-upload-test.outputs.artifact-id }}/zip
+
+        echo "Unzipping artifact..."
+        unzip artifact.zip -d unzipped_artifact
+
+        echo "Checking unzipped artifact contents..."
+        ls -l unzipped_artifact
