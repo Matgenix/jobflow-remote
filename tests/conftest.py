@@ -9,10 +9,13 @@ import pytest
 
 
 @pytest.fixture(scope="session")
-def test_dir():
-    module_dir = Path(__file__).resolve().parent
-    test_dir = module_dir / "test_data"
-    return test_dir.resolve()
+def tests_dir():
+    return Path(__file__).resolve().parent.resolve()
+
+
+@pytest.fixture(scope="session")
+def test_data_dir(tests_dir):
+    return tests_dir / "test_data"
 
 
 @pytest.fixture(scope="session")
@@ -146,7 +149,7 @@ def reset_logging_config():
 
 
 @pytest.fixture(scope="session")
-def upgrade_test_dir(test_dir):
+def upgrade_test_dir(test_data_dir):
     """
     Path to the test data directory used for upgrade tests.
 
@@ -154,7 +157,7 @@ def upgrade_test_dir(test_dir):
         Path: Path to the test data directory used for upgrade tests.
     """
 
-    return test_dir / "upgrade"
+    return test_data_dir / "upgrade"
 
 
 @pytest.hookimpl(tryfirst=True, hookwrapper=True)
@@ -197,7 +200,7 @@ def shared_test_out_dir(tmp_path_factory):
 
 
 @pytest.fixture()
-def job_controller(random_project_name, request, shared_test_out_dir):
+def job_controller(random_project_name, request, shared_test_out_dir, tests_dir):
     """Yields a jobcontroller instance for the test suite that also sets up the
     jobstore, resetting it after every test.
     """
@@ -212,11 +215,15 @@ def job_controller(random_project_name, request, shared_test_out_dir):
     if hasattr(request.node, "rep_call") and request.node.rep_call.failed:
         target_dir = shared_test_out_dir()
 
-        # use the test name (including parameters) as a target folder
+        # use the test directory tree + test name (including parameters) as a target folder
+        test_filepath = request.node.path
+        testpath_relative_to_tests_dir = test_filepath.relative_to(tests_dir)
         test_name = request.node.name
         sanitized_test_name = "".join(c if c.isalnum() else "_" for c in test_name)
 
-        test_dump_dir = target_dir / sanitized_test_name
+        test_dump_dir = (
+            target_dir / testpath_relative_to_tests_dir / sanitized_test_name
+        )
         test_dump_dir.mkdir(parents=True, exist_ok=True)
 
         # don't use the backup to create indented json files for easier access

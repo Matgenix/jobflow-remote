@@ -27,7 +27,7 @@ runs:
       uses: actions/upload-artifact@v4
       id: artifact-upload-test
       with:
-        name: db_dump_${{ matrix.python-version }}
+        name: db_dump_${{ inputs.python-version }}
         path: test_folder
         if-no-files-found: error
 
@@ -52,5 +52,13 @@ runs:
         unzip artifact.zip -d unzipped_artifact
 
         echo "Checking unzipped artifact contents..."
+        ls
         ls -l unzipped_artifact
+      shell: bash
+
+    - name: Clean up local files
+      run: |
+        echo "Removing files"
+        rm artifact.zip
+        rm -r unzipped_artifact
       shell: bash
