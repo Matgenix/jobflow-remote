@@ -1,3 +1,6 @@
+import pytest
+
+
 def test_submit_flow_fail(job_controller, runner) -> None:
     from jobflow import Flow
 
@@ -30,3 +33,20 @@ def test_submit_flow_fail(job_controller, runner) -> None:
     assert (
         job_controller.count_flows(states=FlowState.COMPLETED) == 0
     ), f"Flows not marked as completed, full flow info:\n{job_controller.get_flows({})}"
+
+
+@pytest.mark.parametrize(["x", "y"], [(1, 2), (3, 4)])
+@pytest.mark.parametrize("z", [5, 6, 7])
+def test_parametrized_failed(job_controller, runner, x, y, z) -> None:
+    from jobflow import Flow
+
+    from jobflow_remote import submit_flow
+    from jobflow_remote.testing import add
+
+    add_first = add(1, 5)
+    add_second = add(add_first.output, 5)
+
+    flow = Flow([add_first, add_second])
+    submit_flow(flow, worker="test_local_worker")
+
+    pytest.fail("Explicitly failing this test for testing CI save db artifact.")
