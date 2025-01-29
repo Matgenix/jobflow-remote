@@ -1,5 +1,76 @@
 # Changelog
 
+## [Unreleased](https://github.com/Matgenix/jobflow-remote/tree/HEAD)
+
+[Full Changelog](https://github.com/Matgenix/jobflow-remote/compare/v0.1.5...HEAD)
+
+**Closed issues:**
+
+- Job submission fails based on job name [\#112](https://github.com/Matgenix/jobflow-remote/issues/112)
+
+## [v0.1.5](https://github.com/Matgenix/jobflow-remote/tree/v0.1.5) (2025-01-22)
+
+[Full Changelog](https://github.com/Matgenix/jobflow-remote/compare/v0.1.4...v0.1.5)
+
+**Implemented enhancements:**
+
+- Optionally delay download after job end [\#210](https://github.com/Matgenix/jobflow-remote/issues/210)
+- Add a backup feature [\#165](https://github.com/Matgenix/jobflow-remote/issues/165)
+
+**Closed issues:**
+
+- Print only with no wait [\#245](https://github.com/Matgenix/jobflow-remote/issues/245)
+- Mismatched dumped taskdoc and database state [\#231](https://github.com/Matgenix/jobflow-remote/issues/231)
+- Check status for simulation code in `jf job list` [\#227](https://github.com/Matgenix/jobflow-remote/issues/227)
+- Successful Response not being written to jfremote\_out.json [\#226](https://github.com/Matgenix/jobflow-remote/issues/226)
+- `jf admin upgrade` causes a lot of errors [\#224](https://github.com/Matgenix/jobflow-remote/issues/224)
+- QToolKit is currently pinned to development version [\#218](https://github.com/Matgenix/jobflow-remote/issues/218)
+- Full-split : Remote Runner setup [\#214](https://github.com/Matgenix/jobflow-remote/issues/214)
+- An Error occurred during the command execution: ValueError No daemon runner document. [\#211](https://github.com/Matgenix/jobflow-remote/issues/211)
+- "Error executing jf project check --errors to connect to \<cluster\> \(no additional info\)" [\#208](https://github.com/Matgenix/jobflow-remote/issues/208)
+- how to rerun a job but with improved memory [\#198](https://github.com/Matgenix/jobflow-remote/issues/198)
+- Delete VASP files when rerunnning jobs? [\#197](https://github.com/Matgenix/jobflow-remote/issues/197)
+- call jf from container [\#196](https://github.com/Matgenix/jobflow-remote/issues/196)
+- how to limit number of jobs [\#195](https://github.com/Matgenix/jobflow-remote/issues/195)
+- non-unique uuids as a problem in jobflow-remote [\#193](https://github.com/Matgenix/jobflow-remote/issues/193)
+- Set `projects_folder` via env var [\#188](https://github.com/Matgenix/jobflow-remote/issues/188)
+- Support for heterogenous computing resources? [\#184](https://github.com/Matgenix/jobflow-remote/issues/184)
+- Jobflow remote logo [\#178](https://github.com/Matgenix/jobflow-remote/issues/178)
+- How could I use SGE for job submission?  [\#159](https://github.com/Matgenix/jobflow-remote/issues/159)
+- Check there is not already a runner running [\#140](https://github.com/Matgenix/jobflow-remote/issues/140)
+- How to add metadata to `flows` docs? [\#124](https://github.com/Matgenix/jobflow-remote/issues/124)
+- preventing reset issues [\#102](https://github.com/Matgenix/jobflow-remote/issues/102)
+- Missing docs: batch mode [\#96](https://github.com/Matgenix/jobflow-remote/issues/96)
+- Does jobflow-remote support the pilot job model? [\#86](https://github.com/Matgenix/jobflow-remote/issues/86)
+
+**Merged pull requests:**
+
+- bump qtoolkit 0.1.6 [\#248](https://github.com/Matgenix/jobflow-remote/pull/248) ([gpetretto](https://github.com/gpetretto))
+- Make JobDoc available at runtime [\#244](https://github.com/Matgenix/jobflow-remote/pull/244) ([gpetretto](https://github.com/gpetretto))
+- Finalize gui implementation [\#243](https://github.com/Matgenix/jobflow-remote/pull/243) ([gpetretto](https://github.com/gpetretto))
+- fix typing for submit\_flow [\#242](https://github.com/Matgenix/jobflow-remote/pull/242) ([FabiPi3](https://github.com/FabiPi3))
+- Web GUI for jobflow remote [\#241](https://github.com/Matgenix/jobflow-remote/pull/241) ([fraricci](https://github.com/fraricci))
+- Allow switching off daemon if no running runner doc [\#240](https://github.com/Matgenix/jobflow-remote/pull/240) ([gpetretto](https://github.com/gpetretto))
+- Logo [\#239](https://github.com/Matgenix/jobflow-remote/pull/239) ([gpetretto](https://github.com/gpetretto))
+- \[WIP\] Save db dumps for test failures [\#237](https://github.com/Matgenix/jobflow-remote/pull/237) ([gpetretto](https://github.com/gpetretto))
+- Bump docker/bake-action from 5 to 6 [\#236](https://github.com/Matgenix/jobflow-remote/pull/236) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Various updates [\#234](https://github.com/Matgenix/jobflow-remote/pull/234) ([gpetretto](https://github.com/gpetretto))
+- \[WIP\] test direct execution of docker commands and addition of PBS container [\#233](https://github.com/Matgenix/jobflow-remote/pull/233) ([gpetretto](https://github.com/gpetretto))
+- Testing adding flags for codecov, separating unit and integration tests. [\#232](https://github.com/Matgenix/jobflow-remote/pull/232) ([davidwaroquiers](https://github.com/davidwaroquiers))
+- Option for stored data in `jf job list` [\#228](https://github.com/Matgenix/jobflow-remote/pull/228) ([FabiPi3](https://github.com/FabiPi3))
+- Bump codecov/codecov-action from 4 to 5 [\#209](https://github.com/Matgenix/jobflow-remote/pull/209) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Delete job files when rerunning; customizable execution command [\#201](https://github.com/Matgenix/jobflow-remote/pull/201) ([gpetretto](https://github.com/gpetretto))
+- Add sanitization option to host outputs [\#191](https://github.com/Matgenix/jobflow-remote/pull/191) ([gpetretto](https://github.com/gpetretto))
+- Add backup functionality [\#190](https://github.com/Matgenix/jobflow-remote/pull/190) ([gpetretto](https://github.com/gpetretto))
+- Require date to reset DB [\#189](https://github.com/Matgenix/jobflow-remote/pull/189) ([gpetretto](https://github.com/gpetretto))
+- Allow list of jobs from scheduler using username [\#187](https://github.com/Matgenix/jobflow-remote/pull/187) ([gpetretto](https://github.com/gpetretto))
+- Option to set Job priority [\#183](https://github.com/Matgenix/jobflow-remote/pull/183) ([gpetretto](https://github.com/gpetretto))
+- New CLI functionalities: tree, report, job info [\#180](https://github.com/Matgenix/jobflow-remote/pull/180) ([gpetretto](https://github.com/gpetretto))
+- Parallel batch submission [\#172](https://github.com/Matgenix/jobflow-remote/pull/172) ([gpetretto](https://github.com/gpetretto))
+- Generalize integration tests to other queue systems \(SGE\) and test more Python versions [\#160](https://github.com/Matgenix/jobflow-remote/pull/160) ([ml-evs](https://github.com/ml-evs))
+- Project check [\#158](https://github.com/Matgenix/jobflow-remote/pull/158) ([davidwaroquiers](https://github.com/davidwaroquiers))
+- WIP: Check only one runner [\#150](https://github.com/Matgenix/jobflow-remote/pull/150) ([davidwaroquiers](https://github.com/davidwaroquiers))
+
 ## [v0.1.4](https://github.com/Matgenix/jobflow-remote/tree/v0.1.4) (2024-09-13)
 
 [Full Changelog](https://github.com/Matgenix/jobflow-remote/compare/v0.1.3...v0.1.4)
