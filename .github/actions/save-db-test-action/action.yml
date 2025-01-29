@@ -10,7 +10,7 @@ runs:
     - name: Testing the save db artifact in case a test fails
       id: failure
       run: |
-        pytest tests/github_ci/jobs/test_jobcontroller_fail.py
+        pytest tests/github_ci
       shell: bash
       continue-on-error: true
 

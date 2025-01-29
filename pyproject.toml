@@ -163,6 +163,7 @@ filterwarnings = [
 addopts = [
     "--import-mode=importlib",
 ]
+norecursedirs = ["tests/github_ci"]
 
 [tool.coverage.run]
 parallel = true
