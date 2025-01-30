@@ -96,9 +96,12 @@ with open(this_dir / "ref_data" / "ref_artifact_directory_tree.json") as f:
 
 # Get the tree directory of the downloaded artifact
 artifact_directory_tree = get_tree_dict(artifact_directory)
+if list(artifact_directory_tree.keys()) != ["github_ci"]:
+    print("Uploaded artifact different from reference.")
+    sys.exit()
 
 
-if artifact_directory_tree != ref_artifact_directory_tree:
+if artifact_directory_tree["github_ci"] != ref_artifact_directory_tree:
     import pprint
 
     print("Uploaded artifact different from reference.")
