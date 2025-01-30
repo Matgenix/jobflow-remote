@@ -52,8 +52,7 @@ runs:
         unzip artifact.zip -d unzipped_artifact
 
         echo "Checking unzipped artifact contents..."
-        ls
-        ls -l unzipped_artifact
+        python tests/github_ci/check_artifact.py unzipped_artifact
       shell: bash
 
     - name: Clean up local files

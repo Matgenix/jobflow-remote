@@ -49,5 +49,5 @@ def test_parametrized_failed(job_controller, runner, x, y, z) -> None:
     flow = Flow([add_first, add_second])
     submit_flow(flow, worker="test_local_worker")
 
-    if not (z == 6 and x == 2):
+    if not (z == 6 and x == 1):
         pytest.fail("Explicitly failing this test for testing CI save db artifact.")

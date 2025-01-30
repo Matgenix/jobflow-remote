@@ -1,0 +1,312 @@
+{
+    "cli": {
+        "test_flow.py": {
+            "test_flow_info": {
+                "flows.json": [
+                    {
+                        "name": "f1",
+                        "state": "READY",
+                        "_id_class": "ObjectId"
+                    },
+                    {
+                        "name": "f2",
+                        "state": "READY",
+                        "_id_class": "ObjectId"
+                    }
+                ],
+                "test_info.json": {
+                    "name": "test_flow_info",
+                    "params": null
+                },
+                "jobs.json": [
+                    {
+                        "state": "READY",
+                        "worker": "test_local_worker",
+                        "has_uuid": true,
+                        "uuid_is_uuid": true,
+                        "_id_class": "ObjectId",
+                        "job_name": "add1"
+                    },
+                    {
+                        "state": "WAITING",
+                        "worker": "test_local_worker",
+                        "has_uuid": true,
+                        "uuid_is_uuid": true,
+                        "_id_class": "ObjectId",
+                        "job_name": "add2"
+                    },
+                    {
+                        "state": "READY",
+                        "worker": "test_local_worker",
+                        "has_uuid": true,
+                        "uuid_is_uuid": true,
+                        "_id_class": "ObjectId",
+                        "job_name": "add3"
+                    },
+                    {
+                        "state": "WAITING",
+                        "worker": "test_local_worker",
+                        "has_uuid": true,
+                        "uuid_is_uuid": true,
+                        "_id_class": "ObjectId",
+                        "job_name": "add4"
+                    }
+                ],
+                "jf_auxiliary.json": {
+                    "ndocs": 3,
+                    "running_runner": 1,
+                    "environment_info": 1,
+                    "next_id": 1
+                }
+            }
+        }
+    },
+    "jobs": {
+        "test_jobcontroller_fail.py": {
+            "test_parametrized_failed": {
+                "5_3_4": {
+                    "flows.json": [
+                        {
+                            "name": "Flow",
+                            "state": "READY",
+                            "_id_class": "ObjectId"
+                        }
+                    ],
+                    "test_info.json": {
+                        "name": "test_parametrized_failed[5-3-4]",
+                        "params": {
+                            "z": 5,
+                            "x": 3,
+                            "y": 4
+                        }
+                    },
+                    "jobs.json": [
+                        {
+                            "state": "READY",
+                            "worker": "test_local_worker",
+                            "has_uuid": true,
+                            "uuid_is_uuid": true,
+                            "_id_class": "ObjectId",
+                            "job_name": "add"
+                        },
+                        {
+                            "state": "WAITING",
+                            "worker": "test_local_worker",
+                            "has_uuid": true,
+                            "uuid_is_uuid": true,
+                            "_id_class": "ObjectId",
+                            "job_name": "add"
+                        }
+                    ],
+                    "jf_auxiliary.json": {
+                        "ndocs": 3,
+                        "running_runner": 1,
+                        "environment_info": 1,
+                        "next_id": 1
+                    }
+                },
+                "7_1_2": {
+                    "flows.json": [
+                        {
+                            "name": "Flow",
+                            "state": "READY",
+                            "_id_class": "ObjectId"
+                        }
+                    ],
+                    "test_info.json": {
+                        "name": "test_parametrized_failed[7-1-2]",
+                        "params": {
+                            "z": 7,
+                            "x": 1,
+                            "y": 2
+                        }
+                    },
+                    "jobs.json": [
+                        {
+                            "state": "READY",
+                            "worker": "test_local_worker",
+                            "has_uuid": true,
+                            "uuid_is_uuid": true,
+                            "_id_class": "ObjectId",
+                            "job_name": "add"
+                        },
+                        {
+                            "state": "WAITING",
+                            "worker": "test_local_worker",
+                            "has_uuid": true,
+                            "uuid_is_uuid": true,
+                            "_id_class": "ObjectId",
+                            "job_name": "add"
+                        }
+                    ],
+                    "jf_auxiliary.json": {
+                        "ndocs": 3,
+                        "running_runner": 1,
+                        "environment_info": 1,
+                        "next_id": 1
+                    }
+                },
+                "7_3_4": {
+                    "flows.json": [
+                        {
+                            "name": "Flow",
+                            "state": "READY",
+                            "_id_class": "ObjectId"
+                        }
+                    ],
+                    "test_info.json": {
+                        "name": "test_parametrized_failed[7-3-4]",
+                        "params": {
+                            "z": 7,
+                            "x": 3,
+                            "y": 4
+                        }
+                    },
+                    "jobs.json": [
+                        {
+                            "state": "READY",
+                            "worker": "test_local_worker",
+                            "has_uuid": true,
+                            "uuid_is_uuid": true,
+                            "_id_class": "ObjectId",
+                            "job_name": "add"
+                        },
+                        {
+                            "state": "WAITING",
+                            "worker": "test_local_worker",
+                            "has_uuid": true,
+                            "uuid_is_uuid": true,
+                            "_id_class": "ObjectId",
+                            "job_name": "add"
+                        }
+                    ],
+                    "jf_auxiliary.json": {
+                        "ndocs": 3,
+                        "running_runner": 1,
+                        "environment_info": 1,
+                        "next_id": 1
+                    }
+                },
+                "5_1_2": {
+                    "flows.json": [
+                        {
+                            "name": "Flow",
+                            "state": "READY",
+                            "_id_class": "ObjectId"
+                        }
+                    ],
+                    "test_info.json": {
+                        "name": "test_parametrized_failed[5-1-2]",
+                        "params": {
+                            "z": 5,
+                            "x": 1,
+                            "y": 2
+                        }
+                    },
+                    "jobs.json": [
+                        {
+                            "state": "READY",
+                            "worker": "test_local_worker",
+                            "has_uuid": true,
+                            "uuid_is_uuid": true,
+                            "_id_class": "ObjectId",
+                            "job_name": "add"
+                        },
+                        {
+                            "state": "WAITING",
+                            "worker": "test_local_worker",
+                            "has_uuid": true,
+                            "uuid_is_uuid": true,
+                            "_id_class": "ObjectId",
+                            "job_name": "add"
+                        }
+                    ],
+                    "jf_auxiliary.json": {
+                        "ndocs": 3,
+                        "running_runner": 1,
+                        "environment_info": 1,
+                        "next_id": 1
+                    }
+                },
+                "6_3_4": {
+                    "flows.json": [
+                        {
+                            "name": "Flow",
+                            "state": "READY",
+                            "_id_class": "ObjectId"
+                        }
+                    ],
+                    "test_info.json": {
+                        "name": "test_parametrized_failed[6-3-4]",
+                        "params": {
+                            "z": 6,
+                            "x": 3,
+                            "y": 4
+                        }
+                    },
+                    "jobs.json": [
+                        {
+                            "state": "READY",
+                            "worker": "test_local_worker",
+                            "has_uuid": true,
+                            "uuid_is_uuid": true,
+                            "_id_class": "ObjectId",
+                            "job_name": "add"
+                        },
+                        {
+                            "state": "WAITING",
+                            "worker": "test_local_worker",
+                            "has_uuid": true,
+                            "uuid_is_uuid": true,
+                            "_id_class": "ObjectId",
+                            "job_name": "add"
+                        }
+                    ],
+                    "jf_auxiliary.json": {
+                        "ndocs": 3,
+                        "running_runner": 1,
+                        "environment_info": 1,
+                        "next_id": 1
+                    }
+                }
+            },
+            "test_submit_flow_fail": {
+                "flows.json": [
+                    {
+                        "name": "Flow",
+                        "state": "FAILED",
+                        "_id_class": "ObjectId"
+                    }
+                ],
+                "test_info.json": {
+                    "name": "test_submit_flow_fail",
+                    "params": null
+                },
+                "jobs.json": [
+                    {
+                        "state": "FAILED",
+                        "worker": "test_local_worker",
+                        "has_uuid": true,
+                        "uuid_is_uuid": true,
+                        "_id_class": "ObjectId",
+                        "job_name": "add"
+                    },
+                    {
+                        "state": "WAITING",
+                        "worker": "test_local_worker",
+                        "has_uuid": true,
+                        "uuid_is_uuid": true,
+                        "_id_class": "ObjectId",
+                        "job_name": "add"
+                    }
+                ],
+                "jf_auxiliary.json": {
+                    "ndocs": 3,
+                    "running_runner": 1,
+                    "environment_info": 1,
+                    "next_id": 1
+                }
+            }
+        }
+    }
+}
