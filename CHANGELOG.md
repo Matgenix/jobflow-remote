@@ -34,7 +34,7 @@
 - how to limit number of jobs [\#195](https://github.com/Matgenix/jobflow-remote/issues/195)
 - non-unique uuids as a problem in jobflow-remote [\#193](https://github.com/Matgenix/jobflow-remote/issues/193)
 - Set `projects_folder` via env var [\#188](https://github.com/Matgenix/jobflow-remote/issues/188)
-- Support for heterogenous computing resources? [\#184](https://github.com/Matgenix/jobflow-remote/issues/184)
+- Support for heterogeneous computing resources? [\#184](https://github.com/Matgenix/jobflow-remote/issues/184)
 - Jobflow remote logo [\#178](https://github.com/Matgenix/jobflow-remote/issues/178)
 - How could I use SGE for job submission?  [\#159](https://github.com/Matgenix/jobflow-remote/issues/159)
 - Check there is not already a runner running [\#140](https://github.com/Matgenix/jobflow-remote/issues/140)
