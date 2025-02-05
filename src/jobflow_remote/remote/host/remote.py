@@ -320,7 +320,7 @@ class RemoteHost(BaseHost):
                 return execute_cmd()
             except OSError as e:
                 msg = getattr(e, "message", str(e))
-                error: Exception = e
+                error: BaseException = e
                 if "Socket is closed" not in msg:
                     raise
             except SSHException as e:
@@ -336,9 +336,10 @@ class RemoteHost(BaseHost):
         # if the code gets here one of the errors that could be due to drop of the
         # connection occurred. Try to close and reopen the connection and retry
         # one more time
+        # Call to traceback.format_exception compatible with python 3.9
         logger.warning(
             f"Error while trying to execute a command on host {self.host}:\n"
-            f"{''.join(traceback.format_exception(error))}"
+            f"{''.join(traceback.format_exception(type(error), error, error.__traceback__))}"
             "Probably due to the connection dropping. "
             "Will reopen the connection and retry."
         )
