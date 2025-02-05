@@ -406,7 +406,7 @@ class Runner:
             jobs_available = self.job_controller.count_jobs(query=query)
             if max_seconds and time.time() - t0 > max_seconds:
                 raise RuntimeError(
-                    "Could execute all the jobs within the selected amount of time"
+                    "Could not execute all the jobs within the selected amount of time"
                 )
 
     def run_one_job(
