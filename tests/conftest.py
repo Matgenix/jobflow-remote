@@ -16,6 +16,17 @@ def test_dir():
 
 
 @pytest.fixture(scope="session")
+def coverage_file(request):
+    """Fixture to get the pytest-cov coverage file path."""
+    cov_plugin = request.config.pluginmanager.get_plugin("_cov")
+    if cov_plugin:
+        cov_controller = getattr(cov_plugin, "cov_controller", None)
+        if cov_controller:
+            return cov_controller.cov.config.data_file
+    return None  # pytest-cov is not active or coverage tracking is disabled
+
+
+@pytest.fixture(scope="session")
 def log_to_stdout() -> None:
     import logging
     import sys

@@ -170,7 +170,10 @@ parallel = true
 branch = true
 
 [tool.coverage.paths]
-source = ["src/"]
+source = [
+    "src/",
+    "/home/jobflow/.venv/lib/python3.10/site-packages/",  # for coverage from docker containers
+]
 
 [tool.coverage.report]
 skip_covered = true

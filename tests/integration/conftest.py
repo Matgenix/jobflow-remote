@@ -86,7 +86,7 @@ def bake_containers():
 
 @pytest.fixture(scope="session", autouse=True)
 def compose_containers(
-    slurm_ssh_port, sge_ssh_port, pbs_ssh_port, db_port, bake_containers
+    slurm_ssh_port, sge_ssh_port, pbs_ssh_port, db_port, bake_containers, coverage_file
 ):
     compose_yaml = f"""
 name: jobflow_remote_testing
@@ -194,6 +194,22 @@ services:
 
             yield docker_client
         finally:
+            # After tests finish, copy coverage data from container(s) to local machine
+            if coverage_file:
+                coverage_dir = str(Path(coverage_file).parent)
+                print(" * Copying coverage data back...")
+                for c in containers:
+                    if c.name in ("mongo_container",):
+                        continue
+                    flist = c.execute(
+                        ["ls", "-a", "/home/jobflow/coverage/"]
+                    ).splitlines()
+                    for file in flist:
+                        if file.startswith(".coverage"):
+                            c.copy_from(
+                                f"/home/jobflow/coverage/{file}",
+                                f"{coverage_dir}/{file}",
+                            )
             try:
                 print("\n * Stopping containers...")
                 try:
@@ -248,6 +264,12 @@ def write_tmp_settings(
     # config on import
     from jobflow_remote.config import Project
 
+    prerun = (
+        "source /home/jobflow/.venv/bin/activate; "
+        "export COVERAGE_PROCESS_START=/home/jobflow/.coveragerc; "
+        "export COVERAGE_FILE=/home/jobflow/coverage/.coverage"
+    )
+    # prerun = "source /home/jobflow/.venv/bin/activate"
     project = Project(
         name=random_project_name,
         jobstore={
@@ -301,7 +323,7 @@ def write_tmp_settings(
                 work_dir="/home/jobflow/jfr",
                 user="jobflow",
                 password="jobflow",
-                pre_run="source /home/jobflow/.venv/bin/activate",
+                pre_run=prerun,
                 resources={"partition": "debug", "ntasks": 1, "time": "00:01:00"},
                 connect_kwargs={"allow_agent": False, "look_for_keys": False},
             ),
@@ -314,7 +336,7 @@ def write_tmp_settings(
                 user="jobflow",
                 password="jobflow",
                 scheduler_username="jobflow",
-                pre_run="source /home/jobflow/.venv/bin/activate",
+                pre_run=prerun,
                 connect_kwargs={"allow_agent": False, "look_for_keys": False},
             ),
             "test_remote_pbs_worker": dict(
@@ -325,7 +347,7 @@ def write_tmp_settings(
                 work_dir="/home/jobflow/jfr",
                 user="jobflow",
                 password="jobflow",
-                pre_run="source /home/jobflow/.venv/bin/activate",
+                pre_run=prerun,
                 connect_kwargs={"allow_agent": False, "look_for_keys": False},
                 resources={"walltime": "00:05:00", "select": "nodes=1:ppn=1"},
             ),
@@ -337,7 +359,7 @@ def write_tmp_settings(
                 work_dir="/home/jobflow/jfr",
                 user="jobflow",
                 password="jobflow",
-                pre_run="source /home/jobflow/.venv/bin/activate",
+                pre_run=prerun,
                 resources={"partition": "debug", "ntasks": 1, "time": "00:01:00"},
                 connect_kwargs={"allow_agent": False, "look_for_keys": False},
                 max_jobs=1,
@@ -350,7 +372,7 @@ def write_tmp_settings(
                 work_dir="/home/jobflow/jfr",
                 user="jobflow",
                 password="jobflow",
-                pre_run="source /home/jobflow/.venv/bin/activate",
+                pre_run=prerun,
                 resources={"partition": "debug", "ntasks": 1, "time": "00:01:00"},
                 connect_kwargs={"allow_agent": False, "look_for_keys": False},
                 batch={
@@ -368,7 +390,7 @@ def write_tmp_settings(
                 work_dir="/home/jobflow/jfr",
                 user="jobflow",
                 password="jobflow",
-                pre_run="source /home/jobflow/.venv/bin/activate",
+                pre_run=prerun,
                 resources={"partition": "debug", "ntasks": 1, "time": "00:01:00"},
                 connect_kwargs={"allow_agent": False, "look_for_keys": False},
                 batch={
@@ -394,7 +416,7 @@ def write_tmp_settings(
                 work_dir="/home/jobflow/jfr",
                 user="jobflow",
                 password="jobflow",
-                pre_run="source /home/jobflow/.venv/bin/activate",
+                pre_run=prerun,
                 resources={"partition": "debug", "ntasks": 1, "time": "00:01:00"},
                 connect_kwargs={"allow_agent": False, "look_for_keys": False},
                 sanitize_command=True,
