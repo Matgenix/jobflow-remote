@@ -307,6 +307,11 @@ class RemoteHost(BaseHost):
             Keyword arguments to pass to the remote command
         """
 
+        # The function needs to be called in this way because if retry_on_closed_connection
+        # is True and the first execution of the command fails a new instance self._connection
+        # will be recreated. Since remote_cmd are typically methods of the Connection object,
+        # this ensures that the method is called on the actual instance of the connection, and
+        # not on a previous one.
         def execute_cmd():
             # create the function associated to the current connection
             with ExitStack() as stack:
