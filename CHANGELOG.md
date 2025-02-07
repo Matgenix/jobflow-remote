@@ -1,14 +1,19 @@
 # Changelog
 
-## [Unreleased](https://github.com/Matgenix/jobflow-remote/tree/HEAD)
+## [v0.1.6](https://github.com/Matgenix/jobflow-remote/tree/v0.1.6) (2025-02-06)
 
-[Full Changelog](https://github.com/Matgenix/jobflow-remote/compare/v0.1.5...HEAD)
+[Full Changelog](https://github.com/Matgenix/jobflow-remote/compare/v0.1.5...v0.1.6)
 
 **Closed issues:**
 
-- Job submission fails based on job name [\#112](https://github.com/Matgenix/jobflow-remote/issues/112)
+- Replacing failed jobs and adding new jobs to a flow [\#250](https://github.com/Matgenix/jobflow-remote/issues/250)
 
-## [v0.1.5](https://github.com/Matgenix/jobflow-remote/tree/v0.1.5) (2025-01-22)
+**Merged pull requests:**
+
+- Bug fix for Remote Host [\#253](https://github.com/Matgenix/jobflow-remote/pull/253) ([gpetretto](https://github.com/gpetretto))
+- Hot fix to pin pymongo version to lower than 4.11. [\#251](https://github.com/Matgenix/jobflow-remote/pull/251) ([davidwaroquiers](https://github.com/davidwaroquiers))
+
+## [v0.1.5](https://github.com/Matgenix/jobflow-remote/tree/v0.1.5) (2025-01-29)
 
 [Full Changelog](https://github.com/Matgenix/jobflow-remote/compare/v0.1.4...v0.1.5)
 
@@ -39,6 +44,7 @@
 - How could I use SGE for job submission?  [\#159](https://github.com/Matgenix/jobflow-remote/issues/159)
 - Check there is not already a runner running [\#140](https://github.com/Matgenix/jobflow-remote/issues/140)
 - How to add metadata to `flows` docs? [\#124](https://github.com/Matgenix/jobflow-remote/issues/124)
+- Job submission fails based on job name [\#112](https://github.com/Matgenix/jobflow-remote/issues/112)
 - preventing reset issues [\#102](https://github.com/Matgenix/jobflow-remote/issues/102)
 - Missing docs: batch mode [\#96](https://github.com/Matgenix/jobflow-remote/issues/96)
 - Does jobflow-remote support the pilot job model? [\#86](https://github.com/Matgenix/jobflow-remote/issues/86)
