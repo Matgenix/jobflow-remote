@@ -227,15 +227,16 @@ RUN chown -R ${USERNAME} /home/${USERNAME} && \
     chmod -R 755 /home/${USERNAME}
 USER ${USERNAME}
 
-# Set the COVERAGE_PROCESS_START environment variable
+# Note about setting of the COVERAGE_PROCESS_START and COVERAGE_FILE environment variables
 # Here neither ENV nor having the exports in the .bashrc seems to work, i.e. when jobs are
 # executed within slurm/pbs/sge, the environment variables seem to be "lost". No idea why ...
-# Thus I am setting the coverage environment variables in the pre_run for now ...
+# Thus I am setting the coverage environment variables in each worker pre_run for now ...
 # ENV COVERAGE_PROCESS_START=/home/${USERNAME}/.coveragerc
-RUN mkdir /home/${USERNAME}/coverage
 # ENV COVERAGE_FILE=/home/${USERNAME}/coverage/.coverage
 # RUN printf "\n# Environment variables for implicit coverage\n" >> /home/${USERNAME}/.bashrc
 # RUN printf "\nexport COVERAGE_PROCESS_START=/home/${USERNAME}/.coveragerc\n" >> /home/${USERNAME}/.bashrc
 # RUN printf "export COVERAGE_FILE=/home/${USERNAME}/coverage/.coverage\n" >> /home/${USERNAME}/.bashrc
+RUN mkdir /home/${USERNAME}/coverage
+
 
 CMD sudo /etc/startup.sh ; /bin/bash -l

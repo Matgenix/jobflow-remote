@@ -269,7 +269,6 @@ def write_tmp_settings(
         "export COVERAGE_PROCESS_START=/home/jobflow/.coveragerc; "
         "export COVERAGE_FILE=/home/jobflow/coverage/.coverage"
     )
-    # prerun = "source /home/jobflow/.venv/bin/activate"
     project = Project(
         name=random_project_name,
         jobstore={
