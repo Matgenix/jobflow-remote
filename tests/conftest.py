@@ -1,10 +1,13 @@
 import logging
 import logging.config
+import os
 import random
+import sys
 import time
 import warnings
 from pathlib import Path
 
+import coverage
 import pytest
 
 
@@ -17,13 +20,24 @@ def test_dir():
 
 @pytest.fixture(scope="session")
 def coverage_file(request):
-    """Fixture to get the pytest-cov coverage file path."""
+    """Fixture to get the absolute path of the pytest-cov coverage file, ensuring it exists."""
     cov_plugin = request.config.pluginmanager.get_plugin("_cov")
     if cov_plugin:
         cov_controller = getattr(cov_plugin, "cov_controller", None)
         if cov_controller:
-            return cov_controller.cov.config.data_file
-    return None  # pytest-cov is not active or coverage tracking is disabled
+            data_file = (
+                cov_controller.cov.config.data_file
+            )  # Could be relative or absolute
+            # Check if data_file is already absolute
+            if not os.path.isabs(data_file):
+                invocation_dir = (
+                    request.config.invocation_dir
+                )  # Pytest's invocation dir
+                data_file = os.path.join(
+                    invocation_dir, data_file
+                )  # Convert to absolute path
+            return data_file
+    return None  # Return None if pytest-cov is inactive or file doesn't exist
 
 
 @pytest.fixture(scope="session")
@@ -250,3 +264,98 @@ def job_controller_drop(random_project_name, job_controller):
         yield job_controller
     finally:
         job_controller.db.client.drop_database(job_controller.db)
+
+
+def pytest_collection_modifyitems(config, items):
+    valid_markers = {"unit", "db", "integration"}
+
+    for item in items:
+        if item.nodeid.startswith(os.path.join("tests", "integration", "")):
+            item.add_marker(pytest.mark.integration)
+        elif item.nodeid.startswith(os.path.join("tests", "db", "")):
+            item.add_marker(pytest.mark.db)
+        elif item.nodeid.startswith(os.path.join("tests", "unit", "")):
+            item.add_marker(pytest.mark.unit)
+        elif len(valid_markers.intersection(item.keywords.keys())) != 1:
+            raise RuntimeError(
+                "Tests should be marked as either unit, db "
+                "or integration, or be in of the corresponding "
+                "folders for unit, db or integration tests."
+            )
+
+    # Ensure each test has exactly one marker from the valid set
+    for item in items:
+        applied_markers = set(item.keywords.keys())
+        # Check that the test has exactly one valid marker
+        matching_markers = applied_markers.intersection(valid_markers)
+        if len(matching_markers) != 1:
+            raise AssertionError(
+                f"Test {item.nodeid} should be marked with one of the test type markers "
+                f"({', '.join(valid_markers)}).\n"
+                f"Found: {matching_markers}"
+            )
+
+
+def pytest_addoption(parser):
+    """Add a command-line option to enable the reporting of the coverage per flag."""
+    parser.addoption(
+        "--coverage-per-flag",
+        action="store_true",
+        default=False,
+        dest="coverage_per_flag",
+        help="Enable the reporting of the coverage per flag.",
+    )
+
+
+def pytest_sessionstart(session):
+    if session.config.getoption("coverage_per_flag"):
+        modified_args = [
+            arg for arg in sys.argv[1:] if arg not in ("--coverage-per-flag",)
+        ]
+        if "-m" not in modified_args:
+            index_last_minus_m = None
+        else:
+            index_last_minus_m = next(
+                i for i, v in reversed(list(enumerate(modified_args))) if v == "-m"
+            )
+
+        for marker in ("unit", "db", "integration"):
+            if index_last_minus_m is None:
+                this_marker_args = ["-m", marker, *modified_args]
+            else:
+                this_marker_args = list(modified_args)
+                marker_expr = this_marker_args[index_last_minus_m + 1]
+                this_marker_args[index_last_minus_m + 1] = (
+                    f"({marker_expr}) and {marker}"
+                )
+
+            session.config.option.cov_config = "pyproject.toml"
+            session.config.option.cov = "jobflow_remote"
+            os.environ["COVERAGE_FILE"] = f".coverage-{marker}"
+            this_marker_args.extend(
+                ["--cov=jobflow_remote", "--cov-config=pyproject.toml"]
+            )
+            pytest.main(this_marker_args)
+
+        flags = {
+            "unit": [".coverage-unit"],
+            "db": [".coverage-db"],
+            "integration_remote": [".coverage-integration-remote"],
+            "integration_local": [".coverage-integration"],
+            "integration": [".coverage-integration", ".coverage-integration-remote"],
+            "all": [
+                ".coverage-unit",
+                ".coverage-db",
+                ".coverage-integration",
+                ".coverage-integration-remote",
+            ],
+        }
+        for flag, cov_files in flags.items():
+            cov = coverage.Coverage()
+            cov.combine(cov_files, keep=True)
+            cov.report()
+            cov.html_report(directory=f"htmlcov_{flag}")
+            print(f"\nCoverage report generated in 'htmlcov_{flag}' directory")
+
+        # Exit the original pytest run (prevent double execution)
+        pytest.exit("Rerunning pytest separately for unit, db, and integration tests")
