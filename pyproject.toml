@@ -164,6 +164,11 @@ filterwarnings = [
 addopts = [
     "--import-mode=importlib",
 ]
+markers = [
+    "unit: Unit tests",
+    "db: Tests running with a database",
+    "integration: Full integration tests",
+]
 
 [tool.coverage.run]
 parallel = true
