@@ -217,7 +217,7 @@ RUN mkdir jfr
 # Copy the installed jobflow-remote virtualenv
 COPY --from=jobflow-remote-install /home/${USERNAME}/.venv /home/${USERNAME}/.venv
 # Copy the coveragerc config file
-COPY tests/integration/coverage/.coveragerc /home/${USERNAME}/
+COPY tests/integration/config_files/.coveragerc /home/${USERNAME}/
 
 # Finalize permissions on startup script and jobflow installation
 USER root
