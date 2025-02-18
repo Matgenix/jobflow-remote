@@ -11,6 +11,8 @@ from pathlib import Path
 
 import fabric
 import pytest
+from coverage import Coverage
+from monty.os import cd
 from python_on_whales import DockerClient
 from python_on_whales import docker as docker_pow
 
@@ -193,14 +195,22 @@ services:
                 )
 
             yield docker_client
-        finally:
             # After tests finish, copy coverage data from container(s) to local machine
             if coverage_file:
-                coverage_dir = str(Path(coverage_file).parent)
+                coverage_dir = Path(coverage_file).parent
+                integration_cov_dir = coverage_dir / "coverage_integration_remote"
+                integration_cov_dir.mkdir(exist_ok=True)
+                integration_cov_dir = Path(
+                    tempfile.mkdtemp(prefix="pytest_run_", dir=integration_cov_dir)
+                )
                 print(" * Copying coverage data back...")
+                coverage_container_paths = []
                 for c in containers:
                     if c.name in ("mongo_container",):
                         continue
+                    coverage_container_dir = integration_cov_dir / c.name
+                    coverage_container_dir.mkdir(exist_ok=True)
+                    coverage_container_paths.append(coverage_container_dir)
                     flist = c.execute(
                         ["ls", "-a", "/home/jobflow/coverage/"]
                     ).splitlines()
@@ -208,8 +218,25 @@ services:
                         if file.startswith(".coverage"):
                             c.copy_from(
                                 f"/home/jobflow/coverage/{file}",
-                                f"{coverage_dir}/{file}",
+                                coverage_container_dir / file,
                             )
+                    with cd(coverage_container_dir):
+                        cov = Coverage()
+                        cov.combine()
+                        cov.save()
+                with cd(integration_cov_dir):
+                    cov = Coverage()
+                    data_paths = [
+                        p.relative_to(integration_cov_dir) / ".coverage"
+                        for p in coverage_container_paths
+                    ]
+                    data_paths = [str(p) for p in data_paths if p.exists()]
+                    cov.combine(data_paths=data_paths, keep=True)
+                    cov.save()
+                    shutil.move(
+                        ".coverage", coverage_dir / ".coverage-integration-remote"
+                    )
+        finally:
             try:
                 print("\n * Stopping containers...")
                 try:
