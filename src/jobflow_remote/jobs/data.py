@@ -517,4 +517,5 @@ def get_reset_job_base_dict() -> dict:
         "updated_on": datetime.utcnow(),
         "start_time": None,
         "end_time": None,
+        "stored_data": None,
     }
