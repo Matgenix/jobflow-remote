@@ -156,3 +156,22 @@ class LocalHost(BaseHost):
         shutil.rmtree(path, onerror=onerror if not raise_on_error else None)
 
         return removed
+
+    def to_dir_cmd(self, dir_path: str | Path, target_shell: str = "bash") -> str:
+        """
+        Command that can be used in a unix shell to reach a directory in the host.
+        A simple cd for local host.
+
+        Parameters
+        ----------
+        dir_path
+            The directory to reach
+        target_shell
+            Shell command to be used to start the shell on the worker to access the
+            target directory
+
+        Returns
+        -------
+            The string to be used to reach the chose directory.
+        """
+        return f"cd {dir_path}; {target_shell}"

@@ -147,6 +147,25 @@ class BaseHost(MSONable):
         """
         raise NotImplementedError
 
+    @abc.abstractmethod
+    def to_dir_cmd(self, dir_path: str | Path, target_shell: str = "bash") -> str:
+        """
+        Command that can be used in a unix shell to reach a directory in the host.
+
+        Parameters
+        ----------
+        dir_path
+            The directory to reach
+        target_shell
+            Shell command to be used to start the shell on the worker to access the
+            target directory
+
+        Returns
+        -------
+            The string to be used to reach the chose directory.
+        """
+        raise NotImplementedError
+
     @property
     def interactive_login(self) -> bool:
         """

@@ -74,6 +74,8 @@ DELETABLE_STATES = [
     s for s in JobState if s not in [JobState.BATCH_SUBMITTED, JobState.BATCH_RUNNING]
 ]
 
+ERROR_STATES = [JobState.REMOTE_ERROR, JobState.FAILED]
+
 
 class FlowState(Enum):
     """States of a Flow."""
