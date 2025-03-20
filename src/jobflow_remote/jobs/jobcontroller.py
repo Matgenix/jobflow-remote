@@ -1201,7 +1201,7 @@ class JobController:
                 )
 
         job_doc_update = get_reset_job_base_dict()
-        job_doc_update["state"] = JobState.CHECKED_OUT.value
+        job_doc_update["state"] = JobState.READY.value
         if delete_files:
             job_doc_update["remote.prerun_cleanup"] = True
 
@@ -4039,7 +4039,14 @@ class JobController:
                 else:
                     step_attempts = doc["remote"]["step_attempts"]
                     no_retry = no_retry or step_attempts >= max_step_attempts
-                    queue_out, queue_err = self._get_downloaded_queue_files(doc)
+                    try:
+                        # prevent errors from handling queue files breaking the lock release
+                        queue_out, queue_err = self._get_downloaded_queue_files(doc)
+                    except Exception:
+                        logger.warning(
+                            "Error while trying to retrieve queue output", exc_info=True
+                        )
+                        queue_out, queue_err = None, None
                     if no_retry:
                         update_on_release = {
                             "$set": {
@@ -4438,7 +4445,9 @@ class JobController:
                 flow_doc.parents.pop(job_uuid, None)
 
             # Update flow state if necessary
-            updated_states = {job_uuid: {job_index: None}}  # None indicates job removal
+            updated_states: dict[str, dict[int, Any]] = {
+                job_uuid: {job_index: None}
+            }  # None indicates job removal
             self.update_flow_state(
                 flow_uuid=flow_doc.uuid, updated_states=updated_states
             )

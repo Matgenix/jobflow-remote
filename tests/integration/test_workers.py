@@ -457,3 +457,40 @@ def test_sanitize(worker, job_controller):
     runner.run_one_job()
 
     assert job_controller.count_jobs(states=JobState.COMPLETED) == 1
+
+
+@pytest.mark.parametrize(
+    "worker",
+    ["test_local_worker", "test_remote_slurm_worker"],
+)
+def test_todir(job_controller, worker):
+    from jobflow_remote import submit_flow
+    from jobflow_remote.jobs.runner import Runner
+    from jobflow_remote.testing import add
+    from jobflow_remote.testing.cli import run_check_cli
+
+    j = add(1, 5)
+    submit_flow(j, worker=worker)
+
+    run_check_cli(
+        ["job", "todir", j.uuid],
+        required_out="The selected Job does not have a run_dir defined yet",
+        error=True,
+    )
+
+    runner = Runner()
+    runner.run_all_jobs(max_seconds=MAX_TRY_SECONDS)
+
+    # outputs from the connected shell are not either not executed properly
+    # or not captured from run_check_cli.
+    # Matching the run_dir seems to have problems due to the newlines present in the
+    # captured output that can split the path over multiple lines
+    run_check_cli(
+        ["job", "todir", "1"],
+        cli_input="exit",
+        required_out=[f"Connecting to worker {worker}"],
+    )
+
+    run_check_cli(
+        ["job", "todir", "1", "--command"], required_out=["Connection command:", "cd "]
+    )

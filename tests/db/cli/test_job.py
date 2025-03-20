@@ -50,6 +50,49 @@ def test_jobs_list(job_controller, two_flows_four_jobs) -> None:
         ["job", "list", "-o", "state,name", "-vv"], required_out=output, error=True
     )
 
+    # test state filtering
+    outputs = ["READY"]
+    excluded = ["WAITING", "REMOTE_ERROR"]
+    run_check_cli(
+        ["job", "list", "-s", "READY"],
+        required_out=outputs,
+        excluded_out=excluded,
+    )
+
+    outputs = ["READY", "REMOTE_ERROR"]
+    excluded = ["WAITING"]
+    run_check_cli(
+        ["job", "list", "-s", "READY", "--error"],
+        required_out=outputs,
+        excluded_out=excluded,
+    )
+
+    outputs = ["REMOTE_ERROR"]
+    excluded = ["READY", "WAITING"]
+    run_check_cli(
+        ["job", "list", "--error"],
+        required_out=outputs,
+        excluded_out=excluded,
+    )
+
+    assert job_controller.set_job_state(JobState.DOWNLOADED, db_id="3")
+    outputs = ["REMOTE_ERROR", "DOWNLOADED"]
+    excluded = ["READY", "WAITING"]
+    run_check_cli(
+        ["job", "list", "--error", "--running"],
+        required_out=outputs,
+        excluded_out=excluded,
+    )
+
+    assert job_controller.set_job_state(JobState.DOWNLOADED, db_id="3")
+    outputs = ["DOWNLOADED"]
+    excluded = ["READY", "WAITING", "REMOTE_ERROR"]
+    run_check_cli(
+        ["job", "list", "--running"],
+        required_out=outputs,
+        excluded_out=excluded,
+    )
+
 
 def test_jobs_list_settings(job_controller, two_flows_four_jobs, monkeypatch) -> None:
     from jobflow_remote import SETTINGS
@@ -517,4 +560,32 @@ def test_report(job_controller) -> None:
     run_check_cli(
         ["job", "report", "days", "2"],
         required_out=output + excluded + ["Running Jobs │   1"],
+    )
+
+
+def test_todir(job_controller, one_job):
+    from jobflow_remote.jobs.runner import Runner
+    from jobflow_remote.testing.cli import run_check_cli
+
+    run_check_cli(
+        ["job", "todir", "1"],
+        required_out="The selected Job does not have a run_dir defined yet",
+        error=True,
+    )
+
+    runner = Runner()
+    runner.run_one_job()
+
+    # outputs from the connected shell are not either not executed properly
+    # or not captured from run_check_cli.
+    # Matching the run_dir seems to have problems due to the newlines present in the
+    # captured output that can split the path over multiple lines
+    run_check_cli(
+        ["job", "todir", "1"],
+        cli_input="exit",
+        required_out=["Connecting to worker test_local_worker"],
+    )
+
+    run_check_cli(
+        ["job", "todir", "1", "--command"], required_out=["Connection command:", "cd "]
     )

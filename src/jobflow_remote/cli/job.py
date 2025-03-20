@@ -1,4 +1,6 @@
 import io
+import os
+import shlex
 from datetime import datetime
 from pathlib import Path
 from typing import Annotated, Optional
@@ -70,7 +72,7 @@ from jobflow_remote.cli.utils import (
     str_to_dict,
 )
 from jobflow_remote.jobs.report import JobsReport
-from jobflow_remote.jobs.state import JobState
+from jobflow_remote.jobs.state import ERROR_STATES, RUNNING_STATES, JobState
 from jobflow_remote.remote.queue import ERR_FNAME, OUT_FNAME
 
 app_job = JFRTyper(
@@ -103,7 +105,15 @@ def jobs_list(
         typer.Option(
             "--error",
             "-e",
-            help="Select the jobs in FAILED and REMOTE_ERROR state. Incompatible with the --state option",
+            help="Select the jobs in FAILED and REMOTE_ERROR state",
+        ),
+    ] = False,
+    running: Annotated[
+        bool,
+        typer.Option(
+            "--running",
+            "-run",
+            help="Select the jobs in one of the running states (from CHECKED_OUT to DOWNLOADED)",
         ),
     ] = False,
     stored_data_keys: Annotated[
@@ -130,7 +140,8 @@ def jobs_list(
     """
     check_incompatible_opt({"start_date": start_date, "days": days, "hours": hours})
     check_incompatible_opt({"end_date": end_date, "days": days, "hours": hours})
-    check_incompatible_opt({"state": state, "error": error})
+    # check_incompatible_opt({"state": state, "error": error})
+    # check_incompatible_opt({"state": state, "running": running})
     check_incompatible_opt({"output": cli_output_keys, "verbosity": verbosity})
     check_query_incompatibility(
         custom_query,
@@ -171,7 +182,16 @@ def jobs_list(
     db_sort: list[tuple[str, int]] = [(sort.value, 1 if reverse_sort else -1)]
 
     if error:
-        state = [JobState.REMOTE_ERROR, JobState.FAILED]
+        if state:
+            state.extend(ERROR_STATES)
+        else:
+            state = ERROR_STATES
+
+    if running:
+        if state:
+            state.extend(RUNNING_STATES)
+        else:
+            state = RUNNING_STATES
 
     with loading_spinner():
         if custom_query:
@@ -280,7 +300,9 @@ def job_info(
     if not job_data:
         exit_with_error_msg("No data matching the request")
 
-    out_console.print(format_job_info(job_data, verbosity, show_none=show_none))
+    out_console.print(
+        format_job_info(job_data, verbosity, show_none=show_none), overflow="crop"
+    )
 
 
 @app_job.command()
@@ -769,6 +791,74 @@ def report(
         timezone=timezone,
     )
     out_console.print(*get_job_report_components(jobs_report))
+
+
+@app_job.command()
+def todir(
+    job_db_id: job_db_id_arg = None,
+    job_index: job_index_arg = None,
+    shell: Annotated[
+        Optional[str],
+        typer.Option(
+            "--shell",
+            "-s",
+            help="A shell to be used locally when executing the command to connect",
+        ),
+    ] = "bash",
+    remote_shell: Annotated[
+        Optional[str],
+        typer.Option(
+            "--remote-shell",
+            "-rs",
+            help="A shell to be used on the worker to give access to the terminal",
+        ),
+    ] = "bash",
+    command: Annotated[
+        bool,
+        typer.Option(
+            "--command",
+            "-c",
+            help="Only print the ssh command that will be used to connect",
+        ),
+    ] = False,
+):
+    """
+    Connect to the worker and go to the job run_dir.
+    For remote workers and explicit ssh command is generated, so only a subset
+    of the connection definition are supported.
+    """
+
+    # NOTE this function uses system commands to connect to the remote host and
+    # local host. The shell name is also potentially passed by the user, so
+    # it is potentially dangerous if the user does not have direct access to
+    # the machines involved, but this should not be the case for the CLI of JFR.
+    cm = get_config_manager()
+    jc = get_job_controller()
+
+    db_id, job_id = get_job_db_ids(job_db_id, job_index)
+
+    job_data = jc.get_job_info(
+        job_id=job_id,
+        job_index=job_index,
+        db_id=db_id,
+    )
+    if not job_data.run_dir:
+        exit_with_error_msg("The selected Job does not have a run_dir defined yet")
+    worker = cm.get_worker(job_data.worker)
+    host = worker.get_host()
+    cmd = host.to_dir_cmd(job_data.run_dir, target_shell=remote_shell)
+    if shell:
+        cmd = f"{shell} -c {shlex.quote(cmd)}"
+
+    if command:
+        out_console.print("Connection command:")
+        out_console.print(cmd)
+        return
+
+    out_console.print(
+        f"Connecting to worker {job_data.worker} and moving to {job_data.run_dir}"
+    )
+    os.system(cmd)  # noqa: S605
 
 
 app_job_set = JFRTyper(

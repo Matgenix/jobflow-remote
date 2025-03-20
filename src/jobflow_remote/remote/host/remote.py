@@ -430,6 +430,27 @@ class RemoteHost(BaseHost):
     def interactive_login(self) -> bool:
         return self._interactive_login
 
+    def to_dir_cmd(self, dir_path: str | Path, target_shell: str = "bash") -> str:
+        """
+        Command that can be used in a unix shell to reach a directory in the host.
+        Generates an ssh command from the Connection object. If password is defined
+        in the connection will use sshpass.
+
+        Parameters
+        ----------
+        dir_path
+            The directory to reach
+        target_shell
+            Shell command to be used to start the shell on the worker to access the
+            target directory
+
+        Returns
+        -------
+            The string to be used to reach the chose directory.
+        """
+        ssh_cmd = build_ssh_command(self.connection)
+        return f'{ssh_cmd} "cd {dir_path}; {target_shell}"'
+
 
 def inter_handler(title, instructions, prompt_list):
     """
@@ -492,3 +513,107 @@ class InteractiveAuthStrategy(OpenSSHAuthStrategy):
         #     )
 
         yield Interactive(username=self.username)
+
+
+def build_ssh_command(connection: fabric.Connection) -> str:
+    """
+    Given a fabric Connection generate the ssh command replicating
+    that same connection.
+
+    Only a subset of the cases are implemented and several involved
+    connections will probably not be handled properly.
+
+    Parameters
+    ----------
+    connection
+        The fabric connection used to generate the command
+    Returns
+    -------
+        A string representing the ssh connection
+    """
+    cmd_parts = []
+
+    connect_kwargs = connection.connect_kwargs or {}
+    password = connect_kwargs.get("password")
+    if password:
+        cmd_parts += ["sshpass", "-p", shlex.quote(password)]
+
+    cmd_parts.append("ssh")
+    cmd_parts.append("-t")
+
+    # Forward agent
+    if connection.forward_agent:
+        cmd_parts.append("-A")
+
+    # handle gateway. Only one nested gateway Connection allowed
+    gateway = connection.gateway
+    if gateway:
+        if isinstance(gateway, str):
+            # If the string contains an "ssh" command it should be used as a ProxyCommand
+            # otherwise consider it like a ProxyJump
+            if "ssh " in gateway:
+                cmd_parts += ["-o", f"ProxyCommand={shlex.quote(gateway)}"]
+            else:
+                cmd_parts += ["-J", gateway]
+
+        elif isinstance(gateway, fabric.Connection):
+            # if gateway is another connection create a ProxyCommand using this same
+            # function, but don't do it recursively if there is more than one nested gateway
+            if getattr(gateway, "gateway", None):
+                raise NotImplementedError(
+                    "Nested gateways beyond one level are not supported."
+                )
+            proxy_cmd = build_ssh_command(gateway)
+            cmd_parts += ["-o", f"ProxyCommand={shlex.quote(proxy_cmd + ' -W %h:%p')}"]
+
+    # Port
+    if connection.port:
+        cmd_parts += ["-p", str(connection.port)]
+
+    # Timeout
+    if connection.connect_timeout:
+        cmd_parts += ["-o", f"ConnectTimeout={connection.connect_timeout}"]
+
+    # Identity file
+    if "key_filename" in connect_kwargs:
+        key = connect_kwargs["key_filename"]
+        if isinstance(key, (list, tuple)):
+            for k in key:
+                cmd_parts += ["-i", shlex.quote(k)]
+        else:
+            cmd_parts += ["-i", shlex.quote(key)]
+
+    # Private key passphrase
+    if "passphrase" in connect_kwargs:
+        warnings.warn(
+            "passphrase argument from the configuration will be ignored", stacklevel=2
+        )
+
+    # in paramiko this results in not checking for keys in ~/.ssh, but there seems to
+    # be no equivalent in the ssh command. At this stage this is used in the tests.
+    # With this option, if the key is explicitly set but look_for_keys=False, the connection
+    # will work for paramiko, but not with this ssh command. Assume that if a key is passed
+    # it should not be necessary to also set look_for_keys=False. This may instead be useful
+    # to force the use of the password when many keys are available in ~/.ssh or in the agent.
+    if "look_for_keys" in connect_kwargs:
+        look = "yes" if connect_kwargs["look_for_keys"] else "no"
+        cmd_parts += ["-o", f"PubkeyAuthentication={look}"]
+
+    # Allow agent
+    if "allow_agent" in connect_kwargs:
+        agent = "yes" if connect_kwargs["allow_agent"] else "no"
+        cmd_parts += ["-o", f"IdentityAgent={agent}"]
+
+    if connect_kwargs.get("compress", False):
+        cmd_parts.append("-C")
+
+    # KeepAlive settings if present
+    if "keepalive" in connect_kwargs:
+        interval = connect_kwargs["keepalive"]
+        cmd_parts += ["-o", f"ServerAliveInterval={interval}"]
+
+    # User@host
+    user_prefix = f"{connection.user}@" if connection.user else ""
+    destination = f"{user_prefix}{connection.host}"
+
+    return " ".join([*cmd_parts, destination])

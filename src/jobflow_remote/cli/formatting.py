@@ -12,7 +12,7 @@ from rich.scope import render_scope
 from rich.table import Table
 from rich.text import Text
 
-from jobflow_remote.cli.utils import ReprStr, fmt_datetime
+from jobflow_remote.cli.utils import ReprStr, fmt_datetime, render_scope_jfr
 from jobflow_remote.jobs.state import FlowState, JobState
 from jobflow_remote.remote.data import get_job_path
 from jobflow_remote.utils.data import convert_utc_time
@@ -228,7 +228,7 @@ def format_job_info(
         if k in d:
             sorted_d[k] = d[k]
 
-    return render_scope(sorted_d, sort_keys=False)
+    return render_scope_jfr(sorted_d, sort_keys=False, overflow="fold")
 
 
 def format_flow_info(flow_info: FlowInfo) -> Table:
