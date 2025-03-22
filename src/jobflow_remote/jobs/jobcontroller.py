@@ -2736,6 +2736,32 @@ class JobController:
             for idx in flow_custom_indexes:
                 self.flows.create_index(idx, background=background)
 
+        # if the docs_store is a MongoStore with a collection, create a proper composed
+        # index that is the most effective for retrieving outputs. Otherwise create a simple
+        # index based on the maggma interface for the two indexes separately.
+        # In any case trap all exceptions, as this should not be a blocking point
+        try:
+            docs_store = self.jobstore.docs_store
+            if hasattr(docs_store, "_collection"):
+                if drop:
+                    docs_store._collection.drop_indexes()
+                docs_store._collection.create_index(
+                    [("uuid", 1), ("index", -1)], background=background
+                )
+            else:
+                docs_store.ensure_index("uuid")
+                docs_store.ensure_index("index")
+        except Exception:
+            logger.warning("Could not create the index for the JobStore", exc_info=True)
+        # Use the standard interface to create an index for the additional stores
+        for store_name, additional_store in self.jobstore.additional_stores.items():
+            try:
+                additional_store.ensure_index("blob_uuid")
+            except Exception:
+                logger.warning(
+                    f"Could not create the blob_uuid index for additional store {store_name}"
+                )
+
     def create_indexes(
         self,
         indexes: list[str | list],
