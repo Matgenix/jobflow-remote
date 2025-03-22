@@ -54,6 +54,10 @@ def test_std_operations(
     )
 
     run_check_cli(
+        ["runner", "restart"],
+    )
+
+    run_check_cli(
         ["runner", "stop"],
         required_out="The stop signal has been sent to the Runner",
     )
