@@ -576,7 +576,7 @@ def test_todir(job_controller, one_job):
     runner = Runner()
     runner.run_one_job()
 
-    # outputs from the connected shell are not either not executed properly
+    # outputs from the connected shell are either not executed properly
     # or not captured from run_check_cli.
     # Matching the run_dir seems to have problems due to the newlines present in the
     # captured output that can split the path over multiple lines
@@ -584,8 +584,4 @@ def test_todir(job_controller, one_job):
         ["job", "todir", "1"],
         cli_input="exit",
         required_out=["Connecting to worker test_local_worker"],
-    )
-
-    run_check_cli(
-        ["job", "todir", "1", "--command"], required_out=["Connection command:", "cd "]
     )

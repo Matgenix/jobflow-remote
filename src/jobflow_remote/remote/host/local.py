@@ -157,21 +157,21 @@ class LocalHost(BaseHost):
 
         return removed
 
-    def to_dir_cmd(self, dir_path: str | Path, target_shell: str = "bash") -> str:
+    def shell(self, pre_cmd: str | None = None, shell: str = "bash"):
         """
-        Command that can be used in a unix shell to reach a directory in the host.
-        A simple cd for local host.
+        Open a connection to the host and starts the selected shell
 
         Parameters
         ----------
-        dir_path
-            The directory to reach
-        target_shell
-            Shell command to be used to start the shell on the worker to access the
-            target directory
-
-        Returns
-        -------
-            The string to be used to reach the chose directory.
+        pre_cmd
+            Any command to be executed before starting the shell
+        shell
+            The name of the shell to start
         """
-        return f"cd {dir_path}; {target_shell}"
+
+        from invoke import Context
+
+        cmd = shell
+        if pre_cmd:
+            cmd = f"{pre_cmd}; {shell}"
+        Context().run(cmd, pty=True)

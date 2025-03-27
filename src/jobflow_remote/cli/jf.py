@@ -13,12 +13,10 @@ from jobflow_remote.cli.utils import (
     out_console,
     start_profiling,
 )
-from jobflow_remote.config import ConfigError
-from jobflow_remote.utils.log import initialize_cli_logger
 
 app = JFRTyper(
     name="jf",
-    add_completion=False,
+    add_completion=True,
     no_args_is_help=True,
     context_settings={"help_option_names": ["-h", "--help"]},
     epilog=None,  # to remove the default message in JFRTyper
@@ -70,6 +68,8 @@ def main(
 ) -> None:
     """The controller CLI for jobflow-remote."""
     from jobflow_remote import SETTINGS
+    from jobflow_remote.config import ConfigError
+    from jobflow_remote.utils.log import initialize_cli_logger
 
     if full_exc:
         SETTINGS.cli_full_exc = True

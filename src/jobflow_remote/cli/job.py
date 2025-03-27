@@ -1,6 +1,4 @@
 import io
-import os
-import shlex
 from datetime import datetime
 from pathlib import Path
 from typing import Annotated, Optional
@@ -105,7 +103,7 @@ def jobs_list(
         typer.Option(
             "--error",
             "-e",
-            help="Select the jobs in FAILED and REMOTE_ERROR state",
+            help="Select the jobs in FAILED and REMOTE_ERROR state. Compatible with other state filtering options",
         ),
     ] = False,
     running: Annotated[
@@ -113,7 +111,8 @@ def jobs_list(
         typer.Option(
             "--running",
             "-run",
-            help="Select the jobs in one of the running states (from CHECKED_OUT to DOWNLOADED)",
+            help="Select the jobs in one of the running states (from CHECKED_OUT to DOWNLOADED). "
+            "Compatible with other state filtering options",
         ),
     ] = False,
     stored_data_keys: Annotated[
@@ -802,30 +801,12 @@ def todir(
         typer.Option(
             "--shell",
             "-s",
-            help="A shell to be used locally when executing the command to connect",
+            help="A shell to be used in the opened terminal",
         ),
     ] = "bash",
-    remote_shell: Annotated[
-        Optional[str],
-        typer.Option(
-            "--remote-shell",
-            "-rs",
-            help="A shell to be used on the worker to give access to the terminal",
-        ),
-    ] = "bash",
-    command: Annotated[
-        bool,
-        typer.Option(
-            "--command",
-            "-c",
-            help="Only print the ssh command that will be used to connect",
-        ),
-    ] = False,
 ):
     """
     Connect to the worker and go to the job run_dir.
-    For remote workers and explicit ssh command is generated, so only a subset
-    of the connection definition are supported.
     """
 
     # NOTE this function uses system commands to connect to the remote host and
@@ -842,23 +823,16 @@ def todir(
         job_index=job_index,
         db_id=db_id,
     )
+    if not job_data:
+        exit_with_error_msg("No job matching the critiria")
     if not job_data.run_dir:
         exit_with_error_msg("The selected Job does not have a run_dir defined yet")
     worker = cm.get_worker(job_data.worker)
     host = worker.get_host()
-    cmd = host.to_dir_cmd(job_data.run_dir, target_shell=remote_shell)
-    if shell:
-        cmd = f"{shell} -c {shlex.quote(cmd)}"
-
-    if command:
-        out_console.print("Connection command:")
-        out_console.print(cmd)
-        return
-
     out_console.print(
         f"Connecting to worker {job_data.worker} and moving to {job_data.run_dir}"
     )
-    os.system(cmd)  # noqa: S605
+    host.shell(pre_cmd=f"cd {job_data.run_dir}", shell=shell)
 
 
 app_job_set = JFRTyper(
