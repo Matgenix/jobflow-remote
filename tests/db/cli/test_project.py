@@ -59,7 +59,11 @@ def test_generate(job_controller, random_project_name, monkeypatch, tmp_dir) -> 
         )
 
 
-def test_check(job_controller) -> None:
+def test_check(job_controller, monkeypatch, tmp_dir) -> None:
+    import os
+
+    from jobflow_remote import SETTINGS
+    from jobflow_remote.config.manager import ConfigManager
     from jobflow_remote.testing.cli import run_check_cli
 
     output = [
@@ -69,6 +73,18 @@ def test_check(job_controller) -> None:
         "✓ Queue store",
     ]
     run_check_cli(["project", "check"], required_out=output)
+
+    # create a copy of the project and it so that the jobstore and queue
+    # store have the same db and collection
+    project = ConfigManager().get_project()
+    with monkeypatch.context() as m:
+        m.setattr(SETTINGS, "projects_folder", os.getcwd())
+        project.jobstore["docs_store"]["collection_name"] = "same_collection"
+        project.queue.store["collection_name"] = "same_collection"
+        ConfigManager().create_project(project)
+
+        duplicated_msg = "It seems that the main docs_store of the JobStore and the queue store point to the same database and collection"
+        run_check_cli(["project", "check"], required_out=[*output, duplicated_msg])
 
 
 def test_check_fail(job_controller, monkeypatch, tmp_dir) -> None:
