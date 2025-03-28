@@ -190,6 +190,17 @@ def check(
             )
         workers_to_test = [worker]
 
+    # check that jobstore main Store and the queue Store do not share the same collection
+    if (check_all or (jobstore and queue)) and (
+        project.get_jobstore().docs_store == project.get_queue_store()
+    ):
+        msg_duplicated_stores = (
+            "It seems that the main docs_store of the JobStore and the queue store point to the "
+            "same database and collection. This will lead to errors. Choose different collection names."
+        )
+
+        out_console.print(msg_duplicated_stores, style="red bold")
+
     tick = "[bold green]✓[/] "
     tick_warn = "[bold yellow]✓[/] "
     cross = "[bold red]x[/] "
