@@ -66,7 +66,7 @@ def set_run_config(
     Flow or Job
         The modified object.
     """
-    if not exec_config and not resources and not worker:
+    if not exec_config and not resources and not worker and priority is None:
         return flow_or_job
     config: dict = {"manager_config": {}}
     if exec_config is not None:
