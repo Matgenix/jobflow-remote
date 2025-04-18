@@ -115,3 +115,29 @@ def test_ping_runner_runner(job_controller, runner, monkeypatch, caplog):
         abs((job_controller.get_running_runner()["last_pinged"] - t0).total_seconds())
         > 2
     )
+
+
+def test_resolve_references(job_controller, runner):
+    from jobflow import Flow
+
+    from jobflow_remote import submit_flow
+    from jobflow_remote.testing import add, no_resolve
+
+    j1 = add(1, 2)
+    j2 = no_resolve(j1.output)
+    flow = Flow([j1, j2])
+
+    submit_flow(flow, worker="test_local_worker")
+
+    runner.run_all_jobs(max_seconds=20)
+
+    # verify that the output is the output reference and not directly the output
+    # of the previous job. Since j2 has resolve_references=False in the JobConfig
+    # the reference should not be resolved.
+    job_controller.jobstore.connect()
+    out_docs = list(job_controller.jobstore.docs_store.query({"uuid": j2.uuid}))
+    assert len(out_docs) == 1
+    out_doc = out_docs[0]
+    assert isinstance(out_doc["output"], dict)
+    assert out_doc["output"]["@class"] == "OutputReference"
+    assert out_doc["output"]["uuid"] == j1.uuid

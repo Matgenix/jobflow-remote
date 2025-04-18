@@ -2,7 +2,7 @@
 
 from typing import Callable, NoReturn, Optional, Union
 
-from jobflow import Job, Response, job
+from jobflow import Job, JobConfig, OnMissing, Response, job
 
 
 @job
@@ -103,3 +103,11 @@ def current_jobdoc():
     from jobflow_remote.jobs.run import CURRENT_JOBDOC
 
     return CURRENT_JOBDOC.job_doc
+
+
+@job(config=JobConfig(resolve_references=False, on_missing_references=OnMissing.NONE))
+def no_resolve(ref):
+    """
+    A job that does not resolve the reference in input
+    """
+    return ref
