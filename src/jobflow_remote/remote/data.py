@@ -239,6 +239,8 @@ def resolve_job_dict_args(job_dict: dict, store: JobStore) -> dict:
     Similar to Job.resolve_args, but without the need to deserialize the Job.
     The references are resolved inplace.
 
+    If resolve_references in job.config is False references are not resolved.
+
     Parameters
     ----------
     job_dict
@@ -251,6 +253,9 @@ def resolve_job_dict_args(job_dict: dict, store: JobStore) -> dict:
         The updated version of the input dictionary with references resolved.
     """
     from jobflow.core.reference import OnMissing, find_and_resolve_references
+
+    if not job_dict["config"]["resolve_references"]:
+        return job_dict
 
     on_missing = OnMissing(job_dict["config"]["on_missing_references"])
     cache: dict[str, Any] = {}
