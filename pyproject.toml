@@ -27,7 +27,7 @@ dependencies = [
     "jobflow >= 0.1.19",
     "psutil >= 5.9,< 8.0",
     "pydantic ~= 2.4",
-    "pymongo < 4.11",
+    "pymongo < 4.13",
     "python-dateutil>=2.8.2",
     "qtoolkit >= 0.1.6",
     "rich >= 13.7,< 15.0",
