@@ -10,6 +10,7 @@ def test_jobs_list(job_controller, two_flows_four_jobs) -> None:
     outputs = columns + [f"add{i}" for i in range(1, 5)] + ["READY", "WAITING"]
 
     run_check_cli(["job", "list"], required_out=outputs)
+    run_check_cli(["job", "list", "--count"], required_out="Selected jobs: 4")
 
     # the output table is squeezed. Hard to check stdout. Just check that runs correctly
     run_check_cli(["job", "list", "-v"])
@@ -24,6 +25,10 @@ def test_jobs_list(job_controller, two_flows_four_jobs) -> None:
         ["job", "list", "-q", '{"db_id": "1"}'],
         required_out=outputs,
         excluded_out=excluded,
+    )
+    run_check_cli(
+        ["job", "list", "-q", '{"db_id": "1"}', "--count"],
+        required_out="Selected jobs: 1",
     )
 
     # trigger the additional information
@@ -58,6 +63,9 @@ def test_jobs_list(job_controller, two_flows_four_jobs) -> None:
         required_out=outputs,
         excluded_out=excluded,
     )
+    run_check_cli(
+        ["job", "list", "-s", "READY", "--count"], required_out="Selected jobs: 1"
+    )
 
     outputs = ["READY", "REMOTE_ERROR"]
     excluded = ["WAITING"]
@@ -91,6 +99,9 @@ def test_jobs_list(job_controller, two_flows_four_jobs) -> None:
         ["job", "list", "--running"],
         required_out=outputs,
         excluded_out=excluded,
+    )
+    run_check_cli(
+        ["job", "list", "--running", "--count"], required_out="Selected jobs: 1"
     )
 
 

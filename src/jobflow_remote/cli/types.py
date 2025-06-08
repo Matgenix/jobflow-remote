@@ -383,6 +383,14 @@ index_direction_arg = Annotated[
     ),
 ]
 
+count_opt = Annotated[
+    bool,
+    typer.Option(
+        "--count",
+        help="Just return the count of the selected elements",
+    ),
+]
+
 
 # as of typer version 0.9.0 the dict is not a supported type. Define a custom one
 class DictType(dict):

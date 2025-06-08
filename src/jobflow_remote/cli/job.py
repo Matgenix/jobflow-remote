@@ -22,6 +22,7 @@ from jobflow_remote.cli.jfr_typer import JFRTyper
 from jobflow_remote.cli.types import (
     OptionalStr,
     break_lock_opt,
+    count_opt,
     days_opt,
     db_ids_opt,
     delete_all_opt,
@@ -115,6 +116,7 @@ def jobs_list(
             "Compatible with other state filtering options",
         ),
     ] = False,
+    count: count_opt = False,
     stored_data_keys: Annotated[
         Optional[list[str]],
         typer.Option(
@@ -192,15 +194,10 @@ def jobs_list(
         else:
             state = RUNNING_STATES
 
-    with loading_spinner():
-        if custom_query:
-            jobs_info = jc.get_jobs_info_query(
+    if count:
+        with loading_spinner():
+            n_jobs = jc.count_jobs(
                 query=custom_query,
-                limit=max_results,
-                sort=db_sort,
-            )
-        else:
-            jobs_info = jc.get_jobs_info(
                 job_ids=job_ids_indexes,
                 db_ids=db_id,
                 flow_ids=flow_id,
@@ -211,40 +208,63 @@ def jobs_list(
                 name=name,
                 metadata=metadata,
                 workers=worker_name,
-                limit=max_results,
-                sort=db_sort,
+            )
+        out_console.print(f"Selected jobs: {n_jobs}")
+    else:
+        with loading_spinner():
+            if custom_query:
+                jobs_info = jc.get_jobs_info_query(
+                    query=custom_query,
+                    limit=max_results,
+                    sort=db_sort,
+                )
+            else:
+                jobs_info = jc.get_jobs_info(
+                    job_ids=job_ids_indexes,
+                    db_ids=db_id,
+                    flow_ids=flow_id,
+                    states=state,
+                    start_date=start_date,
+                    locked=locked,
+                    end_date=end_date,
+                    name=name,
+                    metadata=metadata,
+                    workers=worker_name,
+                    limit=max_results,
+                    sort=db_sort,
+                )
+
+            table = get_job_info_table(
+                jobs_info,
+                verbosity=verbosity,
+                output_keys=output_keys,
+                stored_data_keys=stored_data_keys,
             )
 
-        table = get_job_info_table(
-            jobs_info,
-            verbosity=verbosity,
-            output_keys=output_keys,
-            stored_data_keys=stored_data_keys,
-        )
-
-    out_console.print(table)
-    if SETTINGS.cli_suggestions:
-        if max_results and len(jobs_info) == max_results:
-            out_console.print(
-                f"The number of Jobs printed may be limited by the maximum selected: {max_results}",
-                style="yellow",
-            )
-        remote_errors = False
-        if any(
-            ji.remote.retry_time_limit is not None and ji.state != JobState.REMOTE_ERROR
-            for ji in jobs_info
-        ):
-            text = (
-                "Some jobs (state in orange) have failed while interacting with"
-                " the worker, but will be retried."
-            )
-            out_console.print(text, style="yellow")
-            remote_errors = True
-        if remote_errors or any(
-            ji.state in (JobState.REMOTE_ERROR, JobState.FAILED) for ji in jobs_info
-        ):
-            text = "Get more information about the errors with 'jf job info JOB_ID'"
-            out_console.print(text, style="yellow")
+        out_console.print(table)
+        if SETTINGS.cli_suggestions:
+            if max_results and len(jobs_info) == max_results:
+                out_console.print(
+                    f"The number of Jobs printed may be limited by the maximum selected: {max_results}",
+                    style="yellow",
+                )
+            remote_errors = False
+            if any(
+                ji.remote.retry_time_limit is not None
+                and ji.state != JobState.REMOTE_ERROR
+                for ji in jobs_info
+            ):
+                text = (
+                    "Some jobs (state in orange) have failed while interacting with"
+                    " the worker, but will be retried."
+                )
+                out_console.print(text, style="yellow")
+                remote_errors = True
+            if remote_errors or any(
+                ji.state in (JobState.REMOTE_ERROR, JobState.FAILED) for ji in jobs_info
+            ):
+                text = "Get more information about the errors with 'jf job info JOB_ID'"
+                out_console.print(text, style="yellow")
 
 
 @app_job.command(name="info")
