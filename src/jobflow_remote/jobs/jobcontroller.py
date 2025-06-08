@@ -2950,6 +2950,8 @@ class JobController:
         start_date: datetime | None = None,
         end_date: datetime | None = None,
         name: str | None = None,
+        metadata: dict | None = None,
+        locked: bool = False,
     ) -> int:
         """
         Count flows based on filter parameters.
@@ -2975,6 +2977,11 @@ class JobController:
         name
             Pattern matching the name of Flow. Default is an exact match, but all
             conventions from python fnmatch can be used (e.g. *test*)
+        metadata
+            A dictionary of the values of the metadata to match. Should be an
+            exact match for all the values provided.
+        locked
+            If True only locked Flows will be selected.
 
         Returns
         -------
@@ -2990,6 +2997,8 @@ class JobController:
                 start_date=start_date,
                 end_date=end_date,
                 name=name,
+                metadata=metadata,
+                locked=locked,
             )
         return self.flows.count_documents(query)
 
