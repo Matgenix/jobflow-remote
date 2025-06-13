@@ -103,7 +103,7 @@ def flows_list(
                 metadata=metadata,
                 locked=locked,
             )
-        out_console.print(f"Selected Flows: {n_flows}")
+        out_console.print(f"Number of Flows: {n_flows}")
     else:
         with loading_spinner():
             flows_info = jc.get_flows_info(
