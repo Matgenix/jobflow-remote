@@ -209,7 +209,7 @@ def jobs_list(
                 metadata=metadata,
                 workers=worker_name,
             )
-        out_console.print(f"Selected jobs: {n_jobs}")
+        out_console.print(f"Number of jobs: {n_jobs}")
     else:
         with loading_spinner():
             if custom_query:

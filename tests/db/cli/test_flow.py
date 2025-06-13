@@ -14,7 +14,7 @@ def test_flows_list(job_controller, two_flows_four_jobs) -> None:
     outputs = columns + [f"f{i}" for i in range(1, 3)] + ["READY"]
 
     run_check_cli(["flow", "list"], required_out=outputs)
-    run_check_cli(["flow", "list", "--count"], required_out="Selected Flows: 2")
+    run_check_cli(["flow", "list", "--count"], required_out="Number of Flows: 2")
 
     # the output table is squeezed. Hard to check stdout. Just check that runs correctly
     run_check_cli(["flow", "list", "-v"])
@@ -29,7 +29,7 @@ def test_flows_list(job_controller, two_flows_four_jobs) -> None:
     )
     run_check_cli(
         ["flow", "list", "-fid", two_flows_four_jobs[0].uuid, "--count"],
-        required_out="Selected Flows: 1",
+        required_out="Number of Flows: 1",
     )
 
     # test metadata query
@@ -47,7 +47,7 @@ def test_flows_list(job_controller, two_flows_four_jobs) -> None:
     )
     run_check_cli(
         ["flow", "list", "--metadata", "test=x", "--count"],
-        required_out="Selected Flows: 1",
+        required_out="Number of Flows: 1",
     )
 
 

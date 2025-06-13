@@ -198,16 +198,16 @@ class JobController:
 
     def _build_query_job(
         self,
-        job_ids: tuple[str, int] | list[tuple[str, int]] | None = None,
-        db_ids: str | list[str] | None = None,
-        flow_ids: str | list[str] | None = None,
-        states: JobState | list[JobState] | None = None,
-        locked: bool = False,
-        start_date: datetime | None = None,
-        end_date: datetime | None = None,
-        name: str | None = None,
-        metadata: dict | None = None,
-        workers: str | list[str] | None = None,
+        job_ids: tuple[str, int] | list[tuple[str, int]] | None,
+        db_ids: str | list[str] | None,
+        flow_ids: str | list[str] | None,
+        states: JobState | list[JobState] | None,
+        locked: bool,
+        start_date: datetime | None,
+        end_date: datetime | None,
+        name: str | None,
+        metadata: dict | None,
+        workers: str | list[str] | None,
     ) -> dict:
         """
         Build a query to search for Jobs, based on standard parameters.
@@ -303,15 +303,15 @@ class JobController:
 
     def _build_query_flow(
         self,
-        job_ids: str | list[str] | None = None,
-        db_ids: str | list[str] | None = None,
-        flow_ids: str | list[str] | None = None,
-        states: FlowState | list[FlowState] | None = None,
-        start_date: datetime | None = None,
-        end_date: datetime | None = None,
-        name: str | None = None,
-        metadata: dict | None = None,
-        locked: bool = False,
+        job_ids: str | list[str] | None,
+        db_ids: str | list[str] | None,
+        flow_ids: str | list[str] | None,
+        states: FlowState | list[FlowState] | None,
+        start_date: datetime | None,
+        end_date: datetime | None,
+        name: str | None,
+        metadata: dict | None,
+        locked: bool,
     ) -> dict:
         """
         Build a query to search for Flows, based on standard parameters.
@@ -757,6 +757,7 @@ class JobController:
                 name=name,
                 metadata=metadata,
                 workers=workers,
+                locked=False,
             )
         result = self.jobs.find(query, projection=["db_id"])
 
@@ -2579,6 +2580,7 @@ class JobController:
             end_date=end_date,
             locked=True,
             name=name,
+            metadata=None,
         )
 
         result = self.flows.update_many(
@@ -2981,7 +2983,7 @@ class JobController:
             A dictionary of the values of the metadata to match. Should be an
             exact match for all the values provided.
         locked
-            If True only locked Flows will be selected.
+            If True only locked Flows will be counted.
 
         Returns
         -------
