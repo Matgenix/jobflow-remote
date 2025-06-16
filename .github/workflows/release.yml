@@ -40,7 +40,7 @@ jobs:
     - name: Update changelog
       uses: CharMixer/auto-changelog-action@v1
       with:
-        token: ${{ secrets.RELEASE_PAT_BOT }}
+        token: ${{ secrets.GITHUB_TOKEN }}
         release_branch: ${{ env.PUBLISH_UPDATE_BRANCH }}
         exclude_labels: "duplicate,question,invalid,wontfix,dependency_updates,skip_changelog"
 
@@ -59,7 +59,7 @@ jobs:
     - name: Update '${{ env.PUBLISH_UPDATE_BRANCH }}'
       uses: CasperWA/push-protected@v2
       with:
-        token: ${{ secrets.RELEASE_PAT_BOT }}
+        token: ${{ secrets.GITHUB_TOKEN }}
         branch: ${{ env.PUBLISH_UPDATE_BRANCH }}
         unprotect_reviews: true
         sleep: 15
@@ -95,7 +95,7 @@ jobs:
     - name: Create release-specific changelog
       uses: CharMixer/auto-changelog-action@v1
       with:
-        token: ${{ secrets.RELEASE_PAT_BOT }}
+        token: ${{ secrets.GITHUB_TOKEN }}
         release_branch: ${{ env.PUBLISH_UPDATE_BRANCH }}
         since_tag: "${{ env.PREVIOUS_VERSION }}"
         output: "release_changelog.md"
@@ -107,7 +107,7 @@ jobs:
         cat release_changelog.md >> release_body.md
         gh api /repos/${{ github.repository }}/releases/${{ github.event.release.id }} -X PATCH -F body='@release_body.md'
       env:
-        GITHUB_TOKEN: ${{ secrets.RELEASE_PAT_BOT }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Build source distribution
       run: |
