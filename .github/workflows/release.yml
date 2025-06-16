@@ -16,6 +16,8 @@ jobs:
     name: Publish package
     runs-on: ubuntu-latest
     if: github.repository == 'matgenix/jobflow-remote' && startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
 
     steps:
     - name: Checkout repository
