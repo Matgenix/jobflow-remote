@@ -18,6 +18,8 @@ jobs:
     if: github.repository == 'matgenix/jobflow-remote' && startsWith(github.ref, 'refs/tags/v')
     permissions:
       contents: write
+      issues: read
+      pull-requests: read
 
     steps:
     - name: Checkout repository
