@@ -272,12 +272,18 @@ class JobDoc(BaseModel):
         dict
             The dict representing the JobDoc.
         """
+        # split the serialization of the job since Enums should stay enums
+        # in the job inputs and they are not pydantic models that reconstructs
+        # them during deserialization.
+        dump = self.model_dump(mode="python")
+        job = dump.pop("job")
         d = jsanitize(
-            self.model_dump(mode="python"),
+            dump,
             strict=True,
             allow_bson=True,
             enum_values=True,
         )
+        d["job"] = jsanitize(job, strict=True, allow_bson=True)
         # required since the resources are not serialized otherwise
         if isinstance(self.resources, QResources):
             d["resources"] = self.resources.as_dict()
