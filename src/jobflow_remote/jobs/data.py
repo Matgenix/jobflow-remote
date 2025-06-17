@@ -50,7 +50,6 @@ def get_initial_job_doc_dict(
     JobDoc
         A new JobDoc.
     """
-    from monty.json import jsanitize
 
     # take the resources either from the job, if they are defined
     # (they can be defined dynamically by the update_config) or the
@@ -64,7 +63,7 @@ def get_initial_job_doc_dict(
     priority = job.config.manager_config.get("priority") or priority
 
     job_doc = JobDoc(
-        job=jsanitize(job, strict=True, enum_values=True),
+        job=job,
         uuid=job.uuid,
         index=job.index,
         db_id=db_id,
