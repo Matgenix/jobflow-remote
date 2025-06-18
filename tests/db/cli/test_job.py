@@ -130,6 +130,10 @@ def test_jobs_list_settings(job_controller, two_flows_four_jobs, monkeypatch) ->
 
 
 def test_job_info(job_controller, two_flows_four_jobs) -> None:
+    from jobflow import Flow
+
+    from jobflow_remote import submit_flow
+    from jobflow_remote.testing import add
     from jobflow_remote.testing.cli import run_check_cli
 
     outputs = ["name = 'add1'", "state = 'READY'"]
@@ -147,6 +151,26 @@ def test_job_info(job_controller, two_flows_four_jobs) -> None:
 
     run_check_cli(
         ["job", "info", "10"], error=True, required_out="No data matching the request"
+    )
+
+    # test job with many parents. The job is wrong, as it does not take a list, but
+    # it is not going to be executed.
+    parents = [add(1, 5) for _ in range(10)]
+    child = add([p.output for p in parents], 2)
+
+    flow = Flow([child, *parents])
+    submit_flow(flow, worker="test_local_worker")
+    # get the list of parent ids from the DB to be sure to get the correct list ordering
+    pids = job_controller.get_job_info(child.uuid).parents
+    run_check_cli(
+        ["job", "info", child.uuid],
+        required_out=[pids[0], pids[-1], "..."],
+        excluded_out=[pids[5]],
+    )
+    run_check_cli(
+        ["job", "info", child.uuid, "-vv"],
+        required_out=pids,
+        excluded_out=["..."],
     )
 
 
