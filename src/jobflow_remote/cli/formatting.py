@@ -221,6 +221,9 @@ def format_job_info(
         if queue_err:
             d["remote"]["queue_err"] = ReprStr(queue_err)
 
+    if verbosity < 2 and d.get("parents") and len(d.get("parents", [])) > 5:
+        d["parents"] = d["parents"][:2] + ["..."] + d["parents"][-2:]
+
     # reorder the keys
     # Do not check here that all the keys in JobInfo are in JOB_INFO_ORDER. Check in the tests
     sorted_d = {}
