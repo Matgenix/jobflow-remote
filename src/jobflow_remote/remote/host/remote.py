@@ -6,7 +6,9 @@ import logging
 import shlex
 import traceback
 import warnings
+from contextlib import ExitStack
 from pathlib import Path
+from typing import Callable
 
 import fabric
 from fabric import Config
@@ -196,14 +198,14 @@ class RemoteHost(BaseHost):
         else:
             remote_command = command
 
-        with self.connection.cd(workdir):
-            out = self._execute_remote_func(
-                self.connection.run,
-                remote_command,
-                hide=True,
-                warn=True,
-                timeout=timeout,
-            )
+        out = self._execute_remote_func(
+            lambda host: host.connection.run,
+            remote_command,
+            hide=True,
+            warn=True,
+            timeout=timeout,
+            _connection_workdir=workdir,
+        )
 
         stdout = self.sanitize_output(out.stdout)
         stderr = self.sanitize_output(out.stderr)
@@ -234,7 +236,7 @@ class RemoteHost(BaseHost):
 
         f = io.StringIO(content)
 
-        self._execute_remote_func(self.connection.put, f, str(filepath))
+        self._execute_remote_func(lambda host: host.connection.put, f, str(filepath))
 
     def connect(self) -> None:
         self.connection.open()
@@ -245,6 +247,8 @@ class RemoteHost(BaseHost):
                 if isinstance(connection, fabric.Connection):
                     connection.transport.set_keepalive(self.keepalive)
                     connection = connection.gateway
+                else:
+                    connection = None
 
     def close(self) -> bool:
         connection = self.connection
@@ -253,9 +257,11 @@ class RemoteHost(BaseHost):
             try:
                 if isinstance(connection, fabric.Connection):
                     connection.close()
+                    connection = connection.gateway
+                else:
+                    connection = None
             except Exception:
                 all_closed = False
-            connection = connection.gateway
         return all_closed
 
     @property
@@ -265,24 +271,61 @@ class RemoteHost(BaseHost):
     def put(self, src, dst) -> None:
         self._check_connected()
 
-        self._execute_remote_func(self.connection.put, src, dst)
+        self._execute_remote_func(lambda host: host.connection.put, src, dst)
 
     def get(self, src, dst) -> None:
         self._check_connected()
 
-        self._execute_remote_func(self.connection.get, src, dst)
+        self._execute_remote_func(lambda host: host.connection.get, src, dst)
 
     def copy(self, src, dst) -> None:
         cmd = ["cp", str(src), str(dst)]
         self.execute(cmd)
 
-    def _execute_remote_func(self, remote_cmd, *args, **kwargs):
+    def _execute_remote_func(
+        self,
+        remote_cmd: Callable,
+        *args,
+        _connection_workdir: str | Path | None = None,
+        **kwargs,
+    ):
+        """
+        Execute a remote command using the host, with the option to
+        recreate the connection and retry the command in case of failure.
+
+        Parameters
+        ----------
+        remote_cmd
+            A function that takes the current RemoteHost instance as its argument
+            and returns the actual function to execute with the given args/kwargs
+        args
+            Positional arguments to pass to the remote command
+        _connection_workdir:
+            a path passed to Connection.cd to be used as working directory for the
+            command.
+        kwargs
+            Keyword arguments to pass to the remote command
+        """
+
+        # The function needs to be called in this way because if retry_on_closed_connection
+        # is True and the first execution of the command fails a new instance self._connection
+        # will be recreated. Since remote_cmd are typically methods of the Connection object,
+        # this ensures that the method is called on the actual instance of the connection, and
+        # not on a previous one.
+        def execute_cmd():
+            # create the function associated to the current connection
+            with ExitStack() as stack:
+                if _connection_workdir:
+                    stack.enter_context(self.connection.cd(_connection_workdir))
+                func = remote_cmd(self)
+                return func(*args, **kwargs)
+
         if self.retry_on_closed_connection:
             try:
-                return remote_cmd(*args, **kwargs)
+                return execute_cmd()
             except OSError as e:
                 msg = getattr(e, "message", str(e))
-                error = e
+                error: BaseException = e
                 if "Socket is closed" not in msg:
                     raise
             except SSHException as e:
@@ -293,14 +336,15 @@ class RemoteHost(BaseHost):
             except EOFError as e:
                 error = e
         else:
-            return remote_cmd(*args, **kwargs)
+            return execute_cmd()
 
         # if the code gets here one of the errors that could be due to drop of the
         # connection occurred. Try to close and reopen the connection and retry
         # one more time
+        # Call to traceback.format_exception compatible with python 3.9
         logger.warning(
             f"Error while trying to execute a command on host {self.host}:\n"
-            f"{''.join(traceback.format_exception(error))}"
+            f"{''.join(traceback.format_exception(type(error), error, error.__traceback__))}"
             "Probably due to the connection dropping. "
             "Will reopen the connection and retry."
         )
@@ -314,20 +358,22 @@ class RemoteHost(BaseHost):
             )
         self._create_connection()
         self.connect()
-        return remote_cmd(*args, **kwargs)
+        return execute_cmd()
 
     def listdir(self, path: str | Path):
         self._check_connected()
 
         try:
-            return self._execute_remote_func(self.connection.sftp().listdir, str(path))
+            return self._execute_remote_func(
+                lambda host: host.connection.sftp().listdir, str(path)
+            )
         except FileNotFoundError:
             return []
 
     def remove(self, path: str | Path) -> None:
         self._check_connected()
 
-        self._execute_remote_func(self.connection.sftp().remove, str(path))
+        self._execute_remote_func(lambda host: host.connection.sftp().remove, str(path))
 
     def rmtree(self, path: str | Path, raise_on_error: bool = False) -> bool:
         """Recursively delete a directory tree on a remote host.
@@ -383,6 +429,22 @@ class RemoteHost(BaseHost):
     @property
     def interactive_login(self) -> bool:
         return self._interactive_login
+
+    def shell(self, pre_cmd: str | None = None, shell: str = "bash"):
+        """
+        Open a connection to the host and starts the selected shell
+
+        Parameters
+        ----------
+        pre_cmd
+            Any command to be executed before starting the shell
+        shell
+            The name of the shell to start
+        """
+        cmd = shell
+        if pre_cmd:
+            cmd = f"{pre_cmd}; {shell}"
+        self.connection.run(cmd, pty=True)
 
 
 def inter_handler(title, instructions, prompt_list):

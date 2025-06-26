@@ -147,6 +147,20 @@ class BaseHost(MSONable):
         """
         raise NotImplementedError
 
+    @abc.abstractmethod
+    def shell(self, pre_cmd: str | None = None, shell: str = "bash"):
+        """
+        Open a connection to the host and starts the selected shell
+
+        Parameters
+        ----------
+        pre_cmd
+            Any command to be executed before starting the shell
+        shell
+            The name of the shell to start
+        """
+        raise NotImplementedError
+
     @property
     def interactive_login(self) -> bool:
         """

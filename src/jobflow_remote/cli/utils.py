@@ -10,7 +10,7 @@ import uuid
 from contextlib import contextmanager
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import TYPE_CHECKING, Callable, NoReturn
+from typing import TYPE_CHECKING, Any, Callable, NoReturn
 
 import typer
 from click import ClickException
@@ -26,7 +26,10 @@ from jobflow_remote.config.base import ProjectUndefinedError
 from jobflow_remote.jobs.daemon import DaemonError, DaemonManager, DaemonStatus
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
     from cProfile import Profile
+
+    from rich.console import ConsoleRenderable
 
     from jobflow_remote.jobs.state import JobState
 
@@ -714,3 +717,70 @@ def confirm_project_name(style: str | None = "red", exit_on_error: bool = True) 
             exit_with_error_msg("The input does not match the current project name")
         return False
     return True
+
+
+def render_scope_jfr(
+    scope: Mapping[str, Any],
+    *,
+    title: TextType | None = None,
+    sort_keys: bool = True,
+    indent_guides: bool = False,
+    max_length: int | None = None,
+    max_string: int | None = None,
+    overflow: str | None = None,
+) -> ConsoleRenderable:
+    """
+    Render python variables in a given scope.
+    From original rich.scope.render_scope. Customized to fit jfr needs:
+    * allows overflow explicitly
+
+    Args:
+        scope (Mapping): A mapping containing variable names and values.
+        title (str, optional): Optional title. Defaults to None.
+        sort_keys (bool, optional): Enable sorting of items. Defaults to True.
+        indent_guides (bool, optional): Enable indentation guides. Defaults to False.
+        max_length (int, optional): Maximum length of containers before abbreviating, or None for no abbreviation.
+            Defaults to None.
+        max_string (int, optional): Maximum length of string before truncating, or None to disable. Defaults to None.
+        overflow (str):
+            Overflow method: "crop", "fold", or "ellipsis". Defaults to ``None``.
+    Returns:
+        ConsoleRenderable: A renderable object.
+    """
+    from rich.highlighter import ReprHighlighter
+    from rich.panel import Panel
+    from rich.pretty import Pretty
+    from rich.table import Table
+
+    highlighter = ReprHighlighter()
+    items_table = Table.grid(padding=(0, 1), expand=False)
+    items_table.add_column(justify="right")
+
+    def sort_items(item: tuple[str, Any]) -> tuple[bool, str]:
+        """Sort special variables first, then alphabetically."""
+        key, _ = item
+        return (not key.startswith("__"), key.lower())
+
+    items = sorted(scope.items(), key=sort_items) if sort_keys else scope.items()
+    for key, value in items:
+        key_text = Text.assemble(
+            (key, "scope.key.special" if key.startswith("__") else "scope.key"),
+            (" =", "scope.equals"),
+        )
+        items_table.add_row(
+            key_text,
+            Pretty(
+                value,
+                highlighter=highlighter,
+                indent_guides=indent_guides,
+                max_length=max_length,
+                max_string=max_string,
+                overflow=overflow,
+            ),
+        )
+    return Panel.fit(
+        items_table,
+        title=title,
+        border_style="scope.border",
+        padding=(0, 1),
+    )

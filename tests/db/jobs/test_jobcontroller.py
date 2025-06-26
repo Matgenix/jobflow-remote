@@ -878,6 +878,10 @@ def test_backup(job_controller_drop, python, compress):
         )
 
         files = [str(p.name) for p in (dir_path / db_name).glob("*")]
+        ext = ".gz" if compress else ""
+        if "prelude.json" + ext in files:
+            files = list(files)
+            files.remove("prelude.json" + ext)
 
         ext = ".gz" if compress else ""
         assert "flows.bson" + ext in files

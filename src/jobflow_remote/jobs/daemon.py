@@ -856,6 +856,47 @@ class DaemonManager:
             lock.update_on_release = {"$set": {"running_runner": None}}
             return True
 
+    def restart(self, raise_on_error: bool = False) -> bool:
+        """
+        Restart the daemon by stopping and waiting then starting it with the same options.
+
+        Parameters
+        ----------
+        raise_on_error
+            If True, raise an exception if an error occurs.
+
+        Returns
+        -------
+        bool
+            True if the daemon is restarted correctly, False otherwise.
+        """
+        with self.lock_runner_doc(allow_missing=True) as lock:
+            doc = lock.locked_document
+            doc_error = self._check_running_runner(doc, raise_on_error=raise_on_error)
+            if doc_error:
+                logger.error(doc_error)
+                return False
+            status = self.check_status()
+            if status not in (
+                DaemonStatus.RUNNING,
+                DaemonStatus.PARTIALLY_RUNNING,
+            ):
+                logger.warning(f"Status of the runner {status.value}. Cannot restart")
+                return False
+        stop_out = self.stop(wait=True, raise_on_error=raise_on_error)
+        if not stop_out:
+            logger.warning("Could not stop the runner")
+            return False
+        old_config = self.parse_config_file()
+        return self.start(
+            num_procs_transfer=old_config["num_procs_transfer"],
+            num_procs_complete=old_config["num_procs_complete"],
+            single=old_config["single"],
+            log_level=old_config["log_level"],
+            raise_on_error=raise_on_error,
+            connect_interactive=old_config["connect_interactive"],
+        )
+
     def wait_start(self, timeout: int = 30) -> None:
         """
         Wait for all processes of the daemon to start.

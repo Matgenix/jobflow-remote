@@ -1,8 +1,10 @@
 """A series of toy workflows that can be used for testing."""
 
+from dataclasses import dataclass
+from enum import Enum
 from typing import Callable, NoReturn, Optional, Union
 
-from jobflow import Job, Response, job
+from jobflow import Job, JobConfig, Maker, OnMissing, Response, job
 
 
 @job
@@ -103,3 +105,26 @@ def current_jobdoc():
     from jobflow_remote.jobs.run import CURRENT_JOBDOC
 
     return CURRENT_JOBDOC.job_doc
+
+
+@job(config=JobConfig(resolve_references=False, on_missing_references=OnMissing.NONE))
+def no_resolve(ref):
+    """
+    A job that does not resolve the reference in input
+    """
+    return ref
+
+
+class TestEnum(Enum):
+    A = "A"
+    B = "B"
+
+
+@dataclass
+class EnumMaker(Maker):
+    e: TestEnum = TestEnum.A
+    name: str = "enum maker"
+
+    @job
+    def make(self):
+        assert isinstance(self.e, TestEnum)

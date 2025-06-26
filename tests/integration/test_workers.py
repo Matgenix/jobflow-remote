@@ -457,3 +457,55 @@ def test_sanitize(worker, job_controller):
     runner.run_one_job()
 
     assert job_controller.count_jobs(states=JobState.COMPLETED) == 1
+
+
+@pytest.mark.parametrize(
+    "worker",
+    ["test_local_worker", "test_remote_slurm_worker"],
+)
+def test_todir(job_controller, worker):
+    import subprocess
+    import time
+
+    from jobflow_remote import submit_flow
+    from jobflow_remote.jobs.runner import Runner
+    from jobflow_remote.testing import add
+    from jobflow_remote.testing.cli import run_check_cli
+
+    j = add(1, 5)
+    submit_flow(j, worker=worker)
+
+    run_check_cli(
+        ["job", "todir", j.uuid],
+        required_out="The selected Job does not have a run_dir defined yet",
+        error=True,
+    )
+
+    runner = Runner()
+    runner.run_all_jobs(max_seconds=MAX_TRY_SECONDS)
+
+    # Run the CLI command as a subprocess to avoid getting stuck in the remote shell
+    # without the option to pass the "exit" command. It seems that the "input" option
+    # for the CliRunner does not work in this case.
+    process = subprocess.Popen(
+        ["jf", "job", "todir", "1"],  # noqa: S603, S607
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+
+    try:
+        # short wait to be sure that the shell is loaded
+        time.sleep(0.5)
+
+        stdout, stderr = process.communicate(input="ls; exit\n", timeout=5)
+
+        # should be there for the "ls" command
+        assert "jfremote_out.json" in stdout
+
+        assert process.returncode is not None
+
+    except subprocess.TimeoutExpired:
+        process.kill()
+        pytest.fail("CLI todir test timed out")

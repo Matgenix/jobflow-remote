@@ -9,6 +9,12 @@ def check_files(files: list[str], meta: bool, compress: bool):
     assert "flows.bson" + ext in files
     assert "jf_auxiliary.bson" + ext in files
     assert "jobs.bson" + ext in files
+
+    # recent versions of mongodump also produce a prelude.json file. Ignore it.
+    if "prelude.json" + ext in files:
+        files = list(files)
+        files.remove("prelude.json" + ext)
+
     if meta:
         assert "flows.metadata.json" + ext in files
         assert "jf_auxiliary.metadata.json" + ext in files

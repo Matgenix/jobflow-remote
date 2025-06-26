@@ -53,6 +53,14 @@ def test_std_operations(
         required_out=[*info_required, "hostname", "last_pinged", "processes_info"],
     )
 
+    rr_before = job_controller.get_running_runner()
+    run_check_cli(
+        ["runner", "restart"],
+    )
+    wait_daemon_started(daemon_manager)
+    rr_after = job_controller.get_running_runner()
+    assert rr_after["start_time"] > rr_before["start_time"]
+
     run_check_cli(
         ["runner", "stop"],
         required_out="The stop signal has been sent to the Runner",

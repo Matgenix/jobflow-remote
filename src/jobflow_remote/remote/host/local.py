@@ -156,3 +156,22 @@ class LocalHost(BaseHost):
         shutil.rmtree(path, onerror=onerror if not raise_on_error else None)
 
         return removed
+
+    def shell(self, pre_cmd: str | None = None, shell: str = "bash"):
+        """
+        Open a connection to the host and starts the selected shell
+
+        Parameters
+        ----------
+        pre_cmd
+            Any command to be executed before starting the shell
+        shell
+            The name of the shell to start
+        """
+
+        from invoke import Context
+
+        cmd = shell
+        if pre_cmd:
+            cmd = f"{pre_cmd}; {shell}"
+        Context().run(cmd, pty=True)

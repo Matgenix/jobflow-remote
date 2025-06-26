@@ -275,15 +275,9 @@ class Runner:
                 self.checkout
             )
 
-        if transfer or queue or complete:
-            try:
-                self.advance_state(states)
-            except Exception:
-                logger.exception("Error during initial advance_state")
-            scheduler.every(self.runner_options.delay_advance_status).seconds.do(
-                self.advance_state, states=states
-            )
-
+        # first perform this step with check run status and update the status of
+        # the limited workers (if any). Otherwise, upon start of the runner the initial
+        # count of the currently submitted jobs is 0.
         if queue:
             try:
                 self.check_run_status()
@@ -315,6 +309,15 @@ class Runner:
                 scheduler.every(self.runner_options.delay_update_batch).seconds.do(
                     self.update_batch_jobs
                 )
+
+        if transfer or queue or complete:
+            try:
+                self.advance_state(states)
+            except Exception:
+                logger.exception("Error during initial advance_state")
+            scheduler.every(self.runner_options.delay_advance_status).seconds.do(
+                self.advance_state, states=states
+            )
 
         # all the processes will ping the running_runner document to signal
         # that at least one is still active.
@@ -359,11 +362,6 @@ class Runner:
         self.checkout()
         scheduler.every(self.runner_options.delay_checkout).seconds.do(self.checkout)
 
-        self.advance_state(states)
-        scheduler.every(self.runner_options.delay_advance_status).seconds.do(
-            self.advance_state, states=states
-        )
-
         self.check_run_status()
         scheduler.every(self.runner_options.delay_check_run_status).seconds.do(
             self.check_run_status
@@ -387,6 +385,11 @@ class Runner:
                 self.update_batch_jobs
             )
 
+        self.advance_state(states)
+        scheduler.every(self.runner_options.delay_advance_status).seconds.do(
+            self.advance_state, states=states
+        )
+
         running_states = [
             JobState.READY.value,
             JobState.CHECKED_OUT.value,
@@ -406,7 +409,7 @@ class Runner:
             jobs_available = self.job_controller.count_jobs(query=query)
             if max_seconds and time.time() - t0 > max_seconds:
                 raise RuntimeError(
-                    "Could execute all the jobs within the selected amount of time"
+                    "Could not execute all the jobs within the selected amount of time"
                 )
 
     def run_one_job(

@@ -198,16 +198,16 @@ class JobController:
 
     def _build_query_job(
         self,
-        job_ids: tuple[str, int] | list[tuple[str, int]] | None = None,
-        db_ids: str | list[str] | None = None,
-        flow_ids: str | list[str] | None = None,
-        states: JobState | list[JobState] | None = None,
-        locked: bool = False,
-        start_date: datetime | None = None,
-        end_date: datetime | None = None,
-        name: str | None = None,
-        metadata: dict | None = None,
-        workers: str | list[str] | None = None,
+        job_ids: tuple[str, int] | list[tuple[str, int]] | None,
+        db_ids: str | list[str] | None,
+        flow_ids: str | list[str] | None,
+        states: JobState | list[JobState] | None,
+        locked: bool,
+        start_date: datetime | None,
+        end_date: datetime | None,
+        name: str | None,
+        metadata: dict | None,
+        workers: str | list[str] | None,
     ) -> dict:
         """
         Build a query to search for Jobs, based on standard parameters.
@@ -303,15 +303,15 @@ class JobController:
 
     def _build_query_flow(
         self,
-        job_ids: str | list[str] | None = None,
-        db_ids: str | list[str] | None = None,
-        flow_ids: str | list[str] | None = None,
-        states: FlowState | list[FlowState] | None = None,
-        start_date: datetime | None = None,
-        end_date: datetime | None = None,
-        name: str | None = None,
-        metadata: dict | None = None,
-        locked: bool = False,
+        job_ids: str | list[str] | None,
+        db_ids: str | list[str] | None,
+        flow_ids: str | list[str] | None,
+        states: FlowState | list[FlowState] | None,
+        start_date: datetime | None,
+        end_date: datetime | None,
+        name: str | None,
+        metadata: dict | None,
+        locked: bool,
     ) -> dict:
         """
         Build a query to search for Flows, based on standard parameters.
@@ -757,6 +757,7 @@ class JobController:
                 name=name,
                 metadata=metadata,
                 workers=workers,
+                locked=False,
             )
         result = self.jobs.find(query, projection=["db_id"])
 
@@ -1201,7 +1202,7 @@ class JobController:
                 )
 
         job_doc_update = get_reset_job_base_dict()
-        job_doc_update["state"] = JobState.CHECKED_OUT.value
+        job_doc_update["state"] = JobState.READY.value
         if delete_files:
             job_doc_update["remote.prerun_cleanup"] = True
 
@@ -2579,6 +2580,7 @@ class JobController:
             end_date=end_date,
             locked=True,
             name=name,
+            metadata=None,
         )
 
         result = self.flows.update_many(
@@ -2735,6 +2737,32 @@ class JobController:
         if flow_custom_indexes:
             for idx in flow_custom_indexes:
                 self.flows.create_index(idx, background=background)
+
+        # if the docs_store is a MongoStore with a collection, create a proper composed
+        # index that is the most effective for retrieving outputs. Otherwise create a simple
+        # index based on the maggma interface for the two indexes separately.
+        # In any case trap all exceptions, as this should not be a blocking point
+        try:
+            docs_store = self.jobstore.docs_store
+            if hasattr(docs_store, "_collection"):
+                if drop:
+                    docs_store._collection.drop_indexes()
+                docs_store._collection.create_index(
+                    [("uuid", 1), ("index", -1)], background=background
+                )
+            else:
+                docs_store.ensure_index("uuid")
+                docs_store.ensure_index("index")
+        except Exception:
+            logger.warning("Could not create the index for the JobStore", exc_info=True)
+        # Use the standard interface to create an index for the additional stores
+        for store_name, additional_store in self.jobstore.additional_stores.items():
+            try:
+                additional_store.ensure_index("blob_uuid")
+            except Exception:
+                logger.warning(
+                    f"Could not create the blob_uuid index for additional store {store_name}"
+                )
 
     def create_indexes(
         self,
@@ -2927,6 +2955,8 @@ class JobController:
         start_date: datetime | None = None,
         end_date: datetime | None = None,
         name: str | None = None,
+        metadata: dict | None = None,
+        locked: bool = False,
     ) -> int:
         """
         Count flows based on filter parameters.
@@ -2952,6 +2982,11 @@ class JobController:
         name
             Pattern matching the name of Flow. Default is an exact match, but all
             conventions from python fnmatch can be used (e.g. *test*)
+        metadata
+            A dictionary of the values of the metadata to match. Should be an
+            exact match for all the values provided.
+        locked
+            If True only locked Flows will be counted.
 
         Returns
         -------
@@ -2967,6 +3002,8 @@ class JobController:
                 start_date=start_date,
                 end_date=end_date,
                 name=name,
+                metadata=metadata,
+                locked=locked,
             )
         return self.flows.count_documents(query)
 
@@ -4042,7 +4079,14 @@ class JobController:
                 else:
                     step_attempts = doc["remote"]["step_attempts"]
                     no_retry = no_retry or step_attempts >= max_step_attempts
-                    queue_out, queue_err = self._get_downloaded_queue_files(doc)
+                    try:
+                        # prevent errors from handling queue files breaking the lock release
+                        queue_out, queue_err = self._get_downloaded_queue_files(doc)
+                    except Exception:
+                        logger.warning(
+                            "Error while trying to retrieve queue output", exc_info=True
+                        )
+                        queue_out, queue_err = None, None
                     if no_retry:
                         update_on_release = {
                             "$set": {
@@ -4441,7 +4485,9 @@ class JobController:
                 flow_doc.parents.pop(job_uuid, None)
 
             # Update flow state if necessary
-            updated_states = {job_uuid: {job_index: None}}  # None indicates job removal
+            updated_states: dict[str, dict[int, Any]] = {
+                job_uuid: {job_index: None}
+            }  # None indicates job removal
             self.update_flow_state(
                 flow_uuid=flow_doc.uuid, updated_states=updated_states
             )

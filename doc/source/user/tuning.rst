@@ -29,6 +29,8 @@ should always be defined for each Job when adding a Flow to the database.
     to the same HPC center, but with different configurations can be created.
     The ``Runner`` will still open a single connection if the host is the same.
 
+.. _tuning exec_config:
+
 Execution configuration
 -----------------------
 
@@ -36,12 +38,66 @@ An execution configuration, represented as an ``ExecutionConfig`` object in
 the code, contains information to run additional commands before and after
 the execution of a Job.
 
-These can be typically used to define the modules to load on an HPC center,
+This can be typically used to define the modules to load on an HPC center,
 specific python environment to load or setting the ``PATH`` for some executable
-needed by the Job.
+needed by the Job. In an ``ExecutionConfig`` different elements can be defined:
 
-They can be usually given as a string referring to the setting defined in the
-project configuration file, or as an instance of ``ExecutionConfig``.
+* ``modules``: a list of strings representing the modules that will be loaded in the
+  submission script (e.g. the string ``OpenMPI`` will be applied by running ``module load OpenMPI``).
+* ``export``: a dictionary with names and values of variable that will be exported
+  in the submission script (e.g. ``{"X": 1}`` will be translated to ``export X=1``)
+* ``pre_run``: a string that will be included in the submission script before starting
+  the Job.
+* ``post_run``: a string that will be included in the submission script after the Job
+  has been executed.
+
+To customize the job an execution configuration can be selected setting the
+``exec_config`` argument of ``submit_flow`` or ``set_run_config``, where the values can be:
+
+1) a string pointing to an ``exec_config`` defined in the Project configuration
+2) an instance of ``ExecutionConfig``
+
+An example of ``exec_config`` in the configuration file is
+
+.. code-block:: yaml
+
+    exec_config:
+      example_config:
+        modules:
+        - releases/2021b
+        - intel/2021b
+        export:
+          PATH: /path/to/your/code/bin:$PATH
+        pre_run: "echo 'test'\necho 'test2'"
+        post_run:
+
+where ``example_config`` is a custom name. This can be used when submitting a Job as
+
+.. code-block:: python
+
+    submit_flow(flow, exec_config="example_config", worker="worker_1")
+
+and will result in the following lines being added to the submission script
+
+.. code-block:: bash
+
+    echo 'test'
+    echo 'test2'
+    export PATH=/path/to/your/code/bin:$PATH
+    module load releases/2021b
+    module load intel/2021b
+
+The same can be achieved by defining an instance of ``ExecutionConfig`` in the submission
+script and passing it to ``submit_flow``.
+
+.. note::
+
+    These lines will be added **after** the worker ``pre_run`` in the submission script.
+
+.. note::
+
+    Multiple ``exec_config`` can be defined in the Project configuration, but only one
+    can be passed to an ``exec_config`` argument.
 
 Resources
 ---------

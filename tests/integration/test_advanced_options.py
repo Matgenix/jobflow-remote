@@ -78,7 +78,9 @@ def test_run_batch_multi(job_controller, monkeypatch) -> None:
             assert ji1.start_time < ji2.end_time
 
 
-def test_max_jobs_worker(job_controller, daemon_manager) -> None:
+def test_max_jobs_worker(
+    job_controller, daemon_manager, wait_daemon_started, wait_daemon_shutdown
+) -> None:
     import time
 
     from jobflow import Flow
@@ -90,30 +92,59 @@ def test_max_jobs_worker(job_controller, daemon_manager) -> None:
     # run the daemon in background to check what happens to the
     # jobs during the execution
     daemon_manager.start(raise_on_error=True)
+    wait_daemon_started(daemon_manager)
 
     job_ids = []
     for _ in range(4):
-        j = add_sleep(2, 5)
+        j = add_sleep(2, 20)
         job_ids.append((j.uuid, 1))
         flow = Flow([j])
         submit_flow(flow, worker="test_max_jobs_worker")
 
-    finished_states = (JobState.REMOTE_ERROR, JobState.FAILED, JobState.COMPLETED)
-    running_states = (JobState.RUNNING, JobState.SUBMITTED)
+    t0 = time.time()
 
-    max_running_jobs = 0
-    for _ in range(30):
-        time.sleep(1)
-        jobs_info = job_controller.get_jobs_info(job_ids=job_ids)
-        if all(ji.state in finished_states for ji in jobs_info):
-            break
-        current_running = sum(ji.state in running_states for ji in jobs_info)
-        max_running_jobs = max(max_running_jobs, current_running)
+    def check_running_jobs(seconds):
+        finished_states = (JobState.REMOTE_ERROR, JobState.FAILED, JobState.COMPLETED)
+        running_states = (JobState.RUNNING, JobState.SUBMITTED)
 
-    jobs_info = job_controller.get_jobs_info(job_ids=job_ids)
-    assert all(ji.state == JobState.COMPLETED for ji in jobs_info)
+        max_running_jobs = 0
+        for _ in range(seconds):
+            time.sleep(1)
+            jobs_info = job_controller.get_jobs_info(job_ids=job_ids)
+            if all(ji.state in finished_states for ji in jobs_info):
+                break
+            current_running = sum(ji.state in running_states for ji in jobs_info)
+            max_running_jobs = max(max_running_jobs, current_running)
+        return max_running_jobs
+
+    max_running_jobs = check_running_jobs(4)
+
+    assert job_controller.count_jobs(states=JobState.RUNNING) == 2
+    assert job_controller.count_jobs(states=JobState.UPLOADED) == 2
 
     # the max running jobs should be two, meaning that it was reached and cannot
     # be larger. The check could be <= 2, but if it does not reach two it will
     # not be testing some parts of the code and the test is not complete.
     assert max_running_jobs == 2
+
+    # now stop the runner and restart it, so it can check that upon restart the current
+    # running jobs are correctly taken into account
+    daemon_manager.shut_down(raise_on_error=True)
+    wait_daemon_shutdown(daemon_manager)
+    daemon_manager.start(raise_on_error=True)
+    wait_daemon_started(daemon_manager)
+
+    if time.time() - t0 > 15:
+        raise RuntimeError(
+            "The execution of the first part of the test took too long (probably "
+            "the restart of the runner) and the test will not be reliable. "
+            "Consider repeating it or increasing the job sleep time"
+        )
+
+    max_running_jobs = check_running_jobs(60)
+    assert max_running_jobs == 2
+
+    jobs_info = job_controller.get_jobs_info(job_ids=job_ids)
+    for ji in jobs_info:
+        print(ji.db_id, ji.state)
+    assert job_controller.count_jobs(states=JobState.COMPLETED) == 4
