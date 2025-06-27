@@ -1,6 +1,6 @@
 jobflow==0.1.19
 pydantic==2.11.7
-pymongo==4.10.1
+pymongo==4.13.2
 fabric==3.2.2
 tomlkit==0.13.3
 qtoolkit==0.1.6
