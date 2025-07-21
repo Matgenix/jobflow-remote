@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import copy
 import datetime
 import io
 import time
+from itertools import cycle
 from typing import TYPE_CHECKING
 
 from monty.json import jsanitize
@@ -24,6 +26,44 @@ if TYPE_CHECKING:
     from jobflow_remote.jobs.data import FlowInfo, JobDoc, JobInfo
     from jobflow_remote.jobs.report import FlowsReport, JobsReport
     from jobflow_remote.jobs.upgrade import UpgradeAction
+
+
+colors_list = [
+    "red",
+    "green",
+    "yellow",
+    "blue",
+    "magenta",
+    "cyan",
+    "bright_red",
+    "bright_green",
+    "bright_yellow",
+    "bright_blue",
+    "bright_magenta",
+    "bright_cyan",
+    "dark_blue",
+    "salmon1",
+    "dodger_blue1",
+    "spring_green4",
+    "dark_green",
+    "cyan1",
+    "purple4",
+    "royal_blue1",
+    "dark_red",
+    "orange4",
+    "green3",
+    "deep_sky_blue1",
+    "deep_pink1",
+    "orange1",
+    "deep_sky_blue4",
+    "yellow3",
+    "violet",
+    "deep_pink3",
+    "spring_green1",
+    "steel_blue",
+    "green_yellow",
+    "blue3",
+]
 
 
 def format_state(ji: JobInfo) -> Text:
@@ -88,6 +128,7 @@ def get_job_info_table(
     verbosity: int,
     output_keys: list[str] | None = None,
     stored_data_keys: list[str] | None = None,
+    color: bool = False,
 ) -> Table:
     stored_data_keys = stored_data_keys or []
     if not output_keys or verbosity > 0:
@@ -101,6 +142,9 @@ def get_job_info_table(
             output_keys += all_output_keys[11:13]
     all_display_keys = output_keys + stored_data_keys
 
+    # Use a dictionary to determine how to extract the value to print from each
+    # JobInfo object. Main reference is header_name_data_getter_map and gets
+    # updated with additional required values.
     sdk_map = {
         k: (k, lambda x, k=k: x.stored_data.get(k) if x.stored_data else None)
         for k in stored_data_keys
@@ -110,6 +154,22 @@ def get_job_info_table(
     table = Table(title="Jobs info")
     for key in all_display_keys:
         table.add_column(full_map[key][0])
+
+    if color and "name" in all_display_keys:
+        # color the name of the Job by replacing the function that gets the
+        # value of the cell in header_name_data_getter_map.
+        # make a copy to avoid modifying the original object.
+        main_hosts = {ji.hosts[-1] for ji in jobs_info if ji.hosts}
+        hosts_color_map = dict(zip(main_hosts, cycle(colors_list)))
+
+        def get_colored_name(ji):
+            if ji.hosts:
+                return Text(ji.name, style=hosts_color_map.get(ji.hosts[-1], None))
+            # this should likely never happen, but leave to avoid hard failures
+            return ji.name
+
+        full_map = copy.deepcopy(full_map)
+        full_map["name"] = (full_map["name"][0], get_colored_name)
 
     for ji in jobs_info:
         table.add_row(*(full_map[key][1](ji) for key in all_display_keys))
@@ -181,6 +241,7 @@ JOB_INFO_ORDER = [
     "lock_id",
     "lock_time",
     "stored_data",
+    "hosts",
 ]
 
 
@@ -223,6 +284,9 @@ def format_job_info(
 
     if verbosity < 2 and d.get("parents") and len(d.get("parents", [])) > 5:
         d["parents"] = d["parents"][:2] + ["..."] + d["parents"][-2:]
+
+    if verbosity < 2 and d.get("hosts") and len(d.get("hosts", [])) > 5:
+        d["hosts"] = d["hosts"][:2] + ["..."] + d["hosts"][-2:]
 
     # reorder the keys
     # Do not check here that all the keys in JobInfo are in JOB_INFO_ORDER. Check in the tests

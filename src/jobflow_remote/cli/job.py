@@ -135,6 +135,14 @@ def jobs_list(
             f"Available options are: {', '.join(header_name_data_getter_map)}",
         ),
     ] = None,
+    color: Annotated[
+        bool,
+        typer.Option(
+            "--color",
+            "-c",
+            help="Color the job names with same colors for Jobs belonging to the same Flow",
+        ),
+    ] = False,
 ):
     """
     Get the list of Jobs in the database.
@@ -239,6 +247,7 @@ def jobs_list(
                 verbosity=verbosity,
                 output_keys=output_keys,
                 stored_data_keys=stored_data_keys,
+                color=color,
             )
 
         out_console.print(table)
@@ -537,6 +546,52 @@ def pause(
 
 
 @app_job.command()
+def resume(
+    job_db_id: job_db_id_arg = None,
+    job_index: job_index_arg = None,
+    job_id: job_ids_indexes_opt = None,
+    db_id: db_ids_opt = None,
+    flow_id: flow_ids_opt = None,
+    state: job_state_opt = None,
+    start_date: start_date_opt = None,
+    end_date: end_date_opt = None,
+    name: name_opt = None,
+    metadata: metadata_opt = None,
+    worker_name: worker_name_opt = None,
+    custom_query: query_opt = None,
+    days: days_opt = None,
+    hours: hours_opt = None,
+    verbosity: verbosity_opt = 0,
+    wait: wait_lock_opt = None,
+    raise_on_error: raise_on_error_opt = False,
+) -> None:
+    """Resume a Job that was previously PAUSED or STOPPED."""
+    jc = get_job_controller()
+
+    execute_multi_jobs_cmd(
+        single_cmd=jc.resume_job,
+        multi_cmd=jc.resume_jobs,
+        job_db_id=job_db_id,
+        job_index=job_index,
+        job_ids=job_id,
+        db_ids=db_id,
+        flow_ids=flow_id,
+        states=state,
+        start_date=start_date,
+        end_date=end_date,
+        name=name,
+        metadata=metadata,
+        days=days,
+        hours=hours,
+        workers=worker_name,
+        custom_query=custom_query,
+        verbosity=verbosity,
+        wait=wait,
+        raise_on_error=raise_on_error,
+    )
+
+
+@app_job.command(hidden=True)
 def play(
     job_db_id: job_db_id_arg = None,
     job_index: job_index_arg = None,
@@ -556,12 +611,16 @@ def play(
     wait: wait_lock_opt = None,
     raise_on_error: raise_on_error_opt = False,
 ) -> None:
-    """Resume a Job that was previously PAUSED."""
+    """Resume a Job that was previously PAUSED or STOPPED. DEPRECATED: use resume instead"""
+    out_console.print(
+        "The 'jf job play' command is deprecated. Use 'jf job resume' instead",
+        style="gold1",
+    )
     jc = get_job_controller()
 
     execute_multi_jobs_cmd(
-        single_cmd=jc.play_job,
-        multi_cmd=jc.play_jobs,
+        single_cmd=jc.resume_job,
+        multi_cmd=jc.resume_jobs,
         job_db_id=job_db_id,
         job_index=job_index,
         job_ids=job_id,

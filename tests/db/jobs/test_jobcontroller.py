@@ -515,7 +515,7 @@ def test_pause_play(job_controller) -> None:
     assert job_controller.get_job_info(job_id=j.uuid).state == JobState.PAUSED
     assert job_controller.get_flows_info(job_ids=j.uuid)[0].state == FlowState.PAUSED
 
-    assert job_controller.play_jobs(job_ids=(j.uuid, 1)) == ["1"]
+    assert job_controller.resume_jobs(job_ids=(j.uuid, 1)) == ["1"]
     assert job_controller.get_job_info(job_id=j.uuid).state == JobState.READY
     assert job_controller.get_flows_info(job_ids=j.uuid)[0].state == FlowState.READY
 
@@ -1057,3 +1057,72 @@ def test_running_runner(job_controller, daemon_manager, wait_daemon_started):
     ):
         job_controller.clean_running_runner()
     assert job_controller.get_running_runner() == "NO_DOCUMENT"
+
+
+def test_stop_jobflow_resume(job_controller, runner) -> None:
+    from jobflow import Flow
+
+    from jobflow_remote import submit_flow
+    from jobflow_remote.jobs.state import FlowState, JobState
+    from jobflow_remote.testing import add, replace_and_stop_jobflow
+
+    # add other jobs to verify the difference between stop_joblow and stop_children
+    j_add = add(1, 1)
+    j_stop = replace_and_stop_jobflow()
+    j_final = add(j_add.output, j_stop.output)
+    flow = Flow([j_add, j_stop, j_final])
+    submit_flow(flow=flow, worker="test_local_worker")
+
+    runner.run_one_job(job_id=[j_stop.uuid, 1])
+
+    assert job_controller.count_jobs() == 6
+    assert (
+        job_controller.get_jobs_info(job_ids=[j_stop.uuid, 1])[0].state
+        == JobState.COMPLETED
+    )
+    assert job_controller.count_jobs(states=JobState.STOPPED) == 5
+    assert job_controller.get_flows_info()[0].state == FlowState.STOPPED
+
+    job_controller.resume_job(job_id=j_add.uuid)
+    assert (
+        job_controller.get_jobs_info(job_ids=[j_add.uuid, 1])[0].state == JobState.READY
+    )
+    job_controller.resume_job(job_id=j_final.uuid)
+    assert (
+        job_controller.get_jobs_info(job_ids=[j_final.uuid, 1])[0].state
+        == JobState.WAITING
+    )
+    assert job_controller.get_flows_info()[0].state == FlowState.STOPPED
+
+
+def test_stop_children_resume(job_controller, runner) -> None:
+    from jobflow import Flow
+
+    from jobflow_remote import submit_flow
+    from jobflow_remote.jobs.state import FlowState, JobState
+    from jobflow_remote.testing import add, replace_and_stop_children
+
+    j_add = add(1, 1)
+    j_stop_children = replace_and_stop_children()
+    j_final = add(j_add.output, j_stop_children.output)
+    flow = Flow([j_add, j_stop_children, j_final])
+    submit_flow(flow=flow, worker="test_local_worker")
+
+    runner.run_one_job(job_id=[j_stop_children.uuid, 1])
+
+    assert job_controller.count_jobs() == 6
+    assert (
+        job_controller.get_jobs_info(job_ids=[j_stop_children.uuid, 1])[0].state
+        == JobState.COMPLETED
+    )
+    assert (
+        job_controller.get_jobs_info(job_ids=[j_add.uuid, 1])[0].state == JobState.READY
+    )
+    assert job_controller.count_jobs(states=JobState.STOPPED) == 4
+    assert job_controller.get_flows_info()[0].state == FlowState.STOPPED
+
+    job_controller.resume_jobs(states=JobState.STOPPED)
+    assert job_controller.count_jobs(states=JobState.STOPPED) == 0
+    assert job_controller.count_jobs(states=JobState.READY) == 2
+    assert job_controller.count_jobs(states=JobState.WAITING) == 3
+    assert job_controller.get_flows_info()[0].state == FlowState.RUNNING
