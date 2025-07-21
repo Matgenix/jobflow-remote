@@ -1871,7 +1871,7 @@ class JobController:
 
             return return_doc["db_id"]
 
-    def play_jobs(
+    def resume_jobs(
         self,
         job_ids: tuple[str, int] | list[tuple[str, int]] | None = None,
         db_ids: str | list[str] | None = None,
@@ -1888,7 +1888,7 @@ class JobController:
         break_lock: bool = False,
     ) -> list[str]:
         """
-        Restart selected Jobs that were previously paused.
+        Restart selected Jobs that were previously paused or stopped.
 
         Parameters
         ----------
@@ -1935,8 +1935,8 @@ class JobController:
             List of db_ids of the updated Jobs.
         """
         return self._many_jobs_action(
-            method=self.play_job,
-            action_description="playing",
+            method=self.resume_job,
+            action_description="resuming",
             job_ids=job_ids,
             db_ids=db_ids,
             flow_ids=flow_ids,
@@ -1952,7 +1952,7 @@ class JobController:
             break_lock=break_lock,
         )
 
-    def play_job(
+    def resume_job(
         self,
         job_id: str | None = None,
         db_id: str | None = None,
@@ -1961,7 +1961,7 @@ class JobController:
         break_lock: bool = False,
     ) -> str:
         """
-        Restart a single Jobs that was previously paused.
+        Restart a single Jobs that was previously paused or stopped.
         Selected by db_id or uuid+index. Only one among db_id
         and job_id should be defined.
 
@@ -1992,7 +1992,11 @@ class JobController:
         )
         flow_lock_kwargs = dict(projection=["uuid"])
         with self.lock_job_flow(
-            acceptable_states=[JobState.PAUSED],
+            acceptable_states=[
+                JobState.PAUSED,
+                JobState.STOPPED,
+                JobState.USER_STOPPED,
+            ],
             job_id=job_id,
             db_id=db_id,
             job_index=job_index,
@@ -3276,7 +3280,36 @@ class JobController:
         exec_config: ExecutionConfig | None = None,
         resources: QResources | None = None,
         priority: int = 0,
+        stopped: bool = False,
     ) -> None:
+        """
+        Append a new Flow to an existing one as a child of a specific Job.
+
+        Parameters
+        ----------
+        job_doc
+            The dictionary representation of the JobDoc of the Job to which
+             the new Flow will be appended.
+        flow_dict
+            The dictionary of the original Flow.
+        new_flow_dict
+            The dictionary of the new Flow.
+        worker
+            The default worker applied to the newly created Jobs, if not
+            overridden by specific Job configurations.
+        response_type
+            Type or response.
+        exec_config
+            ExecConfig inherited from the generating Job, if not overridden
+            by specific Job updates.
+        resources
+            Resources inherited from the generating Job, if not overridden
+            by specific Job updates.
+        priority
+            Priority inherited from the generating Job.
+        stopped
+            If True the generated Jobs will be set in the STOPPED state.
+        """
         from jobflow import Flow, Job
 
         decoder = MontyDecoder()
@@ -3340,17 +3373,18 @@ class JobController:
             db_id = f"{prefix}{db_id_int}"
             # inherit the parents of the job to which we are appending
             parents = parents if parents else job_parents  # noqa: PLW2901
-            job_dicts.append(
-                get_initial_job_doc_dict(
-                    job,
-                    parents,
-                    db_id,
-                    worker=worker,
-                    exec_config=exec_config,
-                    resources=resources,
-                    priority=priority,
-                )
+            init_job_doc = get_initial_job_doc_dict(
+                job,
+                parents,
+                db_id,
+                worker=worker,
+                exec_config=exec_config,
+                resources=resources,
+                priority=priority,
             )
+            if stopped:
+                init_job_doc["state"] = JobState.STOPPED.value
+            job_dicts.append(init_job_doc)
             flow_updates["$set"][f"parents.{job.uuid}.{job.index}"] = parents
             ids_to_push.append((job_dicts[-1]["db_id"], job.uuid, job.index))
         flow_updates["$push"]["ids"] = {"$each": ids_to_push}
@@ -3587,6 +3621,7 @@ class JobController:
         # handle response
         else:
             new_state = JobState.COMPLETED.value
+            stop_generated = response["stop_children"] or response["stop_jobflow"]
             if response["replace"] is not None:
                 self._append_flow(
                     job_doc,
@@ -3597,6 +3632,7 @@ class JobController:
                     exec_config=job_doc["exec_config"],
                     resources=job_doc["resources"],
                     priority=job_doc["priority"],
+                    stopped=stop_generated,
                 )
 
             if response["addition"] is not None:
@@ -3609,6 +3645,7 @@ class JobController:
                     exec_config=job_doc["exec_config"],
                     resources=job_doc["resources"],
                     priority=job_doc["priority"],
+                    stopped=stop_generated,
                 )
 
             if response["detour"] is not None:
@@ -3621,6 +3658,7 @@ class JobController:
                     exec_config=job_doc["exec_config"],
                     resources=job_doc["resources"],
                     priority=job_doc["priority"],
+                    stopped=stop_generated,
                 )
 
             if response["stored_data"] is not None:
@@ -3726,7 +3764,11 @@ class JobController:
             The number of modified Jobs.
         """
         result = self.jobs.update_many(
-            {"parents": job_uuid, "state": JobState.WAITING.value},
+            {
+                "parents": job_uuid,
+                "state": {"$in": [JobState.WAITING.value, JobState.READY.value]},
+                "lock_id": None,
+            },
             {"$set": {"state": JobState.STOPPED.value}},
         )
         return result.modified_count
@@ -3761,7 +3803,11 @@ class JobController:
         job_uuids = flow_dict["jobs"]
 
         result = self.jobs.update_many(
-            {"uuid": {"$in": job_uuids}, "state": JobState.WAITING.value},
+            {
+                "uuid": {"$in": job_uuids},
+                "state": {"$in": [JobState.WAITING.value, JobState.READY.value]},
+                "lock_id": None,
+            },
             {"$set": {"state": JobState.STOPPED.value}},
         )
         return result.modified_count
