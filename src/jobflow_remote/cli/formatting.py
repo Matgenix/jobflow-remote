@@ -159,7 +159,7 @@ def get_job_info_table(
         # color the name of the Job by replacing the function that gets the
         # value of the cell in header_name_data_getter_map.
         # make a copy to avoid modifying the original object.
-        main_hosts = {ji.hosts[-1] for ji in jobs_info if ji.hosts}
+        main_hosts = list(dict.fromkeys(ji.hosts[-1] for ji in jobs_info if ji.hosts))
         hosts_color_map = dict(zip(main_hosts, cycle(colors_list)))
 
         def get_colored_name(ji):
