@@ -199,3 +199,23 @@ def test_report(job_controller) -> None:
         ["flow", "report", "days", "2"],
         required_out=[*output, "Running Flows │   0"],
     )
+
+
+def test_resume(job_controller, two_flows_four_jobs) -> None:
+    from jobflow_remote.jobs.state import FlowState, JobState
+    from jobflow_remote.testing.cli import run_check_cli
+
+    job_controller.stop_job(db_id="1")
+    job_controller.set_job_state(JobState.STOPPED, db_id="2")
+
+    assert job_controller.get_flows_info(db_ids="1")[0].state == FlowState.STOPPED
+
+    run_check_cli(
+        ["flow", "resume", "1"],
+        required_out="2 Job(s) resumed",
+        excluded_out="The Flow was not fully resumed",
+    )
+    assert job_controller.get_job_info(db_id="1").state == JobState.READY
+    assert job_controller.get_job_info(db_id="2").state == JobState.WAITING
+
+    assert job_controller.get_flows_info(db_ids="1")[0].state == FlowState.READY

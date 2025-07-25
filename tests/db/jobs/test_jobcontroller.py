@@ -1126,3 +1126,41 @@ def test_stop_children_resume(job_controller, runner) -> None:
     assert job_controller.count_jobs(states=JobState.READY) == 2
     assert job_controller.count_jobs(states=JobState.WAITING) == 3
     assert job_controller.get_flows_info()[0].state == FlowState.RUNNING
+
+
+def test_resume_flow(job_controller, runner):
+    from jobflow import Flow
+
+    from jobflow_remote import submit_flow
+    from jobflow_remote.jobs.state import FlowState, JobState
+    from jobflow_remote.testing import add, replace_and_stop_children
+
+    j_add = add(1, 1)
+    j_stop_children = replace_and_stop_children()
+    j_final = add(j_add.output, j_stop_children.output)
+    flow = Flow([j_add, j_stop_children, j_final])
+    submit_flow(flow=flow, worker="test_local_worker")
+
+    runner.run_one_job(job_id=[j_stop_children.uuid, 1])
+
+    assert job_controller.count_jobs() == 6
+    assert (
+        job_controller.get_jobs_info(job_ids=[j_stop_children.uuid, 1])[0].state
+        == JobState.COMPLETED
+    )
+    assert (
+        job_controller.get_jobs_info(job_ids=[j_add.uuid, 1])[0].state == JobState.READY
+    )
+    assert job_controller.count_jobs(states=JobState.STOPPED) == 4
+    assert job_controller.get_flows_info()[0].state == FlowState.STOPPED
+
+    job_controller.pause_job(job_id=j_add.uuid, job_index=1)
+    assert job_controller.get_flows_info()[0].state == FlowState.STOPPED
+    assert (
+        job_controller.get_jobs_info(job_ids=[j_add.uuid, 1])[0].state
+        == JobState.PAUSED
+    )
+    assert job_controller.resume_flow(flow_id=flow.uuid) == 5
+
+    assert job_controller.get_flows_info()[0].state == FlowState.RUNNING
+    assert job_controller.count_jobs(states=[JobState.STOPPED, JobState.PAUSED]) == 0
