@@ -206,7 +206,7 @@ def jobs_list(
     if count:
         with loading_spinner():
             n_jobs = jc.count_jobs(
-                custom_query=custom_query,
+                query=custom_query,
                 job_ids=job_ids_indexes,
                 db_ids=db_id,
                 flow_ids=flow_id,

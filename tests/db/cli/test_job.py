@@ -30,6 +30,41 @@ def test_jobs_list(job_controller, two_flows_four_jobs) -> None:
         ["job", "list", "-q", '{"db_id": "1"}', "--count"],
         required_out="Number of jobs: 1",
     )
+    run_check_cli(
+        ["job", "list", "-q", '{"db_id": {"$in": ["1", "2"]}}', "--count"],
+        required_out="Number of jobs: 2",
+    )
+    run_check_cli(
+        ["job", "list", "-q", '{"db_id": {"$in": ["1", "2"]}}', "-did", "1"],
+        error=True,
+    )
+    run_check_cli(
+        [
+            "job",
+            "list",
+            "-q",
+            '{"db_id": {"$in": ["1", "2"]}}',
+            "--count",
+            "-s",
+            "READY",
+            "-mq",
+        ],
+        required_out="Number of jobs: 1",
+    )
+    # check that duplicate query is overwritten
+    run_check_cli(
+        [
+            "job",
+            "list",
+            "-q",
+            '{"db_id": {"$in": ["1", "2"]}}',
+            "--count",
+            "-did",
+            "1",
+            "-mq",
+        ],
+        required_out="Number of jobs: 2",
+    )
 
     # trigger the additional information
     assert job_controller.set_job_state(JobState.REMOTE_ERROR, db_id="1")
