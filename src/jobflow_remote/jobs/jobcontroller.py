@@ -413,6 +413,7 @@ class JobController:
 
     def get_jobs_info(
         self,
+        custom_query: dict | None = None,
         job_ids: tuple[str, int] | list[tuple[str, int]] | None = None,
         db_ids: str | list[str] | None = None,
         flow_ids: str | list[str] | None = None,
@@ -426,12 +427,15 @@ class JobController:
         sort: list[tuple[str, int]] | None = None,
         limit: int = 0,
         skip: int = 0,
+        merge_queries: bool = False,
     ) -> list[JobInfo]:
         """
         Query for Jobs based on standard parameters and return a list of JobInfo.
 
         Parameters
         ----------
+        custom_query
+            A generic query. Will override all the other parameters. Unless merge_queries is specified.
         job_ids
             One or more tuples, each containing the (uuid, index) pair of the
             Jobs to retrieve.
@@ -464,6 +468,8 @@ class JobController:
             Maximum number of entries to retrieve. 0 means no limit.
         skip
             The number of documents to omit (from the start of the result set).
+        merge_queries
+            Merge the custom query and the automatically generated query.
 
         Returns
         -------
@@ -482,6 +488,8 @@ class JobController:
             metadata=metadata,
             workers=workers,
         )
+        if custom_query:
+            query = query | custom_query if merge_queries else custom_query
         return self.get_jobs_info_query(query=query, sort=sort, limit=limit, skip=skip)
 
     def get_jobs_doc_query(self, query: dict = None, **kwargs) -> list[JobDoc]:
@@ -2888,6 +2896,7 @@ class JobController:
         name: str | None = None,
         metadata: dict | None = None,
         workers: str | list[str] | None = None,
+        merge_queries: bool = False,
     ) -> int:
         """
         Count Jobs based on filters.
@@ -2895,7 +2904,7 @@ class JobController:
         Parameters
         ----------
         query
-            A generic query. Will override all the other parameters.
+            A generic query. Will override all the other parameters. Unless merge_queries is specified.
         job_ids
             One or more tuples, each containing the (uuid, index) pair of the
             Jobs to retrieve.
@@ -2921,26 +2930,29 @@ class JobController:
             exact match for all the values provided.
         workers
             One or more worker names.
+        merge_queries
+            Merge the custom query and the automatically generated query.
 
         Returns
         -------
         int
             Number of Jobs matching the criteria.
         """
-        if query is None:
-            query = self._build_query_job(
-                job_ids=job_ids,
-                db_ids=db_ids,
-                flow_ids=flow_ids,
-                states=states,
-                locked=locked,
-                start_date=start_date,
-                end_date=end_date,
-                name=name,
-                metadata=metadata,
-                workers=workers,
-            )
-        return self.jobs.count_documents(query)
+        full_query = self._build_query_job(
+            job_ids=job_ids,
+            db_ids=db_ids,
+            flow_ids=flow_ids,
+            states=states,
+            locked=locked,
+            start_date=start_date,
+            end_date=end_date,
+            name=name,
+            metadata=metadata,
+            workers=workers,
+        )
+        if query:
+            full_query = full_query | query if merge_queries else query
+        return self.jobs.count_documents(full_query)
 
     def count_flows(
         self,

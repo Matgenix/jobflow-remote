@@ -135,6 +135,14 @@ def jobs_list(
             f"Available options are: {', '.join(header_name_data_getter_map)}",
         ),
     ] = None,
+    merge_queries: Annotated[
+        bool,
+        typer.Option(
+            "--merge-queries",
+            "-mq",
+            help="If enabled merge the custom query with the automatically generated from the other options.",
+        ),
+    ] = False,
 ):
     """
     Get the list of Jobs in the database.
@@ -144,22 +152,23 @@ def jobs_list(
     # check_incompatible_opt({"state": state, "error": error})
     # check_incompatible_opt({"state": state, "running": running})
     check_incompatible_opt({"output": cli_output_keys, "verbosity": verbosity})
-    check_query_incompatibility(
-        custom_query,
-        [
-            job_id,
-            db_id,
-            flow_id,
-            state,
-            start_date,
-            end_date,
-            name,
-            metadata,
-            days,
-            hours,
-            worker_name,
-        ],
-    )
+    if not merge_queries:
+        check_query_incompatibility(
+            custom_query,
+            [
+                job_id,
+                db_id,
+                flow_id,
+                state,
+                start_date,
+                end_date,
+                name,
+                metadata,
+                days,
+                hours,
+                worker_name,
+            ],
+        )
     output_keys = (
         cli_output_keys.split(",")
         if cli_output_keys
@@ -197,7 +206,7 @@ def jobs_list(
     if count:
         with loading_spinner():
             n_jobs = jc.count_jobs(
-                query=custom_query,
+                custom_query=custom_query,
                 job_ids=job_ids_indexes,
                 db_ids=db_id,
                 flow_ids=flow_id,
@@ -208,31 +217,27 @@ def jobs_list(
                 name=name,
                 metadata=metadata,
                 workers=worker_name,
+                merge_queries=merge_queries,
             )
         out_console.print(f"Number of jobs: {n_jobs}")
     else:
         with loading_spinner():
-            if custom_query:
-                jobs_info = jc.get_jobs_info_query(
-                    query=custom_query,
-                    limit=max_results,
-                    sort=db_sort,
-                )
-            else:
-                jobs_info = jc.get_jobs_info(
-                    job_ids=job_ids_indexes,
-                    db_ids=db_id,
-                    flow_ids=flow_id,
-                    states=state,
-                    start_date=start_date,
-                    locked=locked,
-                    end_date=end_date,
-                    name=name,
-                    metadata=metadata,
-                    workers=worker_name,
-                    limit=max_results,
-                    sort=db_sort,
-                )
+            jobs_info = jc.get_jobs_info(
+                custom_query=custom_query,
+                job_ids=job_ids_indexes,
+                db_ids=db_id,
+                flow_ids=flow_id,
+                states=state,
+                start_date=start_date,
+                locked=locked,
+                end_date=end_date,
+                name=name,
+                metadata=metadata,
+                workers=worker_name,
+                limit=max_results,
+                sort=db_sort,
+                merge_queries=merge_queries,
+            )
 
             table = get_job_info_table(
                 jobs_info,
