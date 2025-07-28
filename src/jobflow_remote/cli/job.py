@@ -139,7 +139,7 @@ def jobs_list(
         bool,
         typer.Option(
             "--color",
-            "-c",
+            "-col",
             help="Color the job names with same colors for Jobs belonging to the same Flow",
         ),
     ] = False,
