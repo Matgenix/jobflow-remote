@@ -115,6 +115,32 @@ def no_resolve(ref):
     return ref
 
 
+@job
+def replace_and_stop_jobflow(a=1, b=1) -> Response[None]:
+    from jobflow import Flow
+
+    j1 = add(a, b)
+    j2 = add(j1.output, 1)
+    flow = Flow([j1, j2], output=j2.output)
+    return Response(replace=flow, stop_jobflow=True)
+    # return Response(replace=flow)
+
+
+@job
+def replace_and_stop_children(a: int = 1, b: int = 1) -> Response[None]:
+    from jobflow import Flow
+
+    j1 = add(a, b)
+    j2 = add(j1.output, 1)
+    flow = Flow([j1, j2], output=j2.output)
+    return Response(replace=flow, stop_children=True)
+
+
+@job
+def stop_jobflow(x=None) -> Response[None]:
+    return Response(stop_jobflow=True)
+
+
 class TestEnum(Enum):
     A = "A"
     B = "B"
