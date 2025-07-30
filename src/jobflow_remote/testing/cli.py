@@ -44,6 +44,7 @@ def run_check_cli(
         env=cli_env,
         catch_exceptions=catch_exceptions,
         terminal_width=terminal_width,
+        color=True,
     )
 
     # Since typer 0.16.0 and click 8.2 the stderr is necessarily separated from the output.
