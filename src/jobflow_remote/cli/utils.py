@@ -36,8 +36,8 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-err_console = Console(force_terminal=True, stderr=True)
-out_console = Console(force_terminal=True)
+err_console = Console(stderr=True)
+out_console = Console()
 
 
 fmt_datetime = "%Y-%m-%d %H:%M"
