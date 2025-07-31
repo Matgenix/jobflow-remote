@@ -50,7 +50,6 @@ def get_initial_job_doc_dict(
     JobDoc
         A new JobDoc.
     """
-    from monty.json import jsanitize
 
     # take the resources either from the job, if they are defined
     # (they can be defined dynamically by the update_config) or the
@@ -64,7 +63,7 @@ def get_initial_job_doc_dict(
     priority = job.config.manager_config.get("priority") or priority
 
     job_doc = JobDoc(
-        job=jsanitize(job, strict=True, enum_values=True),
+        job=job,
         uuid=job.uuid,
         index=job.index,
         db_id=db_id,
@@ -151,6 +150,7 @@ class JobInfo(BaseModel):
     priority: int = 0
     metadata: Optional[dict] = None
     stored_data: Optional[dict] = None
+    hosts: Optional[list[str]] = None
 
     @property
     def is_locked(self) -> bool:
@@ -202,7 +202,7 @@ class JobInfo(BaseModel):
             The instance of JobInfo based on the data
         """
         job = d.pop("job")
-        for k in ["name", "metadata"]:
+        for k in ["name", "metadata", "hosts"]:
             d[k] = job[k]
         return cls.model_validate(d)
 
@@ -220,6 +220,7 @@ def _projection_db_info() -> list[str]:
     projection.remove("name")
     projection.append("job.name")
     projection.append("job.metadata")
+    projection.append("job.hosts")
     return projection
 
 
@@ -272,12 +273,18 @@ class JobDoc(BaseModel):
         dict
             The dict representing the JobDoc.
         """
+        # split the serialization of the job since Enums should stay enums
+        # in the job inputs and they are not pydantic models that reconstructs
+        # them during deserialization.
+        dump = self.model_dump(mode="python")
+        job = dump.pop("job")
         d = jsanitize(
-            self.model_dump(mode="python"),
+            dump,
             strict=True,
             allow_bson=True,
             enum_values=True,
         )
+        d["job"] = jsanitize(job, strict=True, allow_bson=True)
         # required since the resources are not serialized otherwise
         if isinstance(self.resources, QResources):
             d["resources"] = self.resources.as_dict()
@@ -517,4 +524,5 @@ def get_reset_job_base_dict() -> dict:
         "updated_on": datetime.utcnow(),
         "start_time": None,
         "end_time": None,
+        "stored_data": None,
     }

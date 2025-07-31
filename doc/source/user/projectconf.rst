@@ -56,7 +56,16 @@ For all these folders the paths are set with defaults, but can be customised set
 
 .. warning::
   The project name does not take into consideration the configuration file name.
-  For coherence it would be better to give use the project name as file name.
+  For coherence it would be better to use the project name as file name.
+
+.. dropdown:: Example
+
+    Standard usage will not require filling in all directories path and usually
+    just the name can be provided in the configuration:
+
+    .. code-block:: yaml
+
+        name: my_project
 
 .. _projectconf worker:
 
@@ -111,6 +120,68 @@ configurations. Those can better be set with the :ref:`projectconf execconfig`.
     through the ``scheduler_username`` option. Jobflow-remote will use that as a filter,
     instead of the list of ids.
 
+.. dropdown:: Example
+
+    Several workers of different kinds can be defined:
+
+    .. code-block:: yaml
+
+        workers:
+          my_cluster_front_end: # A worker on the front end of the cluster
+            scheduler_type: shell
+            work_dir: /path/to/run/dir
+            # Activate the conda environment on the worker
+            pre_run: "\neval \"$(conda shell.bash hook)\"\nconda activate jfr\n"
+            type: remote
+            # No connection details if they are defined in the ~/.ssh/config file
+            host: my_cluster
+          my_cluster: # same cluter, a worker using the SLURM queue
+            scheduler_type: slurm
+            work_dir: /path/to/run/dir
+            resources:
+            pre_run: "\neval \"$(conda shell.bash hook)\"\nconda activate jfr\n"
+            type: remote
+            host: my_cluster
+          another_cluster: # A remote worker on another cluster
+            scheduler_type: slurm
+            work_dir: /path/to/another/run/dir
+            pre_run: source /data/venv/jobflow/bin/activate
+            type: remote
+            # also possible to define connection details here
+            host: another.cluster.host.net
+            user: username
+            key_filename: /path/to/ssh/private/key
+          another_cluster_batch: # A batch worker on the second cluster
+            scheduler_type: slurm
+            work_dir: /path/to/another/run/dir
+            # Each batch job will run on two nodes with 24 cores each
+            resources:
+              nodes: 2
+              ntasks_per_node: 24
+              mem: 95000
+              partition: xxx
+            pre_run: source /data/venv/jobflow/bin/activate
+            type: remote
+            host: another.cluster.host.net
+            user: username
+            key_filename: /path/to/ssh/private/key
+            # maximum 5 batch Slurm jobs in the queue at the same time
+            max_jobs: 5
+            # This will determine that the worker is a "batch" worker
+            batch:
+              jobs_handle_dir: /some/remote/path/run/batch_handle_slurm
+              work_dir: /some/remote/path/run/batch_work_slurm
+              # two jobflow Job executed in parallel in a single SLURM submission
+              parallel_jobs: 2
+          local_shell: # A local worker running in the shell
+            scheduler_type: shell
+            work_dir: /local/path/to/run/jobs
+            pre_run: "\neval \"$(conda shell.bash hook)\"\nconda activate atomate2_pyd2\n"
+            type: local
+            # Limit the number of local jobs. Since there is no queue they can all
+            # start simultaneously otherwise
+            max_jobs: 3
+
 .. _projectconf jobstore:
 
 JobStore
@@ -128,6 +199,28 @@ in this project.
 
     The ``JobStore`` should be defined in jobflow-remote's configuration file.
     The content of the standard jobflow configuration file will be ignored.
+
+.. warning::
+
+    If you have been using jobflow without jobflow-remote and you have a
+    ``JobStore`` defined in a ``jobflow.yaml`` it will be ignored. Only the
+    definition in the jobflow-remote configuration file will be considered
+
+.. dropdown:: Example
+
+    Define a ``JobStore`` similarly to standard jobflow
+
+    .. code-block:: yaml
+
+        jobstore:
+          docs_store:
+            type: MongoStore
+            host: <host name>
+            port: 27017
+            username: <username>
+            password: <password>
+            database: <database name>
+            collection_name: outputs
 
 .. _projectconf queuestore:
 
@@ -151,6 +244,34 @@ of these two collections can also be customized.
     Some key operations required by jobflow-remote on the collections are not
     supported by any file based MongoDB implementation at the moment.
 
+.. warning::
+
+    If the ``JobStore`` is also based on a MongoDB, it is often convenient to have
+    its main ``docs_store`` in the same database as the ``queue`` store, in that
+    case it is important that the two do **not point to the same collection**.
+    Unexpected errors may happen otherwise.
+
+.. dropdown:: Example
+
+    Define a queue store as maggma store. It is possible to use the same syntax
+    as for the ``JobStore``. Customizing the names of the additional collections
+    is also possible but not necessary
+
+    .. code-block:: yaml
+
+        queue:
+          store:
+            type: MongoStore
+            host: <host name>
+            port: 27017
+            username: <username>
+            password: <password>
+            database: <database name>
+            collection_name: jobs
+          flows_collection: flows
+          auxiliary_collection: jf_auxiliary
+
+
 .. _projectconf execconfig:
 
 Execution configurations
@@ -160,6 +281,35 @@ It is possible to define a set of ``ExecutionConfig`` objects to quickly set up
 configurations for different kind of Jobs and Flow. The ``exec_config`` key
 contains a dictionary where the keys are the names associated to the configurations
 and for each a set of instruction to be set before and after the execution of the Job.
+See the :ref:`tuning exec_config` section for more details and a usage examples.
+
+.. dropdown:: Example
+
+    Multiple configurations can be defined, for example one for each version of an
+    external code or for different software requirements. If multiple workers
+    are present, different ``exec_config`` will need to be defined for each of them.
+
+    .. code-block:: yaml
+
+        exec_config:
+          xxx_v1_1_my_cluster:
+            modules:
+            - releases/2021b
+            - intel/2021b
+            export:
+              PATH: /path/to/executable/v1.1:$PATH
+            pre_run:
+            post_run:
+          xxx_v3_2_my_cluster:
+            modules:
+            - releases/2023b
+            - intel/2023b
+            export:
+              PATH: /path/to/executable/v3.2:$PATH
+          yyy_local:
+            export:
+              PATH: /path/to/local/executable:$PATH
+            pre_run: "echo 'test'\necho 'test2'"
 
 Runner options
 --------------
@@ -172,6 +322,26 @@ reasonable values are set for the delay between each check of the database for
 different kind of actions performed by the ``Runner``. These intervals can be
 changed to better fit your needs. Remind that reducing these intervals too much
 may put unnecessary strain on the database.
+
+.. dropdown:: Example
+
+    Most of the times default values should be fine. Here is how to customize
+    the Runner execution
+
+    .. code-block:: yaml
+
+        runner:
+          delay_checkout: 10
+          delay_check_run_status: 10
+          delay_advance_status: 10
+          delay_update_batch: 10
+          lock_timeout: 86400
+          delete_tmp_folder: true
+          max_step_attempts: 3
+          delta_retry:
+          - 30
+          - 300
+          - 1200
 
 Metadata
 --------

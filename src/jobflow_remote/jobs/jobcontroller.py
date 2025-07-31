@@ -198,16 +198,16 @@ class JobController:
 
     def _build_query_job(
         self,
-        job_ids: tuple[str, int] | list[tuple[str, int]] | None = None,
-        db_ids: str | list[str] | None = None,
-        flow_ids: str | list[str] | None = None,
-        states: JobState | list[JobState] | None = None,
-        locked: bool = False,
-        start_date: datetime | None = None,
-        end_date: datetime | None = None,
-        name: str | None = None,
-        metadata: dict | None = None,
-        workers: str | list[str] | None = None,
+        job_ids: tuple[str, int] | list[tuple[str, int]] | None,
+        db_ids: str | list[str] | None,
+        flow_ids: str | list[str] | None,
+        states: JobState | list[JobState] | None,
+        locked: bool,
+        start_date: datetime | None,
+        end_date: datetime | None,
+        name: str | None,
+        metadata: dict | None,
+        workers: str | list[str] | None,
     ) -> dict:
         """
         Build a query to search for Jobs, based on standard parameters.
@@ -303,15 +303,15 @@ class JobController:
 
     def _build_query_flow(
         self,
-        job_ids: str | list[str] | None = None,
-        db_ids: str | list[str] | None = None,
-        flow_ids: str | list[str] | None = None,
-        states: FlowState | list[FlowState] | None = None,
-        start_date: datetime | None = None,
-        end_date: datetime | None = None,
-        name: str | None = None,
-        metadata: dict | None = None,
-        locked: bool = False,
+        job_ids: str | list[str] | None,
+        db_ids: str | list[str] | None,
+        flow_ids: str | list[str] | None,
+        states: FlowState | list[FlowState] | None,
+        start_date: datetime | None,
+        end_date: datetime | None,
+        name: str | None,
+        metadata: dict | None,
+        locked: bool,
     ) -> dict:
         """
         Build a query to search for Flows, based on standard parameters.
@@ -597,7 +597,7 @@ class JobController:
         Returns
         -------
         dict, list
-            A dict and an optional list to be used as query and sort,
+            A dict and an optional list to be used as filter and sort,
             respectively, in a query for a single Job.
         """
         query: dict = {}
@@ -621,6 +621,45 @@ class JobController:
         if not query:
             raise ValueError("At least one among db_id and job_id should be specified")
         return query, sort
+
+    @staticmethod
+    def generate_flow_id_query(
+        db_id: str | None = None,
+        job_id: str | None = None,
+        flow_id: str | None = None,
+    ) -> dict:
+        """
+        Generate a query for a single Flow based on the ids.
+        Only one among the input options should be defined.
+
+        Parameters
+        ----------
+        db_id
+            The db_id of one Job belonging to the Flow.
+        job_id
+            The uuid of one Job belonging to the Flow.
+        flow_id
+            The uuid of the Flow.
+
+        Returns
+        -------
+        dict
+            A dict to be used as filter in a query for a single Job.
+        """
+
+        if sum((job_id is None, db_id is None, flow_id is None)) != 2:
+            raise ValueError(
+                "One and only one among job_id, db_id and flow_id should be defined"
+            )
+
+        if db_id:
+            # the "0" refers to the index in the ids list.
+            # needs to be a string, but is correctly recognized by MongoDB
+            return {"ids": {"$elemMatch": {"0": db_id}}}
+        if job_id:
+            return {"jobs": job_id}
+
+        return {"uuid": flow_id}
 
     def get_job_info(
         self,
@@ -757,6 +796,7 @@ class JobController:
                 name=name,
                 metadata=metadata,
                 workers=workers,
+                locked=False,
             )
         result = self.jobs.find(query, projection=["db_id"])
 
@@ -1201,7 +1241,7 @@ class JobController:
                 )
 
         job_doc_update = get_reset_job_base_dict()
-        job_doc_update["state"] = JobState.CHECKED_OUT.value
+        job_doc_update["state"] = JobState.READY.value
         if delete_files:
             job_doc_update["remote.prerun_cleanup"] = True
 
@@ -1870,7 +1910,7 @@ class JobController:
 
             return return_doc["db_id"]
 
-    def play_jobs(
+    def resume_jobs(
         self,
         job_ids: tuple[str, int] | list[tuple[str, int]] | None = None,
         db_ids: str | list[str] | None = None,
@@ -1887,7 +1927,7 @@ class JobController:
         break_lock: bool = False,
     ) -> list[str]:
         """
-        Restart selected Jobs that were previously paused.
+        Restart selected Jobs that were previously paused or stopped.
 
         Parameters
         ----------
@@ -1934,8 +1974,8 @@ class JobController:
             List of db_ids of the updated Jobs.
         """
         return self._many_jobs_action(
-            method=self.play_job,
-            action_description="playing",
+            method=self.resume_job,
+            action_description="resuming",
             job_ids=job_ids,
             db_ids=db_ids,
             flow_ids=flow_ids,
@@ -1951,7 +1991,7 @@ class JobController:
             break_lock=break_lock,
         )
 
-    def play_job(
+    def resume_job(
         self,
         job_id: str | None = None,
         db_id: str | None = None,
@@ -1960,7 +2000,7 @@ class JobController:
         break_lock: bool = False,
     ) -> str:
         """
-        Restart a single Jobs that was previously paused.
+        Restart a single Jobs that was previously paused or stopped.
         Selected by db_id or uuid+index. Only one among db_id
         and job_id should be defined.
 
@@ -1991,7 +2031,11 @@ class JobController:
         )
         flow_lock_kwargs = dict(projection=["uuid"])
         with self.lock_job_flow(
-            acceptable_states=[JobState.PAUSED],
+            acceptable_states=[
+                JobState.PAUSED,
+                JobState.STOPPED,
+                JobState.USER_STOPPED,
+            ],
             job_id=job_id,
             db_id=db_id,
             job_index=job_index,
@@ -2005,23 +2049,7 @@ class JobController:
                 raise RuntimeError("No job document found in lock")
             job_id = job_doc["uuid"]
             job_index = job_doc["index"]
-            on_missing = job_doc["job"]["config"]["on_missing_references"]
-            allow_failed = on_missing != OnMissing.ERROR.value
-
-            # in principle the lock on each of the parent jobs is not needed
-            # since a parent Job cannot change to COMPLETED or FAILED while
-            # the flow is locked
-            for parent in self.jobs.find(
-                {"uuid": {"$in": job_doc["parents"]}}, projection=["state"]
-            ):
-                parent_state = JobState(parent["state"])
-                if parent_state != JobState.COMPLETED:
-                    if parent_state == JobState.FAILED and allow_failed:
-                        continue
-                    final_state = JobState.WAITING
-                    break
-            else:
-                final_state = JobState.READY
+            final_state = self._resume_job_locked(job_doc)
 
             updated_states = {job_id: {job_index: final_state}}
             self.update_flow_state(
@@ -2030,6 +2058,157 @@ class JobController:
             )
             job_lock.update_on_release = {"$set": {"state": final_state.value}}
             return job_lock.locked_document["db_id"]
+
+    def _resume_job_locked(self, job_doc) -> JobState:
+        """
+        Helper method for the logic of resuming a Job.
+        Assumes the input is the dictionary representation of a JobDoc and that
+        the Flow and Job has been locked.
+
+        Parameters
+        ----------
+        job_doc
+            Dictionary representing the JobDoc with the required elements presents.
+
+        Returns
+        -------
+        JobState
+            The final state that should be set to a Job.
+        """
+        on_missing = job_doc["job"]["config"]["on_missing_references"]
+        allow_failed = on_missing != OnMissing.ERROR.value
+        # in principle the lock on each of the parent jobs is not needed
+        # since a parent Job cannot change to COMPLETED or FAILED while
+        # the flow is locked
+        for parent in self.jobs.find(
+            {"uuid": {"$in": job_doc["parents"]}}, projection=["state"]
+        ):
+            parent_state = JobState(parent["state"])
+            if parent_state != JobState.COMPLETED:
+                if parent_state == JobState.FAILED and allow_failed:
+                    continue
+                final_state = JobState.WAITING
+                break
+        else:
+            final_state = JobState.READY
+        return final_state
+
+    def resume_flow(
+        self,
+        job_id: str | None = None,
+        db_id: str | None = None,
+        flow_id: str | None = None,
+        wait: int | None = None,
+        break_lock: bool = False,
+    ) -> int:
+        """
+        Resume a Flow by resuming all the STOPPED, USER_STOPPED and PAUSED Jobs
+        in the Flow.
+
+        Parameters
+        ----------
+        job_id
+            The uuid of one of the Jobs of the Flow.
+        db_id
+            The db_id of one of the Jobs of the Flow.
+        flow_id
+            The uuid of the Flow.
+        wait
+            In case the Flow or Jobs that need to be updated are locked,
+            wait this time (in seconds) for the lock to be released.
+            Raise an error if lock is not released.
+        break_lock
+            Forcibly break the lock on locked documents. Use with care and
+            verify that the lock has been set by a process that is not running
+            anymore. Doing otherwise will likely lead to inconsistencies in the DB.
+
+        Returns
+        -------
+        int
+            The number of Jobs modified.
+        """
+        sleep = None
+        if wait:
+            sleep = 10
+        flow_filter = self.generate_flow_id_query(
+            job_id=job_id, db_id=db_id, flow_id=flow_id
+        )
+        with self.lock_flow(
+            filter=flow_filter,
+            sleep=sleep,
+            max_wait=wait,
+            get_locked_doc=True,
+            break_lock=break_lock,
+        ) as flow_lock:
+            if not flow_lock.locked_document:
+                if flow_lock.unavailable_document:
+                    raise FlowLockedError.from_flow_doc(flow_lock.unavailable_document)
+                raise ValueError(f"No Flow document matching criteria {flow_filter}")
+            flow_doc = FlowDoc.model_validate(flow_lock.locked_document)
+            if flow_doc.state not in [FlowState.STOPPED, FlowState.PAUSED]:
+                raise ValueError(f"Cannot resume a Flow in state {flow_doc.state}")
+            # loop over the STOPPED, USER_STOPPED and PAUSED jobs.
+            # In principle there should be no ambiguity since in all the cases the Flow should be
+            # locked. Still do not assume that at the end all the Jobs will not be stopped.
+            jobs_filter = self._build_query_job(
+                flow_ids=[flow_doc.uuid],
+                states=[JobState.STOPPED, JobState.USER_STOPPED, JobState.PAUSED],
+                job_ids=None,
+                db_ids=None,
+                locked=False,
+                start_date=None,
+                end_date=None,
+                name=None,
+                metadata=None,
+                workers=None,
+            )
+            job_db_ids_to_resume = [
+                d["db_id"] for d in self.jobs.find(jobs_filter, projection=["db_id"])
+            ]
+
+            job_lock_kwargs = dict(
+                projection=["uuid", "index", "db_id", "state", "job.config", "parents"]
+            )
+            n_updated_jobs = 0
+            for job_db_id in job_db_ids_to_resume:
+                job_lock_filter = {"db_id": job_db_id}
+                with self.lock_job(
+                    filter=job_lock_filter,
+                    break_lock=break_lock,
+                    projection=job_lock_kwargs,
+                    sleep=sleep,
+                    max_wait=wait,
+                    get_locked_doc=True,
+                ) as job_lock:
+                    job_doc_dict = job_lock.locked_document
+                    if not job_doc_dict:
+                        if job_lock.unavailable_document:
+                            raise JobLockedError.from_job_doc(
+                                job_lock.unavailable_document
+                            )
+                        raise ValueError(
+                            f"No Job document matching criteria {job_lock_filter}"
+                        )
+                    # this should not happen, but handle the case to avoid inconsistencies
+                    # no error is raised as the job should already be in the correct state
+                    if JobState(job_doc_dict["state"]) not in [
+                        JobState.STOPPED,
+                        JobState.USER_STOPPED,
+                        JobState.PAUSED,
+                    ]:
+                        continue
+                    final_state = self._resume_job_locked(job_doc_dict)
+                    job_lock.update_on_release = {"$set": {"state": final_state.value}}
+                    n_updated_jobs += 1
+
+            # no need for updated states, since all the Jobs have been already updated separately
+            final_state = self.update_flow_state(flow_uuid=flow_doc.uuid)
+            if final_state in [FlowState.PAUSED, FlowState.STOPPED]:
+                logger.warning(
+                    "The Flow was not fully resumed. Consider running resume again"
+                )
+
+            return n_updated_jobs
 
     def set_job_run_properties(
         self,
@@ -2579,6 +2758,7 @@ class JobController:
             end_date=end_date,
             locked=True,
             name=name,
+            metadata=None,
         )
 
         result = self.flows.update_many(
@@ -2735,6 +2915,32 @@ class JobController:
         if flow_custom_indexes:
             for idx in flow_custom_indexes:
                 self.flows.create_index(idx, background=background)
+
+        # if the docs_store is a MongoStore with a collection, create a proper composed
+        # index that is the most effective for retrieving outputs. Otherwise create a simple
+        # index based on the maggma interface for the two indexes separately.
+        # In any case trap all exceptions, as this should not be a blocking point
+        try:
+            docs_store = self.jobstore.docs_store
+            if hasattr(docs_store, "_collection"):
+                if drop:
+                    docs_store._collection.drop_indexes()
+                docs_store._collection.create_index(
+                    [("uuid", 1), ("index", -1)], background=background
+                )
+            else:
+                docs_store.ensure_index("uuid")
+                docs_store.ensure_index("index")
+        except Exception:
+            logger.warning("Could not create the index for the JobStore", exc_info=True)
+        # Use the standard interface to create an index for the additional stores
+        for store_name, additional_store in self.jobstore.additional_stores.items():
+            try:
+                additional_store.ensure_index("blob_uuid")
+            except Exception:
+                logger.warning(
+                    f"Could not create the blob_uuid index for additional store {store_name}"
+                )
 
     def create_indexes(
         self,
@@ -2924,6 +3130,8 @@ class JobController:
         start_date: datetime | None = None,
         end_date: datetime | None = None,
         name: str | None = None,
+        metadata: dict | None = None,
+        locked: bool = False,
     ) -> int:
         """
         Count flows based on filter parameters.
@@ -2949,6 +3157,11 @@ class JobController:
         name
             Pattern matching the name of Flow. Default is an exact match, but all
             conventions from python fnmatch can be used (e.g. *test*)
+        metadata
+            A dictionary of the values of the metadata to match. Should be an
+            exact match for all the values provided.
+        locked
+            If True only locked Flows will be counted.
 
         Returns
         -------
@@ -2964,6 +3177,8 @@ class JobController:
                 start_date=start_date,
                 end_date=end_date,
                 name=name,
+                metadata=metadata,
+                locked=locked,
             )
         return self.flows.count_documents(query)
 
@@ -3239,7 +3454,36 @@ class JobController:
         exec_config: ExecutionConfig | None = None,
         resources: QResources | None = None,
         priority: int = 0,
+        stopped: bool = False,
     ) -> None:
+        """
+        Append a new Flow to an existing one as a child of a specific Job.
+
+        Parameters
+        ----------
+        job_doc
+            The dictionary representation of the JobDoc of the Job to which
+             the new Flow will be appended.
+        flow_dict
+            The dictionary of the original Flow.
+        new_flow_dict
+            The dictionary of the new Flow.
+        worker
+            The default worker applied to the newly created Jobs, if not
+            overridden by specific Job configurations.
+        response_type
+            Type or response.
+        exec_config
+            ExecConfig inherited from the generating Job, if not overridden
+            by specific Job updates.
+        resources
+            Resources inherited from the generating Job, if not overridden
+            by specific Job updates.
+        priority
+            Priority inherited from the generating Job.
+        stopped
+            If True the generated Jobs will be set in the STOPPED state.
+        """
         from jobflow import Flow, Job
 
         decoder = MontyDecoder()
@@ -3303,17 +3547,18 @@ class JobController:
             db_id = f"{prefix}{db_id_int}"
             # inherit the parents of the job to which we are appending
             parents = parents if parents else job_parents  # noqa: PLW2901
-            job_dicts.append(
-                get_initial_job_doc_dict(
-                    job,
-                    parents,
-                    db_id,
-                    worker=worker,
-                    exec_config=exec_config,
-                    resources=resources,
-                    priority=priority,
-                )
+            init_job_doc = get_initial_job_doc_dict(
+                job,
+                parents,
+                db_id,
+                worker=worker,
+                exec_config=exec_config,
+                resources=resources,
+                priority=priority,
             )
+            if stopped:
+                init_job_doc["state"] = JobState.STOPPED.value
+            job_dicts.append(init_job_doc)
             flow_updates["$set"][f"parents.{job.uuid}.{job.index}"] = parents
             ids_to_push.append((job_dicts[-1]["db_id"], job.uuid, job.index))
         flow_updates["$push"]["ids"] = {"$each": ids_to_push}
@@ -3550,6 +3795,7 @@ class JobController:
         # handle response
         else:
             new_state = JobState.COMPLETED.value
+            stop_generated = response["stop_children"] or response["stop_jobflow"]
             if response["replace"] is not None:
                 self._append_flow(
                     job_doc,
@@ -3560,6 +3806,7 @@ class JobController:
                     exec_config=job_doc["exec_config"],
                     resources=job_doc["resources"],
                     priority=job_doc["priority"],
+                    stopped=stop_generated,
                 )
 
             if response["addition"] is not None:
@@ -3572,6 +3819,7 @@ class JobController:
                     exec_config=job_doc["exec_config"],
                     resources=job_doc["resources"],
                     priority=job_doc["priority"],
+                    stopped=stop_generated,
                 )
 
             if response["detour"] is not None:
@@ -3584,6 +3832,7 @@ class JobController:
                     exec_config=job_doc["exec_config"],
                     resources=job_doc["resources"],
                     priority=job_doc["priority"],
+                    stopped=stop_generated,
                 )
 
             if response["stored_data"] is not None:
@@ -3689,7 +3938,11 @@ class JobController:
             The number of modified Jobs.
         """
         result = self.jobs.update_many(
-            {"parents": job_uuid, "state": JobState.WAITING.value},
+            {
+                "parents": job_uuid,
+                "state": {"$in": [JobState.WAITING.value, JobState.READY.value]},
+                "lock_id": None,
+            },
             {"$set": {"state": JobState.STOPPED.value}},
         )
         return result.modified_count
@@ -3724,7 +3977,11 @@ class JobController:
         job_uuids = flow_dict["jobs"]
 
         result = self.jobs.update_many(
-            {"uuid": {"$in": job_uuids}, "state": JobState.WAITING.value},
+            {
+                "uuid": {"$in": job_uuids},
+                "state": {"$in": [JobState.WAITING.value, JobState.READY.value]},
+                "lock_id": None,
+            },
             {"$set": {"state": JobState.STOPPED.value}},
         )
         return result.modified_count
@@ -3844,7 +4101,7 @@ class JobController:
         self,
         flow_uuid: str,
         updated_states: dict[str, dict[int, JobState | None]] | None = None,
-    ) -> None:
+    ) -> FlowState:
         """
         Update the state of a Flow in the DB based on the Job's states.
 
@@ -3860,6 +4117,11 @@ class JobController:
             If the value is None the Job is considered deleted and the state
             of that Job will be ignored while determining the state of the
             whole Flow.
+
+        Returns
+        -------
+        FlowState
+            The state set for the Flow.
         """
         updated_states = updated_states or {}
         projection = ["uuid", "index", "parents", "state"]
@@ -3899,6 +4161,7 @@ class JobController:
             {"uuid": flow_uuid},
             [{"$set": {"state": flow_state.value, "updated_on": updated_cond}}],
         )
+        return flow_state
 
     @contextlib.contextmanager
     def lock_job(self, **lock_kwargs) -> Generator[MongoLock, None, None]:
@@ -4039,7 +4302,14 @@ class JobController:
                 else:
                     step_attempts = doc["remote"]["step_attempts"]
                     no_retry = no_retry or step_attempts >= max_step_attempts
-                    queue_out, queue_err = self._get_downloaded_queue_files(doc)
+                    try:
+                        # prevent errors from handling queue files breaking the lock release
+                        queue_out, queue_err = self._get_downloaded_queue_files(doc)
+                    except Exception:
+                        logger.warning(
+                            "Error while trying to retrieve queue output", exc_info=True
+                        )
+                        queue_out, queue_err = None, None
                     if no_retry:
                         update_on_release = {
                             "$set": {
@@ -4438,7 +4708,9 @@ class JobController:
                 flow_doc.parents.pop(job_uuid, None)
 
             # Update flow state if necessary
-            updated_states = {job_uuid: {job_index: None}}  # None indicates job removal
+            updated_states: dict[str, dict[int, Any]] = {
+                job_uuid: {job_index: None}
+            }  # None indicates job removal
             self.update_flow_state(
                 flow_uuid=flow_doc.uuid, updated_states=updated_states
             )

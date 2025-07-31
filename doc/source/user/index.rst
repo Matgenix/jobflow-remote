@@ -28,5 +28,6 @@ details are found in :ref:`reference`.
    :hidden:
    :caption: Extras
 
+   additional_material
    ../glossary
    ../license

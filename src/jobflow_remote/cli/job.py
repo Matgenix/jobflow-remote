@@ -22,6 +22,7 @@ from jobflow_remote.cli.jfr_typer import JFRTyper
 from jobflow_remote.cli.types import (
     OptionalStr,
     break_lock_opt,
+    count_opt,
     days_opt,
     db_ids_opt,
     delete_all_opt,
@@ -70,7 +71,7 @@ from jobflow_remote.cli.utils import (
     str_to_dict,
 )
 from jobflow_remote.jobs.report import JobsReport
-from jobflow_remote.jobs.state import JobState
+from jobflow_remote.jobs.state import ERROR_STATES, RUNNING_STATES, JobState
 from jobflow_remote.remote.queue import ERR_FNAME, OUT_FNAME
 
 app_job = JFRTyper(
@@ -103,9 +104,19 @@ def jobs_list(
         typer.Option(
             "--error",
             "-e",
-            help="Select the jobs in FAILED and REMOTE_ERROR state. Incompatible with the --state option",
+            help="Select the jobs in FAILED and REMOTE_ERROR state. Compatible with other state filtering options",
         ),
     ] = False,
+    running: Annotated[
+        bool,
+        typer.Option(
+            "--running",
+            "-run",
+            help="Select the jobs in one of the running states (from CHECKED_OUT to DOWNLOADED). "
+            "Compatible with other state filtering options",
+        ),
+    ] = False,
+    count: count_opt = False,
     stored_data_keys: Annotated[
         Optional[list[str]],
         typer.Option(
@@ -124,13 +135,22 @@ def jobs_list(
             f"Available options are: {', '.join(header_name_data_getter_map)}",
         ),
     ] = None,
+    color: Annotated[
+        bool,
+        typer.Option(
+            "--color",
+            "-col",
+            help="Color the job names with same colors for Jobs belonging to the same Flow",
+        ),
+    ] = False,
 ):
     """
     Get the list of Jobs in the database.
     """
     check_incompatible_opt({"start_date": start_date, "days": days, "hours": hours})
     check_incompatible_opt({"end_date": end_date, "days": days, "hours": hours})
-    check_incompatible_opt({"state": state, "error": error})
+    # check_incompatible_opt({"state": state, "error": error})
+    # check_incompatible_opt({"state": state, "running": running})
     check_incompatible_opt({"output": cli_output_keys, "verbosity": verbosity})
     check_query_incompatibility(
         custom_query,
@@ -171,17 +191,21 @@ def jobs_list(
     db_sort: list[tuple[str, int]] = [(sort.value, 1 if reverse_sort else -1)]
 
     if error:
-        state = [JobState.REMOTE_ERROR, JobState.FAILED]
-
-    with loading_spinner():
-        if custom_query:
-            jobs_info = jc.get_jobs_info_query(
-                query=custom_query,
-                limit=max_results,
-                sort=db_sort,
-            )
+        if state:
+            state.extend(ERROR_STATES)
         else:
-            jobs_info = jc.get_jobs_info(
+            state = ERROR_STATES
+
+    if running:
+        if state:
+            state.extend(RUNNING_STATES)
+        else:
+            state = RUNNING_STATES
+
+    if count:
+        with loading_spinner():
+            n_jobs = jc.count_jobs(
+                query=custom_query,
                 job_ids=job_ids_indexes,
                 db_ids=db_id,
                 flow_ids=flow_id,
@@ -192,40 +216,64 @@ def jobs_list(
                 name=name,
                 metadata=metadata,
                 workers=worker_name,
-                limit=max_results,
-                sort=db_sort,
+            )
+        out_console.print(f"Number of jobs: {n_jobs}")
+    else:
+        with loading_spinner():
+            if custom_query:
+                jobs_info = jc.get_jobs_info_query(
+                    query=custom_query,
+                    limit=max_results,
+                    sort=db_sort,
+                )
+            else:
+                jobs_info = jc.get_jobs_info(
+                    job_ids=job_ids_indexes,
+                    db_ids=db_id,
+                    flow_ids=flow_id,
+                    states=state,
+                    start_date=start_date,
+                    locked=locked,
+                    end_date=end_date,
+                    name=name,
+                    metadata=metadata,
+                    workers=worker_name,
+                    limit=max_results,
+                    sort=db_sort,
+                )
+
+            table = get_job_info_table(
+                jobs_info,
+                verbosity=verbosity,
+                output_keys=output_keys,
+                stored_data_keys=stored_data_keys,
+                color=color,
             )
 
-        table = get_job_info_table(
-            jobs_info,
-            verbosity=verbosity,
-            output_keys=output_keys,
-            stored_data_keys=stored_data_keys,
-        )
-
-    out_console.print(table)
-    if SETTINGS.cli_suggestions:
-        if max_results and len(jobs_info) == max_results:
-            out_console.print(
-                f"The number of Jobs printed may be limited by the maximum selected: {max_results}",
-                style="yellow",
-            )
-        remote_errors = False
-        if any(
-            ji.remote.retry_time_limit is not None and ji.state != JobState.REMOTE_ERROR
-            for ji in jobs_info
-        ):
-            text = (
-                "Some jobs (state in orange) have failed while interacting with"
-                " the worker, but will be retried."
-            )
-            out_console.print(text, style="yellow")
-            remote_errors = True
-        if remote_errors or any(
-            ji.state in (JobState.REMOTE_ERROR, JobState.FAILED) for ji in jobs_info
-        ):
-            text = "Get more information about the errors with 'jf job info JOB_ID'"
-            out_console.print(text, style="yellow")
+        out_console.print(table)
+        if SETTINGS.cli_suggestions:
+            if max_results and len(jobs_info) == max_results:
+                out_console.print(
+                    f"The number of Jobs printed may be limited by the maximum selected: {max_results}",
+                    style="yellow",
+                )
+            remote_errors = False
+            if any(
+                ji.remote.retry_time_limit is not None
+                and ji.state != JobState.REMOTE_ERROR
+                for ji in jobs_info
+            ):
+                text = (
+                    "Some jobs (state in orange) have failed while interacting with"
+                    " the worker, but will be retried."
+                )
+                out_console.print(text, style="yellow")
+                remote_errors = True
+            if remote_errors or any(
+                ji.state in (JobState.REMOTE_ERROR, JobState.FAILED) for ji in jobs_info
+            ):
+                text = "Get more information about the errors with 'jf job info JOB_ID'"
+                out_console.print(text, style="yellow")
 
 
 @app_job.command(name="info")
@@ -280,7 +328,9 @@ def job_info(
     if not job_data:
         exit_with_error_msg("No data matching the request")
 
-    out_console.print(format_job_info(job_data, verbosity, show_none=show_none))
+    out_console.print(
+        format_job_info(job_data, verbosity, show_none=show_none), overflow="crop"
+    )
 
 
 @app_job.command()
@@ -496,6 +546,52 @@ def pause(
 
 
 @app_job.command()
+def resume(
+    job_db_id: job_db_id_arg = None,
+    job_index: job_index_arg = None,
+    job_id: job_ids_indexes_opt = None,
+    db_id: db_ids_opt = None,
+    flow_id: flow_ids_opt = None,
+    state: job_state_opt = None,
+    start_date: start_date_opt = None,
+    end_date: end_date_opt = None,
+    name: name_opt = None,
+    metadata: metadata_opt = None,
+    worker_name: worker_name_opt = None,
+    custom_query: query_opt = None,
+    days: days_opt = None,
+    hours: hours_opt = None,
+    verbosity: verbosity_opt = 0,
+    wait: wait_lock_opt = None,
+    raise_on_error: raise_on_error_opt = False,
+) -> None:
+    """Resume a Job that was previously PAUSED or STOPPED."""
+    jc = get_job_controller()
+
+    execute_multi_jobs_cmd(
+        single_cmd=jc.resume_job,
+        multi_cmd=jc.resume_jobs,
+        job_db_id=job_db_id,
+        job_index=job_index,
+        job_ids=job_id,
+        db_ids=db_id,
+        flow_ids=flow_id,
+        states=state,
+        start_date=start_date,
+        end_date=end_date,
+        name=name,
+        metadata=metadata,
+        days=days,
+        hours=hours,
+        workers=worker_name,
+        custom_query=custom_query,
+        verbosity=verbosity,
+        wait=wait,
+        raise_on_error=raise_on_error,
+    )
+
+
+@app_job.command(hidden=True)
 def play(
     job_db_id: job_db_id_arg = None,
     job_index: job_index_arg = None,
@@ -515,12 +611,16 @@ def play(
     wait: wait_lock_opt = None,
     raise_on_error: raise_on_error_opt = False,
 ) -> None:
-    """Resume a Job that was previously PAUSED."""
+    """Resume a Job that was previously PAUSED or STOPPED. DEPRECATED: use resume instead"""
+    out_console.print(
+        "The 'jf job play' command is deprecated. Use 'jf job resume' instead",
+        style="gold1",
+    )
     jc = get_job_controller()
 
     execute_multi_jobs_cmd(
-        single_cmd=jc.play_job,
-        multi_cmd=jc.play_jobs,
+        single_cmd=jc.resume_job,
+        multi_cmd=jc.resume_jobs,
         job_db_id=job_db_id,
         job_index=job_index,
         job_ids=job_id,
@@ -769,6 +869,49 @@ def report(
         timezone=timezone,
     )
     out_console.print(*get_job_report_components(jobs_report))
+
+
+@app_job.command()
+def todir(
+    job_db_id: job_db_id_arg = None,
+    job_index: job_index_arg = None,
+    shell: Annotated[
+        Optional[str],
+        typer.Option(
+            "--shell",
+            "-s",
+            help="A shell to be used in the opened terminal",
+        ),
+    ] = "bash",
+):
+    """
+    Connect to the worker and go to the job run_dir.
+    """
+
+    # NOTE this function uses system commands to connect to the remote host and
+    # local host. The shell name is also potentially passed by the user, so
+    # it is potentially dangerous if the user does not have direct access to
+    # the machines involved, but this should not be the case for the CLI of JFR.
+    cm = get_config_manager()
+    jc = get_job_controller()
+
+    db_id, job_id = get_job_db_ids(job_db_id, job_index)
+
+    job_data = jc.get_job_info(
+        job_id=job_id,
+        job_index=job_index,
+        db_id=db_id,
+    )
+    if not job_data:
+        exit_with_error_msg("No job matching the critiria")
+    if not job_data.run_dir:
+        exit_with_error_msg("The selected Job does not have a run_dir defined yet")
+    worker = cm.get_worker(job_data.worker)
+    host = worker.get_host()
+    out_console.print(
+        f"Connecting to worker {job_data.worker} and moving to {job_data.run_dir}"
+    )
+    host.shell(pre_cmd=f"cd {job_data.run_dir}", shell=shell)
 
 
 app_job_set = JFRTyper(

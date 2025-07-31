@@ -1,14 +1,54 @@
 # Changelog
 
-## [Unreleased](https://github.com/Matgenix/jobflow-remote/tree/HEAD)
+## [v0.1.7](https://github.com/Matgenix/jobflow-remote/tree/v0.1.7) (2025-06-25)
 
-[Full Changelog](https://github.com/Matgenix/jobflow-remote/compare/v0.1.5...HEAD)
+[Full Changelog](https://github.com/Matgenix/jobflow-remote/compare/v0.1.6...v0.1.7)
+
+**Implemented enhancements:**
+
+- SUGGESTION: `--count` option for `jf flow list` and `jf job list` [\#110](https://github.com/Matgenix/jobflow-remote/issues/110)
 
 **Closed issues:**
 
-- Job submission fails based on job name [\#112](https://github.com/Matgenix/jobflow-remote/issues/112)
+- how to best cite jobflow-remote? [\#290](https://github.com/Matgenix/jobflow-remote/issues/290)
+- Feature Request: New UX for setting job priority [\#287](https://github.com/Matgenix/jobflow-remote/issues/287)
+- The long time interval between two jobs of a flow. [\#278](https://github.com/Matgenix/jobflow-remote/issues/278)
+- The cores in the `submit.sh` is different from the one shown in the OUTCAR. [\#277](https://github.com/Matgenix/jobflow-remote/issues/277)
+- Set a different `work_dir` from the one defined in the configuration file at runtime. [\#276](https://github.com/Matgenix/jobflow-remote/issues/276)
+- Put CECAM slides in the docs? [\#273](https://github.com/Matgenix/jobflow-remote/issues/273)
+- Where can we find information about the Slurm job metadata? [\#268](https://github.com/Matgenix/jobflow-remote/issues/268)
+- How to dynamically change the worker configuration [\#267](https://github.com/Matgenix/jobflow-remote/issues/267)
+- The `run_dir` text is often cutoff in the `jf job info ID` print-out [\#266](https://github.com/Matgenix/jobflow-remote/issues/266)
+- Warn user to not use the same database for queue and output store [\#264](https://github.com/Matgenix/jobflow-remote/issues/264)
+- How to solve the question: TypeError: 'dict' object is not callable [\#263](https://github.com/Matgenix/jobflow-remote/issues/263)
+- a weird problem with job metadata [\#261](https://github.com/Matgenix/jobflow-remote/issues/261)
+- How to update failed jobs input parameters ? [\#125](https://github.com/Matgenix/jobflow-remote/issues/125)
 
-## [v0.1.5](https://github.com/Matgenix/jobflow-remote/tree/v0.1.5) (2025-01-22)
+**Merged pull requests:**
+
+- bugfix and test release workflow [\#313](https://github.com/Matgenix/jobflow-remote/pull/313) ([gpetretto](https://github.com/gpetretto))
+- Update release.yml [\#310](https://github.com/Matgenix/jobflow-remote/pull/310) ([davidwaroquiers](https://github.com/davidwaroquiers))
+- Add --count option in CLI [\#307](https://github.com/Matgenix/jobflow-remote/pull/307) ([gpetretto](https://github.com/gpetretto))
+- Fix testing, upgrade test requirements [\#302](https://github.com/Matgenix/jobflow-remote/pull/302) ([gpetretto](https://github.com/gpetretto))
+- fix ignoring resolve\_references in JobConfig [\#288](https://github.com/Matgenix/jobflow-remote/pull/288) ([gpetretto](https://github.com/gpetretto))
+- CLI and other small updates [\#269](https://github.com/Matgenix/jobflow-remote/pull/269) ([gpetretto](https://github.com/gpetretto))
+- Reset stored data field on rerun [\#260](https://github.com/Matgenix/jobflow-remote/pull/260) ([FabiPi3](https://github.com/FabiPi3))
+- Docker optimisations for CI [\#247](https://github.com/Matgenix/jobflow-remote/pull/247) ([ml-evs](https://github.com/ml-evs))
+
+## [v0.1.6](https://github.com/Matgenix/jobflow-remote/tree/v0.1.6) (2025-02-07)
+
+[Full Changelog](https://github.com/Matgenix/jobflow-remote/compare/v0.1.5...v0.1.6)
+
+**Closed issues:**
+
+- Replacing failed jobs and adding new jobs to a flow [\#250](https://github.com/Matgenix/jobflow-remote/issues/250)
+
+**Merged pull requests:**
+
+- Bug fix for Remote Host [\#253](https://github.com/Matgenix/jobflow-remote/pull/253) ([gpetretto](https://github.com/gpetretto))
+- Hot fix to pin pymongo version to lower than 4.11. [\#251](https://github.com/Matgenix/jobflow-remote/pull/251) ([davidwaroquiers](https://github.com/davidwaroquiers))
+
+## [v0.1.5](https://github.com/Matgenix/jobflow-remote/tree/v0.1.5) (2025-01-29)
 
 [Full Changelog](https://github.com/Matgenix/jobflow-remote/compare/v0.1.4...v0.1.5)
 
@@ -39,6 +79,7 @@
 - How could I use SGE for job submission?  [\#159](https://github.com/Matgenix/jobflow-remote/issues/159)
 - Check there is not already a runner running [\#140](https://github.com/Matgenix/jobflow-remote/issues/140)
 - How to add metadata to `flows` docs? [\#124](https://github.com/Matgenix/jobflow-remote/issues/124)
+- Job submission fails based on job name [\#112](https://github.com/Matgenix/jobflow-remote/issues/112)
 - preventing reset issues [\#102](https://github.com/Matgenix/jobflow-remote/issues/102)
 - Missing docs: batch mode [\#96](https://github.com/Matgenix/jobflow-remote/issues/96)
 - Does jobflow-remote support the pilot job model? [\#86](https://github.com/Matgenix/jobflow-remote/issues/86)

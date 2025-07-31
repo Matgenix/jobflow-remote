@@ -58,6 +58,11 @@ def run_remote_job(run_dir: str | Path = ".") -> None:
             job: Job = in_data["job"]
             store = in_data["store"]
             job_doc_dict = in_data.get("job_doc", None)
+            if isinstance(job.function, dict):
+                raise RuntimeError(  # noqa: TRY004,TRY301
+                    f"The function in the Job could not be deserialized: {job.function}.\n"
+                    "Check if this function is actually available in the worker's python environment"
+                )
             if job_doc_dict:
                 job_doc_dict["job"] = job
                 JfrState().job_doc = JobDoc.model_validate(job_doc_dict)

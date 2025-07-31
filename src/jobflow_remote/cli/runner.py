@@ -279,6 +279,28 @@ def shutdown() -> None:
 
 
 @app_runner.command()
+def restart() -> None:
+    """
+    Restart the runner. Send a stop signal, wait for the runner to stop and
+    restart it with the same configuration.
+    """
+    cm = get_config_manager()
+    dm = DaemonManager.from_project(cm.get_project())
+    with loading_spinner(processing=False) as progress:
+        progress.add_task(description="Restarting the daemon...", total=None)
+        try:
+            dm.restart(raise_on_error=True)
+        except RunningDaemonError as e:
+            exit_with_error_msg(
+                f"Error while restarting the daemon: {getattr(e, 'message', e)}{_running_daemon_error_msg}"
+            )
+        except DaemonError as e:
+            exit_with_error_msg(
+                f"Error while restaring the daemon: {getattr(e, 'message', e)}"
+            )
+
+
+@app_runner.command()
 def status() -> None:
     """Fetch the status of the daemon runner."""
     from jobflow_remote import SETTINGS

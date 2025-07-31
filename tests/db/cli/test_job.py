@@ -10,10 +10,14 @@ def test_jobs_list(job_controller, two_flows_four_jobs) -> None:
     outputs = columns + [f"add{i}" for i in range(1, 5)] + ["READY", "WAITING"]
 
     run_check_cli(["job", "list"], required_out=outputs)
+    run_check_cli(["job", "list", "--count"], required_out="Number of jobs: 4")
 
     # the output table is squeezed. Hard to check stdout. Just check that runs correctly
     run_check_cli(["job", "list", "-v"])
     run_check_cli(["job", "list", "-vvv"])
+
+    # not checking that the output is actually colored. Just check that runs correctly
+    run_check_cli(["job", "list", "--color"], required_out=outputs)
 
     outputs = ["add1", "READY"]
     excluded = [f"add{i}" for i in range(2, 5)]
@@ -24,6 +28,10 @@ def test_jobs_list(job_controller, two_flows_four_jobs) -> None:
         ["job", "list", "-q", '{"db_id": "1"}'],
         required_out=outputs,
         excluded_out=excluded,
+    )
+    run_check_cli(
+        ["job", "list", "-q", '{"db_id": "1"}', "--count"],
+        required_out="Number of jobs: 1",
     )
 
     # trigger the additional information
@@ -48,6 +56,55 @@ def test_jobs_list(job_controller, two_flows_four_jobs) -> None:
     output = "Options output, verbosity are incompatible"
     run_check_cli(
         ["job", "list", "-o", "state,name", "-vv"], required_out=output, error=True
+    )
+
+    # test state filtering
+    outputs = ["READY"]
+    excluded = ["WAITING", "REMOTE_ERROR"]
+    run_check_cli(
+        ["job", "list", "-s", "READY"],
+        required_out=outputs,
+        excluded_out=excluded,
+    )
+    run_check_cli(
+        ["job", "list", "-s", "READY", "--count"], required_out="Number of jobs: 1"
+    )
+
+    outputs = ["READY", "REMOTE_ERROR"]
+    excluded = ["WAITING"]
+    run_check_cli(
+        ["job", "list", "-s", "READY", "--error"],
+        required_out=outputs,
+        excluded_out=excluded,
+    )
+
+    outputs = ["REMOTE_ERROR"]
+    excluded = ["READY", "WAITING"]
+    run_check_cli(
+        ["job", "list", "--error"],
+        required_out=outputs,
+        excluded_out=excluded,
+    )
+
+    assert job_controller.set_job_state(JobState.DOWNLOADED, db_id="3")
+    outputs = ["REMOTE_ERROR", "DOWNLOADED"]
+    excluded = ["READY", "WAITING"]
+    run_check_cli(
+        ["job", "list", "--error", "--running"],
+        required_out=outputs,
+        excluded_out=excluded,
+    )
+
+    assert job_controller.set_job_state(JobState.DOWNLOADED, db_id="3")
+    outputs = ["DOWNLOADED"]
+    excluded = ["READY", "WAITING", "REMOTE_ERROR"]
+    run_check_cli(
+        ["job", "list", "--running"],
+        required_out=outputs,
+        excluded_out=excluded,
+    )
+    run_check_cli(
+        ["job", "list", "--running", "--count"], required_out="Number of jobs: 1"
     )
 
 
@@ -76,6 +133,10 @@ def test_jobs_list_settings(job_controller, two_flows_four_jobs, monkeypatch) ->
 
 
 def test_job_info(job_controller, two_flows_four_jobs) -> None:
+    from jobflow import Flow
+
+    from jobflow_remote import submit_flow
+    from jobflow_remote.testing import add
     from jobflow_remote.testing.cli import run_check_cli
 
     outputs = ["name = 'add1'", "state = 'READY'"]
@@ -93,6 +154,26 @@ def test_job_info(job_controller, two_flows_four_jobs) -> None:
 
     run_check_cli(
         ["job", "info", "10"], error=True, required_out="No data matching the request"
+    )
+
+    # test job with many parents. The job is wrong, as it does not take a list, but
+    # it is not going to be executed.
+    parents = [add(1, 5) for _ in range(10)]
+    child = add([p.output for p in parents], 2)
+
+    flow = Flow([child, *parents])
+    submit_flow(flow, worker="test_local_worker")
+    # get the list of parent ids from the DB to be sure to get the correct list ordering
+    pids = job_controller.get_job_info(child.uuid).parents
+    run_check_cli(
+        ["job", "info", child.uuid],
+        required_out=[pids[0], pids[-1], "..."],
+        excluded_out=[pids[5]],
+    )
+    run_check_cli(
+        ["job", "info", child.uuid, "-vv"],
+        required_out=pids,
+        excluded_out=["..."],
     )
 
 
@@ -207,7 +288,7 @@ def test_retry(job_controller, two_flows_four_jobs) -> None:
     run_check_cli(["job", "retry", "-did", "2"], required_out="Error while retrying")
 
 
-def test_play_pause(job_controller, two_flows_four_jobs) -> None:
+def test_pause_resume(job_controller, two_flows_four_jobs) -> None:
     from jobflow_remote.jobs.state import JobState
     from jobflow_remote.testing.cli import run_check_cli
 
@@ -219,14 +300,20 @@ def test_play_pause(job_controller, two_flows_four_jobs) -> None:
     assert job_controller.get_job_info(db_id="1").state == JobState.PAUSED
 
     run_check_cli(
-        ["job", "play", "-did", "1"],
+        ["job", "resume", "-did", "1"],
         required_out="Operation completed: 1 jobs modified",
     )
     assert job_controller.get_job_info(db_id="1").state == JobState.READY
-    run_check_cli(["job", "play", "-did", "1"], required_out="Error while playing")
+    run_check_cli(["job", "resume", "-did", "1"], required_out="Error while resuming")
+
+    # test the deprecated version. Remove when job play is removed.
+    run_check_cli(
+        ["job", "play", "-did", "1"],
+        required_out=["Error while resuming", "deprecated"],
+    )
 
 
-def test_stop(job_controller, two_flows_four_jobs) -> None:
+def test_stop_resume(job_controller, two_flows_four_jobs) -> None:
     from jobflow_remote.jobs.state import JobState
     from jobflow_remote.testing.cli import run_check_cli
 
@@ -236,6 +323,12 @@ def test_stop(job_controller, two_flows_four_jobs) -> None:
     )
     run_check_cli(["job", "stop", "-did", "1"], required_out="Error while stopping")
     assert job_controller.get_job_info(db_id="1").state == JobState.USER_STOPPED
+
+    run_check_cli(
+        ["job", "resume", "-did", "1"],
+        required_out="Operation completed: 1 jobs modified",
+    )
+    assert job_controller.get_job_info(db_id="1").state == JobState.READY
 
 
 def test_queue_out(job_controller, one_job) -> None:
@@ -402,7 +495,7 @@ def test_queries(job_controller, two_flows_four_jobs) -> None:
         "No filter has been set. This will apply the change to all the jobs in the DB.",
     ]
     run_check_cli(
-        ["job", "play"],
+        ["job", "resume"],
         cli_input="y",
         required_out=req_output_all,
     )
@@ -414,10 +507,10 @@ def test_queries(job_controller, two_flows_four_jobs) -> None:
 
     req_output_partial = [
         "Operation completed: 1 jobs modified",
-        "Error while playing for job 2 ValueError: Job in state WAITING. The action cannot be performed",
+        "Error while resuming for job 2 ValueError: Job in state WAITING. The action cannot be performed",
     ]
     run_check_cli(
-        ["job", "play", "--worker", "test_local_worker"],
+        ["job", "resume", "--worker", "test_local_worker"],
         cli_input="y",
         required_out=req_output_partial,
     )
@@ -435,11 +528,11 @@ def test_queries(job_controller, two_flows_four_jobs) -> None:
     )
 
     run_check_cli(
-        ["job", "play", "--end-date", yesterday],
+        ["job", "resume", "--end-date", yesterday],
         required_out="Operation completed: 0 jobs modified",
     )
     run_check_cli(
-        ["job", "play", "--end-date", tomorrow],
+        ["job", "resume", "--end-date", tomorrow],
         required_out="Operation completed: 4 jobs modified",
     )
 
@@ -449,7 +542,7 @@ def test_queries(job_controller, two_flows_four_jobs) -> None:
     )
 
     run_check_cli(
-        ["job", "play", "--hours", "1"],
+        ["job", "resume", "--hours", "1"],
         required_out="Operation completed: 4 jobs modified",
     )
 
@@ -467,7 +560,7 @@ def test_queries(job_controller, two_flows_four_jobs) -> None:
         required_out="Operation completed: 1 jobs modified",
     )
     run_check_cli(
-        ["job", "play", "--name", "add*"],
+        ["job", "resume", "--name", "add*"],
         required_out="Operation completed: 1 jobs modified",
     )
 
@@ -517,4 +610,28 @@ def test_report(job_controller) -> None:
     run_check_cli(
         ["job", "report", "days", "2"],
         required_out=output + excluded + ["Running Jobs │   1"],
+    )
+
+
+def test_todir(job_controller, one_job):
+    from jobflow_remote.jobs.runner import Runner
+    from jobflow_remote.testing.cli import run_check_cli
+
+    run_check_cli(
+        ["job", "todir", "1"],
+        required_out="The selected Job does not have a run_dir defined yet",
+        error=True,
+    )
+
+    runner = Runner()
+    runner.run_one_job()
+
+    # outputs from the connected shell are either not executed properly
+    # or not captured from run_check_cli.
+    # Matching the run_dir seems to have problems due to the newlines present in the
+    # captured output that can split the path over multiple lines
+    run_check_cli(
+        ["job", "todir", "1"],
+        cli_input="exit",
+        required_out=["Connecting to worker test_local_worker"],
     )

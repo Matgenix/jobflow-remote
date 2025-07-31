@@ -37,25 +37,32 @@ def run_check_cli(
         terminal_width=terminal_width,
     )
 
+    # Since typer 0.16.0 and click 8.2 the stderr is necessarily separated from the output.
+    # To keep backward compatibility with previous click versions handle both defaults cases.
+    try:
+        result_out = result.stdout + "\n" + result.stderr
+    except ValueError:
+        result_out = result.stdout
+
     # note that stderr is not captured separately
     assert (
         error == (result.exit_code != 0)
-    ), f"cli should have {'' if error else 'not '}failed. exit code: {result.exit_code}. stdout: {result.stdout}"
+    ), f"cli should have {'' if error else 'not '}failed. exit code: {result.exit_code}. stdout: {result_out}"
 
-    # the print of the output in the console during the tests may result in newlines added
+    # The print of the output in the console during the tests may result in newlines added
     # that prevent the output to be matched. replace all spaces with a single space.
-    single_space_output = re.sub(r"[\n\t\s]*", " ", result.stdout)
+    single_space_output = re.sub(r"[\n\t\s]*", " ", result_out)
 
     if required_out:
         for ro in required_out:
             assert (
                 re.sub(r"[\n\t\s]*", " ", ro) in single_space_output
-            ), f"{ro} missing from stdout: {result.stdout}"
+            ), f"{ro} missing from stdout: {result_out}"
 
     if excluded_out:
         for eo in excluded_out:
             assert (
                 re.sub(r"[\n\t\s]*", " ", eo) not in single_space_output
-            ), f"{eo} present in stdout: {result.stdout}"
+            ), f"{eo} present in stdout: {result_out}"
 
     return result

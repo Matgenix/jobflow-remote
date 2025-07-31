@@ -333,3 +333,14 @@ def test_missing_running_runner_doc(
     # still cannot start
     with pytest.raises(ValueError, match=error):
         daemon_manager.start(raise_on_error=True, single=False)
+
+
+def test_restart(job_controller, daemon_manager, wait_daemon_started):
+    from jobflow_remote.jobs.daemon import DaemonStatus
+
+    assert not daemon_manager.restart(raise_on_error=False)
+    assert daemon_manager.start()
+    wait_daemon_started(daemon_manager)
+    assert daemon_manager.restart(raise_on_error=True)
+
+    assert daemon_manager.check_status() == DaemonStatus.RUNNING

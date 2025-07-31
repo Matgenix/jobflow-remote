@@ -17,6 +17,7 @@ from jobflow_remote.cli.formatting import (
 from jobflow_remote.cli.jf import app
 from jobflow_remote.cli.jfr_typer import JFRTyper
 from jobflow_remote.cli.types import (
+    count_opt,
     days_opt,
     db_ids_opt,
     delete_all_opt,
@@ -74,6 +75,7 @@ def flows_list(
     metadata: metadata_opt = None,
     locked: locked_flow_opt = False,
     verbosity: verbosity_opt = 0,
+    count: count_opt = False,
     max_results: max_results_opt = 100,
     sort: sort_opt = SortOption.UPDATED_ON,
     reverse_sort: reverse_sort_flag_opt = False,
@@ -88,31 +90,46 @@ def flows_list(
 
     db_sort: list[tuple[str, int]] = [(sort.value, 1 if reverse_sort else -1)]
 
-    with loading_spinner():
-        flows_info = jc.get_flows_info(
-            job_ids=job_id,
-            db_ids=db_id,
-            flow_ids=flow_id,
-            states=state,
-            start_date=start_date,
-            end_date=end_date,
-            name=name,
-            metadata=metadata,
-            locked=locked,
-            limit=max_results,
-            sort=db_sort,
-            full=verbosity > 0,
-        )
+    if count:
+        with loading_spinner():
+            n_flows = jc.count_flows(
+                job_ids=job_id,
+                db_ids=db_id,
+                flow_ids=flow_id,
+                states=state,
+                start_date=start_date,
+                end_date=end_date,
+                name=name,
+                metadata=metadata,
+                locked=locked,
+            )
+        out_console.print(f"Number of Flows: {n_flows}")
+    else:
+        with loading_spinner():
+            flows_info = jc.get_flows_info(
+                job_ids=job_id,
+                db_ids=db_id,
+                flow_ids=flow_id,
+                states=state,
+                start_date=start_date,
+                end_date=end_date,
+                name=name,
+                metadata=metadata,
+                locked=locked,
+                limit=max_results,
+                sort=db_sort,
+                full=verbosity > 0,
+            )
 
-        table = get_flow_info_table(flows_info, verbosity=verbosity)
+            table = get_flow_info_table(flows_info, verbosity=verbosity)
 
-    if SETTINGS.cli_suggestions and max_results and len(flows_info) == max_results:
-        out_console.print(
-            f"The number of Flows printed is limited by the maximum selected: {max_results}",
-            style="yellow",
-        )
+        if SETTINGS.cli_suggestions and max_results and len(flows_info) == max_results:
+            out_console.print(
+                f"The number of Flows printed is limited by the maximum selected: {max_results}",
+                style="yellow",
+            )
 
-    out_console.print(table)
+        out_console.print(table)
 
 
 @app_flow.command()
@@ -363,3 +380,29 @@ def report(
         timezone=timezone,
     )
     out_console.print(*get_flow_report_components(jobs_report))
+
+
+@app_flow.command()
+def resume(
+    flow_db_id: flow_db_id_arg,
+    job_id_flag: job_flow_id_flag_opt = False,
+) -> None:
+    """Resume a STOPPED or PAUSED Flow."""
+    job_id = flow_id = None
+    db_id, jf_id = get_job_db_ids(flow_db_id, None)
+    if db_id is None:
+        if job_id_flag:
+            job_id = jf_id
+        else:
+            flow_id = jf_id
+
+    with loading_spinner():
+        jc = get_job_controller()
+
+        n_jobs = jc.resume_flow(
+            job_id=job_id,
+            db_id=db_id,
+            flow_id=flow_id,
+        )
+
+    out_console.print(f"{n_jobs} Job(s) resumed")

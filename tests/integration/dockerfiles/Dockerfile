@@ -4,7 +4,6 @@ ARG USERNAME=jobflow
 
 # Install jobflow-remote in its own layer with uv
 FROM --platform=linux/amd64 ubuntu:22.04 as jobflow-remote-install
-# FROM ubuntu:22.04 as jobflow-remote-install
 
 ARG USERNAME=jobflow
 ENV USERNAME=${USERNAME}
@@ -14,7 +13,7 @@ RUN apt update && \
     apt clean && \
     rm -rf /var/lib/apt/lists/*
 
-COPY --from=ghcr.io/astral-sh/uv:0.4 /uv /usr/local/bin/uv
+COPY --from=ghcr.io/astral-sh/uv:0.5 /uv /usr/local/bin/uv
 
 # As a bit of a hack, we make the path for this installation the same
 # as the eventual .venv export, to avoid needing to patch the activation
@@ -180,7 +179,6 @@ COPY ./tests/integration/dockerfiles/pbs_startup.sh /etc/startup.sh
 
 # 2) Add common options from ubuntu server
 FROM --platform=linux/amd64 ${QUEUE_SYSTEM} as jobflow
-# FROM ${QUEUE_SYSTEM} as jobflow
 
 ARG USERNAME=jobflow
 ENV USERNAME=${USERNAME}
