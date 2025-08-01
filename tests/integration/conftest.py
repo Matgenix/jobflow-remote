@@ -272,18 +272,12 @@ def write_tmp_settings(
     sge_ssh_port,
     pbs_ssh_port,
     db_port,
+    tmp_proj_work_dirs,
 ):
     """Collects the various sub-configs and writes them to a temporary file in a
     temporary directory."""
-    tmp_dir: Path = Path(tempfile.mkdtemp())
+    tmp_proj_dir, workdir = tmp_proj_work_dirs
 
-    original_jf_remote_projects_folder = os.environ.get("JFREMOTE_PROJECTS_FOLDER")
-    original_jf_remote_project = os.environ.get("JFREMOTE_PROJECT")
-    original_config_file = os.environ.get("JFREMOTE_CONFIG_FILE")
-
-    os.environ["JFREMOTE_PROJECTS_FOLDER"] = str(tmp_dir.resolve())
-    workdir = tmp_dir / "jfr"
-    workdir.mkdir(exist_ok=True)
     os.environ["JFREMOTE_PROJECT"] = random_project_name
     # Set config file to a random path so that we don't accidentally load the default
     os.environ["JFREMOTE_CONFIG_FILE"] = _get_random_name(length=10) + ".json"
@@ -464,16 +458,18 @@ def write_tmp_settings(
         ),
     )
     project_json = project.model_dump_json(indent=2)
-    with open(tmp_dir / f"{random_project_name}.json", "w") as f:
+    with open(tmp_proj_dir / f"{random_project_name}.json", "w") as f:
         f.write(project_json)
+
+    # In some cases it seems that the SETTINGS have already been imported
+    # and thus not taking the new configurations into account.
+    # Regenerate the JobflowRemoteSettings after setting paths and project
+    import jobflow_remote
+    from jobflow_remote.config.settings import JobflowRemoteSettings
+
+    jobflow_remote.SETTINGS = JobflowRemoteSettings()
 
     yield project
 
-    shutil.rmtree(tmp_dir)
-    # Reset environment variables if they were set elsewhere
-    if original_jf_remote_projects_folder is not None:
-        os.environ["JFREMOTE_PROJECTS_FOLDER"] = original_jf_remote_projects_folder
-    if original_jf_remote_project is not None:
-        os.environ["JFREMOTE_PROJECT"] = original_jf_remote_project
-    if original_config_file is not None:
-        os.environ["JFREMOTE_CONFIG_FILE"] = original_config_file
+    if tmp_proj_dir.exists():
+        shutil.rmtree(tmp_proj_dir)

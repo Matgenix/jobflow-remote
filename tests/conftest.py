@@ -90,6 +90,31 @@ def tmp_dir():
 
 
 @pytest.fixture(scope="session")
+def tmp_proj_work_dirs():
+    import tempfile
+
+    tmp_proj_dir: Path = Path(tempfile.mkdtemp())
+
+    original_jf_remote_projects_folder = os.environ.get("JFREMOTE_PROJECTS_FOLDER")
+    original_jf_remote_project = os.environ.get("JFREMOTE_PROJECT")
+    original_config_file = os.environ.get("JFREMOTE_CONFIG_FILE")
+
+    os.environ["JFREMOTE_PROJECTS_FOLDER"] = str(tmp_proj_dir.resolve())
+    workdir = tmp_proj_dir / "jfr"
+    workdir.mkdir(exist_ok=True)
+
+    yield tmp_proj_dir, workdir
+
+    # Reset environment variables if they were set elsewhere
+    if original_jf_remote_projects_folder is not None:
+        os.environ["JFREMOTE_PROJECTS_FOLDER"] = original_jf_remote_projects_folder
+    if original_jf_remote_project is not None:
+        os.environ["JFREMOTE_PROJECT"] = original_jf_remote_project
+    if original_config_file is not None:
+        os.environ["JFREMOTE_CONFIG_FILE"] = original_config_file
+
+
+@pytest.fixture(scope="session")
 def debug_mode() -> bool:
     return False
 
