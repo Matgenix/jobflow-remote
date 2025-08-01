@@ -208,6 +208,7 @@ services:
                 for c in containers:
                     if c.name in ("mongo_container",):
                         continue
+                    print(f"GETTING BACK FROM container {c.name}")
                     coverage_container_dir = integration_cov_dir / c.name
                     coverage_container_dir.mkdir(exist_ok=True)
                     coverage_container_paths.append(coverage_container_dir)
