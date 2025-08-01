@@ -227,6 +227,9 @@ services:
                         print("BEFORE combine:")
                         print(os.listdir(coverage_container_dir))
                         print(os.listdir("."))
+                        print("COVERAGE FILE ENVIRONMENT VARIABLE")
+                        print(os.environ["COVERAGE_FILE"])
+                        os.environ["COVERAGE_FILE"] = ".coverage"
                         cov = Coverage()
                         cov.combine()
                         cov.save()
