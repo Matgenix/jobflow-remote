@@ -226,13 +226,13 @@ services:
                         print("IN coverage_container_dir :", coverage_container_dir)
                         print("BEFORE combine:")
                         print(os.listdir(coverage_container_dir))
-                        print(".")
+                        print(os.listdir("."))
                         cov = Coverage()
                         cov.combine()
                         cov.save()
                         print("AFTER combine and save:")
                         print(os.listdir(coverage_container_dir))
-                        print(".")
+                        print(os.listdir("."))
                 with cd(integration_cov_dir):
                     # cov = Coverage()
                     # data_paths = [
