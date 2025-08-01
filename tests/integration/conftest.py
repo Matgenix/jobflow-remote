@@ -223,32 +223,69 @@ services:
                                 coverage_container_dir / file,
                             )
                     with cd(coverage_container_dir):
+                        print("IN coverage_container_dir :", coverage_container_dir)
                         print("BEFORE combine:")
                         print(os.listdir(coverage_container_dir))
+                        print(".")
                         cov = Coverage()
                         cov.combine()
                         cov.save()
                         print("AFTER combine and save:")
                         print(os.listdir(coverage_container_dir))
+                        print(".")
                 with cd(integration_cov_dir):
-                    cov = Coverage()
-                    data_paths = [
-                        p.relative_to(integration_cov_dir) / ".coverage"
-                        for p in coverage_container_paths
-                    ]
-                    print("DATA PATHS:")
-                    print(data_paths)
-                    data_paths = [str(p) for p in data_paths if p.exists()]
-                    cov.combine(data_paths=data_paths, keep=True)
-                    cov.save()
-                    print("INTEGRATION COV DIR AFTER combine and save")
-                    print(os.listdir(integration_cov_dir))
+                    # cov = Coverage()
+                    # data_paths = [
+                    #     p.relative_to(integration_cov_dir) / ".coverage"
+                    #     for p in coverage_container_paths
+                    # ]
+                    # print("DATA PATHS:")
+                    # print(data_paths)
+                    #
+                    # data_paths = [str(p) for p in data_paths if p.exists()]
+                    # cov.combine(data_paths=data_paths, keep=True)
+                    # cov.save()
+                    # print("INTEGRATION COV DIR AFTER combine and save")
+                    # print(os.listdir(integration_cov_dir))
+                    # for directory in os.listdir(integration_cov_dir):
+                    #     print(f"List of files in directory {directory}")
+                    #     if os.path.isdir(directory):
+                    #         print(os.listdir(integration_cov_dir / directory))
+                    #     else:
+                    #         print("... not a directory!!")
+                    # shutil.move(
+                    #     ".coverage", coverage_dir / ".coverage-integration-remote"
+                    # )
                     for directory in os.listdir(integration_cov_dir):
                         print(f"List of files in directory {directory}")
                         if os.path.isdir(directory):
                             print(os.listdir(integration_cov_dir / directory))
                         else:
                             print("... not a directory!!")
+                    for cov_container_path in coverage_container_paths:
+                        cov_dir = cov_container_path.relative_to(integration_cov_dir)
+                        cov_file = cov_dir / ".coverage"
+                        shutil.copy(cov_file, f".coverage.{cov_dir}")
+
+                    cov = Coverage()
+                    # data_paths = [
+                    #     p.relative_to(integration_cov_dir) / ".coverage"
+                    #     for p in coverage_container_paths
+                    # ]
+                    # print("DATA PATHS:")
+                    # print(data_paths)
+                    #
+                    # data_paths = [str(p) for p in data_paths if p.exists()]
+                    cov.combine()
+                    cov.save()
+                    # print("INTEGRATION COV DIR AFTER combine and save")
+                    # print(os.listdir(integration_cov_dir))
+                    # for directory in os.listdir(integration_cov_dir):
+                    #     print(f"List of files in directory {directory}")
+                    #     if os.path.isdir(directory):
+                    #         print(os.listdir(integration_cov_dir / directory))
+                    #     else:
+                    #         print("... not a directory!!")
                     shutil.move(
                         ".coverage", coverage_dir / ".coverage-integration-remote"
                     )
