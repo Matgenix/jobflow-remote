@@ -177,7 +177,7 @@ An example of a configuration for a parallel *batch* worker is:
 Consider that, depending on how the cluster is configured and how the job is implemented,
 it will probably be needed to specify the number of processors used by each of the Jobs.
 For example, for a Job running a code based on MPI parallelization in SLURM, it may be
-needed to run the code with the command:
+needed to run the code with the command::
 
     srun --nodes 1 -n 128 --exclusive EXECUTABLE
 
