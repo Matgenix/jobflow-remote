@@ -243,6 +243,12 @@ services:
                     cov.save()
                     print("INTEGRATION COV DIR AFTER combine and save")
                     print(os.listdir(integration_cov_dir))
+                    for directory in os.listdir(integration_cov_dir):
+                        print(f"List of files in directory {directory}")
+                        if os.path.isdir(directory):
+                            print(os.listdir(integration_cov_dir / directory))
+                        else:
+                            print("... not a directory!!")
                     shutil.move(
                         ".coverage", coverage_dir / ".coverage-integration-remote"
                     )
