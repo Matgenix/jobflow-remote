@@ -230,6 +230,8 @@ services:
                         cov = Coverage()
                         cov.combine()
                         cov.save()
+                        with open("somerandomfile.txt", "w") as fff:
+                            fff.write("SOME text ...")
                         print("AFTER combine and save:")
                         print(os.listdir(coverage_container_dir))
                         print(os.listdir("."))
