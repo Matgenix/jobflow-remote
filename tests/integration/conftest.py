@@ -216,23 +216,32 @@ services:
                     ).splitlines()
                     for file in flist:
                         if file.startswith(".coverage"):
+                            print("DBG coverage file:", file)
                             c.copy_from(
                                 f"/home/jobflow/coverage/{file}",
                                 coverage_container_dir / file,
                             )
                     with cd(coverage_container_dir):
+                        print("BEFORE combine:")
+                        print(os.listdir(coverage_container_dir))
                         cov = Coverage()
                         cov.combine()
                         cov.save()
+                        print("AFTER combine and save:")
+                        print(os.listdir(coverage_container_dir))
                 with cd(integration_cov_dir):
                     cov = Coverage()
                     data_paths = [
                         p.relative_to(integration_cov_dir) / ".coverage"
                         for p in coverage_container_paths
                     ]
+                    print("DATA PATHS:")
+                    print(data_paths)
                     data_paths = [str(p) for p in data_paths if p.exists()]
                     cov.combine(data_paths=data_paths, keep=True)
                     cov.save()
+                    print("INTEGRATION COV DIR AFTER combine and save")
+                    print(os.listdir(integration_cov_dir))
                     shutil.move(
                         ".coverage", coverage_dir / ".coverage-integration-remote"
                     )
