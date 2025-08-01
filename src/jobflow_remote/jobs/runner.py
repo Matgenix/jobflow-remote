@@ -858,7 +858,7 @@ class Runner:
         worker = self.get_worker(doc["worker"])
         if not worker.is_local:
             host = self.get_host(doc["worker"])
-            store = self.get_jobstore(doc["hosts"][-1])
+            store = self.get_jobstore(job_dict["hosts"][-1])
 
             remote_path = doc["run_dir"]
             local_path = get_local_data_path(
