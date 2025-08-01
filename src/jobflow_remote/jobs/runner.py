@@ -10,7 +10,7 @@ import signal
 import time
 import traceback
 import uuid
-from collections import defaultdict
+from collections import OrderedDict, defaultdict
 from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -48,6 +48,8 @@ from jobflow_remote.utils.remote import UnsafeDeletionError, safe_remove_job_fil
 from jobflow_remote.utils.schedule import SafeScheduler
 
 if TYPE_CHECKING:
+    from jobflow.core.store import JobStore
+
     from jobflow_remote.remote.host import BaseHost
     from jobflow_remote.utils.db import MongoLock
 
@@ -138,6 +140,14 @@ class Runner:
         # How to deal with cases where the connection gets closed?
         # how to deal with file based stores?
         self.jobstore = self.project.get_jobstore()
+        self.optional_jobstores = {}
+        if self.project.optional_jobstores:
+            self.optional_jobstores = {
+                name: self.project.get_jobstore(name)
+                for name in self.project.optional_jobstores
+            }
+        # create a cached for the jobstores to be used in the get_jobstore method
+        self._cached_jostores: OrderedDict[str, JobStore] = OrderedDict()
 
         if connect_interactive:
             for host_name, host in self.hosts.items():
@@ -220,6 +230,47 @@ class Runner:
                 worker.get_scheduler_io(), self.get_host(worker_name)
             )
         return self.queue_managers[worker_name]
+
+    def get_jobstore(self, flow_id: str | None) -> JobStore:
+        """
+        Get the JobStore associated to a Flow.
+
+        Uses a small internal cache to reduce the calls to the DB, assuming
+        that not too many Flows will be updated at the same time.
+
+        Parameters
+        ----------
+        flow_id
+            The uuid of the Flow.
+
+        Returns
+        -------
+        JobStore
+            The JobStore associated to a Flow.
+        """
+        # A simple manual cache based on an OrderedDict is used here.
+        # The lru_cache decorator is discouraged since it will prevent
+        # garbage collection of the object. In principle this is likely
+        # not an issue for the Runner, but to avoid potential issues it is
+        # not used.
+        # Other packages exist that offer these functionalities (e.g. cachetools),
+        # but adding a dependence for this trivial caching seems an overkill.
+        # Note that an OrderedDict is needed because popitem() for a standard
+        # dict does not have the `last` argument.
+        if flow_id in self._cached_jostores:
+            return self._cached_jostores[flow_id]
+        jobstore = self.jobstore
+        if flow_id and self.optional_jobstores:
+            store_name = self.job_controller.get_flow_store(flow_id=flow_id)
+            if store_name:
+                jobstore = self.optional_jobstores[store_name]
+
+        self._cached_jostores[flow_id] = jobstore
+
+        if len(self._cached_jostores) > 20:
+            self._cached_jostores.popitem(last=False)
+
+        return jobstore
 
     def run(
         self,
@@ -621,7 +672,8 @@ class Runner:
                     no_retry=False,
                 ) from e
 
-        store = self.jobstore
+        store = self.get_jobstore(job_dict["hosts"][-1])
+
         # TODO would it be better/feasible to keep a pool of the required
         # Stores already connected, to avoid opening and closing them?
         store.connect()
@@ -806,7 +858,7 @@ class Runner:
         worker = self.get_worker(doc["worker"])
         if not worker.is_local:
             host = self.get_host(doc["worker"])
-            store = self.jobstore
+            store = self.get_jobstore(doc["hosts"][-1])
 
             remote_path = doc["run_dir"]
             local_path = get_local_data_path(
@@ -883,7 +935,7 @@ class Runner:
         )
 
         try:
-            store = self.jobstore
+            store = self.get_jobstore(doc["job"]["hosts"][-1])
             completed = self.job_controller.complete_job(doc, local_path, store)
 
         except json.JSONDecodeError as exc:
@@ -1301,5 +1353,14 @@ class Runner:
             self.jobstore.close()
         except Exception:
             logging.exception("error while closing connection to jobstore")
+
+        if self.optional_jobstores:
+            for name, optional_jobstore in self.optional_jobstores.items():
+                try:
+                    optional_jobstore.close()
+                except Exception:
+                    logging.exception(
+                        f"error while closing connection to optional jobstore {name}"
+                    )
 
         self.job_controller.close()

@@ -1,3 +1,6 @@
+import pytest
+
+
 def test_upload_cleanup_error(job_controller, runner, monkeypatch):
     from pathlib import Path
 
@@ -141,3 +144,46 @@ def test_resolve_references(job_controller, runner):
     assert isinstance(out_doc["output"], dict)
     assert out_doc["output"]["@class"] == "OutputReference"
     assert out_doc["output"]["uuid"] == j1.uuid
+
+
+def test_optional_store(job_controller, runner, two_flows_four_jobs):
+    # test that the jobs will run in different stores and that
+    # references are correctly resolved within a Flow.
+    job_controller.set_flow_store(
+        store="other_jobstore", flow_id=two_flows_four_jobs[0].uuid
+    )
+    runner.run_all_jobs(max_seconds=30)
+
+    std_js = job_controller.jobstore
+    assert std_js.get_output(two_flows_four_jobs[1][0].uuid)
+    assert std_js.get_output(two_flows_four_jobs[1][1].uuid)
+    with pytest.raises(
+        ValueError, match=f".*UUID: {two_flows_four_jobs[0][0].uuid} has no outputs.*"
+    ):
+        std_js.get_output(two_flows_four_jobs[0][0].uuid)
+    with pytest.raises(
+        ValueError, match=f".*UUID: {two_flows_four_jobs[0][1].uuid} has no outputs.*"
+    ):
+        std_js.get_output(two_flows_four_jobs[0][1].uuid)
+
+    opt_js = job_controller.optional_jobstores["other_jobstore"]
+    assert opt_js.get_output(two_flows_four_jobs[0][0].uuid)
+    assert opt_js.get_output(two_flows_four_jobs[0][1].uuid)
+    with pytest.raises(
+        ValueError, match=f".*UUID: {two_flows_four_jobs[1][0].uuid} has no outputs.*"
+    ):
+        opt_js.get_output(two_flows_four_jobs[1][0].uuid)
+    with pytest.raises(
+        ValueError, match=f".*UUID: {two_flows_four_jobs[1][1].uuid} has no outputs.*"
+    ):
+        opt_js.get_output(two_flows_four_jobs[1][1].uuid)
+
+    assert (
+        runner._cached_jostores[two_flows_four_jobs[0].uuid].docs_store.collection_name
+        == "other_docs"
+    )
+    assert (
+        runner._cached_jostores[two_flows_four_jobs[1].uuid].docs_store.collection_name
+        == "docs"
+    )
+    assert len(runner._cached_jostores) == 2
