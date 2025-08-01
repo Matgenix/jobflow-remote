@@ -129,7 +129,7 @@ jobs:
       - name: Full integration tests
         run: |
           COVERAGE_FILE=.coverage-integration \
-          pytest -k test_priority \
+          pytest -k test_priority -k test_submit_flow_with_dependencies \
             --pytest-durations-min=1 \
             --cov=jobflow_remote --cov-report= --cov-config=pyproject.toml \
             tests/integration
