@@ -236,6 +236,18 @@ def check(
                 header = cross
             progress.print(Text.from_markup(header + "Jobstore"))
 
+            if project.optional_jobstores:
+                progress.update(task_id, description="Checking optional jobstores")
+                for jobstore_name in project.optional_jobstores:
+                    err = check_jobstore(project.get_jobstore(jobstore_name))
+                    header = tick
+                    if err:
+                        errors.append((f"Jobstore {jobstore_name}", err))
+                        header = cross
+                    progress.print(
+                        Text.from_markup(header + f"Optional jobstore {jobstore_name}")
+                    )
+
         if check_all or queue:
             progress.update(task_id, description="Checking queue store")
             err = check_queue_store(project.get_queue_store())

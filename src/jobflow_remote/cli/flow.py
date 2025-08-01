@@ -406,3 +406,37 @@ def resume(
         )
 
     out_console.print(f"{n_jobs} Job(s) resumed")
+
+
+app_flow_set = JFRTyper(
+    name="set", help="Commands for setting properties for flows", no_args_is_help=True
+)
+app_flow.add_typer(app_flow_set)
+
+
+@app_flow_set.command()
+def store(
+    flow_db_id: flow_db_id_arg,
+    store: Annotated[
+        Optional[str],
+        typer.Argument(
+            help="The name of the Store to be set. If empty will set the default JobStore",
+            metavar="STORE",
+        ),
+    ] = None,
+    job_id_flag: job_flow_id_flag_opt = False,
+) -> None:
+    """Provide detailed information on a Flow."""
+    db_id = job_id = flow_id = None
+    db_id, jf_id = get_job_db_ids(flow_db_id, None)
+    if db_id is None:
+        if job_id_flag:
+            job_id = jf_id
+        else:
+            flow_id = jf_id
+
+    with loading_spinner():
+        jc = get_job_controller()
+
+        jc.set_flow_store(store=store, flow_id=flow_id, db_id=db_id, job_id=job_id)
+    out_console.print("Flow has been updated")

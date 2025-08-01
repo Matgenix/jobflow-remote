@@ -1255,19 +1255,9 @@ def output(
     with loading_spinner():
         jc = get_job_controller()
 
-        if db_id:
-            job_info = jc.get_job_info(
-                job_id=job_id,
-                job_index=job_index,
-                db_id=db_id,
-            )
-            if job_info:
-                job_id = job_info.uuid
-                job_index = job_info.index
-
-        job_output = None
-        if job_id:
-            job_output = jc.jobstore.get_output(job_id, job_index or "last", load=load)
+        job_output = jc.get_job_output(
+            db_id=db_id, job_id=job_id, job_index=job_index, load=load
+        )
 
     if not job_output:
         exit_with_error_msg("No data matching the request")

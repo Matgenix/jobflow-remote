@@ -79,8 +79,14 @@ from jobflow_remote.utils.remote import SharedHosts, safe_remove_job_files
 
 if TYPE_CHECKING:
     from collections.abc import Generator, Sequence
+    from enum import Enum
+    from typing import Union
 
     from maggma.stores import MongoStore
+    from monty.json import MSONable
+
+    obj_type = Union[str, Enum, type[MSONable], list[Union[Enum, str, type[MSONable]]]]
+    load_type = Union[bool, dict[str, Union[bool, obj_type]]]
 
 
 logger = logging.getLogger(__name__)
@@ -105,6 +111,7 @@ class JobController:
         flows_collection: str = "flows",
         auxiliary_collection: str = "jf_auxiliary",
         project: Project | None = None,
+        optional_jobstores: dict[str, JobStore] | None = None,
     ) -> None:
         """
         Parameters
@@ -123,15 +130,20 @@ class JobController:
             Uses the DB defined in the queue_store.
         project
             The project where the Stores were defined.
+        optional_jobstores
+            A dictionary of optional JobStores as defined in the project.
         """
         self.queue_store = queue_store
         self.jobstore = jobstore
         self.jobs_collection = self.queue_store.collection_name
         self.flows_collection = flows_collection
         self.auxiliary_collection = auxiliary_collection
+        self.optional_jobstores = optional_jobstores or {}
         # TODO should it connect here? Or the passed stores should be connected?
         self.queue_store.connect()
         self.jobstore.connect()
+        for opt_js in self.optional_jobstores.values():
+            opt_js.connect()
         self.db = self.queue_store._collection.database
         self.jobs = self.queue_store._collection
         self.flows = self.db[self.flows_collection]
@@ -177,12 +189,17 @@ class JobController:
         flows_collection = project.queue.flows_collection
         auxiliary_collection = project.queue.auxiliary_collection
         jobstore = project.get_jobstore()
+        optional_jobstores = {}
+        if project.optional_jobstores:
+            for js_name in project.optional_jobstores:
+                optional_jobstores[js_name] = project.get_jobstore(name=js_name)
         return cls(
             queue_store=queue_store,
             jobstore=jobstore,
             flows_collection=flows_collection,
             auxiliary_collection=auxiliary_collection,
             project=project,
+            optional_jobstores=optional_jobstores,
         )
 
     def close(self) -> None:
@@ -196,6 +213,14 @@ class JobController:
             self.jobstore.close()
         except Exception:
             logger.exception("Error while closing the connection to the job store")
+
+        for js_name, js in self.optional_jobstores.items():
+            try:
+                js.close()
+            except Exception:
+                logger.exception(
+                    f"Error while closing the connection to the optional job store {js_name}"
+                )
 
     def _build_query_job(
         self,
@@ -2519,6 +2544,71 @@ class JobController:
 
         return [FlowInfo.from_query_dict(d) for d in data]
 
+    def get_flow_store(self, flow_id: str) -> str | None:
+        """
+        Fetch the name of the optional JobStore to store the outputs
+        of a Flow, if defined.
+
+        Parameters
+        ----------
+        flow_id
+            The uuid of the Flow
+        Returns
+        -------
+        str
+            The name of one of the optional JobStores to be used.
+            None if the default should be used.
+        """
+        out = self.flows.find_one({"uuid": flow_id}, projection=["jobstore"])
+        if not out:
+            raise ValueError(f"No Flow matching id {flow_id}")
+        return out.get("jobstore") or None
+
+    def set_flow_store(
+        self,
+        store: str | None,
+        db_id: str | None = None,
+        job_id: str | None = None,
+        flow_id: str | None = None,
+    ) -> None:
+        """
+        Set the name of the optional JobStore to store the outputs
+        of a Flow. If None the default JobStore will be used.
+        Can be changed only for READY Flows.
+
+        Parameters
+        ----------
+        store
+            The name of one of the optional JobStores. If None sets to the
+            default JobStore.
+        db_id
+            The db_id of one Job belonging to the Flow.
+        job_id
+            The uuid of one Job belonging to the Flow.
+        flow_id
+            The uuid of the Flow.
+
+        """
+        filter_query = self.generate_flow_id_query(
+            db_id=db_id, job_id=job_id, flow_id=flow_id
+        )
+        if store and store not in self.optional_jobstores:
+            raise ValueError(f"Store {store} is not defined as an optional jobstore")
+        with self.lock_flow(
+            filter=filter_query, get_locked_doc=True, projection=["state"]
+        ) as flow_lock:
+            if not flow_lock.locked_document:
+                if flow_lock.unavailable_document:
+                    raise FlowLockedError.from_flow_doc(flow_lock.unavailable_document)
+                raise ValueError(f"No Flow document matching criteria {filter_query}")
+            if FlowState(flow_lock.locked_document["state"]) != FlowState.READY:
+                raise RuntimeError("The JobStore can be set only for a READY Flow")
+            flow_lock.update_on_release = {
+                "$set": {
+                    "jobstore": store,
+                }
+            }
+
     def delete_flows(
         self,
         flow_ids: str | list[str] | None = None,
@@ -2598,7 +2688,10 @@ class JobController:
             return False
         job_ids = flow["jobs"]
         if delete_output:
-            self.jobstore.remove_docs({"uuid": {"$in": job_ids}})
+            jobstore = self.jobstore
+            if flow.get("jobstore"):
+                jobstore = self.optional_jobstores[flow["jobstore"]]
+            jobstore.remove_docs({"uuid": {"$in": job_ids}})
         if delete_files:
             jobs_info = self.get_jobs_info(flow_ids=[flow_id])
             self._safe_delete_files(jobs_info)
@@ -2837,6 +2930,8 @@ class JobController:
 
         if reset_output:
             self.jobstore.remove_docs({})
+            for opt_jobstore in self.optional_jobstores.values():
+                opt_jobstore.remove_docs({})
 
         self.jobs.drop()
         self.flows.drop()
@@ -2937,31 +3032,38 @@ class JobController:
             for idx in flow_custom_indexes:
                 self.flows.create_index(idx, background=background)
 
-        # if the docs_store is a MongoStore with a collection, create a proper composed
-        # index that is the most effective for retrieving outputs. Otherwise create a simple
-        # index based on the maggma interface for the two indexes separately.
-        # In any case trap all exceptions, as this should not be a blocking point
-        try:
-            docs_store = self.jobstore.docs_store
-            if hasattr(docs_store, "_collection"):
-                if drop:
-                    docs_store._collection.drop_indexes()
-                docs_store._collection.create_index(
-                    [("uuid", 1), ("index", -1)], background=background
-                )
-            else:
-                docs_store.ensure_index("uuid")
-                docs_store.ensure_index("index")
-        except Exception:
-            logger.warning("Could not create the index for the JobStore", exc_info=True)
-        # Use the standard interface to create an index for the additional stores
-        for store_name, additional_store in self.jobstore.additional_stores.items():
+        def create_jobstore_indices(jobstore: JobStore, name: str):
+            # if the docs_store is a MongoStore with a collection, create a proper composed
+            # index that is the most effective for retrieving outputs. Otherwise create a simple
+            # index based on the maggma interface for the two indexes separately.
+            # In any case trap all exceptions, as this should not be a blocking point
             try:
-                additional_store.ensure_index("blob_uuid")
+                docs_store = jobstore.docs_store
+                if hasattr(docs_store, "_collection"):
+                    if drop:
+                        docs_store._collection.drop_indexes()
+                    docs_store._collection.create_index(
+                        [("uuid", 1), ("index", -1)], background=background
+                    )
+                else:
+                    docs_store.ensure_index("uuid")
+                    docs_store.ensure_index("index")
             except Exception:
                 logger.warning(
-                    f"Could not create the blob_uuid index for additional store {store_name}"
+                    f"Could not create the index for the {name} JobStore", exc_info=True
                 )
+            # Use the standard interface to create an index for the additional stores
+            for store_name, additional_store in jobstore.additional_stores.items():
+                try:
+                    additional_store.ensure_index("blob_uuid")
+                except Exception:
+                    logger.warning(
+                        f"Could not create the blob_uuid index for additional store {store_name} in {name} Jobstore"
+                    )
+
+        create_jobstore_indices(self.jobstore, "default")
+        for jobstore_name, jobstore in self.optional_jobstores.items():
+            create_jobstore_indices(jobstore, jobstore_name)
 
     def create_indexes(
         self,
@@ -3408,6 +3510,7 @@ class JobController:
         exec_config: ExecutionConfig | None = None,
         resources: dict | QResources | None = None,
         priority: int = 0,
+        jobstore: str | None = None,
     ) -> list[str]:
         from jobflow.core.flow import get_flow
 
@@ -3445,7 +3548,7 @@ class JobController:
                 )
             )
 
-        flow_doc = get_initial_flow_doc_dict(flow, job_dicts)
+        flow_doc = get_initial_flow_doc_dict(flow, job_dicts, jobstore=jobstore)
 
         # inserting first the flow document and, iteratively, all the jobs
         # should not lead to inconsistencies in the states, even if one of
@@ -3689,8 +3792,6 @@ class JobController:
 
         return reserved_uuid, reserved_index
 
-    # TODO if jobstore is not an option anymore, the "store" argument
-    # can be removed and just use self.jobstore.
     def complete_job(
         self, job_doc: dict, local_path: Path | str, store: JobStore
     ) -> bool:
@@ -4760,9 +4861,13 @@ class JobController:
 
             # Optionally delete from jobstore
             if delete_output:
+                jobstore = self.jobstore
+                if self.optional_jobstores:
+                    store_name = self.get_flow_store(job_doc["job"]["hosts"][-1])
+                    if store_name:
+                        jobstore = self.optional_jobstores[store_name]
                 try:
-                    if delete_output:
-                        self.jobstore.remove_docs({"uuid": job_id, "index": job_index})
+                    jobstore.remove_docs({"uuid": job_id, "index": job_index})
                 except Exception:
                     warnings.warn(
                         f"Error while delete the output of job {job_id} {job_index}",
@@ -4867,6 +4972,61 @@ class JobController:
                 delete_files=delete_files,
                 max_limit=max_limit,
             )
+
+    def get_job_output(
+        self,
+        job_id: str | None = None,
+        db_id: str | None = None,
+        job_index: int | None = None,
+        load: load_type = False,
+    ) -> Any:
+        """
+        Get the output of a single Job based on db_id or uuid+index.
+        Only one among db_id and job_id should be defined.
+
+        Parameters
+        ----------
+        db_id
+            The db_id of the Job.
+        job_id
+            The uuid of the Job.
+        job_index
+            The index of the Job. If None the Job with the largest index
+            will be selected.
+        load
+            Which items to load from additional stores. Setting to ``True`` will load
+            all items stored in additional stores. See the ``JobStore`` constructor for
+            more details.
+
+        Returns
+        -------
+        Any
+            The output(s) for the job
+        """
+        job_info = None
+        if db_id:
+            job_info = self.get_job_info(
+                job_id=job_id,
+                job_index=job_index,
+                db_id=db_id,
+            )
+            if not job_info:
+                raise ValueError(f"No Job with db_id {db_id}")
+            job_id = job_info.uuid
+            job_index = job_info.index
+
+        jobstore = self.jobstore
+        # if jobstore are defined need to check which JobStore to use
+        if self.optional_jobstores:
+            if not job_info:
+                job_info = self.get_job_info(
+                    job_id=job_id,
+                    job_index=job_index,
+                )
+            jobstore_name = self.get_flow_store(job_info.hosts[-1])
+            if jobstore_name:
+                jobstore = self.optional_jobstores[jobstore_name]
+        return jobstore.get_output(job_id, job_index or "last", load=load)
 
     def backup_dump(
         self,
