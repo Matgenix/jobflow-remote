@@ -1,7 +1,7 @@
 import os
 
 
-def test_jobs_list(job_controller, two_flows_four_jobs) -> None:
+def test_jobs_list(job_controller, two_flows_four_jobs, patch_cli_consoles) -> None:
     from jobflow_remote.jobs.state import JobState
     from jobflow_remote.testing.cli import run_check_cli
 

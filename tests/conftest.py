@@ -11,7 +11,7 @@ import pytest
 from rich.console import Console
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture()
 def patch_cli_consoles(monkeypatch):
     import jobflow_remote.cli
 

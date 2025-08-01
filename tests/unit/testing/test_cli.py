@@ -4,7 +4,7 @@ from typer.testing import Result
 from jobflow_remote.testing.cli import run_check_cli
 
 
-def test_run_check_cli():
+def test_run_check_cli(patch_cli_consoles):
     # Check multiple lines is found
     flow_excerpt = """├── flow: Commands for managing the flows
 │   ├── delete: Permanently delete Flows from the database
