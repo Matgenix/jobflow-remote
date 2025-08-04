@@ -386,6 +386,11 @@ def pytest_sessionstart(session):
             "integration_remote": [".coverage-integration-remote"],
             "integration_local": [".coverage-integration"],
             "integration": [".coverage-integration", ".coverage-integration-remote"],
+            "all_local": [
+                ".coverage-unit",
+                ".coverage-db",
+                ".coverage-integration",
+            ],
             "all": [
                 ".coverage-unit",
                 ".coverage-db",
@@ -393,9 +398,11 @@ def pytest_sessionstart(session):
                 ".coverage-integration-remote",
             ],
         }
+        os.environ.pop("COVERAGE_FILE", None)
         for flag, cov_files in flags.items():
             cov = coverage.Coverage()
             cov.combine(cov_files, keep=True)
+            print(f"\n\nCoverage for {flag} tests:\n{' '*(20+len(flag))}\n")
             cov.report()
             cov.html_report(directory=f"htmlcov_{flag}")
             print(f"\nCoverage report generated in 'htmlcov_{flag}' directory")

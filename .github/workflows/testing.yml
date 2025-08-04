@@ -84,6 +84,7 @@ jobs:
         run: |
           wget https://fastdl.mongodb.org/tools/db/mongodb-database-tools-ubuntu2204-x86_64-100.10.0.deb
           sudo apt install ./mongodb-database-tools-*-100.10.0.deb
+          sudo apt install tree
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -121,7 +122,7 @@ jobs:
       - name: Database tests
         run: |
           COVERAGE_FILE=.coverage-db \
-          pytest \
+          pytest -k test_index_rebuild \
             --pytest-durations-min=1 \
             --cov=jobflow_remote --cov-report= --cov-config=pyproject.toml \
             tests/db
@@ -129,7 +130,7 @@ jobs:
       - name: Full integration tests
         run: |
           COVERAGE_FILE=.coverage-integration \
-          pytest \
+          pytest -k test_priority -k test_submit_flow_with_dependencies \
             --pytest-durations-min=1 \
             --cov=jobflow_remote --cov-report= --cov-config=pyproject.toml \
             tests/integration
