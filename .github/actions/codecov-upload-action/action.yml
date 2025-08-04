@@ -9,7 +9,7 @@ runs:
   steps:
     - name: Tree of files
       run: |
-        tree
+        tree -a
       shell: bash
     # For some reason, the codecov update fails when passing the name of the file (e.g. ".coverage-unit")
     # so we use the standard name and do some silly moving of files ...
