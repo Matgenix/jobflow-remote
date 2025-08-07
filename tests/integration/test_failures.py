@@ -30,12 +30,12 @@ def test_missing_store_files(worker, job_controller, runner):
     flow = Flow([j])
     submit_flow(flow, worker=worker)
 
-    # if the worker is local the TERMINATED state is skipped
+    # if the worker is local the EXECUTED state is skipped
     # get the Job after the RUNNING state
     target_state = (
         JobState.DOWNLOADED
         if runner.workers[worker].type == "local"
-        else JobState.TERMINATED
+        else JobState.EXECUTED
     )
     assert runner.run_one_job(
         max_seconds=10, job_id=[j.uuid, j.index], target_state=target_state

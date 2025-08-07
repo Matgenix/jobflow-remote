@@ -214,6 +214,105 @@ def test_upgrade_to_0_1_5(
     )
 
 
+def test_upgrade_to_0_2_0(
+    job_controller, upgrade_test_dir, random_project_name
+) -> None:
+    from jobflow_remote.testing.cli import run_check_cli
+
+    job_controller.backup_restore(upgrade_test_dir / "0.2.0", python=True)
+
+    assert job_controller.count_jobs() == 10
+    assert job_controller.count_flows() == 10
+
+    assert job_controller.count_jobs({"state": "READY"}) == 1
+    assert job_controller.count_jobs({"state": "CHECKED_OUT"}) == 1
+    assert job_controller.count_jobs({"state": "UPLOADED"}) == 1
+    assert job_controller.count_jobs({"state": "SUBMITTED"}) == 1
+    assert job_controller.count_jobs({"state": "RUNNING"}) == 1
+    assert job_controller.count_jobs({"state": "TERMINATED"}) == 1
+    assert job_controller.count_jobs({"state": "DOWNLOADED"}) == 1
+    assert job_controller.count_jobs({"state": "COMPLETED"}) == 1
+    assert job_controller.count_jobs({"state": "FAILED"}) == 1
+    assert job_controller.count_jobs({"state": "REMOTE_ERROR"}) == 1
+    assert job_controller.count_jobs({"state": "EXECUTED"}) == 0
+
+    assert str(job_controller.get_current_db_version()) == "0.1.6"
+
+    # Try accessing the DB and get a proper error message
+    run_check_cli(
+        ["job", "list", "--sort", "created_on"],
+        required_out=[
+            "The TERMINATED state has been replaced by EXECUTED",
+            "jf admin upgrade",
+        ],
+        error=True,
+    )
+    run_check_cli(
+        ["job", "info", "2", "-vvv"],
+        required_out=["The CHECKED_OUT state has been removed", "jf admin upgrade"],
+        error=True,
+    )
+
+    run_check_cli(
+        ["admin", "upgrade", "--target", "0.2.0"],
+        cli_input="wrong_project_name",
+        required_out=[
+            "Remove CHECKED_OUT state in the Job collection. Set Jobs back to READY",
+            "Replace TERMINATED state with EXECUTED",
+            "Update database version number to 0.2.0",
+            "It is advisable to perform a backup before proceeding",
+            f"Insert the name of the project ({random_project_name}) to confirm that you want to proceed",
+        ],
+        error=True,
+    )
+
+    run_check_cli(
+        ["-fe", "admin", "upgrade", "--target", "0.2.0"],
+        cli_input=random_project_name,
+        required_out=["The database has been upgraded"],
+    )
+
+    versions_info = job_controller.auxiliary.find_one(
+        {"jobflow_remote_version": {"$exists": True}}
+    )
+    assert versions_info is not None
+    assert versions_info["jobflow_remote_version"] == "0.2.0"
+    assert job_controller.get_running_runner() is None
+
+    run_check_cli(
+        ["job", "list", "--sort", "created_on"],
+        required_out=["EXECUTED", "READY"],
+        excluded_out=["CHECKED_OUT", "TERMINATED"],
+    )
+    run_check_cli(
+        ["job", "info", "2", "-vvv"],
+        required_out=["READY"],
+    )
+
+    assert job_controller.count_jobs() == 10
+    assert job_controller.count_flows() == 10
+
+    assert job_controller.count_jobs({"state": "READY"}) == 2
+    assert job_controller.count_jobs({"state": "CHECKED_OUT"}) == 0
+    assert job_controller.count_jobs({"state": "UPLOADED"}) == 1
+    assert job_controller.count_jobs({"state": "SUBMITTED"}) == 1
+    assert job_controller.count_jobs({"state": "RUNNING"}) == 1
+    assert job_controller.count_jobs({"state": "TERMINATED"}) == 0
+    assert job_controller.count_jobs({"state": "DOWNLOADED"}) == 1
+    assert job_controller.count_jobs({"state": "COMPLETED"}) == 1
+    assert job_controller.count_jobs({"state": "FAILED"}) == 1
+    assert job_controller.count_jobs({"state": "REMOTE_ERROR"}) == 1
+    assert job_controller.count_jobs({"state": "EXECUTED"}) == 1
+
+    # test upgrading again to check that it will not perform the upgrade
+    run_check_cli(
+        ["admin", "upgrade", "--target", "0.2.0"],
+        required_out=[
+            "Current DB version: 0.2.0. No upgrade required for target version 0.2.0"
+        ],
+    )
+
+
 def test_index_rebuild(job_controller, one_job):
     from jobflow_remote.testing.cli import run_check_cli
 

@@ -81,14 +81,6 @@ def run(
             help="Enable the queue option in the runner",
         ),
     ] = False,
-    checkout: Annotated[
-        bool,
-        typer.Option(
-            "--checkout",
-            "-cho",
-            help="Enable the checkout option in the runner",
-        ),
-    ] = False,
     connect_interactive: Annotated[
         bool,
         typer.Option(
@@ -109,11 +101,11 @@ def run(
         runner_id=str(runner_id),
         connect_interactive=connect_interactive,
     )
-    if not (transfer or complete or queue or checkout):
-        transfer = complete = queue = checkout = True
+    if not (transfer or complete or queue):
+        transfer = complete = queue = True
 
     try:
-        runner.run(transfer=transfer, complete=complete, queue=queue, checkout=checkout)
+        runner.run(transfer=transfer, complete=complete, queue=queue)
     finally:
         runner.cleanup()
 

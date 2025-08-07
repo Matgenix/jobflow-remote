@@ -36,7 +36,6 @@ def test_std_operations(
 
     info_required = [
         "supervisord",
-        "runner_daemon_checkout:run_jobflow_checkout",
         "runner_daemon_complete:run_jobflow_complete0",
         "runner_daemon_queue:run_jobflow_queue",
         "runner_daemon_transfer:run_jobflow_transfer0",

@@ -135,7 +135,6 @@ def write_tmp_settings(
         },
         exec_config={"test": {"export": {"TESTING_ENV_VAR": random_project_name}}},
         runner=dict(
-            delay_checkout=1,
             delay_check_run_status=1,
             delay_advance_status=1,
             max_step_attempts=3,

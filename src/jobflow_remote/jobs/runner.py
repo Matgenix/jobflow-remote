@@ -226,7 +226,6 @@ class Runner:
         transfer: bool = True,
         complete: bool = True,
         queue: bool = True,
-        checkout: bool = True,
         ticks: int | None = None,
     ) -> None:
         """
@@ -242,8 +241,6 @@ class Runner:
             If True Job completion is performed by the runner.
         queue
             If True interactions with the queue manager are handled by the Runner.
-        checkout
-            If True the checkout of Jobs is performed by the Runner.
         ticks
             If provided, the Runner will run for this number of ticks before exiting.
         """
@@ -251,30 +248,21 @@ class Runner:
 
         states = []
         if transfer:
-            states.append(JobState.CHECKED_OUT.value)
-            states.append(JobState.TERMINATED.value)
+            states.append(JobState.READY.value)
+            states.append(JobState.EXECUTED.value)
         if complete:
             states.append(JobState.DOWNLOADED.value)
         if queue:
             states.append(JobState.UPLOADED.value)
 
         logger.info(
-            f"Runner run options: transfer: {transfer} complete: {complete} queue: {queue} checkout: {checkout}"
+            f"Runner run options: transfer: {transfer} complete: {complete} queue: {queue}"
         )
 
         scheduler = SafeScheduler(seconds_after_failure=120)
 
         # run a first call for each case, since schedule will wait for the delay
         # to make the first execution.
-        if checkout:
-            try:
-                self.checkout()
-            except Exception:
-                logger.exception("Error during initial checkout")
-            scheduler.every(self.runner_options.delay_checkout).seconds.do(
-                self.checkout
-            )
-
         if transfer or queue or complete:
             try:
                 self.advance_state(states)
@@ -293,7 +281,7 @@ class Runner:
                 self.check_run_status
             )
             # Limited workers will only affect the process interacting with the queue
-            # manager. When a job is submitted or terminated the count in the
+            # manager. When a job is submitted or executed the count in the
             # limited_workers can be directly updated, since by construction only one
             # process will take care of the queue state.
             # The refresh can be run on a relatively high delay since it should only
@@ -345,8 +333,8 @@ class Runner:
         Mainly used for testing.
         """
         states = [
-            JobState.CHECKED_OUT.value,
-            JobState.TERMINATED.value,
+            JobState.READY.value,
+            JobState.EXECUTED.value,
             JobState.DOWNLOADED.value,
             JobState.UPLOADED.value,
         ]
@@ -356,9 +344,6 @@ class Runner:
         t0 = time.time()
         # run a first call for each case, since schedule will wait for the delay
         # to make the first execution.
-        self.checkout()
-        scheduler.every(self.runner_options.delay_checkout).seconds.do(self.checkout)
-
         self.advance_state(states)
         scheduler.every(self.runner_options.delay_advance_status).seconds.do(
             self.advance_state, states=states
@@ -370,7 +355,7 @@ class Runner:
         )
 
         # Limited workers will only affect the process interacting with the queue
-        # manager. When a job is submitted or terminated the count in the
+        # manager. When a job is submitted or executed the count in the
         # limited_workers can be directly updated, since by construction only one
         # process will take care of the queue state.
         # The refresh can be run on a relatively high delay since it should only
@@ -389,8 +374,7 @@ class Runner:
 
         running_states = [
             JobState.READY.value,
-            JobState.CHECKED_OUT.value,
-            JobState.TERMINATED.value,
+            JobState.EXECUTED.value,
             JobState.DOWNLOADED.value,
             JobState.UPLOADED.value,
             JobState.SUBMITTED.value,
@@ -423,8 +407,8 @@ class Runner:
         Mainly used for testing.
         """
         states = [
-            JobState.CHECKED_OUT.value,
-            JobState.TERMINATED.value,
+            JobState.READY.value,
+            JobState.EXECUTED.value,
             JobState.DOWNLOADED.value,
             JobState.UPLOADED.value,
         ]
@@ -438,33 +422,29 @@ class Runner:
         if job_id:
             query["uuid"] = job_id[0]
             query["index"] = job_id[1]
-        job_data = self.job_controller.checkout_job(query=query)
-        if not job_data:
-            if not db_id and not job_id:
-                return False
-            if not db_id:
-                job_data = job_id
-            else:
-                j_info = self.job_controller.get_job_info(db_id=db_id)
-                job_data = (j_info.uuid, j_info.index)
+        job_docs = self.job_controller.get_jobs_doc_query(query)
+        if not job_docs:
+            return False
 
+        job_data = (job_docs[0].uuid, job_docs[0].index)
         filters = {"uuid": job_data[0], "index": job_data[1]}
-        self.advance_state(states)
+        print(job_data)
+        print(filters)
+        self.advance_state(states, filter=filters)
         scheduler.every(self.runner_options.delay_advance_status).seconds.do(
             self.advance_state,
             states=states,
             filter=filters,
         )
 
-        self.check_run_status()
+        self.check_run_status(filter=filters)
         scheduler.every(self.runner_options.delay_check_run_status).seconds.do(
             self.check_run_status, filter=filters
         )
 
         running_states = [
             JobState.READY.value,
-            JobState.CHECKED_OUT.value,
-            JobState.TERMINATED.value,
+            JobState.EXECUTED.value,
             JobState.DOWNLOADED.value,
             JobState.UPLOADED.value,
             JobState.SUBMITTED.value,
@@ -542,9 +522,9 @@ class Runner:
             The state of the Jobs that can be queried.
         """
         states_methods = {
-            JobState.CHECKED_OUT: self.upload,
+            JobState.READY: self.upload,
             JobState.UPLOADED: self.submit,
-            JobState.TERMINATED: self.download,
+            JobState.EXECUTED: self.download,
             JobState.DOWNLOADED: self.complete_job,
         }
 
@@ -574,7 +554,7 @@ class Runner:
 
     def upload(self, lock: MongoLock) -> None:
         """
-        Upload files for a locked Job in the CHECKED_OUT state.
+        Upload files for a locked Job in the READY state.
         If successful set the state to UPLOADED.
 
         Parameters
@@ -661,6 +641,8 @@ class Runner:
             }
         }
         lock.update_on_release = set_output
+        # possibly mark the flow as running, if not already done
+        self.job_controller.start_flow(job_dict["uuid"])
 
     def submit(self, lock: MongoLock) -> None:
         """
@@ -783,7 +765,7 @@ class Runner:
 
     def download(self, lock) -> None:
         """
-        Download the final files for a locked Job in the TERMINATED state.
+        Download the final files for a locked Job in the EXECUTED state.
         If successful set the state to DOWNLOADED.
 
         Parameters
@@ -901,7 +883,7 @@ class Runner:
         Check the status of all the jobs submitted to a queue.
 
         If Jobs started update their state from SUBMITTED to RUNNING.
-        If Jobs terminated set their state to TERMINATED if running on a remote
+        If Jobs are finished set their state to EXECUTED if running on a remote
         host. If on a local host set them directly to DOWNLOADED.
         """
         logger.debug("check_run_status")
@@ -972,13 +954,13 @@ class Runner:
                     # if the worker is local go directly to DOWNLOADED, as files
                     # are not copied locally
                     if not worker.is_local:
-                        next_state = JobState.TERMINATED
+                        next_state = JobState.EXECUTED
                     else:
                         next_state = JobState.DOWNLOADED
                     # the delay is applied if the job is finished on the worker
                     next_step_delay = worker.delay_download
                     logger.debug(
-                        f"terminated remote job with id {remote_doc['process_id']}"
+                        f"executed remote job with id {remote_doc['process_id']}"
                     )
                 elif not error and remote_doc["step_attempts"] > 0:
                     # reset the step attempts if succeeding in case there was
@@ -1018,27 +1000,10 @@ class Runner:
                             lock.update_on_release = set_output
                     # decrease the amount of jobs running if it is a limited worker
                     if (
-                        next_state in (JobState.TERMINATED, JobState.DOWNLOADED)
+                        next_state in (JobState.EXECUTED, JobState.DOWNLOADED)
                         and worker_name in self.limited_workers
                     ):
                         self.limited_workers[doc["worker"]]["current"] -= 1
-
-    def checkout(self) -> None:
-        """Checkout READY Jobs."""
-        logger.debug("checkout jobs")
-        n_checked_out = 0
-        while True:
-            try:
-                reserved = self.job_controller.checkout_job()
-                if not reserved:
-                    break
-            except Exception:
-                logger.exception("Error while checking out jobs")
-                break
-
-            n_checked_out += 1
-
-        logger.debug(f"checked out {n_checked_out} jobs")
 
     def refresh_num_current_jobs(self) -> None:
         """
@@ -1230,17 +1195,17 @@ class Runner:
                 else:
                     logger.error(f"unhandled submission status {submit_result.status}")
 
-            # check for jobs that have terminated in the batch runner and
+            # check for jobs that have finished in the batch runner and
             # update the DB state accordingly
-            terminated_jobs = []
+            executed_jobs = []
             try:
-                terminated_jobs = batch_manager.get_terminated()
+                executed_jobs = batch_manager.get_executed()
             except Exception:
                 logger.warning(
-                    f"error trying to get the list of terminated batch jobs for worker: {worker_name}",
+                    f"error trying to get the list of executed batch jobs for worker: {worker_name}",
                     exc_info=True,
                 )
-            for job_id, job_index, process_running_uuid in terminated_jobs:
+            for job_id, job_index, process_running_uuid in executed_jobs:
                 lock_filter = {
                     "uuid": job_id,
                     "index": job_index,
@@ -1258,7 +1223,7 @@ class Runner:
                 ) as lock:
                     if lock.locked_document:
                         if not worker.is_local:
-                            next_state = JobState.TERMINATED
+                            next_state = JobState.EXECUTED
                         else:
                             next_state = JobState.DOWNLOADED
                         set_output = {
@@ -1268,7 +1233,7 @@ class Runner:
                             }
                         }
                         lock.update_on_release = set_output
-                batch_manager.delete_terminated(
+                batch_manager.delete_executed(
                     [(job_id, job_index, process_running_uuid)]
                 )
 

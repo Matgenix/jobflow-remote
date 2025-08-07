@@ -365,11 +365,10 @@ def get_job_report_components(report: JobsReport) -> list[RenderableType]:
     state_colors = {
         JobState.WAITING: "grey39",
         JobState.READY: "cyan",
-        JobState.CHECKED_OUT: "bright_cyan",
         JobState.UPLOADED: "deep_sky_blue1",
         JobState.SUBMITTED: "blue",
         JobState.RUNNING: "green",
-        JobState.TERMINATED: "red",
+        JobState.EXECUTED: "red",
         JobState.DOWNLOADED: "blue_violet",
         JobState.REMOTE_ERROR: "yellow",
         JobState.COMPLETED: "green",

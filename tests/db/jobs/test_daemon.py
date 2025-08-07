@@ -57,7 +57,7 @@ def test_start_stop(
     assert job_controller.count_jobs(states=JobState.COMPLETED) == 1
 
     processes_info = daemon_manager.get_processes_info()
-    expected_nprocs = 2 if single else 5
+    expected_nprocs = 2 if single else 4
     assert len(processes_info) == expected_nprocs
 
     assert daemon_manager.stop(raise_on_error=True, wait=True)

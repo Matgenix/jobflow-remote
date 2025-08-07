@@ -81,15 +81,6 @@ nodaemon=$nodaemon
 [supervisorctl]
 serverurl=unix://$sock_file
 
-[program:runner_daemon_checkout]
-priority=100
-command=jf -p $project runner run -pid --checkout -log $loglevel $connect_interactive
-autostart=true
-autorestart=false
-numprocs=1
-process_name=run_jobflow_checkout
-stopwaitsecs=86400
-
 [program:runner_daemon_transfer]
 priority=100
 command=jf -p $project runner run -pid --transfer -log $loglevel $connect_interactive

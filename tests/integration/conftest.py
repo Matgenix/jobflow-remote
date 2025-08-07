@@ -408,7 +408,6 @@ def write_tmp_settings(
             "long_pre_run": {"pre_run": f"echo {'X'*4000}; echo {'X'*4000} 1>&2"},
         },
         runner=dict(
-            delay_checkout=1,
             delay_check_run_status=1,
             delay_advance_status=1,
             max_step_attempts=3,

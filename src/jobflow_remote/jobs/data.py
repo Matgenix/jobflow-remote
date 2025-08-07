@@ -6,11 +6,11 @@ from typing import Optional, Union
 
 from jobflow import Flow, Job
 from monty.json import jsanitize
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from qtoolkit.core.data_objects import QResources, QState
 
 from jobflow_remote.config.base import ExecutionConfig
-from jobflow_remote.jobs.state import FlowState, JobState
+from jobflow_remote.jobs.state import DeprecatedStateError, FlowState, JobState
 
 IN_FILENAME = "jfremote_in.json"
 OUT_FILENAME = "jfremote_out.json"
@@ -206,6 +206,19 @@ class JobInfo(BaseModel):
             d[k] = job[k]
         return cls.model_validate(d)
 
+    @field_validator("state", mode="before")
+    @classmethod
+    def state_validator(cls, value):
+        # show the custom message only for DeprecatedStateError, leave handling
+        # all the rest to standard pydantic Enum validation
+        try:
+            JobState(value)
+        except DeprecatedStateError:
+            raise
+        except Exception:
+            pass
+        return value
+
 
 def _projection_db_info() -> list[str]:
     """
@@ -282,6 +295,19 @@ class JobDoc(BaseModel):
         if isinstance(self.resources, QResources):
             d["resources"] = self.resources.as_dict()
         return d
+
+    @field_validator("state", mode="before")
+    @classmethod
+    def state_validator(cls, value):
+        # show the custom message only for DeprecatedStateError, leave handling
+        # all the rest to standard pydantic Enum validation
+        try:
+            JobState(value)
+        except DeprecatedStateError:
+            raise
+        except Exception:
+            pass
+        return value
 
 
 class FlowDoc(BaseModel):

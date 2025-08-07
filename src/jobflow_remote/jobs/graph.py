@@ -250,11 +250,10 @@ RED_COLOR = "#fC3737"
 COLOR_MAPPING = {
     JobState.WAITING.value: "#aaaaaa",
     JobState.READY.value: "#DAF7A6",
-    JobState.CHECKED_OUT.value: BLUE_COLOR,
     JobState.UPLOADED.value: BLUE_COLOR,
     JobState.SUBMITTED.value: BLUE_COLOR,
     JobState.RUNNING.value: BLUE_COLOR,
-    JobState.TERMINATED.value: BLUE_COLOR,
+    JobState.EXECUTED.value: BLUE_COLOR,
     JobState.DOWNLOADED.value: BLUE_COLOR,
     JobState.REMOTE_ERROR.value: RED_COLOR,
     JobState.COMPLETED.value: "#47bf00",

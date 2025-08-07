@@ -3,16 +3,19 @@ from __future__ import annotations
 from enum import Enum
 
 
+class DeprecatedStateError(ValueError):
+    pass
+
+
 class JobState(Enum):
     """States of a Job."""
 
     WAITING = "WAITING"
     READY = "READY"
-    CHECKED_OUT = "CHECKED_OUT"  # TODO should it be RESERVED?
     UPLOADED = "UPLOADED"
     SUBMITTED = "SUBMITTED"
     RUNNING = "RUNNING"
-    TERMINATED = "TERMINATED"
+    EXECUTED = "EXECUTED"
     DOWNLOADED = "DOWNLOADED"
     REMOTE_ERROR = "REMOTE_ERROR"
     COMPLETED = "COMPLETED"
@@ -23,6 +26,20 @@ class JobState(Enum):
     BATCH_SUBMITTED = "BATCH_SUBMITTED"
     BATCH_RUNNING = "BATCH_RUNNING"
 
+    @classmethod
+    def _missing_(cls, value):
+        if isinstance(value, str):
+            if value.upper() == "CHECKED_OUT":
+                raise DeprecatedStateError(
+                    "The CHECKED_OUT state has been removed. If this is present in the "
+                    "queue database run 'jf admin upgrade' to fix the issue"
+                )
+            if value.upper() == "TERMINATED":
+                raise DeprecatedStateError(
+                    "The TERMINATED state has been replaced by EXECUTED. If this is "
+                    "present in the queue database run 'jf admin upgrade' to fix the issue"
+                )
+
     @property
     def short_value(self) -> str:
         return short_state_mapping[self]
@@ -31,11 +48,10 @@ class JobState(Enum):
 short_state_mapping = {
     JobState.WAITING: "W",
     JobState.READY: "R",
-    JobState.CHECKED_OUT: "CE",
     JobState.UPLOADED: "U",
     JobState.SUBMITTED: "SU",
     JobState.RUNNING: "RU",
-    JobState.TERMINATED: "T",
+    JobState.EXECUTED: "T",
     JobState.DOWNLOADED: "D",
     JobState.REMOTE_ERROR: "RERR",
     JobState.COMPLETED: "C",
@@ -56,11 +72,10 @@ PAUSABLE_STATES = [
 PAUSABLE_STATES_V = [s.value for s in PAUSABLE_STATES]
 
 RUNNING_STATES = [
-    JobState.CHECKED_OUT,
     JobState.UPLOADED,
     JobState.SUBMITTED,
     JobState.RUNNING,
-    JobState.TERMINATED,
+    JobState.EXECUTED,
     JobState.DOWNLOADED,
 ]
 

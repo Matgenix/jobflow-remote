@@ -64,12 +64,10 @@ class JobsReport:
         return sum(
             self.state_counts.get(state, 0)
             for state in [
-                JobState.CHECKED_OUT,
-                JobState.UPLOADED,
                 JobState.UPLOADED,
                 JobState.SUBMITTED,
                 JobState.RUNNING,
-                JobState.TERMINATED,
+                JobState.EXECUTED,
                 JobState.DOWNLOADED,
                 JobState.BATCH_SUBMITTED,
                 JobState.BATCH_RUNNING,

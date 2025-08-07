@@ -482,7 +482,7 @@ def test_retry(job_controller, monkeypatch, runner) -> None:
     assert job_controller.retry_job(job_id=j.uuid, job_index=j.index) == j_info.db_id
 
     j_info = job_controller.get_job_info(job_id=j.uuid, job_index=j.index)
-    assert j_info.state == JobState.CHECKED_OUT
+    assert j_info.state == JobState.READY
     assert j_info.remote.retry_time_limit is None
 
     # Run to fail only once
@@ -496,7 +496,7 @@ def test_retry(job_controller, monkeypatch, runner) -> None:
             )
 
     j_info = job_controller.get_job_info(job_id=j.uuid, job_index=j.index)
-    assert j_info.state == JobState.CHECKED_OUT
+    assert j_info.state == JobState.READY
     assert j_info.remote.retry_time_limit is not None
 
 

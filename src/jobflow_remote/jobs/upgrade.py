@@ -267,3 +267,52 @@ def upgrade_to_0_1_5(
 
     actions.append(action)
     return actions
+
+
+@DatabaseUpgrader.register_upgrade("0.2.0")
+def upgrade_to_0_2_0(
+    job_controller: JobController,
+    session: ClientSession | None = None,
+    dry_run: bool = False,
+) -> list[UpgradeAction]:
+    actions = []
+    action_checked_out = UpgradeAction(
+        description="Remove CHECKED_OUT state in the Job collection. Set Jobs back to READY",
+        collection="jobs",
+        action_type="update",
+        details={
+            "filter": {"state": "CHECKED_OUT"},
+            "update": {"$set": {"state": "READY"}},
+            "required": True,
+        },
+    )
+
+    if not dry_run:
+        job_controller.jobs.update_many(
+            filter=action_checked_out.details["filter"],
+            update=action_checked_out.details["update"],
+            session=session,
+        )
+
+    actions.append(action_checked_out)
+
+    action_terminated = UpgradeAction(
+        description="Replace TERMINATED state with EXECUTED",
+        collection="jobs",
+        action_type="update",
+        details={
+            "filter": {"state": "TERMINATED"},
+            "update": {"$set": {"state": "EXECUTED"}},
+            "required": True,
+        },
+    )
+
+    if not dry_run:
+        job_controller.jobs.update_many(
+            filter=action_terminated.details["filter"],
+            update=action_terminated.details["update"],
+            session=session,
+        )
+
+    actions.append(action_terminated)
+    return actions

@@ -803,7 +803,7 @@ def worker(
 ):
     """
     Set the worker for the selected Jobs.
-    Only Jobs not in an evolving state (e.g. CHECKED_OUT, UPLOADED, ...).
+    Only Jobs not in an evolving state (e.g. UPLOADED, SUBMITTED,...).
     """
     jc = get_job_controller()
     execute_multi_jobs_cmd(
@@ -855,7 +855,7 @@ def exec_config(
 ):
     """
     Set the exec_config for the selected Jobs.
-    Only Jobs not in an evolving state (e.g. CHECKED_OUT, UPLOADED, ...).
+    Only Jobs not in an evolving state (e.g. UPLOADED, SUBMITTED, ...).
     """
     jc = get_job_controller()
     execute_multi_jobs_cmd(
@@ -928,7 +928,7 @@ def resources(
 ):
     """
     Set the resources for the selected Jobs.
-    Only Jobs not in an evolving state (e.g. CHECKED_OUT, UPLOADED, ...)
+    Only Jobs not in an evolving state (e.g. UPLOADED, SUBMITTED, ...)
     """
     resources = str_to_dict(resources_value)
 
@@ -986,7 +986,7 @@ def priority(
 ):
     """
     Set the priority for the selected Jobs.
-    Only Jobs not in an evolving state (e.g. CHECKED_OUT, UPLOADED, ...).
+    Only Jobs not in an evolving state (e.g. UPLOADED, SUBMITTED, ...).
     """
     jc = get_job_controller()
     execute_multi_jobs_cmd(

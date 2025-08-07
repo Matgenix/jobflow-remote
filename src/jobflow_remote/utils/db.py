@@ -93,7 +93,7 @@ class MongoLock:
     >>> with MongoLock(collection, {"state": "READY"}) as lock:
     ...     if lock.locked_document:
     ...         # Perform some operations based on the job...
-    ...         lock.update_on_release = {"$set": {"state": "CHECKED_OUT"}}
+    ...         lock.update_on_release = {"$set": {"state": "UPLOADED"}}
 
     Delete the locked document upon lock release
 
@@ -183,7 +183,7 @@ class MongoLock:
         properties upon lock release.
 
         For example:
-        lock.update_on_release = {"$set": {"state": "CHECKED_OUT"}}
+        lock.update_on_release = {"$set": {"state": "UPLOADED"}}
 
         Cannot be set together with delete_on_release.
 

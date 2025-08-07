@@ -891,8 +891,8 @@ class JobController:
         Selected by db_id or uuid+index. Only one among db_id
         and job_id should be defined.
 
-        By default, only Jobs in one of the running states (CHECKED_OUT,
-        UPLOADED, ...), in the REMOTE_ERROR state or FAILED with
+        By default, only Jobs in one of the running states (UPLOADED,
+        SUBMITTED, ...), in the REMOTE_ERROR state or FAILED with
         children in the READY or WAITING state can be rerun.
         This should guarantee that no unexpected inconsistencies due to
         dynamic Jobs generation should appear. This limitation can be bypassed
@@ -941,7 +941,7 @@ class JobController:
 
         modified_jobs: list[str] = []
         # the job to rerun is the last to be released since this prevents
-        # a checkout of the job while the flow is still locked
+        # a start of the job while the flow is still locked
         with self.lock_job(
             filter=lock_filter,
             break_lock=break_lock,
@@ -1058,7 +1058,7 @@ class JobController:
                     "Rerunning it will lead to inconsistencies and is not allowed."
                 )
 
-            # check that the all the children only those with the largest index
+            # check that among all the children only those with the largest index
             # in the flow are present.
             # If that is the case the rerun would lead to inconsistencies.
             # If only the last one is among the children it is acceptable
@@ -1201,7 +1201,7 @@ class JobController:
                 )
 
         job_doc_update = get_reset_job_base_dict()
-        job_doc_update["state"] = JobState.CHECKED_OUT.value
+        job_doc_update["state"] = JobState.READY.value
         if delete_files:
             job_doc_update["remote.prerun_cleanup"] = True
 
@@ -3335,63 +3335,7 @@ class JobController:
 
         logger.info(f"Appended flow ({new_flow.uuid}) with jobs: {new_flow.job_uuids}")
 
-    def checkout_job(
-        self,
-        query=None,
-        flow_uuid: str = None,
-        sort: list[tuple[str, int]] | None = None,
-    ) -> tuple[str, int] | None:
-        """
-        Check out one job.
-
-        Set the job state from READY to CHECKED_OUT with an atomic update.
-        Flow state is also updated if needed.
-
-        NB: flow is not locked during the checkout at any time.
-        Does not require lock of the Job document.
-        """
-        # comment on locking: lock during check out may serve two purposes:
-        # 1) update the state of the Flow object. With the conditional set
-        #    this should be fine even without locking
-        # 2) to prevent checking out jobs while other processes may be working
-        #    on the same flow. (e.g. while rerunning a parent of a READY child,
-        #    it would be necessary that the job is not started in the meanwhile).
-        #    Without a full Flow lock this case may show up.
-        # For the time being do not lock the flow and check if issues are arising.
-
-        query = {} if query is None else dict(query)
-        query.update({"state": JobState.READY.value})
-
-        if flow_uuid is not None:
-            # if flow uuid provided, only include job ids in that flow
-            flow_out = self.get_flow_info_by_flow_uuid(flow_uuid, ["jobs"])
-            if not flow_out:
-                return None
-            job_uuids = flow_out["jobs"]
-            query["uuid"] = {"$in": job_uuids}
-
-        if sort is None:
-            sort = [("priority", pymongo.DESCENDING), ("created_on", pymongo.ASCENDING)]
-
-        result = self.jobs.find_one_and_update(
-            query,
-            {
-                "$set": {
-                    "state": JobState.CHECKED_OUT.value,
-                    "updated_on": datetime.utcnow(),
-                }
-            },
-            projection=["uuid", "index"],
-            sort=sort,
-            # return_document=ReturnDocument.AFTER,
-        )
-
-        if not result:
-            return None
-
-        reserved_uuid = result["uuid"]
-        reserved_index = result["index"]
-
+    def start_flow(self, job_id):
         # update flow state. If it is READY switch its state, otherwise no change
         # to the state. The operation is atomic.
         # Filtering on the index is not needed
@@ -3410,14 +3354,10 @@ class JobController:
             }
         }
         self.flows.find_one_and_update(
-            {"jobs": reserved_uuid},
+            {"jobs": job_id},
             [{"$set": {"state": state_cond, "updated_on": updated_cond}}],
         )
 
-        return reserved_uuid, reserved_index
-
-    # TODO if jobstore is not an option anymore, the "store" argument
-    # can be removed and just use self.jobstore.
     def complete_job(
         self, job_doc: dict, local_path: Path | str, store: JobStore
     ) -> bool:

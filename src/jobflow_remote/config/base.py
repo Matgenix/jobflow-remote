@@ -21,7 +21,7 @@ class RunnerOptions(BaseModel):
 
     delay_checkout: int = Field(
         30,
-        description="Delay between subsequent execution of the checkout from database (seconds)",
+        description="Delay between subsequent execution of the checkout from database (seconds). Deprecated. Not used anymore",
     )
     delay_check_run_status: int = Field(
         30,
@@ -205,7 +205,7 @@ class WorkerBase(BaseModel):
     delay_download: Optional[int] = Field(
         default=None,
         description="Amount of seconds to wait to start the download after the Runner marked a Job "
-        "as TERMINATED. To account for delays in the writing of the file on the worker file system"
+        "as EXECUTED. To account for delays in the writing of the file on the worker file system"
         " (e.g. NFS).",
     )
     model_config = ConfigDict(extra="forbid")
