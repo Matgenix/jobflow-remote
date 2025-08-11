@@ -1,7 +1,7 @@
 import os
 
 
-def test_jobs_list(job_controller, two_flows_four_jobs) -> None:
+def test_jobs_list(job_controller, two_flows_four_jobs, patch_cli_consoles) -> None:
     from jobflow_remote.jobs.state import JobState
     from jobflow_remote.testing.cli import run_check_cli
 
@@ -18,6 +18,17 @@ def test_jobs_list(job_controller, two_flows_four_jobs) -> None:
 
     # not checking that the output is actually colored. Just check that runs correctly
     run_check_cli(["job", "list", "--color"], required_out=outputs)
+
+    run_check_cli(
+        ["job", "list", "--color"],
+        required_out=outputs,
+        required_out_colored=[
+            "[green]add1[/green]",
+            "[green]add2[/green]",
+            "[red]add3[/red]",
+            "[red]add4[/red]",
+        ],
+    )
 
     outputs = ["add1", "READY"]
     excluded = [f"add{i}" for i in range(2, 5)]
