@@ -208,6 +208,7 @@ class JobController:
         name: str | None,
         metadata: dict | None,
         workers: str | list[str] | None,
+        custom_query: dict | None,
     ) -> dict:
         """
         Build a query to search for Jobs, based on standard parameters.
@@ -240,6 +241,8 @@ class JobController:
             exact match for all the values provided.
         workers
             One or more worker names.
+        custom_query
+            A generic query. Keys must not overlap with other specified query options.
 
         Returns
         -------
@@ -299,7 +302,13 @@ class JobController:
         if workers:
             query["worker"] = {"$in": workers}
 
-        return query
+        custom_query_dict = custom_query or {}
+        if not set(query).isdisjoint(custom_query_dict):
+            raise ValueError(
+                f"Custom_query must not overlap with other query options. Duplicates: {set(query) & set(custom_query_dict)}"
+            )
+
+        return query | custom_query_dict
 
     def _build_query_flow(
         self,
@@ -427,7 +436,6 @@ class JobController:
         sort: list[tuple[str, int]] | None = None,
         limit: int = 0,
         skip: int = 0,
-        merge_queries: bool = False,
     ) -> list[JobInfo]:
         """
         Query for Jobs based on standard parameters and return a list of JobInfo.
@@ -435,7 +443,7 @@ class JobController:
         Parameters
         ----------
         custom_query
-            A generic query. Will override all the other parameters. Unless merge_queries is specified.
+            A generic query. Keys must not overlap with other specified query options.
         job_ids
             One or more tuples, each containing the (uuid, index) pair of the
             Jobs to retrieve.
@@ -468,8 +476,6 @@ class JobController:
             Maximum number of entries to retrieve. 0 means no limit.
         skip
             The number of documents to omit (from the start of the result set).
-        merge_queries
-            Merge the custom query and the automatically generated query.
 
         Returns
         -------
@@ -487,9 +493,8 @@ class JobController:
             name=name,
             metadata=metadata,
             workers=workers,
+            custom_query=custom_query,
         )
-        if custom_query:
-            query = query | custom_query if merge_queries else custom_query
         return self.get_jobs_info_query(query=query, sort=sort, limit=limit, skip=skip)
 
     def get_jobs_doc_query(self, query: dict = None, **kwargs) -> list[JobDoc]:
@@ -514,6 +519,7 @@ class JobController:
 
     def get_jobs_doc(
         self,
+        custom_query: dict | None = None,
         job_ids: tuple[str, int] | list[tuple[str, int]] | None = None,
         db_ids: str | list[str] | None = None,
         flow_ids: str | list[str] | None = None,
@@ -532,6 +538,8 @@ class JobController:
 
         Parameters
         ----------
+        custom_query
+            A dictionary representing the filter.
         job_ids
             One or more tuples, each containing the (uuid, index) pair of the
             Jobs to retrieve.
@@ -579,6 +587,7 @@ class JobController:
             name=name,
             metadata=metadata,
             workers=workers,
+            custom_query=custom_query,
         )
         return self.get_jobs_doc_query(query=query, sort=sort, limit=limit)
 
@@ -761,7 +770,7 @@ class JobController:
         workers
             One or more worker names.
         custom_query
-            A generic query. Incompatible with all the other filtering options.
+            A generic query. Keys must not overlap with other specified query options.
         raise_on_error
             If True raise in case of error on one job error and stop the loop.
             Otherwise, just log the error and proceed.
@@ -776,36 +785,19 @@ class JobController:
         list
             List of db_ids of the updated Jobs.
         """
-        filtering_options = [
-            job_ids,
-            db_ids,
-            flow_ids,
-            states,
-            start_date,
-            end_date,
-            name,
-            metadata,
-            workers,
-        ]
-        if custom_query and any(opt is not None for opt in filtering_options):
-            raise ValueError(
-                "The custom query option is incompatible with all the other filtering options"
-            )
-        if custom_query:
-            query = custom_query
-        else:
-            query = self._build_query_job(
-                job_ids=job_ids,
-                db_ids=db_ids,
-                flow_ids=flow_ids,
-                states=states,
-                start_date=start_date,
-                end_date=end_date,
-                name=name,
-                metadata=metadata,
-                workers=workers,
-                locked=False,
-            )
+        query = self._build_query_job(
+            job_ids=job_ids,
+            db_ids=db_ids,
+            flow_ids=flow_ids,
+            states=states,
+            start_date=start_date,
+            end_date=end_date,
+            name=name,
+            metadata=metadata,
+            workers=workers,
+            locked=False,
+            custom_query=custom_query,
+        )
         result = self.jobs.find(query, projection=["db_id"])
 
         queried_dbs_ids = [r["db_id"] for r in result]
@@ -882,7 +874,7 @@ class JobController:
         workers
             One or more worker names.
         custom_query
-            A generic query. Incompatible with all the other filtering options.
+            A generic query. Keys must not overlap with other specified query options.
         raise_on_error
             If True raise in case of error on one job error and stop the loop.
             Otherwise, just log the error and proceed.
@@ -1492,7 +1484,7 @@ class JobController:
         workers
             One or more worker names.
         custom_query
-            A generic query. Incompatible with all the other filtering options.
+            A generic query. Keys must not overlap with other specified query options.
         raise_on_error
             If True raise in case of error on one job error and stop the loop.
             Otherwise, just log the error and proceed.
@@ -1658,7 +1650,7 @@ class JobController:
         workers
             One or more worker names.
         custom_query
-            A generic query. Incompatible with all the other filtering options.
+            A generic query. Keys must not overlap with other specified query options.
         raise_on_error
             If True raise in case of error on one job error and stop the loop.
             Otherwise, just log the error and proceed.
@@ -1736,7 +1728,7 @@ class JobController:
         workers
             One or more worker names.
         custom_query
-            A generic query. Incompatible with all the other filtering options.
+            A generic query. Keys must not overlap with other specified query options.
         raise_on_error
             If True raise in case of error on one job error and stop the loop.
             Otherwise, just log the error and proceed.
@@ -1963,7 +1955,7 @@ class JobController:
         workers
             One or more worker names.
         custom_query
-            A generic query. Incompatible with all the other filtering options.
+            A generic query. Keys must not overlap with other specified query options.
         raise_on_error
             If True raise in case of error on one job error and stop the loop.
             Otherwise, just log the error and proceed.
@@ -2169,6 +2161,7 @@ class JobController:
                 name=None,
                 metadata=None,
                 workers=None,
+                custom_query=None,
             )
             job_db_ids_to_resume = [
                 d["db_id"] for d in self.jobs.find(jobs_filter, projection=["db_id"])
@@ -2280,7 +2273,7 @@ class JobController:
         workers
             One or more worker names.
         custom_query
-            A generic query. Incompatible with all the other filtering options.
+            A generic query. Keys must not overlap with other specified query options.
         raise_on_error
             If True raise in case of error on one job error and stop the loop.
             Otherwise, just log the error and proceed.
@@ -2673,6 +2666,7 @@ class JobController:
             name=name,
             metadata=metadata,
             workers=workers,
+            custom_query=None,
         )
 
         result = self.jobs.update_many(
@@ -3074,7 +3068,6 @@ class JobController:
         name: str | None = None,
         metadata: dict | None = None,
         workers: str | list[str] | None = None,
-        merge_queries: bool = False,
     ) -> int:
         """
         Count Jobs based on filters.
@@ -3082,7 +3075,7 @@ class JobController:
         Parameters
         ----------
         query
-            A generic query. Will override all the other parameters. Unless merge_queries is specified.
+            A generic query.
         job_ids
             One or more tuples, each containing the (uuid, index) pair of the
             Jobs to retrieve.
@@ -3108,8 +3101,6 @@ class JobController:
             exact match for all the values provided.
         workers
             One or more worker names.
-        merge_queries
-            Merge the custom query and the automatically generated query.
 
         Returns
         -------
@@ -3127,9 +3118,8 @@ class JobController:
             name=name,
             metadata=metadata,
             workers=workers,
+            custom_query=query,
         )
-        if query:
-            full_query = full_query | query if merge_queries else query
         return self.jobs.count_documents(full_query)
 
     def count_flows(
@@ -4809,7 +4799,7 @@ class JobController:
         workers
             One or more worker names.
         custom_query
-            A generic query. Incompatible with all the other filtering options.
+            A generic query. Keys must not overlap with other specified query options.
         raise_on_error
             If True raise in case of error on one job error and stop the loop.
             Otherwise, just log the error and proceed.

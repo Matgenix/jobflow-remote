@@ -54,7 +54,6 @@ from jobflow_remote.cli.utils import (
     ReportInterval,
     SortOption,
     check_incompatible_opt,
-    check_query_incompatibility,
     check_stopped_runner,
     execute_multi_jobs_cmd,
     exit_with_error_msg,
@@ -143,14 +142,6 @@ def jobs_list(
             help="Color the job names with same colors for Jobs belonging to the same Flow",
         ),
     ] = False,
-    merge_queries: Annotated[
-        bool,
-        typer.Option(
-            "--merge-queries",
-            "-mq",
-            help="If enabled merge the custom query with the automatically generated from the other options.",
-        ),
-    ] = False,
 ):
     """
     Get the list of Jobs in the database.
@@ -160,23 +151,6 @@ def jobs_list(
     # check_incompatible_opt({"state": state, "error": error})
     # check_incompatible_opt({"state": state, "running": running})
     check_incompatible_opt({"output": cli_output_keys, "verbosity": verbosity})
-    if not merge_queries:
-        check_query_incompatibility(
-            custom_query,
-            [
-                job_id,
-                db_id,
-                flow_id,
-                state,
-                start_date,
-                end_date,
-                name,
-                metadata,
-                days,
-                hours,
-                worker_name,
-            ],
-        )
     output_keys = (
         cli_output_keys.split(",")
         if cli_output_keys
@@ -225,7 +199,6 @@ def jobs_list(
                 name=name,
                 metadata=metadata,
                 workers=worker_name,
-                merge_queries=merge_queries,
             )
         out_console.print(f"Number of jobs: {n_jobs}")
     else:
@@ -244,7 +217,6 @@ def jobs_list(
                 workers=worker_name,
                 limit=max_results,
                 sort=db_sort,
-                merge_queries=merge_queries,
             )
 
             table = get_job_info_table(
@@ -1186,22 +1158,6 @@ def job_dump(
     """Dump to json the documents of the selected Jobs from the DB. For debugging."""
     check_incompatible_opt({"start_date": start_date, "days": days, "hours": hours})
     check_incompatible_opt({"end_date": end_date, "days": days, "hours": hours})
-    check_query_incompatibility(
-        custom_query,
-        [
-            job_id,
-            db_id,
-            flow_id,
-            state,
-            start_date,
-            end_date,
-            name,
-            metadata,
-            days,
-            hours,
-            worker_name,
-        ],
-    )
 
     job_ids_indexes = get_job_ids_indexes(job_id)
 
@@ -1210,22 +1166,18 @@ def job_dump(
     start_date = get_start_date(start_date, days, hours)
 
     with loading_spinner():
-        if custom_query:
-            jobs_doc = jc.get_jobs_doc_query(
-                query=custom_query,
-            )
-        else:
-            jobs_doc = jc.get_jobs_doc(
-                job_ids=job_ids_indexes,
-                db_ids=db_id,
-                flow_ids=flow_id,
-                states=state,
-                start_date=start_date,
-                end_date=end_date,
-                name=name,
-                metadata=metadata,
-                workers=worker_name,
-            )
+        jobs_doc = jc.get_jobs_doc(
+            custom_query=custom_query,
+            job_ids=job_ids_indexes,
+            db_ids=db_id,
+            flow_ids=flow_id,
+            states=state,
+            start_date=start_date,
+            end_date=end_date,
+            name=name,
+            metadata=metadata,
+            workers=worker_name,
+        )
         if jobs_doc:
             dumpfn(jsanitize(jobs_doc, strict=True, enum_values=True), file_path)
 

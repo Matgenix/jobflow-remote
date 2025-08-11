@@ -470,22 +470,6 @@ def execute_multi_jobs_cmd(
                 {"start_date": start_date, "days": days, "hours": hours}
             )
             check_incompatible_opt({"end_date": end_date, "days": days, "hours": hours})
-            check_query_incompatibility(
-                custom_query,
-                [
-                    job_ids,
-                    db_ids,
-                    flow_ids,
-                    states,
-                    start_date,
-                    end_date,
-                    name,
-                    metadata,
-                    days,
-                    hours,
-                    workers,
-                ],
-            )
 
             job_ids_indexes = get_job_ids_indexes(job_ids)
             start_date = get_start_date(start_date, days, hours)
