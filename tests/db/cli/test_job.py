@@ -51,6 +51,7 @@ def test_jobs_list(job_controller, two_flows_four_jobs, patch_cli_consoles) -> N
     run_check_cli(
         ["job", "list", "-q", '{"db_id": {"$in": ["1", "2"]}}', "-did", "1"],
         error=True,
+        required_out="Custom_query must not overlap with other query options. Duplicates: {'db_id'}",
     )
     run_check_cli(
         [
@@ -61,23 +62,8 @@ def test_jobs_list(job_controller, two_flows_four_jobs, patch_cli_consoles) -> N
             "--count",
             "-s",
             "READY",
-            "-mq",
         ],
         required_out="Number of jobs: 1",
-    )
-    # check that duplicate query is overwritten
-    run_check_cli(
-        [
-            "job",
-            "list",
-            "-q",
-            '{"db_id": {"$in": ["1", "2"]}}',
-            "--count",
-            "-did",
-            "1",
-            "-mq",
-        ],
-        required_out="Number of jobs: 2",
     )
 
     # trigger the additional information
