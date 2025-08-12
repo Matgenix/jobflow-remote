@@ -6,6 +6,7 @@ import importlib.metadata
 import logging
 import shutil
 import traceback
+import uuid
 import warnings
 from collections import defaultdict
 from contextlib import ExitStack
@@ -83,6 +84,14 @@ if TYPE_CHECKING:
 
 
 logger = logging.getLogger(__name__)
+
+
+def check_valid_uuid(uuid_str) -> bool:
+    with contextlib.suppress(ValueError):
+        uuid_obj = uuid.UUID(uuid_str)
+        if str(uuid_obj) == uuid_str:
+            return True
+    return False
 
 
 class JobController:
@@ -222,7 +231,7 @@ class JobController:
         db_ids
             One or more db_ids of the Jobs to retrieve.
         flow_ids
-            One or more Flow uuids to which the Jobs to retrieve belong.
+            One or more Flow uuids or DB_IDs to which the Jobs to retrieve belong.
         states
             One or more states of the Jobs.
         locked
@@ -253,10 +262,25 @@ class JobController:
         if job_ids and not any(isinstance(ji, (list, tuple)) for ji in job_ids):
             # without these cast mypy is confused about the type
             job_ids = cast(list[tuple[str, int]], [job_ids])
-        if db_ids is not None and not isinstance(db_ids, (list, tuple)):
-            db_ids = [db_ids]
-        if flow_ids and not isinstance(flow_ids, (list, tuple)):
-            flow_ids = [flow_ids]
+        db_ids = [db_ids] if isinstance(db_ids, str) else db_ids or []
+
+        flow_ids = [flow_ids] if isinstance(flow_ids, str) else flow_ids or []
+        flow_uuids, flow_db_ids = [], []
+        for flow_id in flow_ids:
+            if check_valid_uuid(flow_id):
+                flow_uuids.append(flow_id)
+            else:
+                flow_db_ids.append(flow_id)
+
+        for flow_db_id in flow_db_ids:
+            flows_info = self.get_flows_info(
+                db_ids=flow_db_id,
+                limit=1,
+                full=True,  # needed?
+            )
+            if flows_info:
+                db_ids.extend(flows_info[0].db_ids)
+
         if isinstance(states, JobState):
             states = [states]
         if isinstance(workers, str):
@@ -273,8 +297,8 @@ class JobController:
                 or_list.append({"uuid": job_id, "index": job_index})
             query["$or"] = or_list
 
-        if flow_ids:
-            query["job.hosts"] = {"$in": flow_ids}
+        if flow_uuids:
+            query["job.hosts"] = {"$in": flow_uuids}
 
         if states:
             query["state"] = {"$in": [s.value for s in states]}
@@ -450,7 +474,7 @@ class JobController:
         db_ids
             One or more db_ids of the Jobs to retrieve.
         flow_ids
-            One or more Flow uuids to which the Jobs to retrieve belong.
+            One or more Flow uuids to which the Jobs to retrieve belong. Can contain db_ids and uuids.
         states
             One or more states of the Jobs.
         locked
@@ -546,7 +570,7 @@ class JobController:
         db_ids
             One or more db_ids of the Jobs to retrieve.
         flow_ids
-            One or more Flow uuids to which the Jobs to retrieve belong.
+            One or more Flow uuids to which the Jobs to retrieve belong. Can contain db_ids and uuids.
         states
             One or more states of the Jobs.
         locked
@@ -750,7 +774,7 @@ class JobController:
         db_ids
             One or more db_ids of the Jobs to retrieve.
         flow_ids
-            One or more Flow uuids to which the Jobs to retrieve belong.
+            One or more Flow uuids to which the Jobs to retrieve belong. Can contain db_ids and uuids.
         states
             The state of the Jobs.
         locked
@@ -856,7 +880,7 @@ class JobController:
         db_ids
             One or more db_ids of the Jobs to retrieve.
         flow_ids
-            One or more Flow uuids to which the Jobs to retrieve belong.
+            One or more Flow uuids to which the Jobs to retrieve belong. Can contain db_ids and uuids.
         states
             One or more states of the Jobs.
         start_date
@@ -1466,7 +1490,7 @@ class JobController:
         db_ids
             One or more db_ids of the Jobs to retrieve.
         flow_ids
-            One or more Flow uuids to which the Jobs to retrieve belong.
+            One or more Flow uuids to which the Jobs to retrieve belong. Can contain db_ids and uuids.
         states
             One or more states of the Jobs.
         start_date
@@ -1632,7 +1656,7 @@ class JobController:
         db_ids
             One or more db_ids of the Jobs to retrieve.
         flow_ids
-            One or more Flow uuids to which the Jobs to retrieve belong.
+            One or more Flow uuids to which the Jobs to retrieve belong. Can contain db_ids and uuids.
         states
             One or more states of the Jobs.
         start_date
@@ -1710,7 +1734,7 @@ class JobController:
         db_ids
             One or more db_ids of the Jobs to retrieve.
         flow_ids
-            One or more Flow uuids to which the Jobs to retrieve belong.
+            One or more Flow uuids to which the Jobs to retrieve belong. Can contain db_ids and uuids.
         states
             One or more states of the Jobs.
         start_date
@@ -1937,7 +1961,7 @@ class JobController:
         db_ids
             One or more db_ids of the Jobs to retrieve.
         flow_ids
-            One or more Flow uuids to which the Jobs to retrieve belong.
+            One or more Flow uuids to which the Jobs to retrieve belong. Can contain db_ids and uuids.
         states
             One or more states of the Jobs.
         start_date
@@ -2255,7 +2279,7 @@ class JobController:
         db_ids
             One or more db_ids of the Jobs to retrieve.
         flow_ids
-            One or more Flow uuids to which the Jobs to retrieve belong.
+            One or more Flow uuids to which the Jobs to retrieve belong. Can contain db_ids and uuids.
         states
             One or more states of the Jobs.
         start_date
@@ -2581,7 +2605,7 @@ class JobController:
         Parameters
         ----------
         flow_id
-            One or more Flow uuids.
+            One Flow ids. Can be db_id or uuid.
         delete_output
             If True also delete the associated output in the JobStore.
         delete_files
@@ -2632,7 +2656,7 @@ class JobController:
         db_ids
             One or more db_ids of the Jobs to retrieve.
         flow_ids
-            One or more Flow uuids to which the Jobs to retrieve belong.
+            One or more Flow uuids to which the Jobs to retrieve belong. Can contain db_ids and uuids.
         states
             One or more states of the Jobs.
         start_date
@@ -3082,7 +3106,7 @@ class JobController:
         db_ids
             One or more db_ids of the Jobs to retrieve.
         flow_ids
-            One or more Flow uuids to which the Jobs to retrieve belong.
+            One or more Flow uuids to which the Jobs to retrieve belong. Can contain db_ids and uuids.
         states
             One or more states of the Jobs.
         locked
@@ -4781,7 +4805,7 @@ class JobController:
         db_ids
             One or more db_ids of the Jobs to retrieve.
         flow_ids
-            One or more Flow uuids to which the Jobs to retrieve belong.
+            One or more Flow uuids to which the Jobs to retrieve belong. Can contain db_ids and uuids.
         states
             One or more states of the Jobs.
         start_date

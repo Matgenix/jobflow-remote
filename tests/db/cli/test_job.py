@@ -65,6 +65,9 @@ def test_jobs_list(job_controller, two_flows_four_jobs, patch_cli_consoles) -> N
         ],
         required_out="Number of jobs: 1",
     )
+    run_check_cli(
+        ["job", "list", "-fid", "1", "--count"], required_out="Number of jobs: 2"
+    )
 
     # trigger the additional information
     assert job_controller.set_job_state(JobState.REMOTE_ERROR, db_id="1")

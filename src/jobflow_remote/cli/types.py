@@ -62,7 +62,7 @@ flow_ids_opt = Annotated[
     typer.Option(
         "--flow-id",
         "-fid",
-        help="One or more flow ids",
+        help="One or more flow ids. Can the db id (i.e. an integer) or a string (i.e. the uuid)",
     ),
 ]
 
