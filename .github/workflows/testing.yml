@@ -113,32 +113,23 @@ jobs:
       - name: Unit tests
         run: |
           COVERAGE_FILE=.coverage-unit \
-          pytest \
+          pytest -m unit \
             --pytest-durations-min=1 \
-            --cov=jobflow_remote --cov-report= --cov-config=pyproject.toml \
-            tests/unit
+            --cov=jobflow_remote --cov-report= --cov-config=pyproject.toml
 
       - name: Database tests
         run: |
           COVERAGE_FILE=.coverage-db \
-          pytest -k test_index_rebuild \
+          pytest --m db \
             --pytest-durations-min=1 \
-            --cov=jobflow_remote --cov-report= --cov-config=pyproject.toml \
-            tests/db
+            --cov=jobflow_remote --cov-report= --cov-config=pyproject.toml
 
       - name: Full integration tests
         run: |
           COVERAGE_FILE=.coverage-integration \
-          pytest -k test_priority -k test_submit_flow_with_dependencies \
+          pytest -m integration \
             --pytest-durations-min=1 \
-            --cov=jobflow_remote --cov-report= --cov-config=pyproject.toml \
-            tests/integration
-
-#      - name: Codecov upload
-#        if: matrix.python-version == '3.12'
-#        uses: ./.github/actions/codecov-upload-action
-#        with:
-#          codecov-token: ${{ secrets.CODECOV_TOKEN }}
+            --cov=jobflow_remote --cov-report= --cov-config=pyproject.toml
 
       - name: Tree of files
         run: |
@@ -155,13 +146,8 @@ jobs:
         with:
           name: coverage-files-artifact-${{ matrix.python-version }}
           if-no-files-found: error
-          include-hidden-files: true
+          include-hidden-files: true  # Needed even if passing explicitly the hidden files!
           path: .coverage*
-#          path: |
-#            .coverage-unit
-#            .coverage-db
-#            .coverage-integration
-#            .coverage-integration-remote
 
       - name: Upload DB dump
         if: failure()
@@ -194,31 +180,14 @@ jobs:
               matrix = {'include':[{'codecov-flag': k, 'coverage-files': ' '.join(v)} for k,v in data.items()]}
               print(f'matrix={json.dumps(matrix)}')
               " >> $GITHUB_OUTPUT
-          echo "GITHUBOUTPUT:"
-          echo "$GITHUB_OUTPUT"
 
   codecov-upload:
     name: Upload coverage to Codecov
     runs-on: ubuntu-latest
-    needs: [test,generate-codecov-matrix]
+    needs: [test, generate-codecov-matrix]
 
     strategy:
       matrix: ${{fromJSON(needs.generate-codecov-matrix.outputs.matrix)}}
-#        include:
-#          - codecov-flag: unit
-#            coverage-files: '.coverage-unit'
-#          - codecov-flag: db
-#            coverage-files: '.coverage-db'
-#          - codecov-flag: integration_remote
-#            coverage-files: '.coverage-integration-remote'
-#          - codecov-flag: integration_local
-#            coverage-files: '.coverage-integration'
-#          - codecov-flag: integration
-#            coverage-files: '.coverage-integration .coverage-integration-remote'
-#          - codecov-flag: all_local
-#            coverage-files: '.coverage-unit .coverage-db .coverage-integration'
-#          - codecov-flag: all
-#            coverage-files: '.coverage-unit .coverage-db .coverage-integration .coverage-integration-remote'
 
     steps:
       - uses: actions/checkout@v4
@@ -250,29 +219,29 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-      with:
-        submodules: true
-        fetch-depth: 0
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+          fetch-depth: 0
 
-    - name: Set up Python 3.11
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.11'
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
 
-    - name: Install docs dependencies
-      run: |
-        python -m pip install -U pip
-        pip install -U setuptools wheel
-        # Required to generate rst files from markdown
-        sudo apt install pandoc
-        pip install -r requirements/requirements.txt
-        pip install .[docs]
+      - name: Install docs dependencies
+        run: |
+          python -m pip install -U pip
+          pip install -U setuptools wheel
+          # Required to generate rst files from markdown
+          sudo apt install pandoc
+          pip install -r requirements/requirements.txt
+          pip install .[docs]
 
-    - name: Build Sphinx docs
-      working-directory: doc
-      run: |
-        # cannot use sphinx build directly as the makefile handles generation
-        # of some rst files
-        make html
+      - name: Build Sphinx docs
+        working-directory: doc
+        run: |
+          # cannot use sphinx build directly as the makefile handles generation
+          # of some rst files
+          make html
