@@ -84,7 +84,6 @@ jobs:
         run: |
           wget https://fastdl.mongodb.org/tools/db/mongodb-database-tools-ubuntu2204-x86_64-100.10.0.deb
           sudo apt install ./mongodb-database-tools-*-100.10.0.deb
-          sudo apt install tree
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -135,11 +134,22 @@ jobs:
             --cov=jobflow_remote --cov-report= --cov-config=pyproject.toml \
             tests/integration
 
-      - name: Codecov upload
-        if: matrix.python-version == '3.12'
-        uses: ./.github/actions/codecov-upload-action
+#      - name: Codecov upload
+#        if: matrix.python-version == '3.12'
+#        uses: ./.github/actions/codecov-upload-action
+#        with:
+#          codecov-token: ${{ secrets.CODECOV_TOKEN }}
+
+      - name: Upload coverage files as artifact for coverage upload job
+        uses: actions/upload-artifact@v4
         with:
-          codecov-token: ${{ secrets.CODECOV_TOKEN }}
+          name: coverage-files-artifact-${{ matrix.python-version }}
+          if-no-files-found: error
+          path: |
+            .coverage-unit
+            .coverage-db
+            .coverage-integration
+            .coverage-integration-remote
 
       - name: Upload DB dump
         if: failure()
@@ -147,6 +157,44 @@ jobs:
         with:
           name: db_dump_${{ matrix.python-version }}
           path: test_folder
+
+  codecov-upload:
+    name: Upload coverage to Codecov
+    runs-on: ubuntu-latest
+    needs: test
+
+    strategy:
+      matrix:
+        include:
+          - coverage-flag: unit
+            coverage-files: '.coverage-unit'
+          - coverage-flag: db
+            coverage-files: '.coverage-db'
+          - coverage-flag: integration_remote
+            coverage-files: '.coverage-integration-remote'
+          - coverage-flag: integration_local
+            coverage-files: '.coverage-integration'
+          - coverage-flag: integration
+            coverage-files: '.coverage-integration .coverage-integration-remote'
+          - coverage-flag: all_local
+            coverage-files: '.coverage-unit .coverage-db .coverage-integration'
+          - coverage-flag: all
+            coverage-files: '.coverage-unit .coverage-db .coverage-integration .coverage-integration-remote'
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Get files from artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-files-artifact-3.12
+
+      - name: Codecov upload
+        uses: ./.github/actions/codecov-upload-action
+        with:
+          codecov-token: ${{ secrets.CODECOV_TOKEN }}
+          coverage-flag: ${{ matrix.coverage-flag }}
+          coverage-files: ${{ matrix.coverage-files }}
+
 
   docs:
     name: Build documentation
