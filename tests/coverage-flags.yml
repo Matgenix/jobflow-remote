@@ -1,0 +1,20 @@
+unit:
+  - .coverage-unit
+db:
+  - .coverage-db
+integration_remote:
+  - .coverage-integration-remote
+integration_local:
+  - .coverage-integration
+integration:
+  - .coverage-integration
+  - .coverage-integration-remote
+all_local:
+  - .coverage-unit
+  - .coverage-db
+  - .coverage-integration
+all:
+  - .coverage-unit
+  - .coverage-db
+  - .coverage-integration
+  - .coverage-integration-remote

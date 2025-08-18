@@ -380,24 +380,12 @@ def pytest_sessionstart(session):
             )
             pytest.main(this_marker_args)
 
-        flags = {
-            "unit": [".coverage-unit"],
-            "db": [".coverage-db"],
-            "integration_remote": [".coverage-integration-remote"],
-            "integration_local": [".coverage-integration"],
-            "integration": [".coverage-integration", ".coverage-integration-remote"],
-            "all_local": [
-                ".coverage-unit",
-                ".coverage-db",
-                ".coverage-integration",
-            ],
-            "all": [
-                ".coverage-unit",
-                ".coverage-db",
-                ".coverage-integration",
-                ".coverage-integration-remote",
-            ],
-        }
+        import yaml
+
+        module_dir = Path(__file__).resolve().parent
+        with open(module_dir / "coverage-flags.yml") as f:
+            flags = yaml.safe_load(f)
+
         os.environ.pop("COVERAGE_FILE", None)
         for flag, cov_files in flags.items():
             cov = coverage.Coverage()
