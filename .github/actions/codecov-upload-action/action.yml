@@ -15,17 +15,18 @@ runs:
   steps:
     - name: Generate combined coverage report from files
       run: |
+        echo "Combining coverage files: ${{ inputs.codecov-files }}"
         coverage combine --keep ${{ inputs.codecov-files }}
       shell: bash
 
-    - name: Upload ${{ inputs.coverage-flag }} tests coverage report to Codecov
+    - name: Upload ${{ inputs.codecov-flag }} tests coverage report to Codecov
       uses: codecov/codecov-action@v5
       env:
         CODECOV_TOKEN: ${{ inputs.codecov-token }}
       with:
         files: .coverage  # Here for some reason, we need to have .coverage as a filename
-        flags: ${{ inputs.coverage-flag }}_tests
-        name: ${{ inputs.coverage-flag }}_tests
+        flags: ${{ inputs.codecov-flag }}_tests
+        name: ${{ inputs.codecov-flag }}_tests
 
 #    - name: Tree of files
 #      run: |
