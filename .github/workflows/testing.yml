@@ -131,16 +131,6 @@ jobs:
             --pytest-durations-min=1 \
             --cov=jobflow_remote --cov-report= --cov-config=pyproject.toml
 
-      - name: Tree of files
-        run: |
-          tree -a
-          ls -la .coverage*
-          echo "CURRENT WORKING DIRECTORY:"
-          pwd
-          echo "ENVIRONMENT VARIABLES:"
-          env
-        shell: bash
-
       - name: Upload coverage files as artifact for coverage upload job
         uses: actions/upload-artifact@v4
         with:
