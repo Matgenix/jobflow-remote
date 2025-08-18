@@ -7,7 +7,7 @@ inputs:
   codecov-flag:
     description: 'Codecov flag'
     required: true
-  codecov-files:
+  coverage-files:
     description: 'Coverage files'
     required: true
 runs:
@@ -15,8 +15,8 @@ runs:
   steps:
     - name: Generate combined coverage report from files
       run: |
-        echo "Combining coverage files: ${{ inputs.codecov-files }}"
-        coverage combine --keep ${{ inputs.codecov-files }}
+        echo "Combining coverage files: ${{ inputs.coverage-files }}"
+        coverage combine --keep ${{ inputs.coverage-files }}
       shell: bash
 
     - name: Upload ${{ inputs.codecov-flag }} tests coverage report to Codecov

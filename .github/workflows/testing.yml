@@ -178,19 +178,19 @@ jobs:
     strategy:
       matrix:
         include:
-          - coverage-flag: unit
+          - codecov-flag: unit
             coverage-files: '.coverage-unit'
-          - coverage-flag: db
+          - codecov-flag: db
             coverage-files: '.coverage-db'
-          - coverage-flag: integration_remote
+          - codecov-flag: integration_remote
             coverage-files: '.coverage-integration-remote'
-          - coverage-flag: integration_local
+          - codecov-flag: integration_local
             coverage-files: '.coverage-integration'
-          - coverage-flag: integration
+          - codecov-flag: integration
             coverage-files: '.coverage-integration .coverage-integration-remote'
-          - coverage-flag: all_local
+          - codecov-flag: all_local
             coverage-files: '.coverage-unit .coverage-db .coverage-integration'
-          - coverage-flag: all
+          - codecov-flag: all
             coverage-files: '.coverage-unit .coverage-db .coverage-integration .coverage-integration-remote'
 
     steps:
@@ -204,7 +204,7 @@ jobs:
         uses: ./.github/actions/codecov-upload-action
         with:
           codecov-token: ${{ secrets.CODECOV_TOKEN }}
-          coverage-flag: ${{ matrix.coverage-flag }}
+          codecov-flag: ${{ matrix.codecov-flag }}
           coverage-files: ${{ matrix.coverage-files }}
 
 
