@@ -120,7 +120,7 @@ jobs:
       - name: Database tests
         run: |
           COVERAGE_FILE=.coverage-db \
-          pytest --m db \
+          pytest -m db \
             --pytest-durations-min=1 \
             --cov=jobflow_remote --cov-report= --cov-config=pyproject.toml
 
@@ -148,6 +148,7 @@ jobs:
 
   generate-codecov-matrix:
     runs-on: ubuntu-latest
+    needs: test
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
