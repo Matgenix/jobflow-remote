@@ -200,7 +200,7 @@ jobs:
   codecov-upload:
     name: Upload coverage to Codecov
     runs-on: ubuntu-latest
-    needs: test
+    needs: [test,generate-matrix]
 
     strategy:
       matrix: ${{fromJSON(needs.generate-matrix.outputs.matrix)}}
