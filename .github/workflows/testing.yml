@@ -151,11 +151,12 @@ jobs:
         with:
           name: coverage-files-artifact-${{ matrix.python-version }}
           if-no-files-found: error
-          path: |
-            .coverage-unit
-            .coverage-db
-            .coverage-integration
-            .coverage-integration-remote
+          path: .coverage*
+#          path: |
+#            .coverage-unit
+#            .coverage-db
+#            .coverage-integration
+#            .coverage-integration-remote
 
       - name: Upload DB dump
         if: failure()
