@@ -13,6 +13,9 @@ inputs:
 runs:
   using: "composite"
   steps:
+    - name: Config test...
+      run: coverage debug config
+      shell: bash
     - name: Generate combined coverage report from files
       run: |
         echo "Combining coverage files: ${{ inputs.coverage-files }}"
