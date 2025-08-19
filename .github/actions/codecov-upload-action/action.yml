@@ -16,10 +16,32 @@ runs:
     - name: Config test...
       run: coverage debug config
       shell: bash
+    - name: Separate coverage reports
+      run: |
+        echo "COVERAGE REPORT FOR UNIT"
+        coverage report --data-file=.coverage-unit
+        echo ""
+        echo ""
+        echo "COVERAGE REPORT FOR INTEGERATION"
+        coverage report --data-file=.coverage-integration
+        echo ""
+        echo ""
+        echo "COVERAGE REPORT FOR INTEGRATION REMOTE"
+        coverage report --data-file=.coverage-integration-remote
+        echo ""
+        echo ""
+        echo "COVERAGE REPORT FOR DB"
+        coverage report --data-file=.coverage-db
+        echo ""
+        echo ""
+      shell: bash
     - name: Generate combined coverage report from files
       run: |
         echo "Combining coverage files: ${{ inputs.coverage-files }}"
+        ls -la
         coverage combine --keep ${{ inputs.coverage-files }}
+        ls -la
+        coverage report
       shell: bash
 
     - name: Upload ${{ inputs.codecov-flag }} tests coverage report to Codecov
