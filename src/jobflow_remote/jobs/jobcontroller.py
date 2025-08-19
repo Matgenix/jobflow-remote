@@ -2589,11 +2589,12 @@ class JobController:
             The uuid of the Flow.
 
         """
+        if store and store not in self.optional_jobstores:
+            raise ValueError(f"Store {store} is not defined as an optional jobstore")
+
         filter_query = self.generate_flow_id_query(
             db_id=db_id, job_id=job_id, flow_id=flow_id
         )
-        if store and store not in self.optional_jobstores:
-            raise ValueError(f"Store {store} is not defined as an optional jobstore")
         with self.lock_flow(
             filter=filter_query, get_locked_doc=True, projection=["state"]
         ) as flow_lock:
@@ -2689,8 +2690,8 @@ class JobController:
         job_ids = flow["jobs"]
         if delete_output:
             jobstore = self.jobstore
-            if flow.get("jobstore"):
-                jobstore = self.optional_jobstores[flow["jobstore"]]
+            if jobstore_name := flow.get("jobstore"):
+                jobstore = self.optional_jobstores[jobstore_name]
             jobstore.remove_docs({"uuid": {"$in": job_ids}})
         if delete_files:
             jobs_info = self.get_jobs_info(flow_ids=[flow_id])

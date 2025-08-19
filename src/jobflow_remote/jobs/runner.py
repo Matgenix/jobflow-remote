@@ -147,7 +147,7 @@ class Runner:
                 for name in self.project.optional_jobstores
             }
         # create a cached for the jobstores to be used in the get_jobstore method
-        self._cached_jostores: OrderedDict[str, JobStore] = OrderedDict()
+        self._cached_jobstores: OrderedDict[str, JobStore] = OrderedDict()
 
         if connect_interactive:
             for host_name, host in self.hosts.items():
@@ -257,18 +257,18 @@ class Runner:
         # but adding a dependence for this trivial caching seems an overkill.
         # Note that an OrderedDict is needed because popitem() for a standard
         # dict does not have the `last` argument.
-        if flow_id in self._cached_jostores:
-            return self._cached_jostores[flow_id]
+        if flow_id in self._cached_jobstores:
+            return self._cached_jobstores[flow_id]
         jobstore = self.jobstore
         if flow_id and self.optional_jobstores:
             store_name = self.job_controller.get_flow_store(flow_id=flow_id)
             if store_name:
                 jobstore = self.optional_jobstores[store_name]
 
-        self._cached_jostores[flow_id] = jobstore
+        self._cached_jobstores[flow_id] = jobstore
 
-        if len(self._cached_jostores) > 20:
-            self._cached_jostores.popitem(last=False)
+        if len(self._cached_jobstores) > 20:
+            self._cached_jobstores.popitem(last=False)
 
         return jobstore
 
