@@ -179,11 +179,11 @@ def test_optional_store(job_controller, runner, two_flows_four_jobs):
         opt_js.get_output(two_flows_four_jobs[1][1].uuid)
 
     assert (
-        runner._cached_jostores[two_flows_four_jobs[0].uuid].docs_store.collection_name
+        runner._cached_jobstores[two_flows_four_jobs[0].uuid].docs_store.collection_name
         == "other_docs"
     )
     assert (
-        runner._cached_jostores[two_flows_four_jobs[1].uuid].docs_store.collection_name
+        runner._cached_jobstores[two_flows_four_jobs[1].uuid].docs_store.collection_name
         == "docs"
     )
-    assert len(runner._cached_jostores) == 2
+    assert len(runner._cached_jobstores) == 2
