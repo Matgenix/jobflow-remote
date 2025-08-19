@@ -177,8 +177,8 @@ branch = true
 [tool.coverage.paths]
 source = [
     "src/",
-    "/home/jobflow/.venv/lib/python3.10/site-packages/",  # for coverage from docker containers
-#    "/opt/hostedtoolcache/Python/3.12.11/x64/lib/python3.12/site-packages/",  # Test for CI ...
+    "/home/jobflow/.venv/lib/python*/site-packages/",  # for coverage from docker containers
+    "/opt/hostedtoolcache/Python/*/x64/lib/python*/site-packages/",  # for combining coverages in CI
 ]
 
 [tool.coverage.report]
