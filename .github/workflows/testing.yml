@@ -116,7 +116,6 @@ jobs:
           pytest -m unit \
             --pytest-durations-min=1 \
             --cov=jobflow_remote --cov-report= --cov-config=pyproject.toml
-          coverage report --data-file=.coverage-unit
 
       - name: Database tests
         run: |
@@ -124,7 +123,6 @@ jobs:
           pytest -m db \
             --pytest-durations-min=1 \
             --cov=jobflow_remote --cov-report= --cov-config=pyproject.toml
-          coverage report --data-file=.coverage-db
 
       - name: Full integration tests
         run: |
@@ -132,8 +130,6 @@ jobs:
           pytest -m integration \
             --pytest-durations-min=1 \
             --cov=jobflow_remote --cov-report= --cov-config=pyproject.toml
-          coverage report --data-file=.coverage-integration
-          coverage report --data-file=.coverage-integration-remote
 
       - name: Upload coverage files as artifact for coverage upload job
         uses: actions/upload-artifact@v4
