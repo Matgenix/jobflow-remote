@@ -446,6 +446,30 @@ class RemoteHost(BaseHost):
             cmd = f"{pre_cmd}; {shell}"
         self.connection.run(cmd, pty=True)
 
+    def exists(self, path: str | Path) -> bool:
+        """
+        Test whether a path exists.
+
+        Parameters
+        ----------
+        path
+            The path to the directory tree to be removed.
+
+        Returns
+        -------
+        bool
+            True if the path exists
+        """
+        try:
+            stat = self._execute_remote_func(
+                lambda host: host.connection.sftp().stat, str(path)
+            )
+            if stat:
+                return True
+        except FileNotFoundError:
+            pass
+        return False
+
 
 def inter_handler(title, instructions, prompt_list):
     """

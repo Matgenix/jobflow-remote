@@ -1077,6 +1077,10 @@ class Runner:
                     exc_info=True,
                 )
 
+            # Set the process state to BATCH_RUNNING for those that are
+            # in the BATCH_SUBMITTED and started.
+            # This requires running the query at each check consider devising
+            # a cheaper option in terms of DB queries.
             for job_id, job_index, process_running_uuid in running_jobs:
                 lock_filter = {
                     "uuid": job_id,
@@ -1146,6 +1150,8 @@ class Runner:
                                 if lock.locked_document:
                                     err_msg = f"The batch process that was running the job (process_id: {pid}, uuid: {process_running_uuid} was likely killed before terminating the job execution"
                                     raise RemoteError(err_msg, no_retry=True)
+                    # Also remove the corresponding files from the running folder of batch manager
+                    batch_manager.delete_running(batch_processes_data[pid])
 
                 processes = list(running_processes)
 
@@ -1153,7 +1159,8 @@ class Runner:
             # amount to reach max_jobs, if needed.
 
             dict_n_jobs = self.job_controller.count_jobs_states(
-                [JobState.BATCH_SUBMITTED, JobState.BATCH_RUNNING]
+                [JobState.BATCH_SUBMITTED, JobState.BATCH_RUNNING],
+                worker=worker_name,
             )
             n_jobs_submitted = dict_n_jobs[JobState.BATCH_SUBMITTED]
             n_jobs_running = dict_n_jobs[JobState.BATCH_RUNNING]
