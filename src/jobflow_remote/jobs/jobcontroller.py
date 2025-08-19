@@ -28,6 +28,7 @@ from qtoolkit.core.data_objects import CancelStatus, QResources
 import jobflow_remote
 from jobflow_remote.config.base import ConfigError, ExecutionConfig, Project
 from jobflow_remote.config.manager import ConfigManager
+from jobflow_remote.jobs.batch import RemoteBatchManager
 from jobflow_remote.jobs.data import (
     OUT_FILENAME,
     DbCollection,
@@ -2845,6 +2846,26 @@ class JobController:
         self.update_version_information()
         self.build_indexes(drop=True)
 
+        # handle the case that self.project is None, since it is a possibility
+        if self.project:
+            for wname, worker_data in self.project.workers.items():
+                try:
+                    if worker_data.batch is not None:
+                        host = worker_data.get_host()
+                        host.connect()
+                        batch_manager = RemoteBatchManager(
+                            host, worker_data.batch.jobs_handle_dir
+                        )
+                        if not batch_manager.cleanup():
+                            logger.warning(
+                                f"Could not cleanup the jobs_handle_dir for batch worker {wname}"
+                            )
+                except Exception:
+                    logger.warning(
+                        f"Error while cleaning up the jobs_handle_dir for worker {wname}",
+                        exc_info=True,
+                    )
+
         return True
 
     def build_indexes(
@@ -3182,7 +3203,9 @@ class JobController:
             )
         return self.flows.count_documents(query)
 
-    def count_jobs_states(self, states: list[JobState]) -> dict[JobState, int]:
+    def count_jobs_states(
+        self, states: list[JobState], worker: str | None = None
+    ) -> dict[JobState, int]:
         """
         Count the number of jobs in each of the given states.
 
@@ -3190,14 +3213,19 @@ class JobController:
         ----------
         states
             List of JobState to count.
+        worker
+            Name of the worker
 
         Returns
         -------
         dict[JobState, int]
             A dictionary with the count of jobs in each state.
         """
+        query: dict[str, Any] = {"state": {"$in": [s.value for s in states]}}
+        if worker:
+            query["worker"] = worker
         pipeline = [
-            {"$match": {"state": {"$in": [s.value for s in states]}}},
+            {"$match": query},
             {"$group": {"_id": "$state", "count": {"$sum": 1}}},
         ]
         result = self.jobs.aggregate(pipeline) or []

@@ -175,3 +175,18 @@ class LocalHost(BaseHost):
         if pre_cmd:
             cmd = f"{pre_cmd}; {shell}"
         Context().run(cmd, pty=True)
+
+    def exists(self, path: str | Path) -> bool:
+        """
+        Test whether a path exists.
+
+        Parameters
+        ----------
+        path
+            The path to the directory tree to be removed.
+        Returns
+        -------
+        bool
+            True if the path exists
+        """
+        return os.path.exists(path)

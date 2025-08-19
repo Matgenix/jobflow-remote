@@ -161,6 +161,21 @@ class BaseHost(MSONable):
         """
         raise NotImplementedError
 
+    @abc.abstractmethod
+    def exists(self, path: str | Path) -> bool:
+        """
+        Test whether a path exists.
+
+        Parameters
+        ----------
+        path
+            The path to the directory tree to be removed.
+        Returns
+        -------
+        bool
+            True if the path exists
+        """
+
     @property
     def interactive_login(self) -> bool:
         """
