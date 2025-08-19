@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import contextlib
 import os
+import uuid
 from collections.abc import Mapping, MutableMapping
 from copy import deepcopy
 from datetime import datetime, timezone
@@ -239,3 +241,24 @@ def suuid() -> str:
     from uuid import uuid4
 
     return str(uuid4())
+
+
+def check_valid_uuid(uuid_str: str) -> bool:
+    """
+    Check if the given uuid is valid.
+
+    Parameters
+    ----------
+    uuid_str
+        The uuid string to check.
+
+    Returns
+    -------
+    bool
+        True if the given uuid is valid, False otherwise.
+    """
+    with contextlib.suppress(ValueError):
+        uuid_obj = uuid.UUID(uuid_str)
+        if str(uuid_obj) == uuid_str:
+            return True
+    return False

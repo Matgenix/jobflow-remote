@@ -6,7 +6,6 @@ import importlib.metadata
 import logging
 import shutil
 import traceback
-import uuid
 import warnings
 from collections import defaultdict
 from contextlib import ExitStack
@@ -60,6 +59,7 @@ from jobflow_remote.remote.data import (
 )
 from jobflow_remote.remote.queue import QueueManager
 from jobflow_remote.utils.data import (
+    check_valid_uuid,
     deep_merge_dict,
     get_past_time_rounded,
     get_utc_offset,
@@ -84,14 +84,6 @@ if TYPE_CHECKING:
 
 
 logger = logging.getLogger(__name__)
-
-
-def check_valid_uuid(uuid_str) -> bool:
-    with contextlib.suppress(ValueError):
-        uuid_obj = uuid.UUID(uuid_str)
-        if str(uuid_obj) == uuid_str:
-            return True
-    return False
 
 
 class JobController:
@@ -265,21 +257,14 @@ class JobController:
         db_ids = [db_ids] if isinstance(db_ids, str) else db_ids or []
 
         flow_ids = [flow_ids] if isinstance(flow_ids, str) else flow_ids or []
-        flow_uuids, flow_db_ids = [], []
-        for flow_id in flow_ids:
-            if check_valid_uuid(flow_id):
-                flow_uuids.append(flow_id)
-            else:
-                flow_db_ids.append(flow_id)
-
-        for flow_db_id in flow_db_ids:
-            flows_info = self.get_flows_info(
-                db_ids=flow_db_id,
-                limit=1,
-                full=True,  # needed?
-            )
-            if flows_info:
-                db_ids.extend(flows_info[0].db_ids)
+        flow_uuids = [
+            fid
+            if check_valid_uuid(fid)
+            else self.flows.find_one(
+                {"ids": {"$elemMatch": {"0": fid}}}, projection=["uuid"]
+            )["uuid"]
+            for fid in flow_ids
+        ]
 
         if isinstance(states, JobState):
             states = [states]
