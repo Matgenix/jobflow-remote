@@ -108,5 +108,5 @@ if artifact_directory_tree["github_ci"] != ref_artifact_directory_tree:
     print("Reference:")
     pprint.pprint(ref_artifact_directory_tree, indent=2)
     print("Uploaded artifact:")
-    pprint.pprint(artifact_directory_tree, indent=2)
+    pprint.pprint(artifact_directory_tree["github_ci"], indent=2)
     sys.exit(1)
