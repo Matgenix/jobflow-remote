@@ -380,3 +380,29 @@ def report(
         timezone=timezone,
     )
     out_console.print(*get_flow_report_components(jobs_report))
+
+
+@app_flow.command()
+def resume(
+    flow_db_id: flow_db_id_arg,
+    job_id_flag: job_flow_id_flag_opt = False,
+) -> None:
+    """Resume a STOPPED or PAUSED Flow."""
+    job_id = flow_id = None
+    db_id, jf_id = get_job_db_ids(flow_db_id, None)
+    if db_id is None:
+        if job_id_flag:
+            job_id = jf_id
+        else:
+            flow_id = jf_id
+
+    with loading_spinner():
+        jc = get_job_controller()
+
+        n_jobs = jc.resume_flow(
+            job_id=job_id,
+            db_id=db_id,
+            flow_id=flow_id,
+        )
+
+    out_console.print(f"{n_jobs} Job(s) resumed")

@@ -150,6 +150,7 @@ class JobInfo(BaseModel):
     priority: int = 0
     metadata: Optional[dict] = None
     stored_data: Optional[dict] = None
+    hosts: Optional[list[str]] = None
 
     @property
     def is_locked(self) -> bool:
@@ -201,7 +202,7 @@ class JobInfo(BaseModel):
             The instance of JobInfo based on the data
         """
         job = d.pop("job")
-        for k in ["name", "metadata"]:
+        for k in ["name", "metadata", "hosts"]:
             d[k] = job[k]
         return cls.model_validate(d)
 
@@ -219,6 +220,7 @@ def _projection_db_info() -> list[str]:
     projection.remove("name")
     projection.append("job.name")
     projection.append("job.metadata")
+    projection.append("job.hosts")
     return projection
 
 

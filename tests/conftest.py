@@ -1,3 +1,4 @@
+import inspect
 import logging
 import logging.config
 import random
@@ -7,6 +8,22 @@ from functools import partial
 from pathlib import Path
 
 import pytest
+from rich.console import Console
+
+
+@pytest.fixture()
+def patch_cli_consoles(monkeypatch):
+    import jobflow_remote.cli
+
+    err_console = Console(force_terminal=True, stderr=True)
+    out_console = Console(force_terminal=True)
+    # The out_console and err_console have to be patched everywhere they are imported
+    # Doing this only for the cli
+    for _mod_name, module in inspect.getmembers(jobflow_remote.cli, inspect.ismodule):
+        if hasattr(module, "err_console"):
+            monkeypatch.setattr(module, "err_console", err_console)
+        if hasattr(module, "out_console"):
+            monkeypatch.setattr(module, "out_console", out_console)
 
 
 @pytest.fixture(scope="session")

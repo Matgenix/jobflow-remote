@@ -113,12 +113,12 @@ STOPPED
 
 Error state. The Job was stopped by another Job as a consequence of a
 ``stop_jobflow`` or ``stop_children`` actions in the Job's response.
-This state cannot be modified.
+A Job in this state can be resumed.
 
 USER_STOPPED
 ------------
 
-Error state. A Job stopped by the user. This state cannot be modified.
+Error state. A Job stopped by the user. A Job in this state can be resumed.
 
 BATCH_SUBMITTED
 ---------------

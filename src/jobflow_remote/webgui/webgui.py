@@ -175,7 +175,7 @@ def set_job_controller_deamon(project_name):
     job_controller = job_controllers[project_name]
     job_controller_actions = {
         "jobs": {
-            "Play": job_controller.play_jobs,
+            "Resume": job_controller.resume_jobs,
             "Pause": job_controller.pause_jobs,
             "Stop": job_controller.stop_jobs,
             "Retry": job_controller.retry_jobs,
