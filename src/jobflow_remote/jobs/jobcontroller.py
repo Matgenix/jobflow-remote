@@ -311,13 +311,13 @@ class JobController:
         if workers:
             query["worker"] = {"$in": workers}
 
-        custom_query_dict = custom_query or {}
-        if not set(query).isdisjoint(custom_query_dict):
+        custom_query = custom_query or {}
+        if not set(query).isdisjoint(custom_query):
             raise ValueError(
-                f"Custom_query must not overlap with other query options. Duplicates: {set(query) & set(custom_query_dict)}"
+                f"Custom_query must not overlap with other query options. Duplicates: {set(query) & set(custom_query)}"
             )
 
-        return query | custom_query_dict
+        return query | custom_query
 
     def _build_query_flow(
         self,
