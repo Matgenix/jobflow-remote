@@ -87,7 +87,6 @@ def test_run_batch_multi_fail(
     wait_daemon_shutdown,
     clean_slurm_queue,
 ) -> None:
-    from jobflow import Flow
     from qtoolkit.core.data_objects import CancelStatus
 
     from jobflow_remote import submit_flow
@@ -101,8 +100,7 @@ def test_run_batch_multi_fail(
         for _ in range(n):
             add_j = add_sleep(2, sleep)
 
-            flow = Flow([add_j])
-            submit_flow(flow, worker=worker_name)
+            submit_flow(add_j, worker=worker_name)
             job_ids.append(add_j.uuid)
         return job_ids
 
@@ -304,7 +302,4 @@ def test_max_jobs_worker(
     max_running_jobs = check_running_jobs(60)
     assert max_running_jobs == 2
 
-    jobs_info = job_controller.get_jobs_info(job_ids=job_ids)
-    for ji in jobs_info:
-        print(ji.db_id, ji.state)
     assert job_controller.count_jobs(states=JobState.COMPLETED) == 4

@@ -154,7 +154,7 @@ class RemoteBatchManager:
         Parameters
         ----------
         process_id
-            The uuid of the process for the running files to be removes
+            The uuid of the process for the running files to be removed.
         """
         if not self._dir_initialized:
             self._init_files_dir()
