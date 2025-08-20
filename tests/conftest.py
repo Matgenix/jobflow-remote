@@ -344,8 +344,9 @@ def update_project_data(
     else:
         d = d | update
 
-    # validate the Project to get an error, otherwise if the values
-    # are wrong the error may be hidden by the runner/daemon starting
+    # Validate the Project to get an error in case of invalid file generated,
+    # otherwise if the values are wrong the error may be hidden by the
+    # runner/daemon
     Project.model_validate(d)
 
     dumpfn(d, project_file_path)

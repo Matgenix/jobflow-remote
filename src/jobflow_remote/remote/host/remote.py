@@ -453,7 +453,7 @@ class RemoteHost(BaseHost):
         Parameters
         ----------
         path
-            The path to the directory tree to be removed.
+            The path to check whether it exists.
 
         Returns
         -------
