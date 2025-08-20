@@ -61,3 +61,12 @@ def test_get_utc_offset():
     assert get_utc_offset("Asia/Shanghai") == "+08:00"
     with pytest.raises(ValueError, match="Could not determine the timezone for XXX"):
         get_utc_offset("XXX")
+
+
+def test_check_valid_uuid():
+    from jobflow_remote.utils.data import check_valid_uuid
+
+    assert check_valid_uuid("3140") is False
+    assert check_valid_uuid("abc-3140") is False
+    assert check_valid_uuid("bb4ab187-9b4b-470e-a0f2-483e2e0c0332") is True
+    assert check_valid_uuid("d0c2274c-ad5a-45e2-b5ae-0524a107f7b7") is True
