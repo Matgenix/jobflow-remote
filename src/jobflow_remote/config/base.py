@@ -585,20 +585,39 @@ class Project(BaseModel):
     metadata: Optional[dict] = Field(
         None, description="A dictionary with metadata associated to the project"
     )
+    optional_jobstores: Optional[dict[str, dict]] = Field(
+        default_factory=dict,
+        description="A dictionary of optional JobStores that can be use to store "
+        "outputs instead of the default jobstore. The key is the name used to "
+        "refer to the JobStore.",
+    )
 
-    def get_jobstore(self) -> Optional[JobStore]:
+    def get_jobstore(self, name: Optional[str] = None) -> Optional[JobStore]:
         """
         Generate an instance of the JobStore based on the configuration.
+
+        Parameters
+        ----------
+        name
+            name of the JobStore to fetch. If None the default JobStore,
+            otherwise one of the optional_jobstores.
 
         Returns
         -------
         A JobStore
         """
-        if not self.jobstore:
-            return None
+
+        if name:
+            if name not in self.optional_jobstores:
+                raise ValueError(f"No JobStore named {name} defined in the project.")
+            jobstore_dict = self.optional_jobstores[name]
+        else:
+            if not self.jobstore:
+                return None
+            jobstore_dict = self.jobstore
         if self.jobstore.get("@class") == "JobStore":
-            return JobStore.from_dict(self.jobstore)
-        return JobStore.from_dict_spec(self.jobstore)
+            return JobStore.from_dict(jobstore_dict)
+        return JobStore.from_dict_spec(jobstore_dict)
 
     def get_queue_store(self):
         """
@@ -664,6 +683,23 @@ class Project(BaseModel):
                     f"error while converting jobstore to JobStore. Error: {traceback.format_exc()}"
                 ) from e
         return jobstore
+
+    @field_validator("optional_jobstores")
+    @classmethod
+    def check_optional_jobstore(cls, optional_jobstores: dict) -> dict:
+        """Check that the jobstore configuration could be converted to a JobStore."""
+        if optional_jobstores:
+            for name, jobstore_dict in optional_jobstores.items():
+                try:
+                    if jobstore_dict.get("@class") == "JobStore":
+                        JobStore.from_dict(jobstore_dict)
+                    else:
+                        JobStore.from_dict_spec(jobstore_dict)
+                except Exception as e:
+                    raise ValueError(
+                        f"error while converting optional jobstore to JobStore: {name}. Error: {traceback.format_exc()}"
+                    ) from e
+        return optional_jobstores
 
     @property
     def has_interactive_workers(self) -> bool:

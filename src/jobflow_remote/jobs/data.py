@@ -78,7 +78,9 @@ def get_initial_job_doc_dict(
     return job_doc.as_db_dict()
 
 
-def get_initial_flow_doc_dict(flow: Flow, job_dicts: list[dict]) -> dict:
+def get_initial_flow_doc_dict(
+    flow: Flow, job_dicts: list[dict], jobstore: Optional[str] = None
+) -> dict:
     """
     Generate a serialized FlowDoc for initial insertion in the DB.
 
@@ -88,6 +90,9 @@ def get_initial_flow_doc_dict(flow: Flow, job_dicts: list[dict]) -> dict:
         The Flow used to generate the FlowDoc.
     job_dicts
         The dictionaries of the Jobs composing the Flow.
+    jobstore
+        The name of the JobStore used for the output of the submitted Flow.
+        If None the default is used.
 
     Returns
     -------
@@ -106,6 +111,7 @@ def get_initial_flow_doc_dict(flow: Flow, job_dicts: list[dict]) -> dict:
         ids=ids,
         parents=parents,
         metadata=flow.metadata or {},
+        jobstore=jobstore,
     )
 
     return flow_doc.as_db_dict()
@@ -312,6 +318,7 @@ class FlowDoc(BaseModel):
     parents: dict[str, dict[str, list[str]]] = Field(default_factory=dict)
     # ids correspond to db_id, uuid, index for each JobDoc
     ids: list[tuple[str, str, int]] = Field(default_factory=list)
+    jobstore: Optional[str] = None
 
     def as_db_dict(self) -> dict:
         """

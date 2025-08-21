@@ -282,7 +282,7 @@ def shutdown() -> None:
 def restart() -> None:
     """
     Restart the runner. Send a stop signal, wait for the runner to stop and
-    restart it with the same configuration.
+    restart it. The options to start the runner (e.g. --single) remain the same.
     """
     cm = get_config_manager()
     dm = DaemonManager.from_project(cm.get_project())

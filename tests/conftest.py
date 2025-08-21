@@ -467,3 +467,40 @@ def wait_daemon_shutdown():
         target_status=DaemonStatus.SHUT_DOWN,
         acceptable_states=acceptable_states,
     )
+
+
+def update_project_data(
+    update: dict, dict_mods: bool = True, project_file_path: Path = None
+):
+    from jobflow.utils.dict_mods import apply_mod
+    from monty.serialization import dumpfn, loadfn
+
+    from jobflow_remote.config.base import Project
+
+    d = loadfn(project_file_path)
+
+    if dict_mods:
+        apply_mod(update, d)
+    else:
+        d = d | update
+
+    # Validate the Project to get an error in case of invalid file generated,
+    # otherwise if the values are wrong the error may be hidden by the
+    # runner/daemon
+    Project.model_validate(d)
+
+    dumpfn(d, project_file_path)
+
+
+@pytest.fixture()
+def patch_project(monkeypatch):
+    from jobflow_remote.config.manager import ConfigManager
+
+    cm = ConfigManager()
+    current_project_data = cm.get_project_data()
+
+    yield partial(
+        update_project_data, project_file_path=Path(current_project_data.filepath)
+    )
+
+    cm.dump_project(current_project_data)

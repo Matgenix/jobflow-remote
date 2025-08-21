@@ -478,3 +478,19 @@ def write_tmp_settings(
 
     if tmp_proj_dir.exists():
         shutil.rmtree(tmp_proj_dir)
+
+
+@pytest.fixture()
+def clean_slurm_queue(write_tmp_settings):
+    """
+    Clean the list of Jobs in the SLURM queue at the end of the test.
+    """
+    from jobflow_remote.remote.queue import QueueManager
+
+    yield
+    project = write_tmp_settings
+    worker = project.workers["test_remote_slurm_worker"]
+    queue_manager = QueueManager(worker.get_scheduler_io(), worker.get_host())
+    for qjob in queue_manager.get_jobs_list():
+        queue_manager.cancel(qjob)
+        time.sleep(0.1)

@@ -135,6 +135,26 @@ def write_tmp_settings(
             max_step_attempts=3,
             delta_retry=(1, 1, 1),
         ),
+        optional_jobstores={
+            "other_jobstore": {
+                "docs_store": {
+                    "type": "MongoStore",
+                    "database": store_database_name,
+                    "host": mongoclient.HOST,
+                    "port": mongoclient.PORT,
+                    "collection_name": "other_docs",
+                },
+                "additional_stores": {
+                    "big_data": {
+                        "type": "GridFSStore",
+                        "database": store_database_name,
+                        "host": mongoclient.HOST,
+                        "port": mongoclient.PORT,
+                        "collection_name": "other_data",
+                    },
+                },
+            },
+        },
     )
     project_json = project.model_dump_json(indent=2)
     with open(tmp_proj_dir / f"{random_project_name}.json", "w") as f:

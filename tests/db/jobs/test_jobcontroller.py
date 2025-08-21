@@ -1164,3 +1164,67 @@ def test_resume_flow(job_controller, runner):
 
     assert job_controller.get_flows_info()[0].state == FlowState.RUNNING
     assert job_controller.count_jobs(states=[JobState.STOPPED, JobState.PAUSED]) == 0
+
+
+def test_flow_store(job_controller, two_flows_four_jobs, runner):
+    from jobflow_remote.jobs.state import FlowState
+
+    job_controller.set_flow_store("other_jobstore", flow_id=two_flows_four_jobs[0].uuid)
+
+    assert (
+        job_controller.get_flow_store(flow_id=two_flows_four_jobs[0].uuid)
+        == "other_jobstore"
+    )
+    assert job_controller.get_flow_store(flow_id=two_flows_four_jobs[1].uuid) is None
+
+    with pytest.raises(
+        ValueError,
+        match=".*Store wrong_jobstore is not defined as an optional jobstore.*",
+    ):
+        job_controller.set_flow_store(
+            "wrong_jobstore", flow_id=two_flows_four_jobs[0].uuid
+        )
+
+    with pytest.raises(ValueError, match="No Flow document matching criteria"):
+        job_controller.set_flow_store("other_jobstore", flow_id="wrong_id")
+
+    job_controller.set_flow_store("other_jobstore", flow_id=two_flows_four_jobs[1].uuid)
+    assert (
+        job_controller.get_flow_store(flow_id=two_flows_four_jobs[1].uuid)
+        == "other_jobstore"
+    )
+    job_controller.set_flow_store(None, flow_id=two_flows_four_jobs[1].uuid)
+    assert job_controller.get_flow_store(flow_id=two_flows_four_jobs[1].uuid) is None
+
+    with pytest.raises(ValueError, match="No Flow matching id"):
+        job_controller.get_flow_store(flow_id="wrong_id")
+
+    runner.run_one_job(job_id=(two_flows_four_jobs[0][0].uuid, 1))
+
+    assert (
+        job_controller.get_flows_info(flow_ids=[two_flows_four_jobs[0].uuid])[0].state
+        == FlowState.RUNNING
+    )
+    with pytest.raises(
+        RuntimeError, match=".*The JobStore can be set only for a READY Flow.*"
+    ):
+        job_controller.set_flow_store(
+            "other_jobstore", flow_id=two_flows_four_jobs[0].uuid
+        )
+
+    # test get_job_output from the additional store
+    assert job_controller.get_job_output(job_id=two_flows_four_jobs[0][0].uuid) == 6
+
+
+def test_get_job_output(job_controller, runner, one_job):
+    # here it is tested with the standard jobstore. The optional jobstore is
+    # tested in test_flow_store
+
+    with pytest.raises(
+        ValueError, match=rf".*UUID: {one_job[0].uuid} \(index: 1\) has no outputs.*"
+    ):
+        job_controller.get_job_output(db_id="1")
+
+    runner.run_all_jobs(max_seconds=20)
+
+    assert job_controller.get_job_output(db_id="1") == 6

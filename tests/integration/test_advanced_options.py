@@ -1,4 +1,5 @@
 import os
+import time
 
 import pytest
 
@@ -8,7 +9,7 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-def test_run_batch(job_controller, monkeypatch) -> None:
+def test_run_batch(job_controller, monkeypatch, clean_slurm_queue) -> None:
     from jobflow import Flow
 
     from jobflow_remote import submit_flow
@@ -44,7 +45,7 @@ def test_run_batch(job_controller, monkeypatch) -> None:
         assert jobs_info[i].end_time < jobs_info[i + 1].start_time
 
 
-def test_run_batch_multi(job_controller, monkeypatch) -> None:
+def test_run_batch_multi(job_controller, monkeypatch, clean_slurm_queue) -> None:
     from jobflow import Flow
 
     from jobflow_remote import submit_flow
@@ -76,6 +77,163 @@ def test_run_batch_multi(job_controller, monkeypatch) -> None:
     for ji1 in jobs_info:
         for ji2 in jobs_info:
             assert ji1.start_time < ji2.end_time
+
+
+def test_run_batch_multi_fail(
+    patch_project,
+    job_controller,
+    daemon_manager,
+    wait_daemon_started,
+    wait_daemon_shutdown,
+    clean_slurm_queue,
+) -> None:
+    from qtoolkit.core.data_objects import CancelStatus
+
+    from jobflow_remote import submit_flow
+    from jobflow_remote.jobs.batch import RemoteBatchManager
+    from jobflow_remote.jobs.state import JobState
+    from jobflow_remote.remote.queue import QueueManager
+    from jobflow_remote.testing import add_sleep
+
+    def submit_jobs(n: int, sleep: int):
+        job_ids = []
+        for _ in range(n):
+            add_j = add_sleep(2, sleep)
+
+            submit_flow(add_j, worker=worker_name)
+            job_ids.append(add_j.uuid)
+        return job_ids
+
+    proj = job_controller.project
+    worker_name = "test_batch_multi_remote_worker"
+    patch_project({"_set": {"runner->delay_update_batch": 1}})
+
+    job_ids = submit_jobs(2, sleep=60)
+
+    daemon_manager.start()
+    wait_daemon_started(daemon_manager)
+
+    for _ in range(10):
+        if (
+            len(
+                job_controller.get_jobs_info(
+                    job_ids=list(zip(job_ids, [1] * len(job_ids))),
+                    states=JobState.BATCH_RUNNING,
+                )
+            )
+            == 2
+        ):
+            break
+        time.sleep(1)
+    else:
+        raise RuntimeError(
+            "The submitted jobs were never both running at the same time"
+        )
+
+    daemon_manager.shut_down()
+    wait_daemon_shutdown(daemon_manager)
+
+    assert (
+        len(
+            job_controller.get_jobs_info(
+                job_ids=list(zip(job_ids, [1] * len(job_ids))),
+                states=JobState.BATCH_RUNNING,
+            )
+        )
+        == 2
+    )
+
+    # check that jobs were submitted only for the correct worker
+    # (a bug submitted jobs for the wrong worker as well)
+    full_dict_batch_processes = job_controller.get_batch_processes()
+    for batch_worker_name, submitted_jobs in full_dict_batch_processes.items():
+        n_submitted = 1 if batch_worker_name == worker_name else 0
+        assert (
+            len(submitted_jobs) == n_submitted
+        ), f"wrong number of jobs for worker {batch_worker_name}"
+
+    worker = proj.workers[worker_name]
+    host = worker.get_host()
+    host.connect()
+    batch_manager = RemoteBatchManager(host, worker.batch.jobs_handle_dir)
+    queue_manager = QueueManager(worker.get_scheduler_io(), host)
+    dict_batch_processes = job_controller.get_batch_processes(worker_name)
+    assert len(dict_batch_processes[worker_name]) == 1
+    assert (
+        queue_manager.cancel(next(iter(dict_batch_processes[worker_name]))).status
+        == CancelStatus.SUCCESSFUL
+    )
+    assert len(queue_manager.get_jobs_list()) == 0
+
+    assert len(batch_manager.get_running()) == 2
+
+    # now restart the runner and verify that the job is set to remote error
+    # and running files are properly cleaned
+    daemon_manager.start()
+    wait_daemon_started(daemon_manager)
+    for _ in range(10):
+        if all(
+            ji.state == JobState.REMOTE_ERROR
+            for ji in job_controller.get_jobs_info(
+                job_ids=list(zip(job_ids, [1] * len(job_ids)))
+            )
+        ):
+            break
+        time.sleep(1)
+    else:
+        raise RuntimeError("The Jobs were not set to REMOTE_ERROR state")
+
+    assert len(batch_manager.get_running()) == 0
+
+    # submit more jobs, will also be used to check that the files are cleaned during the reset
+    job_ids = submit_jobs(4, 60)
+
+    for _ in range(10):
+        if (
+            len(
+                job_controller.get_jobs_info(
+                    job_ids=list(zip(job_ids, [1] * len(job_ids))),
+                    states=JobState.BATCH_RUNNING,
+                )
+            )
+            == 2
+        ):
+            break
+        time.sleep(1)
+    else:
+        raise RuntimeError(
+            "The submitted jobs were never both running at the same time"
+        )
+
+    daemon_manager.shut_down()
+    wait_daemon_shutdown(daemon_manager)
+
+    assert (
+        len(
+            job_controller.get_jobs_info(
+                job_ids=list(zip(job_ids, [1] * len(job_ids))),
+                states=JobState.BATCH_RUNNING,
+            )
+        )
+        == 2
+    )
+    assert (
+        len(
+            job_controller.get_jobs_info(
+                job_ids=list(zip(job_ids, [1] * len(job_ids))),
+                states=JobState.BATCH_SUBMITTED,
+            )
+        )
+        == 2
+    )
+
+    assert len(batch_manager.get_running()) == 2
+
+    # now reset the DB, the files should also be cleaned up
+    job_controller.reset()
+    assert len(batch_manager.get_terminated()) == 0
+    assert len(batch_manager.get_submitted()) == 0
+    assert len(batch_manager.get_running()) == 0
 
 
 def test_max_jobs_worker(
@@ -144,7 +302,4 @@ def test_max_jobs_worker(
     max_running_jobs = check_running_jobs(60)
     assert max_running_jobs == 2
 
-    jobs_info = job_controller.get_jobs_info(job_ids=job_ids)
-    for ji in jobs_info:
-        print(ji.db_id, ji.state)
     assert job_controller.count_jobs(states=JobState.COMPLETED) == 4
