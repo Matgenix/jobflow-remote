@@ -60,6 +60,7 @@ from jobflow_remote.remote.data import (
 )
 from jobflow_remote.remote.queue import QueueManager
 from jobflow_remote.utils.data import (
+    check_valid_uuid,
     deep_merge_dict,
     get_past_time_rounded,
     get_utc_offset,
@@ -234,6 +235,7 @@ class JobController:
         name: str | None,
         metadata: dict | None,
         workers: str | list[str] | None,
+        custom_query: dict | None,
     ) -> dict:
         """
         Build a query to search for Jobs, based on standard parameters.
@@ -247,7 +249,7 @@ class JobController:
         db_ids
             One or more db_ids of the Jobs to retrieve.
         flow_ids
-            One or more Flow uuids to which the Jobs to retrieve belong.
+            One or more Flow uuids or DB_IDs to which the Jobs to retrieve belong.
         states
             One or more states of the Jobs.
         locked
@@ -266,6 +268,8 @@ class JobController:
             exact match for all the values provided.
         workers
             One or more worker names.
+        custom_query
+            A generic query. Keys must not overlap with other specified query options.
 
         Returns
         -------
@@ -276,10 +280,18 @@ class JobController:
         if job_ids and not any(isinstance(ji, (list, tuple)) for ji in job_ids):
             # without these cast mypy is confused about the type
             job_ids = cast(list[tuple[str, int]], [job_ids])
-        if db_ids is not None and not isinstance(db_ids, (list, tuple)):
-            db_ids = [db_ids]
-        if flow_ids and not isinstance(flow_ids, (list, tuple)):
-            flow_ids = [flow_ids]
+        db_ids = [db_ids] if isinstance(db_ids, str) else db_ids or []
+
+        flow_ids = [flow_ids] if isinstance(flow_ids, str) else flow_ids or []
+        flow_uuids = [
+            fid
+            if check_valid_uuid(fid)
+            else self.flows.find_one(
+                {"ids": {"$elemMatch": {"0": fid}}}, projection=["uuid"]
+            )["uuid"]
+            for fid in flow_ids
+        ]
+
         if isinstance(states, JobState):
             states = [states]
         if isinstance(workers, str):
@@ -296,8 +308,8 @@ class JobController:
                 or_list.append({"uuid": job_id, "index": job_index})
             query["$or"] = or_list
 
-        if flow_ids:
-            query["job.hosts"] = {"$in": flow_ids}
+        if flow_uuids:
+            query["job.hosts"] = {"$in": flow_uuids}
 
         if states:
             query["state"] = {"$in": [s.value for s in states]}
@@ -325,7 +337,13 @@ class JobController:
         if workers:
             query["worker"] = {"$in": workers}
 
-        return query
+        custom_query = custom_query or {}
+        if not set(query).isdisjoint(custom_query):
+            raise ValueError(
+                f"Custom_query must not overlap with other query options. Duplicates: {set(query) & set(custom_query)}"
+            )
+
+        return query | custom_query
 
     def _build_query_flow(
         self,
@@ -439,6 +457,7 @@ class JobController:
 
     def get_jobs_info(
         self,
+        custom_query: dict | None = None,
         job_ids: tuple[str, int] | list[tuple[str, int]] | None = None,
         db_ids: str | list[str] | None = None,
         flow_ids: str | list[str] | None = None,
@@ -458,13 +477,15 @@ class JobController:
 
         Parameters
         ----------
+        custom_query
+            A generic query. Keys must not overlap with other specified query options.
         job_ids
             One or more tuples, each containing the (uuid, index) pair of the
             Jobs to retrieve.
         db_ids
             One or more db_ids of the Jobs to retrieve.
         flow_ids
-            One or more Flow uuids to which the Jobs to retrieve belong.
+            One or more Flow uuids to which the Jobs to retrieve belong. Can contain db_ids and uuids.
         states
             One or more states of the Jobs.
         locked
@@ -507,6 +528,7 @@ class JobController:
             name=name,
             metadata=metadata,
             workers=workers,
+            custom_query=custom_query,
         )
         return self.get_jobs_info_query(query=query, sort=sort, limit=limit, skip=skip)
 
@@ -532,6 +554,7 @@ class JobController:
 
     def get_jobs_doc(
         self,
+        custom_query: dict | None = None,
         job_ids: tuple[str, int] | list[tuple[str, int]] | None = None,
         db_ids: str | list[str] | None = None,
         flow_ids: str | list[str] | None = None,
@@ -550,13 +573,15 @@ class JobController:
 
         Parameters
         ----------
+        custom_query
+            A dictionary representing the filter.
         job_ids
             One or more tuples, each containing the (uuid, index) pair of the
             Jobs to retrieve.
         db_ids
             One or more db_ids of the Jobs to retrieve.
         flow_ids
-            One or more Flow uuids to which the Jobs to retrieve belong.
+            One or more Flow uuids to which the Jobs to retrieve belong. Can contain db_ids and uuids.
         states
             One or more states of the Jobs.
         locked
@@ -597,6 +622,7 @@ class JobController:
             name=name,
             metadata=metadata,
             workers=workers,
+            custom_query=custom_query,
         )
         return self.get_jobs_doc_query(query=query, sort=sort, limit=limit)
 
@@ -759,7 +785,7 @@ class JobController:
         db_ids
             One or more db_ids of the Jobs to retrieve.
         flow_ids
-            One or more Flow uuids to which the Jobs to retrieve belong.
+            One or more Flow uuids to which the Jobs to retrieve belong. Can contain db_ids and uuids.
         states
             The state of the Jobs.
         locked
@@ -779,7 +805,7 @@ class JobController:
         workers
             One or more worker names.
         custom_query
-            A generic query. Incompatible with all the other filtering options.
+            A generic query. Keys must not overlap with other specified query options.
         raise_on_error
             If True raise in case of error on one job error and stop the loop.
             Otherwise, just log the error and proceed.
@@ -794,36 +820,19 @@ class JobController:
         list
             List of db_ids of the updated Jobs.
         """
-        filtering_options = [
-            job_ids,
-            db_ids,
-            flow_ids,
-            states,
-            start_date,
-            end_date,
-            name,
-            metadata,
-            workers,
-        ]
-        if custom_query and any(opt is not None for opt in filtering_options):
-            raise ValueError(
-                "The custom query option is incompatible with all the other filtering options"
-            )
-        if custom_query:
-            query = custom_query
-        else:
-            query = self._build_query_job(
-                job_ids=job_ids,
-                db_ids=db_ids,
-                flow_ids=flow_ids,
-                states=states,
-                start_date=start_date,
-                end_date=end_date,
-                name=name,
-                metadata=metadata,
-                workers=workers,
-                locked=False,
-            )
+        query = self._build_query_job(
+            job_ids=job_ids,
+            db_ids=db_ids,
+            flow_ids=flow_ids,
+            states=states,
+            start_date=start_date,
+            end_date=end_date,
+            name=name,
+            metadata=metadata,
+            workers=workers,
+            locked=False,
+            custom_query=custom_query,
+        )
         result = self.jobs.find(query, projection=["db_id"])
 
         queried_dbs_ids = [r["db_id"] for r in result]
@@ -882,7 +891,7 @@ class JobController:
         db_ids
             One or more db_ids of the Jobs to retrieve.
         flow_ids
-            One or more Flow uuids to which the Jobs to retrieve belong.
+            One or more Flow uuids to which the Jobs to retrieve belong. Can contain db_ids and uuids.
         states
             One or more states of the Jobs.
         start_date
@@ -900,7 +909,7 @@ class JobController:
         workers
             One or more worker names.
         custom_query
-            A generic query. Incompatible with all the other filtering options.
+            A generic query. Keys must not overlap with other specified query options.
         raise_on_error
             If True raise in case of error on one job error and stop the loop.
             Otherwise, just log the error and proceed.
@@ -1492,7 +1501,7 @@ class JobController:
         db_ids
             One or more db_ids of the Jobs to retrieve.
         flow_ids
-            One or more Flow uuids to which the Jobs to retrieve belong.
+            One or more Flow uuids to which the Jobs to retrieve belong. Can contain db_ids and uuids.
         states
             One or more states of the Jobs.
         start_date
@@ -1510,7 +1519,7 @@ class JobController:
         workers
             One or more worker names.
         custom_query
-            A generic query. Incompatible with all the other filtering options.
+            A generic query. Keys must not overlap with other specified query options.
         raise_on_error
             If True raise in case of error on one job error and stop the loop.
             Otherwise, just log the error and proceed.
@@ -1658,7 +1667,7 @@ class JobController:
         db_ids
             One or more db_ids of the Jobs to retrieve.
         flow_ids
-            One or more Flow uuids to which the Jobs to retrieve belong.
+            One or more Flow uuids to which the Jobs to retrieve belong. Can contain db_ids and uuids.
         states
             One or more states of the Jobs.
         start_date
@@ -1676,7 +1685,7 @@ class JobController:
         workers
             One or more worker names.
         custom_query
-            A generic query. Incompatible with all the other filtering options.
+            A generic query. Keys must not overlap with other specified query options.
         raise_on_error
             If True raise in case of error on one job error and stop the loop.
             Otherwise, just log the error and proceed.
@@ -1736,7 +1745,7 @@ class JobController:
         db_ids
             One or more db_ids of the Jobs to retrieve.
         flow_ids
-            One or more Flow uuids to which the Jobs to retrieve belong.
+            One or more Flow uuids to which the Jobs to retrieve belong. Can contain db_ids and uuids.
         states
             One or more states of the Jobs.
         start_date
@@ -1754,7 +1763,7 @@ class JobController:
         workers
             One or more worker names.
         custom_query
-            A generic query. Incompatible with all the other filtering options.
+            A generic query. Keys must not overlap with other specified query options.
         raise_on_error
             If True raise in case of error on one job error and stop the loop.
             Otherwise, just log the error and proceed.
@@ -1963,7 +1972,7 @@ class JobController:
         db_ids
             One or more db_ids of the Jobs to retrieve.
         flow_ids
-            One or more Flow uuids to which the Jobs to retrieve belong.
+            One or more Flow uuids to which the Jobs to retrieve belong. Can contain db_ids and uuids.
         states
             One or more states of the Jobs.
         start_date
@@ -1981,7 +1990,7 @@ class JobController:
         workers
             One or more worker names.
         custom_query
-            A generic query. Incompatible with all the other filtering options.
+            A generic query. Keys must not overlap with other specified query options.
         raise_on_error
             If True raise in case of error on one job error and stop the loop.
             Otherwise, just log the error and proceed.
@@ -2187,6 +2196,7 @@ class JobController:
                 name=None,
                 metadata=None,
                 workers=None,
+                custom_query=None,
             )
             job_db_ids_to_resume = [
                 d["db_id"] for d in self.jobs.find(jobs_filter, projection=["db_id"])
@@ -2280,7 +2290,7 @@ class JobController:
         db_ids
             One or more db_ids of the Jobs to retrieve.
         flow_ids
-            One or more Flow uuids to which the Jobs to retrieve belong.
+            One or more Flow uuids to which the Jobs to retrieve belong. Can contain db_ids and uuids.
         states
             One or more states of the Jobs.
         start_date
@@ -2298,7 +2308,7 @@ class JobController:
         workers
             One or more worker names.
         custom_query
-            A generic query. Incompatible with all the other filtering options.
+            A generic query. Keys must not overlap with other specified query options.
         raise_on_error
             If True raise in case of error on one job error and stop the loop.
             Otherwise, just log the error and proceed.
@@ -2672,7 +2682,7 @@ class JobController:
         Parameters
         ----------
         flow_id
-            One or more Flow uuids.
+            One Flow ids. Can be db_id or uuid.
         delete_output
             If True also delete the associated output in the JobStore.
         delete_files
@@ -2726,7 +2736,7 @@ class JobController:
         db_ids
             One or more db_ids of the Jobs to retrieve.
         flow_ids
-            One or more Flow uuids to which the Jobs to retrieve belong.
+            One or more Flow uuids to which the Jobs to retrieve belong. Can contain db_ids and uuids.
         states
             One or more states of the Jobs.
         start_date
@@ -2760,6 +2770,7 @@ class JobController:
             name=name,
             metadata=metadata,
             workers=workers,
+            custom_query=None,
         )
 
         result = self.jobs.update_many(
@@ -3197,14 +3208,14 @@ class JobController:
         Parameters
         ----------
         query
-            A generic query. Will override all the other parameters.
+            A generic query.
         job_ids
             One or more tuples, each containing the (uuid, index) pair of the
             Jobs to retrieve.
         db_ids
             One or more db_ids of the Jobs to retrieve.
         flow_ids
-            One or more Flow uuids to which the Jobs to retrieve belong.
+            One or more Flow uuids to which the Jobs to retrieve belong. Can contain db_ids and uuids.
         states
             One or more states of the Jobs.
         locked
@@ -3229,20 +3240,20 @@ class JobController:
         int
             Number of Jobs matching the criteria.
         """
-        if query is None:
-            query = self._build_query_job(
-                job_ids=job_ids,
-                db_ids=db_ids,
-                flow_ids=flow_ids,
-                states=states,
-                locked=locked,
-                start_date=start_date,
-                end_date=end_date,
-                name=name,
-                metadata=metadata,
-                workers=workers,
-            )
-        return self.jobs.count_documents(query)
+        full_query = self._build_query_job(
+            job_ids=job_ids,
+            db_ids=db_ids,
+            flow_ids=flow_ids,
+            states=states,
+            locked=locked,
+            start_date=start_date,
+            end_date=end_date,
+            name=name,
+            metadata=metadata,
+            workers=workers,
+            custom_query=query,
+        )
+        return self.jobs.count_documents(full_query)
 
     def count_flows(
         self,
@@ -4913,7 +4924,7 @@ class JobController:
         db_ids
             One or more db_ids of the Jobs to retrieve.
         flow_ids
-            One or more Flow uuids to which the Jobs to retrieve belong.
+            One or more Flow uuids to which the Jobs to retrieve belong. Can contain db_ids and uuids.
         states
             One or more states of the Jobs.
         start_date
@@ -4931,7 +4942,7 @@ class JobController:
         workers
             One or more worker names.
         custom_query
-            A generic query. Incompatible with all the other filtering options.
+            A generic query. Keys must not overlap with other specified query options.
         raise_on_error
             If True raise in case of error on one job error and stop the loop.
             Otherwise, just log the error and proceed.

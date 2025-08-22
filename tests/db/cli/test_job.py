@@ -44,6 +44,35 @@ def test_jobs_list(job_controller, two_flows_four_jobs, patch_cli_consoles) -> N
         ["job", "list", "-q", '{"db_id": "1"}', "--count"],
         required_out="Number of jobs: 1",
     )
+    run_check_cli(
+        ["job", "list", "-q", '{"db_id": {"$in": ["1", "2"]}}', "--count"],
+        required_out="Number of jobs: 2",
+    )
+    run_check_cli(
+        ["job", "list", "-q", '{"db_id": {"$in": ["1", "2"]}}', "-did", "1"],
+        error=True,
+        required_out="Custom_query must not overlap with other query options. Duplicates: {'db_id'}",
+    )
+    run_check_cli(
+        [
+            "job",
+            "list",
+            "-q",
+            '{"db_id": {"$in": ["1", "2"]}}',
+            "--count",
+            "-s",
+            "READY",
+        ],
+        required_out="Number of jobs: 1",
+    )
+    run_check_cli(
+        ["job", "list", "-fid", "1", "--count"], required_out="Number of jobs: 2"
+    )
+    second_flow_uuid = two_flows_four_jobs[1].uuid
+    run_check_cli(
+        ["job", "list", "-fid", "1", "-fid", second_flow_uuid, "--count"],
+        required_out="Number of jobs: 4",
+    )
 
     # trigger the additional information
     assert job_controller.set_job_state(JobState.REMOTE_ERROR, db_id="1")
