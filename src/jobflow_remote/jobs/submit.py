@@ -21,6 +21,7 @@ def submit_flow(
     resources: dict | QResources | None = None,
     priority: int = 0,
     allow_external_references: bool = False,
+    jobstore: str | None = None,
 ) -> list[str]:
     """
     Submit a flow for calculation to the selected Worker.
@@ -49,6 +50,9 @@ def submit_flow(
     allow_external_references
         If False all the references to other outputs should be from other Jobs
         of the Flow.
+    jobstore
+        The name of the JobStore used for the output of the submitted Flow.
+        If None the default is used.
 
     Returns
     -------
@@ -73,9 +77,9 @@ def submit_flow(
     flow = get_flow(flow, allow_external_references=allow_external_references)
 
     # check that all the additional stores are properly defined
-    jobstore = proj_obj.get_jobstore()
+    jobstore_obj = proj_obj.get_jobstore(jobstore)
     for job, _ in flow.iterflow():
-        missing_stores = check_additional_stores(job, jobstore)
+        missing_stores = check_additional_stores(job, jobstore_obj)
         if missing_stores:
             raise ConfigError(
                 f"Additional stores {missing_stores!r} are not configured for this project."
@@ -90,4 +94,5 @@ def submit_flow(
         resources=resources,
         priority=priority,
         allow_external_references=allow_external_references,
+        jobstore=jobstore,
     )

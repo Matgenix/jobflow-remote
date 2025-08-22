@@ -219,3 +219,34 @@ def test_resume(job_controller, two_flows_four_jobs) -> None:
     assert job_controller.get_job_info(db_id="2").state == JobState.WAITING
 
     assert job_controller.get_flows_info(db_ids="1")[0].state == FlowState.READY
+
+
+def test_set_store(job_controller, runner, one_job):
+    from jobflow_remote.testing.cli import run_check_cli
+
+    assert job_controller.get_flow_store(one_job.uuid) is None
+
+    run_check_cli(
+        ["flow", "set", "store", one_job.uuid, "other_jobstore"],
+        required_out="Flow has been updated",
+    )
+
+    assert job_controller.get_flow_store(one_job.uuid) == "other_jobstore"
+
+    run_check_cli(
+        ["flow", "set", "store", "1"],
+        required_out="Flow has been updated",
+    )
+
+    assert job_controller.get_flow_store(one_job.uuid) is None
+
+    runner.run_one_job(db_id="1")
+
+    run_check_cli(
+        ["flow", "set", "store", "1", "other_jobstore"],
+        required_out="The JobStore can be set only for a READY Flow",
+        excluded_out="Flow has been updated",
+        error=True,
+    )
+
+    assert job_controller.get_flow_store(one_job.uuid) is None
