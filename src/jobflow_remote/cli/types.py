@@ -62,7 +62,7 @@ flow_ids_opt = Annotated[
     typer.Option(
         "--flow-id",
         "-fid",
-        help="One or more flow ids",
+        help="One or more flow ids. Can the db id (i.e. an integer) or a string (i.e. the uuid)",
     ),
 ]
 
@@ -419,7 +419,8 @@ query_opt = Annotated[
         "--query",
         "-q",
         help="A JSON string representing a generic query in the form of a dictionary. "
-        "Overrides all other query options. Requires knowledge of the internal structure of the DB. "
+        "Keys must not overlap with those from other specified query options. "
+        "Requires knowledge of the internal structure of the DB. "
         "Can be either a list of comma separated key=value pairs or a string with the JSON"
         " representation of a dictionary containing the mongoDB query that "
         'should be performed (e.g \'{"key1.key2": 1, "key3": "test"}\')',
