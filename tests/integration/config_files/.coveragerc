@@ -1,5 +1,0 @@
-[run]
-branch = True
-source = jobflow_remote
-relative_files = True
-parallel = True

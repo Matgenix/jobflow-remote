@@ -88,7 +88,13 @@ def bake_containers():
 
 @pytest.fixture(scope="session", autouse=True)
 def compose_containers(
-    slurm_ssh_port, sge_ssh_port, pbs_ssh_port, db_port, bake_containers, coverage_file
+    slurm_ssh_port,
+    sge_ssh_port,
+    pbs_ssh_port,
+    db_port,
+    bake_containers,
+    coverage_file,
+    pytestconfig,
 ):
     compose_yaml = f"""
 name: jobflow_remote_testing
@@ -195,6 +201,18 @@ services:
                 )
 
             yield docker_client
+            if pytestconfig.getoption("copy_files_from_containers"):
+                print(" * Copying files back from the containers...")
+                containers_files_dir = pytestconfig.rootpath / "containers_files"
+                for c in containers:
+                    if c.name in ("mongo_container",):
+                        continue
+                    container_dir = containers_files_dir / c.name
+                    container_dir.mkdir(parents=True, exist_ok=True)
+                    c.copy_from(
+                        "/home/jobflow/jfr/",
+                        container_dir,
+                    )
             # After tests finish, copy coverage data from container(s) to local machine
             if coverage_file:
                 coverage_dir = Path(coverage_file).parent
@@ -231,7 +249,8 @@ services:
                     for cov_container_path in coverage_container_paths:
                         cov_dir = cov_container_path.relative_to(integration_cov_dir)
                         cov_file = cov_dir / ".coverage"
-                        shutil.copy(cov_file, f".coverage.{cov_dir}")
+                        if cov_file.exists():
+                            shutil.copy(cov_file, f".coverage.{cov_dir}")
 
                     # Combining the coverage from each container
                     cov = Coverage()
@@ -242,26 +261,30 @@ services:
                         ".coverage", coverage_dir / ".coverage-integration-remote"
                     )
         finally:
-            try:
-                print("\n * Stopping containers...")
+            if pytestconfig.getoption("keep_containers_alive"):
+                print("\n * Keeping containers alive...")
+                print(f"\n  - Docker compose yaml file: {f.name}")
+            else:
                 try:
-                    docker_client.compose.stop()
-                except Exception:
-                    pass
+                    print("\n * Stopping containers...")
+                    try:
+                        docker_client.compose.stop()
+                    except Exception:
+                        pass
 
-                try:
-                    docker_client.compose.kill()
-                except Exception:
-                    pass
+                    try:
+                        docker_client.compose.kill()
+                    except Exception:
+                        pass
 
-                try:
-                    docker_client.compose.rm(volumes=True)
-                except Exception:
-                    pass
+                    try:
+                        docker_client.compose.rm(volumes=True)
+                    except Exception:
+                        pass
 
-                print(" * Done!")
-            except Exception as exc:
-                print(f" x Failed to stop container: {exc}")
+                    print(" * Done!")
+                except Exception as exc:
+                    print(f" x Failed to stop container: {exc}")
 
 
 @pytest.fixture(scope="session")
@@ -278,6 +301,7 @@ def write_tmp_settings(
     pbs_ssh_port,
     db_port,
     tmp_proj_work_dirs,
+    pytestconfig,
 ):
     """Collects the various sub-configs and writes them to a temporary file in a
     temporary directory."""
@@ -292,7 +316,7 @@ def write_tmp_settings(
 
     prerun = (
         "source /home/jobflow/.venv/bin/activate; "
-        "export COVERAGE_PROCESS_START=/home/jobflow/.coveragerc; "
+        "export COVERAGE_PROCESS_START=/home/jobflow/pyproject.toml; "
         "export COVERAGE_FILE=/home/jobflow/coverage/.coverage"
     )
     project = Project(
@@ -476,12 +500,15 @@ def write_tmp_settings(
 
     yield project
 
-    if tmp_proj_dir.exists():
+    if pytestconfig.getoption("keep_containers_alive"):
+        print("\n * Containers are kept alive ... also keeping project configuration:")
+        print(f"\n  - Directory for project configuration file: {tmp_proj_dir}")
+    elif tmp_proj_dir.exists():
         shutil.rmtree(tmp_proj_dir)
 
 
 @pytest.fixture()
-def clean_slurm_queue(write_tmp_settings):
+def clean_slurm_queue(write_tmp_settings, coverage_file):
     """
     Clean the list of Jobs in the SLURM queue at the end of the test.
     """
@@ -491,6 +518,12 @@ def clean_slurm_queue(write_tmp_settings):
     project = write_tmp_settings
     worker = project.workers["test_remote_slurm_worker"]
     queue_manager = QueueManager(worker.get_scheduler_io(), worker.get_host())
+    # If tests are run with coverage, first try to wait until the slurm job finishes smoothly
+    if coverage_file:
+        for _ in range(60):
+            time.sleep(1.0)
+            if not queue_manager.get_jobs_list():
+                break
     for qjob in queue_manager.get_jobs_list():
         queue_manager.cancel(qjob)
         time.sleep(0.1)

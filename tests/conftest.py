@@ -348,6 +348,22 @@ def pytest_addoption(parser):
         dest="coverage_per_flag",
         help="Enable the reporting of the coverage per flag.",
     )
+    parser.addoption(
+        "--copy-files-from-containers",
+        "--cffc",
+        action="store_true",
+        default=False,
+        dest="copy_files_from_containers",
+        help="Copy back the files from the containers.",
+    )
+    parser.addoption(
+        "--keep-containers-alive",
+        "--kca",
+        action="store_true",
+        default=False,
+        dest="keep_containers_alive",
+        help="Keep the containers alive for inspection.",
+    )
 
 
 def pytest_sessionstart(session):

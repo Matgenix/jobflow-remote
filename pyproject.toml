@@ -40,7 +40,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pre-commit>=3.0.0"]
-tests = ["docker ~= 7.0", "pytest ~= 8.0", "pytest-cov >= 4,< 7", "pytest-durations ~= 1.3", "pytest-mock ~= 3.14", "python-on-whales ~=0.75"]
+tests = ["docker ~= 7.0", "pytest ~= 8.0", "pytest-cov >= 6,< 7", "pytest-durations ~= 1.3", "pytest-mock ~= 3.14", "python-on-whales ~=0.75", "coverage >= 7.10"]
 docs = [
     "autodoc_pydantic>=2.0.0",
     "pydata-sphinx-theme",
@@ -173,12 +173,22 @@ markers = [
 [tool.coverage.run]
 parallel = true
 branch = true
+source = [
+    "jobflow_remote"
+]
+relative_files = true
+concurrency = [
+    "multiprocessing"
+]
+patch = [
+    "subprocess"
+]
 
 [tool.coverage.paths]
 source = [
-    "src/",
-    "/home/jobflow/.venv/lib/python*/site-packages/",  # for coverage from docker containers
-    "/opt/hostedtoolcache/Python/*/x64/lib/python*/site-packages/",  # for combining coverages in GitHub CI
+    "src/jobflow_remote",
+    "/home/jobflow/.venv/lib/python*/site-packages/jobflow_remote",  # for coverage from docker containers
+    "/opt/hostedtoolcache/Python/*/x64/lib/python*/site-packages/jobflow_remote",  # for combining coverages in GitHub CI
 ]
 
 [tool.coverage.report]
