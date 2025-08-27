@@ -364,3 +364,36 @@ def patch_project(monkeypatch):
     )
 
     cm.dump_project(current_project_data)
+
+
+@pytest.fixture()
+def remove_jfremote_modules():
+    """
+    At the end of the test remove the jobflow_remote modules from sys
+    so that they are reloaded in the next test.
+
+    Used in case a test modifies the objects in the tests and to prevent
+    influencing the other tests.
+    """
+    import sys
+
+    yield
+
+    for module_name in list(sys.modules.keys()):
+        if module_name.startswith("jobflow_remote"):
+            try:
+                if module_name in sys.modules:
+                    del sys.modules[module_name]
+            except Exception:
+                pass
+
+
+@pytest.fixture(autouse=True)
+def disable_initial_load_plugins(monkeypatch):
+    """
+    Disable the execution of the initial load_plugins happening at import time
+    to avoid that plugins installed in the environment change the CLI.
+    """
+    from jobflow_remote import SETTINGS
+
+    monkeypatch.setattr(SETTINGS, "cli_load_plugins", False)

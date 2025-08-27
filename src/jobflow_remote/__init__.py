@@ -18,4 +18,5 @@ __all__ = (
     "JobController",
     "get_jobstore",
     "submit_flow",
+    "SETTINGS",
 )
