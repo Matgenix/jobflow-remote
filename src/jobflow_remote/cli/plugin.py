@@ -18,7 +18,7 @@ PLUGIN_LOAD_FUNCTION = "setup_jf_plugin"
 
 app_plugin = JFRTyper(
     name="plugin",
-    help="Commands for handling backup of the database",
+    help="Commands for managing plugins",
     no_args_is_help=True,
 )
 app.add_typer(app_plugin)
