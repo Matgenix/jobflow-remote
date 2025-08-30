@@ -19,6 +19,11 @@ All the commands have an associated help that can be shown with the
 ``--help`` flag. Below are reported the help for all the commands
 available in ``jf``.
 
+It is possible to extend the ``jf`` CLI from external packages through a
+plugin system. The discovery of such plugins is automatic and can be disabled
+by setting the ``cli_load_plugins`` to ``False`` in :ref:`projectconf general`.
+To develop new plugins follow the developer guide for :ref:`cliplugin`
+
 .. typer:: jobflow_remote.cli:app
     :preferred: html
     :width: 65
