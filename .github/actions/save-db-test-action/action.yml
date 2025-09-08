@@ -1,0 +1,63 @@
+name: "Testing save db artifact"
+description: "This action ensures that the save db artifact works properly"
+inputs:
+  python-version:
+    description: 'Python version used'
+    required: true
+runs:
+  using: "composite"
+  steps:
+    - name: Testing the save db artifact in case a test fails
+      id: failure
+      run: |
+        pytest tests/github_ci
+      shell: bash
+      continue-on-error: true
+
+    # Ensure previous test indeed failed (it continues on error but also continues on success ...)
+    - name: Make sure the previous step has failed
+      if: ${{ steps.failure.outcome == 'success' }}
+      run: |
+        echo "The previous step with an explicit failure should have failed while it succeeded"
+        exit 1
+      shell: bash
+
+    - name: Upload DB dump
+      if: ${{ steps.failure.outcome == 'failure' }}
+      uses: actions/upload-artifact@v4
+      id: artifact-upload-test
+      with:
+        name: db_dump_${{ inputs.python-version }}
+        path: test_folder
+        if-no-files-found: error
+
+    # This should check that a dump has been created in the github workspace, check its content (?)
+    # and then remove it
+    - name: Check the dump of the db
+      run: |
+        echo "Checking db dump"
+      shell: bash
+
+    - name: Download and inspect the artifact
+      if: ${{ steps.failure.outcome == 'failure' }}
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        echo "Downloading artifact directly using gh CLI..."
+        gh api --method GET \
+          -H "Accept: application/vnd.github+json" \
+          repos/matgenix/jobflow-remote/actions/artifacts/${{ steps.artifact-upload-test.outputs.artifact-id }}/zip > artifact.zip
+
+        echo "Unzipping artifact..."
+        unzip artifact.zip -d unzipped_artifact
+
+        echo "Checking unzipped artifact contents..."
+        python tests/github_ci/check_artifact.py unzipped_artifact
+      shell: bash
+
+    - name: Clean up local files
+      run: |
+        echo "Removing files"
+        rm artifact.zip
+        rm -r unzipped_artifact
+      shell: bash
