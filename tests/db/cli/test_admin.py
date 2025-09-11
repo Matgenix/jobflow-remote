@@ -1,7 +1,7 @@
 import pytest
 
 
-def test_reset(job_controller, one_job, capsys) -> None:
+def test_reset(job_controller, one_job) -> None:
     from datetime import datetime
 
     from jobflow import Flow
@@ -21,12 +21,11 @@ def test_reset(job_controller, one_job, capsys) -> None:
         f = Flow(add(1, 2))
         submit_flow(f, worker="test_local_worker")
 
-    with capsys.disabled():
-        run_check_cli(
-            ["admin", "reset"],
-            required_out="The database was NOT reset",
-            cli_input="y",
-        )
+    run_check_cli(
+        ["admin", "reset"],
+        required_out="The database was NOT reset",
+        cli_input="y",
+    )
     assert job_controller.count_jobs() == 26
 
     run_check_cli(["admin", "reset"], cli_input="n")
@@ -43,7 +42,7 @@ def test_reset(job_controller, one_job, capsys) -> None:
     assert job_controller.count_jobs() == 0
 
 
-def test_unlock(job_controller, one_job, capsys) -> None:
+def test_unlock(job_controller, one_job) -> None:
     from jobflow_remote.testing.cli import run_check_cli
 
     j = one_job.jobs[0]
@@ -51,7 +50,6 @@ def test_unlock(job_controller, one_job, capsys) -> None:
     with (
         pytest.warns(UserWarning, match="Could not release lock for document"),
         job_controller.lock_job(filter={"uuid": j.uuid}),
-        capsys.disabled(),
     ):
         run_check_cli(
             ["admin", "unlock", "-did", "1"],
@@ -73,14 +71,13 @@ def test_unlock(job_controller, one_job, capsys) -> None:
     )
 
 
-def test_unlock_flow(job_controller, one_job, capsys) -> None:
+def test_unlock_flow(job_controller, one_job) -> None:
     from jobflow_remote.testing.cli import run_check_cli
 
     # catch the warning coming from MongoLock
     with (
         pytest.warns(UserWarning, match="Could not release lock for document"),
         job_controller.lock_flow(filter={"uuid": one_job.uuid}),
-        capsys.disabled(),
     ):
         run_check_cli(
             ["admin", "unlock-flow", "-fid", one_job.uuid],
@@ -103,7 +100,7 @@ def test_unlock_flow(job_controller, one_job, capsys) -> None:
 
 
 @pytest.mark.filterwarnings("ignore:Could not release lock for document")
-def test_unlock_runner(job_controller, capsys) -> None:
+def test_unlock_runner(job_controller) -> None:
     from jobflow_remote.testing.cli import run_check_cli
 
     with job_controller.lock_auxiliary(filter={"running_runner": {"$exists": True}}):
@@ -126,41 +123,39 @@ def test_unlock_runner(job_controller, capsys) -> None:
     )
 
     job_controller.auxiliary.delete_many({"running_runner": {"$exists": True}})
-    with capsys.disabled():
-        run_check_cli(
-            ["admin", "unlock-runner"],
-            required_out=[
-                "No runner document... ",
-                "Consider upgrading your database using 'jf admin upgrade'",
-            ],
-        )
+    run_check_cli(
+        ["admin", "unlock-runner"],
+        required_out=[
+            "No runner document... ",
+            "Consider upgrading your database using 'jf admin upgrade'",
+        ],
+    )
 
 
-def test_upgrade(job_controller, upgrade_test_dir, random_project_name, capsys) -> None:
+def test_upgrade(job_controller, upgrade_test_dir, random_project_name) -> None:
     from jobflow_remote.testing.cli import run_check_cli
 
     # Test upgrading from development version. Explicitly pass such a target version
     # This is the case if the target version is not specified and the code installed
     # from source. No upgrade performed here.
-    with capsys.disabled():
-        run_check_cli(
-            [
-                "admin",
-                "upgrade",
-                "--target",
-                "0.1.4.post95+gc325f4e.d20250102",
-            ],
-            cli_input=random_project_name,
-            required_out=[
-                "Target version 0.1.4.post95+gc325f4e.d20250102 is likely a development version. "
-                "Explicitly specify the target version with the --target option if this is the case. "
-                "Available upgrades larger than 0.1.4: 0.1.5"
-            ],
-        )
+    run_check_cli(
+        [
+            "admin",
+            "upgrade",
+            "--target",
+            "0.1.4.post95+gc325f4e.d20250102",
+        ],
+        cli_input=random_project_name,
+        required_out=[
+            "Target version 0.1.4.post95+gc325f4e.d20250102 is likely a development version. "
+            "Explicitly specify the target version with the --target option if this is the case. "
+            "Available upgrades larger than 0.1.4: 0.1.5"
+        ],
+    )
 
 
 def test_upgrade_to_0_1_5(
-    job_controller, upgrade_test_dir, random_project_name, capsys
+    job_controller, upgrade_test_dir, random_project_name
 ) -> None:
     from jobflow_remote.testing.cli import run_check_cli
 
@@ -172,21 +167,20 @@ def test_upgrade_to_0_1_5(
     assert job_controller.get_running_runner() == "NO_DOCUMENT"
     assert str(job_controller.get_current_db_version()) == "0.1.0"
 
-    with capsys.disabled():
-        run_check_cli(
-            ["admin", "upgrade", "--target", "0.1.5"],
-            cli_input="wrong_project_name",
-            required_out=[
-                "No information about jobflow version in the database.",
-                "The database is likely from before version 0.1.5 of jobflow-remote.",
-                "In order to upgrade the DB to version 0.1.5 the following actions will be performed:",
-                "Create a document for the running runner in the auxiliary collection",
-                "Update database version number to 0.1.5",
-                "It is advisable to perform a backup before proceeding",
-                f"Insert the name of the project ({random_project_name}) to confirm that you want to proceed",
-            ],
-            error=True,
-        )
+    run_check_cli(
+        ["admin", "upgrade", "--target", "0.1.5"],
+        cli_input="wrong_project_name",
+        required_out=[
+            "No information about jobflow version in the database.",
+            "The database is likely from before version 0.1.5 of jobflow-remote.",
+            "In order to upgrade the DB to version 0.1.5 the following actions will be performed:",
+            "Create a document for the running runner in the auxiliary collection",
+            "Update database version number to 0.1.5",
+            "It is advisable to perform a backup before proceeding",
+            f"Insert the name of the project ({random_project_name}) to confirm that you want to proceed",
+        ],
+        error=True,
+    )
     assert job_controller.get_running_runner() == "NO_DOCUMENT"
     versions_info = job_controller.auxiliary.find_one(
         {"jobflow_remote_version": {"$exists": True}}

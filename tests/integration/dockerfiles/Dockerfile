@@ -36,7 +36,10 @@ RUN uv venv /home/${USERNAME}/.venv && \
     uv pip install --python /home/${USERNAME}/.venv/bin/python -r /home/${USERNAME}/jobflow-remote/requirements/requirements_tests.txt
 
 # Create a .pth file to auto-start coverage
-RUN printf "import coverage; coverage.process_startup()\n" > /home/${USERNAME}/.venv/lib/python3.10/site-packages/coverage_autostart.pth
+SHELL ["/bin/bash", "-c"]  # to get access to the source built-in of bash (default shell is sh)
+RUN source /home/${USERNAME}/.venv/bin/activate && python -c "import site, os; \
+    open(os.path.join(site.getsitepackages()[0], 'coverage_autostart.pth'), 'w').write('import coverage; coverage.process_startup()\n')"
+SHELL ["/bin/sh", "-c"]
 
 # Add desired queue system as a build stage:
 # Each different queue system must provide an startup script, following the example

@@ -1,6 +1,5 @@
 import os
 import random
-import shutil
 import warnings
 
 import pytest
@@ -167,11 +166,6 @@ def write_tmp_settings(
     from jobflow_remote.config.settings import JobflowRemoteSettings
 
     jobflow_remote.SETTINGS = JobflowRemoteSettings()
-
-    yield
-
-    if tmp_proj_dir.exists():
-        shutil.rmtree(tmp_proj_dir)
 
 
 @pytest.fixture()

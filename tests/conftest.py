@@ -3,13 +3,13 @@ import logging
 import logging.config
 import os
 import random
+import shutil
 import sys
 import time
 import warnings
 from functools import partial
 from pathlib import Path
 
-import coverage
 import pytest
 from rich.console import Console
 
@@ -107,7 +107,7 @@ def tmp_dir():
 
 
 @pytest.fixture(scope="session")
-def tmp_proj_work_dirs():
+def tmp_proj_work_dirs(pytestconfig):
     import tempfile
 
     tmp_proj_dir: Path = Path(tempfile.mkdtemp())
@@ -129,6 +129,12 @@ def tmp_proj_work_dirs():
         os.environ["JFREMOTE_PROJECT"] = original_jf_remote_project
     if original_config_file is not None:
         os.environ["JFREMOTE_CONFIG_FILE"] = original_config_file
+
+    if pytestconfig.getoption("keep_containers_alive"):
+        print("\n * Containers are kept alive ... also keeping project configuration:")
+        print(f"\n  - Directory for project configuration file: {tmp_proj_dir}")
+    elif tmp_proj_dir.exists():
+        shutil.rmtree(tmp_proj_dir)
 
 
 @pytest.fixture(scope="session")
@@ -368,6 +374,18 @@ def pytest_addoption(parser):
 
 def pytest_sessionstart(session):
     if session.config.getoption("coverage_per_flag"):
+        import coverage
+
+        # This part is not used in the GitHub testing workflows.
+        # The goal is to be able to test the coverage per flag locally.
+        # If the --coverage-per-flag option is set, the normal execution of pytest
+        # is modified. Three pytest sessions (for each of the unit/db/integration markers
+        # are executed (see the pytest.main calls below).
+        # The normal execution is exited at the end of this pytest_sessionstart.
+        # In this procedure, we want to keep the other options passed initially to pytest.
+        # Hence, we get the initial arguments, remove the --coverage-per-flag argument and
+        # modify the last -m argument if any (pytest only considers the last -m argument,
+        # the others are ignored).
         modified_args = [
             arg for arg in sys.argv[1:] if arg not in ("--coverage-per-flag",)
         ]
@@ -396,6 +414,10 @@ def pytest_sessionstart(session):
             )
             pytest.main(this_marker_args)
 
+        # Here we combine the different coverage files together. This is done manually here based
+        # on which coverage files needed to be combined for each flag (defined in the coverage-flags.yaml file).
+        # In the GitHub testing workflow, the same coverage-flags.yaml file is used by the codecov action
+        # to combine and upload coverages to codecov.
         import yaml
 
         module_dir = Path(__file__).resolve().parent

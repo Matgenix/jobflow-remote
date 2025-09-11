@@ -11,7 +11,6 @@ from pathlib import Path
 
 import fabric
 import pytest
-from coverage import Coverage
 from monty.os import cd
 from python_on_whales import DockerClient
 from python_on_whales import docker as docker_pow
@@ -215,6 +214,8 @@ services:
                     )
             # After tests finish, copy coverage data from container(s) to local machine
             if coverage_file:
+                from coverage import Coverage
+
                 coverage_dir = Path(coverage_file).parent
                 integration_cov_dir = coverage_dir / "coverage_integration_remote"
                 integration_cov_dir.mkdir(exist_ok=True)
@@ -264,6 +265,31 @@ services:
             if pytestconfig.getoption("keep_containers_alive"):
                 print("\n * Keeping containers alive...")
                 print(f"\n  - Docker compose yaml file: {f.name}")
+                print("\n  - Docker containers:")
+                containers = docker_client.compose.ps()
+                for c in containers:
+                    print(f"\n    - {c.name}")
+                    inspect = docker_client.container.inspect(c.name)
+                    ports = inspect.network_settings.ports or {}
+                    ssh_bindings = ports.get("22/tcp", [])
+                    seen_ports = set()
+                    for binding in ssh_bindings:
+                        host_ip = binding.get("HostIp") or "localhost"
+                        host_port = binding.get("HostPort")
+
+                        # Skip IPv6 all-addresses
+                        if host_ip == "::":
+                            continue
+
+                        # Normalize IPv4 all-addresses to localhost
+                        if host_ip == "0.0.0.0":  # noqa: S104
+                            host_ip = "localhost"
+
+                        # Deduplicate multiple bindings with same port
+                        if host_port in seen_ports:
+                            continue
+                        seen_ports.add(host_port)
+                        print(f"      ssh jobflow@{host_ip} -p {host_port}")
             else:
                 try:
                     print("\n * Stopping containers...")
@@ -498,13 +524,7 @@ def write_tmp_settings(
 
     jobflow_remote.SETTINGS = JobflowRemoteSettings()
 
-    yield project
-
-    if pytestconfig.getoption("keep_containers_alive"):
-        print("\n * Containers are kept alive ... also keeping project configuration:")
-        print(f"\n  - Directory for project configuration file: {tmp_proj_dir}")
-    elif tmp_proj_dir.exists():
-        shutil.rmtree(tmp_proj_dir)
+    return project
 
 
 @pytest.fixture()
