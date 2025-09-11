@@ -1,4 +1,4 @@
-from typing import Annotated
+from typing import Annotated, Union
 
 import typer
 from rich.text import Text
@@ -21,6 +21,18 @@ app = JFRTyper(
     context_settings={"help_option_names": ["-h", "--help"]},
     epilog=None,  # to remove the default message in JFRTyper
 )
+
+
+ADDITIONAL_LOGGERS = []
+
+
+def add_cli_logger_names(loggers: Union[str, list[str]]):
+    # global ADDITIONAL_LOGGERS
+
+    if isinstance(loggers, str):
+        loggers = [loggers]
+
+    ADDITIONAL_LOGGERS.extend(loggers)
 
 
 def main_result_callback(*args, **kwargs) -> None:
@@ -78,7 +90,9 @@ def main(
         start_profiling()
 
     initialize_cli_logger(
-        level=SETTINGS.cli_log_level.to_logging(), full_exc_info=SETTINGS.cli_full_exc
+        level=SETTINGS.cli_log_level.to_logging(),
+        full_exc_info=SETTINGS.cli_full_exc,
+        loggers=ADDITIONAL_LOGGERS,
     )
 
     # initialize the ConfigManager only once, to avoid parsing the configuration
