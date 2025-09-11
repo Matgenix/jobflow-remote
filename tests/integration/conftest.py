@@ -453,7 +453,7 @@ def write_tmp_settings(
                 batch={
                     "jobs_handle_dir": "/home/jobflow/jfr/batch_handle",
                     "work_dir": "/home/jobflow/jfr/batch_work",
-                    "max_wait": 10,
+                    "max_wait": 5,
                 },
                 max_jobs=1,
             ),
@@ -540,7 +540,7 @@ def clean_slurm_queue(write_tmp_settings, coverage_file):
     queue_manager = QueueManager(worker.get_scheduler_io(), worker.get_host())
     # If tests are run with coverage, first try to wait until the slurm job finishes smoothly
     if coverage_file:
-        for _ in range(60):
+        for _ in range(30):
             time.sleep(1.0)
             if not queue_manager.get_jobs_list():
                 break
