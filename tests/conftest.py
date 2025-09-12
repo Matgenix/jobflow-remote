@@ -1,7 +1,10 @@
 import inspect
 import logging
 import logging.config
+import os
 import random
+import shutil
+import sys
 import time
 import warnings
 from functools import partial
@@ -31,6 +34,28 @@ def test_dir():
     module_dir = Path(__file__).resolve().parent
     test_dir = module_dir / "test_data"
     return test_dir.resolve()
+
+
+@pytest.fixture(scope="session")
+def coverage_file(request):
+    """Fixture to get the absolute path of the pytest-cov coverage file, ensuring it exists."""
+    cov_plugin = request.config.pluginmanager.get_plugin("_cov")
+    if cov_plugin:
+        cov_controller = getattr(cov_plugin, "cov_controller", None)
+        if cov_controller:
+            data_file = (
+                cov_controller.cov.config.data_file
+            )  # Could be relative or absolute
+            # Check if data_file is already absolute
+            if not os.path.isabs(data_file):
+                invocation_dir = (
+                    request.config.invocation_dir
+                )  # Pytest's invocation dir
+                data_file = os.path.join(
+                    invocation_dir, data_file
+                )  # Convert to absolute path
+            return data_file
+    return None  # Return None if pytest-cov is inactive or file doesn't exist
 
 
 @pytest.fixture(scope="session")
@@ -79,6 +104,37 @@ def tmp_dir():
     yield
     os.chdir(old_cwd)
     shutil.rmtree(new_path)
+
+
+@pytest.fixture(scope="session")
+def tmp_proj_work_dirs(pytestconfig):
+    import tempfile
+
+    tmp_proj_dir: Path = Path(tempfile.mkdtemp())
+
+    original_jf_remote_projects_folder = os.environ.get("JFREMOTE_PROJECTS_FOLDER")
+    original_jf_remote_project = os.environ.get("JFREMOTE_PROJECT")
+    original_config_file = os.environ.get("JFREMOTE_CONFIG_FILE")
+
+    os.environ["JFREMOTE_PROJECTS_FOLDER"] = str(tmp_proj_dir.resolve())
+    workdir = tmp_proj_dir / "jfr"
+    workdir.mkdir(exist_ok=True)
+
+    yield tmp_proj_dir, workdir
+
+    # Reset environment variables if they were set elsewhere
+    if original_jf_remote_projects_folder is not None:
+        os.environ["JFREMOTE_PROJECTS_FOLDER"] = original_jf_remote_projects_folder
+    if original_jf_remote_project is not None:
+        os.environ["JFREMOTE_PROJECT"] = original_jf_remote_project
+    if original_config_file is not None:
+        os.environ["JFREMOTE_CONFIG_FILE"] = original_config_file
+
+    if pytestconfig.getoption("keep_containers_alive"):
+        print("\n * Containers are kept alive ... also keeping project configuration:")
+        print(f"\n  - Directory for project configuration file: {tmp_proj_dir}")
+    elif tmp_proj_dir.exists():
+        shutil.rmtree(tmp_proj_dir)
 
 
 @pytest.fixture(scope="session")
@@ -257,6 +313,128 @@ def job_controller_drop(random_project_name, job_controller):
         yield job_controller
     finally:
         job_controller.db.client.drop_database(job_controller.db)
+
+
+def pytest_collection_modifyitems(config, items):
+    valid_markers = {"unit", "db", "integration"}
+
+    for item in items:
+        if item.nodeid.startswith(os.path.join("tests", "integration", "")):
+            item.add_marker(pytest.mark.integration)
+        elif item.nodeid.startswith(os.path.join("tests", "db", "")):
+            item.add_marker(pytest.mark.db)
+        elif item.nodeid.startswith(os.path.join("tests", "unit", "")):
+            item.add_marker(pytest.mark.unit)
+        elif len(valid_markers.intersection(item.keywords.keys())) != 1:
+            raise RuntimeError(
+                "Tests should be marked as either unit, db "
+                "or integration, or be in one of the corresponding "
+                "folders for unit, db or integration tests."
+            )
+
+    # Ensure each test has exactly one marker from the valid set
+    for item in items:
+        applied_markers = set(item.keywords.keys())
+        # Check that the test has exactly one valid marker
+        matching_markers = applied_markers.intersection(valid_markers)
+        if len(matching_markers) != 1:
+            raise AssertionError(
+                f"Test {item.nodeid} should be marked with one of the test type markers "
+                f"({', '.join(valid_markers)}).\n"
+                f"Found: {matching_markers}"
+            )
+
+
+def pytest_addoption(parser):
+    """Add a command-line option to enable the reporting of the coverage per flag."""
+    parser.addoption(
+        "--coverage-per-flag",
+        action="store_true",
+        default=False,
+        dest="coverage_per_flag",
+        help="Enable the reporting of the coverage per flag.",
+    )
+    parser.addoption(
+        "--copy-files-from-containers",
+        "--cffc",
+        action="store_true",
+        default=False,
+        dest="copy_files_from_containers",
+        help="Copy back the files from the containers.",
+    )
+    parser.addoption(
+        "--keep-containers-alive",
+        "--kca",
+        action="store_true",
+        default=False,
+        dest="keep_containers_alive",
+        help="Keep the containers alive for inspection.",
+    )
+
+
+def pytest_sessionstart(session):
+    if session.config.getoption("coverage_per_flag"):
+        import coverage
+
+        # This part is not used in the GitHub testing workflows.
+        # The goal is to be able to test the coverage per flag locally.
+        # If the --coverage-per-flag option is set, the normal execution of pytest
+        # is modified. Three pytest sessions (for each of the unit/db/integration markers
+        # are executed (see the pytest.main calls below).
+        # The normal execution is exited at the end of this pytest_sessionstart.
+        # In this procedure, we want to keep the other options passed initially to pytest.
+        # Hence, we get the initial arguments, remove the --coverage-per-flag argument and
+        # modify the last -m argument if any (pytest only considers the last -m argument,
+        # the others are ignored).
+        modified_args = [
+            arg for arg in sys.argv[1:] if arg not in ("--coverage-per-flag",)
+        ]
+        if "-m" not in modified_args:
+            index_last_minus_m = None
+        else:
+            index_last_minus_m = next(
+                i for i, v in reversed(list(enumerate(modified_args))) if v == "-m"
+            )
+
+        for marker in ("unit", "db", "integration"):
+            if index_last_minus_m is None:
+                this_marker_args = ["-m", marker, *modified_args]
+            else:
+                this_marker_args = list(modified_args)
+                marker_expr = this_marker_args[index_last_minus_m + 1]
+                this_marker_args[index_last_minus_m + 1] = (
+                    f"({marker_expr}) and {marker}"
+                )
+
+            session.config.option.cov_config = "pyproject.toml"
+            session.config.option.cov = "jobflow_remote"
+            os.environ["COVERAGE_FILE"] = f".coverage-{marker}"
+            this_marker_args.extend(
+                ["--cov=jobflow_remote", "--cov-config=pyproject.toml"]
+            )
+            pytest.main(this_marker_args)
+
+        # Here we combine the different coverage files together. This is done manually here based
+        # on which coverage files needed to be combined for each flag (defined in the coverage-flags.yaml file).
+        # In the GitHub testing workflow, the same coverage-flags.yaml file is used by the codecov action
+        # to combine and upload coverages to codecov.
+        import yaml
+
+        module_dir = Path(__file__).resolve().parent
+        with open(module_dir / "coverage-flags.yml") as f:
+            flags = yaml.safe_load(f)
+
+        os.environ.pop("COVERAGE_FILE", None)
+        for flag, cov_files in flags.items():
+            cov = coverage.Coverage()
+            cov.combine(cov_files, keep=True)
+            print(f"\n\nCoverage for {flag} tests:\n{' '*(20+len(flag))}\n")
+            cov.report()
+            cov.html_report(directory=f"htmlcov_{flag}")
+            print(f"\nCoverage report generated in 'htmlcov_{flag}' directory")
+
+        # Exit the original pytest run (prevent double execution)
+        pytest.exit("Rerunning pytest separately for unit, db, and integration tests")
 
 
 def wait_daemon_status(

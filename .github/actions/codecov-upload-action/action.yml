@@ -4,76 +4,26 @@ inputs:
   codecov-token:
     description: 'Codecov token'
     required: true
+  codecov-flag:
+    description: 'Codecov flag'
+    required: true
+  coverage-files:
+    description: 'Coverage files'
+    required: true
 runs:
   using: "composite"
   steps:
-    # For some reason, the codecov update fails when passing the name of the file (e.g. ".coverage-unit")
-    # so we use the standard name and do some silly moving of files ...
-    - name: Move .coverage-unit file
+    - name: Generate combined coverage report from files
       run: |
-        mv .coverage-unit .coverage
+        echo "Combining coverage files: ${{ inputs.coverage-files }}"
+        coverage combine --keep ${{ inputs.coverage-files }}
       shell: bash
 
-    - name: Upload unit tests coverage report to Codecov
+    - name: Upload ${{ inputs.codecov-flag }} tests coverage report to Codecov
       uses: codecov/codecov-action@v5
       env:
         CODECOV_TOKEN: ${{ inputs.codecov-token }}
       with:
         files: .coverage  # Here for some reason, we need to have .coverage as a filename
-        flags: unit_tests
-        name: unit_tests
-
-    # For some reason, the codecov update fails when passing the name of the file (e.g. ".coverage-db")
-    # so we use the standard name and do some silly moving of files ...
-    - name: Move back .coverage-unit file and move .coverage-db file
-      run: |
-        mv .coverage .coverage-unit
-        mv .coverage-db .coverage
-      shell: bash
-
-    - name: Upload db tests coverage report to Codecov
-      uses: codecov/codecov-action@v5
-      env:
-        CODECOV_TOKEN: ${{ inputs.codecov-token }}
-      with:
-        files: .coverage  # Here for some reason, we need to have .coverage as a filename
-        flags: db_tests
-        name: db_tests
-
-    # For some reason, the codecov update fails when passing the name of the file (e.g. ".coverage-integration")
-    # so we use the standard name and do some silly moving of files ...
-    - name: Move back .coverage-db file and move .coverage-integration file
-      run: |
-        mv .coverage .coverage-db
-        mv .coverage-integration .coverage
-      shell: bash
-
-    - name: Upload integration tests coverage report to Codecov
-      uses: codecov/codecov-action@v5
-      env:
-        CODECOV_TOKEN: ${{ inputs.codecov-token }}
-      with:
-        files: .coverage  # Here for some reason, we need to have .coverage as a filename
-        flags: integration_tests
-        name: integration_tests
-
-    # For some reason, the codecov update fails when passing the name of the file (e.g. ".coverage-all")
-    # so we use the standard name and do some silly moving of files ...
-    - name: Move back .coverage-integration file
-      run: |
-        mv .coverage .coverage-integration
-      shell: bash
-
-    - name: Generate combined coverage report for unit, database, and integration tests
-      run: |
-        coverage combine .coverage-unit .coverage-db .coverage-integration
-      shell: bash
-
-    - name: Upload all (unit+db+integration) tests coverage report to Codecov
-      uses: codecov/codecov-action@v5
-      env:
-        CODECOV_TOKEN: ${{ inputs.codecov-token }}
-      with:
-        files: .coverage  # Here for some reason, we need to have .coverage as a filename
-        flags: all_tests
-        name: all_tests
+        flags: ${{ inputs.codecov-flag }}_tests
+        name: ${{ inputs.codecov-flag }}_tests

@@ -11,6 +11,7 @@ from pathlib import Path
 
 import fabric
 import pytest
+from monty.os import cd
 from python_on_whales import DockerClient
 from python_on_whales import docker as docker_pow
 
@@ -86,7 +87,13 @@ def bake_containers():
 
 @pytest.fixture(scope="session", autouse=True)
 def compose_containers(
-    slurm_ssh_port, sge_ssh_port, pbs_ssh_port, db_port, bake_containers
+    slurm_ssh_port,
+    sge_ssh_port,
+    pbs_ssh_port,
+    db_port,
+    bake_containers,
+    coverage_file,
+    pytestconfig,
 ):
     compose_yaml = f"""
 name: jobflow_remote_testing
@@ -193,27 +200,117 @@ services:
                 )
 
             yield docker_client
+            if pytestconfig.getoption("copy_files_from_containers"):
+                print(" * Copying files back from the containers...")
+                containers_files_dir = pytestconfig.rootpath / "containers_files"
+                for c in containers:
+                    if c.name in ("mongo_container",):
+                        continue
+                    container_dir = containers_files_dir / c.name
+                    container_dir.mkdir(parents=True, exist_ok=True)
+                    c.copy_from(
+                        "/home/jobflow/jfr/",
+                        container_dir,
+                    )
+            # After tests finish, copy coverage data from container(s) to local machine
+            if coverage_file:
+                from coverage import Coverage
+
+                coverage_dir = Path(coverage_file).parent
+                integration_cov_dir = coverage_dir / "coverage_integration_remote"
+                integration_cov_dir.mkdir(exist_ok=True)
+                integration_cov_dir = Path(
+                    tempfile.mkdtemp(prefix="pytest_run_", dir=integration_cov_dir)
+                )
+                print(" * Copying coverage data back...")
+                coverage_container_paths = []
+                # This needs to be set as it may have been set elsewhere
+                os.environ["COVERAGE_FILE"] = ".coverage"
+                for c in containers:
+                    if c.name in ("mongo_container",):
+                        continue
+                    coverage_container_dir = integration_cov_dir / c.name
+                    coverage_container_dir.mkdir(exist_ok=True)
+                    coverage_container_paths.append(coverage_container_dir)
+                    flist = c.execute(
+                        ["ls", "-a", "/home/jobflow/coverage/"]
+                    ).splitlines()
+                    for file in flist:
+                        if file.startswith(".coverage"):
+                            c.copy_from(
+                                f"/home/jobflow/coverage/{file}",
+                                coverage_container_dir / file,
+                            )
+                    with cd(coverage_container_dir):
+                        # Combining coverage from the different jf execution runs for all the tests on this container
+                        cov = Coverage()
+                        cov.combine()
+                        cov.save()
+                with cd(integration_cov_dir):
+                    for cov_container_path in coverage_container_paths:
+                        cov_dir = cov_container_path.relative_to(integration_cov_dir)
+                        cov_file = cov_dir / ".coverage"
+                        if cov_file.exists():
+                            shutil.copy(cov_file, f".coverage.{cov_dir}")
+
+                    # Combining the coverage from each container
+                    cov = Coverage()
+                    cov.combine()
+                    cov.save()
+
+                    shutil.move(
+                        ".coverage", coverage_dir / ".coverage-integration-remote"
+                    )
         finally:
-            try:
-                print("\n * Stopping containers...")
-                try:
-                    docker_client.compose.stop()
-                except Exception:
-                    pass
+            if pytestconfig.getoption("keep_containers_alive"):
+                print("\n * Keeping containers alive...")
+                print(f"\n  - Docker compose yaml file: {f.name}")
+                print("\n  - Docker containers:")
+                containers = docker_client.compose.ps()
+                for c in containers:
+                    print(f"\n    - {c.name}")
+                    inspect = docker_client.container.inspect(c.name)
+                    ports = inspect.network_settings.ports or {}
+                    ssh_bindings = ports.get("22/tcp", [])
+                    seen_ports = set()
+                    for binding in ssh_bindings:
+                        host_ip = binding.get("HostIp") or "localhost"
+                        host_port = binding.get("HostPort")
 
-                try:
-                    docker_client.compose.kill()
-                except Exception:
-                    pass
+                        # Skip IPv6 all-addresses
+                        if host_ip == "::":
+                            continue
 
-                try:
-                    docker_client.compose.rm(volumes=True)
-                except Exception:
-                    pass
+                        # Normalize IPv4 all-addresses to localhost
+                        if host_ip == "0.0.0.0":  # noqa: S104
+                            host_ip = "localhost"
 
-                print(" * Done!")
-            except Exception as exc:
-                print(f" x Failed to stop container: {exc}")
+                        # Deduplicate multiple bindings with same port
+                        if host_port in seen_ports:
+                            continue
+                        seen_ports.add(host_port)
+                        print(f"      ssh jobflow@{host_ip} -p {host_port}")
+            else:
+                try:
+                    print("\n * Stopping containers...")
+                    try:
+                        docker_client.compose.stop()
+                    except Exception:
+                        pass
+
+                    try:
+                        docker_client.compose.kill()
+                    except Exception:
+                        pass
+
+                    try:
+                        docker_client.compose.rm(volumes=True)
+                    except Exception:
+                        pass
+
+                    print(" * Done!")
+                except Exception as exc:
+                    print(f" x Failed to stop container: {exc}")
 
 
 @pytest.fixture(scope="session")
@@ -229,18 +326,13 @@ def write_tmp_settings(
     sge_ssh_port,
     pbs_ssh_port,
     db_port,
+    tmp_proj_work_dirs,
+    pytestconfig,
 ):
     """Collects the various sub-configs and writes them to a temporary file in a
     temporary directory."""
-    tmp_dir: Path = Path(tempfile.mkdtemp())
+    tmp_proj_dir, workdir = tmp_proj_work_dirs
 
-    original_jf_remote_projects_folder = os.environ.get("JFREMOTE_PROJECTS_FOLDER")
-    original_jf_remote_project = os.environ.get("JFREMOTE_PROJECT")
-    original_config_file = os.environ.get("JFREMOTE_CONFIG_FILE")
-
-    os.environ["JFREMOTE_PROJECTS_FOLDER"] = str(tmp_dir.resolve())
-    workdir = tmp_dir / "jfr"
-    workdir.mkdir(exist_ok=True)
     os.environ["JFREMOTE_PROJECT"] = random_project_name
     # Set config file to a random path so that we don't accidentally load the default
     os.environ["JFREMOTE_CONFIG_FILE"] = _get_random_name(length=10) + ".json"
@@ -248,6 +340,11 @@ def write_tmp_settings(
     # config on import
     from jobflow_remote.config import Project
 
+    prerun = (
+        "source /home/jobflow/.venv/bin/activate; "
+        "export COVERAGE_PROCESS_START=/home/jobflow/pyproject.toml; "
+        "export COVERAGE_FILE=/home/jobflow/coverage/.coverage"
+    )
     project = Project(
         name=random_project_name,
         jobstore={
@@ -301,7 +398,7 @@ def write_tmp_settings(
                 work_dir="/home/jobflow/jfr",
                 user="jobflow",
                 password="jobflow",
-                pre_run="source /home/jobflow/.venv/bin/activate",
+                pre_run=prerun,
                 resources={"partition": "debug", "ntasks": 1, "time": "00:01:00"},
                 connect_kwargs={"allow_agent": False, "look_for_keys": False},
             ),
@@ -314,7 +411,7 @@ def write_tmp_settings(
                 user="jobflow",
                 password="jobflow",
                 scheduler_username="jobflow",
-                pre_run="source /home/jobflow/.venv/bin/activate",
+                pre_run=prerun,
                 connect_kwargs={"allow_agent": False, "look_for_keys": False},
             ),
             "test_remote_pbs_worker": dict(
@@ -325,7 +422,7 @@ def write_tmp_settings(
                 work_dir="/home/jobflow/jfr",
                 user="jobflow",
                 password="jobflow",
-                pre_run="source /home/jobflow/.venv/bin/activate",
+                pre_run=prerun,
                 connect_kwargs={"allow_agent": False, "look_for_keys": False},
                 resources={"walltime": "00:05:00", "select": "nodes=1:ppn=1"},
             ),
@@ -337,7 +434,7 @@ def write_tmp_settings(
                 work_dir="/home/jobflow/jfr",
                 user="jobflow",
                 password="jobflow",
-                pre_run="source /home/jobflow/.venv/bin/activate",
+                pre_run=prerun,
                 resources={"partition": "debug", "ntasks": 1, "time": "00:01:00"},
                 connect_kwargs={"allow_agent": False, "look_for_keys": False},
                 max_jobs=1,
@@ -350,13 +447,13 @@ def write_tmp_settings(
                 work_dir="/home/jobflow/jfr",
                 user="jobflow",
                 password="jobflow",
-                pre_run="source /home/jobflow/.venv/bin/activate",
+                pre_run=prerun,
                 resources={"partition": "debug", "ntasks": 1, "time": "00:01:00"},
                 connect_kwargs={"allow_agent": False, "look_for_keys": False},
                 batch={
                     "jobs_handle_dir": "/home/jobflow/jfr/batch_handle",
                     "work_dir": "/home/jobflow/jfr/batch_work",
-                    "max_wait": 10,
+                    "max_wait": 5,
                 },
                 max_jobs=1,
             ),
@@ -368,7 +465,7 @@ def write_tmp_settings(
                 work_dir="/home/jobflow/jfr",
                 user="jobflow",
                 password="jobflow",
-                pre_run="source /home/jobflow/.venv/bin/activate",
+                pre_run=prerun,
                 resources={"partition": "debug", "ntasks": 1, "time": "00:01:00"},
                 connect_kwargs={"allow_agent": False, "look_for_keys": False},
                 batch={
@@ -394,7 +491,7 @@ def write_tmp_settings(
                 work_dir="/home/jobflow/jfr",
                 user="jobflow",
                 password="jobflow",
-                pre_run="source /home/jobflow/.venv/bin/activate",
+                pre_run=prerun,
                 resources={"partition": "debug", "ntasks": 1, "time": "00:01:00"},
                 connect_kwargs={"allow_agent": False, "look_for_keys": False},
                 sanitize_command=True,
@@ -416,23 +513,22 @@ def write_tmp_settings(
         ),
     )
     project_json = project.model_dump_json(indent=2)
-    with open(tmp_dir / f"{random_project_name}.json", "w") as f:
+    with open(tmp_proj_dir / f"{random_project_name}.json", "w") as f:
         f.write(project_json)
 
-    yield project
+    # In some cases it seems that the SETTINGS have already been imported
+    # and thus not taking the new configurations into account.
+    # Regenerate the JobflowRemoteSettings after setting paths and project
+    import jobflow_remote
+    from jobflow_remote.config.settings import JobflowRemoteSettings
 
-    shutil.rmtree(tmp_dir)
-    # Reset environment variables if they were set elsewhere
-    if original_jf_remote_projects_folder is not None:
-        os.environ["JFREMOTE_PROJECTS_FOLDER"] = original_jf_remote_projects_folder
-    if original_jf_remote_project is not None:
-        os.environ["JFREMOTE_PROJECT"] = original_jf_remote_project
-    if original_config_file is not None:
-        os.environ["JFREMOTE_CONFIG_FILE"] = original_config_file
+    jobflow_remote.SETTINGS = JobflowRemoteSettings()
+
+    return project
 
 
 @pytest.fixture()
-def clean_slurm_queue(write_tmp_settings):
+def clean_slurm_queue(write_tmp_settings, coverage_file):
     """
     Clean the list of Jobs in the SLURM queue at the end of the test.
     """
@@ -442,6 +538,12 @@ def clean_slurm_queue(write_tmp_settings):
     project = write_tmp_settings
     worker = project.workers["test_remote_slurm_worker"]
     queue_manager = QueueManager(worker.get_scheduler_io(), worker.get_host())
+    # If tests are run with coverage, first try to wait until the slurm job finishes smoothly
+    if coverage_file:
+        for _ in range(30):
+            time.sleep(1.0)
+            if not queue_manager.get_jobs_list():
+                break
     for qjob in queue_manager.get_jobs_list():
         queue_manager.cancel(qjob)
         time.sleep(0.1)

@@ -371,11 +371,23 @@ class DaemonManager:
         interface = self.get_interface()
         try:
             proc_info = interface.supervisor.getAllProcessInfo()
+        except ConnectionResetError:
+            process_active = self.check_supervisord_process()
+
+            if not process_active:
+                return DaemonStatus.SHUT_DOWN
+            raise
+
         except Fault as exc:
             # catch this exception as it may be raised if the status is queried while
             # the supervisord process is shutting down. The error is quite cryptic, so
             # replace with one that is clearer. Also see a related issue in supervisord:
             # https://github.com/Supervisor/supervisor/issues/48
+            process_active = self.check_supervisord_process()
+
+            if not process_active:
+                return DaemonStatus.SHUT_DOWN
+
             if exc.faultString == "SHUTDOWN_STATE":
                 raise DaemonError(
                     "The daemon is likely shutting down and the actual state cannot be determined"

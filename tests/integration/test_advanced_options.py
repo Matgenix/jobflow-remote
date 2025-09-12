@@ -29,7 +29,7 @@ def test_run_batch(job_controller, monkeypatch, clean_slurm_queue) -> None:
     runner = Runner()
 
     # set this so it will be called
-    monkeypatch.setattr(runner.runner_options, "delay_update_batch", 5)
+    monkeypatch.setattr(runner.runner_options, "delay_update_batch", 1)
 
     runner.run_all_jobs(max_seconds=120)
 
@@ -66,7 +66,7 @@ def test_run_batch_multi(job_controller, monkeypatch, clean_slurm_queue) -> None
     runner = Runner()
 
     # set this so it will be called
-    monkeypatch.setattr(runner.runner_options, "delay_update_batch", 5)
+    monkeypatch.setattr(runner.runner_options, "delay_update_batch", 1)
 
     runner.run_all_jobs(max_seconds=120)
 
@@ -186,7 +186,7 @@ def test_run_batch_multi_fail(
     assert len(batch_manager.get_running()) == 0
 
     # submit more jobs, will also be used to check that the files are cleaned during the reset
-    job_ids = submit_jobs(4, 60)
+    job_ids = submit_jobs(4, 15)
 
     for _ in range(10):
         if (

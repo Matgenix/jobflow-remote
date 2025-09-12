@@ -10,7 +10,6 @@ from monty.serialization import dumpfn
 from qtoolkit.core.data_objects import QResources
 from rich.pretty import pprint
 
-from jobflow_remote import SETTINGS
 from jobflow_remote.cli.formatting import (
     format_job_info,
     get_job_info_table,
@@ -146,6 +145,8 @@ def jobs_list(
     """
     Get the list of Jobs in the database.
     """
+    from jobflow_remote import SETTINGS
+
     check_incompatible_opt({"start_date": start_date, "days": days, "hours": hours})
     check_incompatible_opt({"end_date": end_date, "days": days, "hours": hours})
     # check_incompatible_opt({"state": state, "error": error})
