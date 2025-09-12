@@ -86,6 +86,7 @@ def test_run_batch_multi_fail(
     wait_daemon_started,
     wait_daemon_shutdown,
     clean_slurm_queue,
+    patch_cli_consoles,
 ) -> None:
     from qtoolkit.core.data_objects import CancelStatus
 
