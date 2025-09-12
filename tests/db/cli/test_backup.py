@@ -41,10 +41,10 @@ def check_files(files: list[str], meta: bool, compress: bool):
     "compress",
     [True, False],
 )
-def test_reset(job_controller, two_flows_four_jobs, python, compress) -> None:
+def test_reset(
+    job_controller, two_flows_four_jobs, python, compress, run_check_cli
+) -> None:
     from pathlib import Path
-
-    from jobflow_remote.testing.cli import run_check_cli
 
     assert job_controller.count_jobs() == 4
     db_name = job_controller.queue_store.database

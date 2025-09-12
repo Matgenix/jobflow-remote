@@ -1,14 +1,13 @@
 import pytest
 
 
-def test_reset(job_controller, one_job) -> None:
+def test_reset(job_controller, one_job, run_check_cli) -> None:
     from datetime import datetime
 
     from jobflow import Flow
 
     from jobflow_remote import submit_flow
     from jobflow_remote.testing import add
-    from jobflow_remote.testing.cli import run_check_cli
 
     run_check_cli(
         ["admin", "reset"],
@@ -42,9 +41,7 @@ def test_reset(job_controller, one_job) -> None:
     assert job_controller.count_jobs() == 0
 
 
-def test_unlock(job_controller, one_job) -> None:
-    from jobflow_remote.testing.cli import run_check_cli
-
+def test_unlock(job_controller, one_job, run_check_cli) -> None:
     j = one_job.jobs[0]
     # catch the warning coming from MongoLock
     with (
@@ -71,9 +68,7 @@ def test_unlock(job_controller, one_job) -> None:
     )
 
 
-def test_unlock_flow(job_controller, one_job) -> None:
-    from jobflow_remote.testing.cli import run_check_cli
-
+def test_unlock_flow(job_controller, one_job, run_check_cli) -> None:
     # catch the warning coming from MongoLock
     with (
         pytest.warns(UserWarning, match="Could not release lock for document"),
@@ -100,9 +95,7 @@ def test_unlock_flow(job_controller, one_job) -> None:
 
 
 @pytest.mark.filterwarnings("ignore:Could not release lock for document")
-def test_unlock_runner(job_controller) -> None:
-    from jobflow_remote.testing.cli import run_check_cli
-
+def test_unlock_runner(job_controller, run_check_cli) -> None:
     with job_controller.lock_auxiliary(filter={"running_runner": {"$exists": True}}):
         rr_before = job_controller.auxiliary.find_one(
             {"running_runner": {"$exists": True}}
@@ -132,9 +125,9 @@ def test_unlock_runner(job_controller) -> None:
     )
 
 
-def test_upgrade(job_controller, upgrade_test_dir, random_project_name) -> None:
-    from jobflow_remote.testing.cli import run_check_cli
-
+def test_upgrade(
+    job_controller, upgrade_test_dir, random_project_name, run_check_cli
+) -> None:
     # Test upgrading from development version. Explicitly pass such a target version
     # This is the case if the target version is not specified and the code installed
     # from source. No upgrade performed here.
@@ -155,10 +148,8 @@ def test_upgrade(job_controller, upgrade_test_dir, random_project_name) -> None:
 
 
 def test_upgrade_to_0_1_5(
-    job_controller, upgrade_test_dir, random_project_name
+    job_controller, upgrade_test_dir, random_project_name, run_check_cli
 ) -> None:
-    from jobflow_remote.testing.cli import run_check_cli
-
     job_controller.backup_restore(upgrade_test_dir / "0.1.5", python=True)
 
     assert job_controller.count_jobs() == 1
@@ -214,9 +205,7 @@ def test_upgrade_to_0_1_5(
     )
 
 
-def test_index_rebuild(job_controller, one_job):
-    from jobflow_remote.testing.cli import run_check_cli
-
+def test_index_rebuild(job_controller, one_job, run_check_cli):
     assert job_controller.count_jobs() == 1
 
     # use foreground to avoid checking before the DB created the index
@@ -230,9 +219,7 @@ def test_index_rebuild(job_controller, one_job):
     assert len(flows_indexes) == 7
 
 
-def test_index_create(job_controller, one_job):
-    from jobflow_remote.testing.cli import run_check_cli
-
+def test_index_create(job_controller, one_job, run_check_cli):
     assert job_controller.count_jobs() == 1
 
     run_check_cli(

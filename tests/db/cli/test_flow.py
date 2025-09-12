@@ -3,12 +3,11 @@ import os.path
 import pytest
 
 
-def test_flows_list(job_controller, two_flows_four_jobs) -> None:
+def test_flows_list(job_controller, two_flows_four_jobs, run_check_cli) -> None:
     from jobflow import Flow
 
     from jobflow_remote import submit_flow
     from jobflow_remote.testing import add
-    from jobflow_remote.testing.cli import run_check_cli
 
     columns = ["DB id", "Name", "State", "Flow id", "Num Jobs", "Last updated"]
     outputs = columns + [f"f{i}" for i in range(1, 3)] + ["READY"]
@@ -51,14 +50,13 @@ def test_flows_list(job_controller, two_flows_four_jobs) -> None:
     )
 
 
-def test_delete(job_controller, two_flows_four_jobs) -> None:
+def test_delete(job_controller, two_flows_four_jobs, run_check_cli) -> None:
     from jobflow import Flow
 
     from jobflow_remote import submit_flow
     from jobflow_remote.jobs.runner import Runner
     from jobflow_remote.jobs.state import JobState
     from jobflow_remote.testing import add
-    from jobflow_remote.testing.cli import run_check_cli
 
     # run one of the jobs to check that the output is not deleted
     runner = Runner()
@@ -157,9 +155,7 @@ def test_delete(job_controller, two_flows_four_jobs) -> None:
     )
 
 
-def test_flow_info(job_controller, two_flows_four_jobs) -> None:
-    from jobflow_remote.testing.cli import run_check_cli
-
+def test_flow_info(job_controller, two_flows_four_jobs, run_check_cli) -> None:
     columns = ["DB id", "Name", "State", "Job id", "(Index)", "Worker"]
     outputs = columns + [f"add{i}" for i in range(1, 3)] + ["READY", "WAITING"]
     excluded = [f"add{i}" for i in range(3, 5)]
@@ -168,14 +164,13 @@ def test_flow_info(job_controller, two_flows_four_jobs) -> None:
     )
 
 
-def test_report(job_controller) -> None:
+def test_report(job_controller, run_check_cli) -> None:
     from datetime import datetime
 
     from jobflow import Flow
 
     from jobflow_remote import submit_flow
     from jobflow_remote.testing import add_sleep
-    from jobflow_remote.testing.cli import run_check_cli
 
     # run first with an empty db to check that everything works fine
     now = datetime.now()
@@ -201,9 +196,8 @@ def test_report(job_controller) -> None:
     )
 
 
-def test_resume(job_controller, two_flows_four_jobs) -> None:
+def test_resume(job_controller, two_flows_four_jobs, run_check_cli) -> None:
     from jobflow_remote.jobs.state import FlowState, JobState
-    from jobflow_remote.testing.cli import run_check_cli
 
     job_controller.stop_job(db_id="1")
     job_controller.set_job_state(JobState.STOPPED, db_id="2")
@@ -221,9 +215,7 @@ def test_resume(job_controller, two_flows_four_jobs) -> None:
     assert job_controller.get_flows_info(db_ids="1")[0].state == FlowState.READY
 
 
-def test_set_store(job_controller, runner, one_job):
-    from jobflow_remote.testing.cli import run_check_cli
-
+def test_set_store(job_controller, runner, one_job, run_check_cli):
     assert job_controller.get_flow_store(one_job.uuid) is None
 
     run_check_cli(
