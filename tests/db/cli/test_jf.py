@@ -1,6 +1,4 @@
-def test_jobs_list() -> None:
-    from jobflow_remote.testing.cli import run_check_cli
-
+def test_jobs_list(run_check_cli) -> None:
     outputs = ["job", "set", "resources", "admin"]
     excluded = ["─ execution", "start_date"]  # hidden, option
     run_check_cli(["--tree"], required_out=outputs, excluded_out=excluded)

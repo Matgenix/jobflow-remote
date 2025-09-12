@@ -49,9 +49,7 @@ def test_paramiko_ssh_connection(random_project_name, job_controller) -> None:
             )
 
 
-def test_project_check(job_controller) -> None:
-    from jobflow_remote.testing.cli import run_check_cli
-
+def test_project_check(job_controller, run_check_cli) -> None:
     expected = [
         "✓ Worker test_local_worker",
         "✓ Worker test_sanitize_local_worker",
@@ -463,14 +461,13 @@ def test_sanitize(worker, job_controller):
     "worker",
     ["test_local_worker", "test_remote_slurm_worker"],
 )
-def test_todir(job_controller, worker):
+def test_todir(job_controller, worker, run_check_cli):
     import subprocess
     import time
 
     from jobflow_remote import submit_flow
     from jobflow_remote.jobs.runner import Runner
     from jobflow_remote.testing import add
-    from jobflow_remote.testing.cli import run_check_cli
 
     j = add(1, 5)
     submit_flow(j, worker=worker)

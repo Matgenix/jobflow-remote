@@ -1,12 +1,11 @@
 def test_list_projects(
-    job_controller, random_project_name, monkeypatch, tmp_dir
+    job_controller, random_project_name, monkeypatch, tmp_dir, run_check_cli
 ) -> None:
     import os
 
     from monty.serialization import dumpfn
 
     from jobflow_remote import SETTINGS
-    from jobflow_remote.testing.cli import run_check_cli
 
     run_check_cli(["project", "list"], required_out=random_project_name)
 
@@ -24,19 +23,18 @@ def test_list_projects(
         run_check_cli(["project", "list"], required_out=output)
 
 
-def test_current_project(job_controller, random_project_name) -> None:
-    from jobflow_remote.testing.cli import run_check_cli
-
+def test_current_project(job_controller, random_project_name, run_check_cli) -> None:
     run_check_cli(
         ["project"], required_out=f"The selected project is {random_project_name}"
     )
 
 
-def test_generate(job_controller, random_project_name, monkeypatch, tmp_dir) -> None:
+def test_generate(
+    job_controller, random_project_name, monkeypatch, tmp_dir, run_check_cli
+) -> None:
     import os
 
     from jobflow_remote import SETTINGS
-    from jobflow_remote.testing.cli import run_check_cli
 
     run_check_cli(["project", "list"], required_out=random_project_name)
 
@@ -59,12 +57,11 @@ def test_generate(job_controller, random_project_name, monkeypatch, tmp_dir) -> 
         )
 
 
-def test_check(job_controller, monkeypatch, tmp_dir) -> None:
+def test_check(job_controller, monkeypatch, tmp_dir, run_check_cli) -> None:
     import os
 
     from jobflow_remote import SETTINGS
     from jobflow_remote.config.manager import ConfigManager
-    from jobflow_remote.testing.cli import run_check_cli
 
     output = [
         "✓ Worker test_local_worker",
@@ -87,7 +84,7 @@ def test_check(job_controller, monkeypatch, tmp_dir) -> None:
         run_check_cli(["project", "check"], required_out=[*output, duplicated_msg])
 
 
-def test_check_fail(job_controller, monkeypatch, tmp_dir) -> None:
+def test_check_fail(job_controller, monkeypatch, tmp_dir, run_check_cli) -> None:
     import json
     import os
 
@@ -98,7 +95,6 @@ def test_check_fail(job_controller, monkeypatch, tmp_dir) -> None:
     from jobflow_remote.config import helper
     from jobflow_remote.remote.host.remote import RemoteHost
     from jobflow_remote.remote.queue import QueueManager
-    from jobflow_remote.testing.cli import run_check_cli
 
     def return_none(*args, **kwargs):
         return None
@@ -160,11 +156,12 @@ def test_check_fail(job_controller, monkeypatch, tmp_dir) -> None:
         )
 
 
-def test_remove(job_controller, random_project_name, monkeypatch, tmp_dir) -> None:
+def test_remove(
+    job_controller, random_project_name, monkeypatch, tmp_dir, run_check_cli
+) -> None:
     import os
 
     from jobflow_remote import SETTINGS, ConfigManager
-    from jobflow_remote.testing.cli import run_check_cli
 
     run_check_cli(["project", "list"], required_out=random_project_name)
 
@@ -194,15 +191,11 @@ def test_remove(job_controller, random_project_name, monkeypatch, tmp_dir) -> No
         )
 
 
-def test_list_exec_config(job_controller) -> None:
-    from jobflow_remote.testing.cli import run_check_cli
-
+def test_list_exec_config(job_controller, run_check_cli) -> None:
     output = ["Name", "modules", "export", "pre_run", "post_run", "test"]
     run_check_cli(["project", "exec_config", "list", "-v"], required_out=output)
 
 
-def test_list_workers(job_controller) -> None:
-    from jobflow_remote.testing.cli import run_check_cli
-
+def test_list_workers(job_controller, run_check_cli) -> None:
     output = ["Name", "type", "info", "test_local_worker", "test_local_worker_2"]
     run_check_cli(["project", "worker", "list", "-v"], required_out=output)
