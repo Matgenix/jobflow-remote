@@ -209,7 +209,7 @@ def run_single_batch_jobs(
                         try:
                             os.kill(pid, 0)  # throws OSError if the process is dead
                         except OSError:  # means this process is dead!
-                            pid_is_running[pid] = False
+                            parallel_ids[pid] = False
                 if not any(parallel_ids.values()):
                     logger.info(
                         f"No jobs available for more than {max_wait} seconds and all other jobs are stopped. Stopping."

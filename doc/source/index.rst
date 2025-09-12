@@ -90,7 +90,7 @@ Jobflow Remote is a package to submit `Jobflow
 
         +++
 
-        .. button-ref:: dev/devinstall
+        .. button-ref:: dev
             :expand:
             :color: secondary
             :click-parent:

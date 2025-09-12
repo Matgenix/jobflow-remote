@@ -1,9 +1,6 @@
 import os
 import random
-import shutil
-import tempfile
 import warnings
-from pathlib import Path
 
 import pytest
 
@@ -72,14 +69,12 @@ def write_tmp_settings(
     random_project_name,
     store_database_name,
     mongoclient,
+    tmp_proj_work_dirs,
 ):
     """Collects the various sub-configs and writes them to a temporary file in a
     temporary directory."""
-    tmp_dir: Path = Path(tempfile.mkdtemp())
+    tmp_proj_dir, workdir = tmp_proj_work_dirs
 
-    os.environ["JFREMOTE_PROJECTS_FOLDER"] = str(tmp_dir.resolve())
-    workdir = tmp_dir / "jfr"
-    workdir.mkdir(exist_ok=True)
     os.environ["JFREMOTE_PROJECT"] = random_project_name
     # Set config file to a random path so that we don't accidentally load the default
     os.environ["JFREMOTE_CONFIG_FILE"] = _get_random_name(length=10) + ".json"
@@ -161,7 +156,7 @@ def write_tmp_settings(
         },
     )
     project_json = project.model_dump_json(indent=2)
-    with open(tmp_dir / f"{random_project_name}.json", "w") as f:
+    with open(tmp_proj_dir / f"{random_project_name}.json", "w") as f:
         f.write(project_json)
 
     # In some cases it seems that the SETTINGS have already been imported
@@ -171,9 +166,6 @@ def write_tmp_settings(
     from jobflow_remote.config.settings import JobflowRemoteSettings
 
     jobflow_remote.SETTINGS = JobflowRemoteSettings()
-
-    yield
-    shutil.rmtree(tmp_dir)
 
 
 @pytest.fixture()

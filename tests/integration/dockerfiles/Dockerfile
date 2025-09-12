@@ -22,6 +22,7 @@ WORKDIR /home/${USERNAME}/jobflow-remote
 COPY src/jobflow_remote /home/${USERNAME}/jobflow-remote/src/jobflow_remote
 COPY pyproject.toml /home/${USERNAME}/jobflow-remote/
 COPY requirements/requirements.txt /home/${USERNAME}/jobflow-remote/requirements/
+COPY requirements/requirements_tests.txt /home/${USERNAME}/jobflow-remote/requirements/
 
 # versioningit refuses to install a package without its full git history
 # so here we remove versioningit config from pyproject.toml as we don't need
@@ -31,7 +32,14 @@ RUN sed -i '/\[tool.versioningit.vcs\]/,+3d' /home/${USERNAME}/jobflow-remote/py
 WORKDIR /home/${USERNAME}/jobflow-remote
 RUN uv venv /home/${USERNAME}/.venv && \
     uv pip install --python /home/${USERNAME}/.venv/bin/python -r /home/${USERNAME}/jobflow-remote/requirements/requirements.txt && \
-    uv pip install --python /home/${USERNAME}/.venv/bin/python --no-deps .
+    uv pip install --python /home/${USERNAME}/.venv/bin/python --no-deps . && \
+    uv pip install --python /home/${USERNAME}/.venv/bin/python -r /home/${USERNAME}/jobflow-remote/requirements/requirements_tests.txt
+
+# Create a .pth file to auto-start coverage
+SHELL ["/bin/bash", "-c"]  # to get access to the source built-in of bash (default shell is sh)
+RUN source /home/${USERNAME}/.venv/bin/activate && python -c "import site, os; \
+    open(os.path.join(site.getsitepackages()[0], 'coverage_autostart.pth'), 'w').write('import coverage; coverage.process_startup()\n')"
+SHELL ["/bin/sh", "-c"]
 
 # Add desired queue system as a build stage:
 # Each different queue system must provide an startup script, following the example
@@ -209,6 +217,8 @@ RUN mkdir jfr
 
 # Copy the installed jobflow-remote virtualenv
 COPY --from=jobflow-remote-install /home/${USERNAME}/.venv /home/${USERNAME}/.venv
+# Copy the pyproject.toml file for the coverage configuration
+COPY pyproject.toml /home/${USERNAME}/
 
 # Finalize permissions on startup script and jobflow installation
 USER root
@@ -217,5 +227,17 @@ RUN chmod +x /etc/startup.sh && \
 RUN chown -R ${USERNAME} /home/${USERNAME} && \
     chmod -R 755 /home/${USERNAME}
 USER ${USERNAME}
+
+# Note about setting of the COVERAGE_PROCESS_START and COVERAGE_FILE environment variables
+# Here neither ENV nor having the exports in the .bashrc seems to work, i.e. when jobs are
+# executed within slurm/pbs/sge, the environment variables seem to be "lost". No idea why ...
+# Thus I am setting the coverage environment variables in each worker pre_run for now ...
+# ENV COVERAGE_PROCESS_START=/home/${USERNAME}/.coveragerc
+# ENV COVERAGE_FILE=/home/${USERNAME}/coverage/.coverage
+# RUN printf "\n# Environment variables for implicit coverage\n" >> /home/${USERNAME}/.bashrc
+# RUN printf "\nexport COVERAGE_PROCESS_START=/home/${USERNAME}/.coveragerc\n" >> /home/${USERNAME}/.bashrc
+# RUN printf "export COVERAGE_FILE=/home/${USERNAME}/coverage/.coverage\n" >> /home/${USERNAME}/.bashrc
+RUN mkdir /home/${USERNAME}/coverage
+
 
 CMD sudo /etc/startup.sh ; /bin/bash -l

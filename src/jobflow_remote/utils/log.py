@@ -69,7 +69,9 @@ def initialize_runner_logger(
 
 
 def initialize_cli_logger(
-    level: int = logging.WARNING, full_exc_info: bool = True
+    level: int = logging.WARNING,
+    full_exc_info: bool = True,
+    loggers: list[str] | None = None,
 ) -> None:
     """
     Initialize the logger for the CLI based on rich.
@@ -78,7 +80,16 @@ def initialize_cli_logger(
     ----------
     level
         The log level.
+    full_exc_info
+        If True the full stack trace will be printed in the log message
+        in case of error.
+    loggers
+        Additional loggers to be considered. jobflow_remote is always included
     """
+
+    loggers = loggers or []
+    loggers.insert(0, "jobflow_remote")
+
     config = {
         "version": 1,
         "disable_existing_loggers": True,
@@ -98,11 +109,12 @@ def initialize_cli_logger(
             },
         },
         "loggers": {
-            "jobflow_remote": {  # root logger
+            ln: {
                 "handlers": ["rich"],
                 "level": level,
                 "propagate": False,
-            },
+            }
+            for ln in loggers
         },
     }
 

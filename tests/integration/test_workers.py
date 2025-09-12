@@ -49,7 +49,7 @@ def test_paramiko_ssh_connection(random_project_name, job_controller) -> None:
             )
 
 
-def test_project_check(job_controller, capsys) -> None:
+def test_project_check(job_controller) -> None:
     from jobflow_remote.testing.cli import run_check_cli
 
     expected = [
