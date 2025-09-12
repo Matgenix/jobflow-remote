@@ -642,7 +642,6 @@ def stop(
 ) -> None:
     """
     Stop a Job. Only Jobs that did not complete or had an error can be stopped.
-    The operation is irreversible.
     If possible, the associated job submitted to the remote queue will be cancelled.
     """
     if break_lock:
