@@ -9,6 +9,7 @@ pytestmark = pytest.mark.skipif(
 )
 
 
+@pytest.mark.workers(["test_batch_remote_worker"])
 def test_run_batch(job_controller, monkeypatch, clean_slurm_queue) -> None:
     from jobflow import Flow
 
@@ -45,6 +46,7 @@ def test_run_batch(job_controller, monkeypatch, clean_slurm_queue) -> None:
         assert jobs_info[i].end_time < jobs_info[i + 1].start_time
 
 
+@pytest.mark.workers(["test_batch_multi_remote_worker"])
 def test_run_batch_multi(job_controller, monkeypatch, clean_slurm_queue) -> None:
     from jobflow import Flow
 
@@ -79,6 +81,7 @@ def test_run_batch_multi(job_controller, monkeypatch, clean_slurm_queue) -> None
             assert ji1.start_time < ji2.end_time
 
 
+@pytest.mark.workers(["test_batch_multi_remote_worker"])
 def test_run_batch_multi_fail(
     patch_project,
     job_controller,
@@ -113,7 +116,7 @@ def test_run_batch_multi_fail(
     daemon_manager.start()
     wait_daemon_started(daemon_manager)
 
-    for _ in range(10):
+    for _ in range(20):
         if (
             len(
                 job_controller.get_jobs_info(
@@ -171,7 +174,7 @@ def test_run_batch_multi_fail(
     # and running files are properly cleaned
     daemon_manager.start()
     wait_daemon_started(daemon_manager)
-    for _ in range(10):
+    for _ in range(20):
         if all(
             ji.state == JobState.REMOTE_ERROR
             for ji in job_controller.get_jobs_info(
@@ -188,7 +191,7 @@ def test_run_batch_multi_fail(
     # submit more jobs, will also be used to check that the files are cleaned during the reset
     job_ids = submit_jobs(4, 15)
 
-    for _ in range(10):
+    for _ in range(20):
         if (
             len(
                 job_controller.get_jobs_info(
@@ -236,6 +239,7 @@ def test_run_batch_multi_fail(
     assert len(batch_manager.get_running()) == 0
 
 
+@pytest.mark.workers(["test_max_jobs_worker"])
 def test_max_jobs_worker(
     job_controller, daemon_manager, wait_daemon_started, wait_daemon_shutdown
 ) -> None:

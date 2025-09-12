@@ -167,6 +167,15 @@ def delete(
     delete_output: delete_output_opt = False,
     delete_files: delete_files_opt = False,
     delete_all: delete_all_opt = False,
+    keep_processes: Annotated[
+        bool,
+        typer.Option(
+            "--keep-processes",
+            "-kp",
+            help="Do not attempt to cancel SUBMITTED and RUNNING processes from "
+            "the worker associated with the deleted Flows",
+        ),
+    ] = False,
 ) -> None:
     """Permanently delete Flows from the database"""
     check_incompatible_opt({"start_date": start_date, "days": days, "hours": hours})
@@ -234,6 +243,7 @@ def delete(
             flow_ids=to_delete,
             delete_output=delete_output,
             delete_files=delete_files,
+            cancel_processes=not keep_processes,
             max_limit=max_limit,
         )
 
