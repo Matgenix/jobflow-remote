@@ -1,9 +1,8 @@
 import os
 
 
-def test_jobs_list(job_controller, two_flows_four_jobs, patch_cli_consoles) -> None:
+def test_jobs_list(job_controller, two_flows_four_jobs, run_check_cli) -> None:
     from jobflow_remote.jobs.state import JobState
-    from jobflow_remote.testing.cli import run_check_cli
 
     # split "job id" from "index", because it can be sent to a new line
     columns = ["DB id", "Name", "State", "Job id", "(Index)", "Worker", "Last updated"]

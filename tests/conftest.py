@@ -29,6 +29,13 @@ def patch_cli_consoles(monkeypatch):
             monkeypatch.setattr(module, "out_console", out_console)
 
 
+@pytest.fixture()
+def run_check_cli(patch_cli_consoles):
+    from jobflow_remote.testing.cli import run_check_cli
+
+    return run_check_cli
+
+
 @pytest.fixture(scope="session")
 def test_dir():
     module_dir = Path(__file__).resolve().parent
