@@ -42,7 +42,7 @@ def run_batch(
             help="The path to the folder where files for handling the batch jobs will be stored",
         ),
     ],
-    process_uuid: Annotated[
+    batch_uid: Annotated[
         str,
         typer.Argument(
             help="A uuid representing the batch process",
@@ -89,7 +89,7 @@ def run_batch(
     run_batch_jobs(
         base_run_dir,
         files_dir,
-        process_uuid,
+        batch_uid,
         max_time=max_time,
         max_wait=max_wait,
         max_jobs=max_jobs,

@@ -358,6 +358,19 @@ delete_all_opt = Annotated[
     ),
 ]
 
+show_all_batches_opt = Annotated[
+    bool, typer.Option("--all", "-a", help="Show all batches (running and stopped)")
+]
+
+max_batches_per_worker_opt = Annotated[
+    int,
+    typer.Option(
+        "--max-batches-per-worker",
+        "-m",
+        help="Limit the maximum number of returned results per worker. Set 0 for no limit",
+    ),
+]
+
 foreground_index_opt = Annotated[
     bool,
     typer.Option(

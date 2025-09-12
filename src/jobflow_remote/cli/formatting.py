@@ -590,10 +590,11 @@ def get_batch_processes_table(
     workers: dict[str, WorkerBase],
     running_jobs: dict[str, list[tuple[str, int, str]]],
     verbosity: int = 0,
+    title: str = "Running batches info",
 ):
-    table = Table(title="Flows info")
+    table = Table(title=title)
     table.add_column("Process ID")
-    table.add_column("Process UUID")
+    table.add_column("Batch UID")
     table.add_column("Worker")
     table.add_column("Process folder")
     if verbosity > 0:

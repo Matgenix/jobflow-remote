@@ -94,6 +94,21 @@ def test_run_batch_multi_fail(
     from jobflow_remote.jobs.state import JobState
     from jobflow_remote.remote.queue import QueueManager
     from jobflow_remote.testing import add_sleep
+    from jobflow_remote.testing.cli import run_check_cli
+    from jobflow_remote.utils.data import check_valid_uuid
+
+    # First reset everything
+    assert job_controller.reset(max_limit=0)
+
+    run_check_cli(
+        ["batch", "list"],
+        required_out_colored="[gold1]No batch processes running[/gold1]",
+        excluded_out="Running batches info",
+    )
+    run_check_cli(
+        ["batch", "list", "--all"],
+        required_out_colored="[italic]No batch processes running[/italic]",
+    )
 
     def submit_jobs(n: int, sleep: int):
         job_ids = []
@@ -129,6 +144,13 @@ def test_run_batch_multi_fail(
         raise RuntimeError(
             "The submitted jobs were never both running at the same time"
         )
+
+    run_check_cli(
+        ["batch", "list"],
+        required_out="Running batches info",
+        excluded_out="No archived batch processes",
+    )
+    run_check_cli(["batch", "list", "-a"], required_out="No archived batch processes")
 
     daemon_manager.shut_down()
     wait_daemon_shutdown(daemon_manager)
@@ -167,6 +189,8 @@ def test_run_batch_multi_fail(
 
     assert len(batch_manager.get_running()) == 2
 
+    assert len(batch_manager.get_archived_batches()) == 0
+
     # now restart the runner and verify that the job is set to remote error
     # and running files are properly cleaned
     daemon_manager.start()
@@ -183,7 +207,20 @@ def test_run_batch_multi_fail(
     else:
         raise RuntimeError("The Jobs were not set to REMOTE_ERROR state")
 
+    run_check_cli(["batch", "list"], required_out="No batch processes running")
+    run_check_cli(
+        ["batch", "list", "-a"],
+        required_out=["No batch processes running", "Archived batches info"],
+    )
+
     assert len(batch_manager.get_running()) == 0
+    assert len(batch_manager.get_terminated()) == 0
+    assert len(batch_manager.get_submitted()) == 0
+    assert len(batch_manager.get_running()) == 0
+    archived_batches = batch_manager.get_archived_batches()
+    assert len(archived_batches) == 1
+    ((batch_uid),) = archived_batches.values()
+    assert check_valid_uuid(batch_uid)
 
     # submit more jobs, will also be used to check that the files are cleaned during the reset
     job_ids = submit_jobs(4, 60)
@@ -204,6 +241,16 @@ def test_run_batch_multi_fail(
         raise RuntimeError(
             "The submitted jobs were never both running at the same time"
         )
+
+    run_check_cli(
+        ["batch", "list"],
+        required_out="Running batches info",
+        excluded_out=["Archived batches info", "No archived batch processes"],
+    )
+    run_check_cli(
+        ["batch", "list", "-a"],
+        required_out=["Running batches info", "Archived batches info"],
+    )
 
     daemon_manager.shut_down()
     wait_daemon_shutdown(daemon_manager)

@@ -122,7 +122,7 @@ def run_remote_job(run_dir: str | Path = ".") -> None:
 def run_batch_jobs(
     base_run_dir: str | Path,
     files_dir: str | Path,
-    process_uuid: str,
+    batch_uid: str,
     max_time: int | None = None,
     max_wait: int = 60,
     max_jobs: int | None = None,
@@ -134,7 +134,7 @@ def run_batch_jobs(
         run_single_batch_jobs(
             base_run_dir=base_run_dir,
             files_dir=files_dir,
-            process_uuid=process_uuid,
+            batch_uid=batch_uid,
             max_time=max_time,
             max_wait=max_wait,
             max_jobs=max_jobs,
@@ -145,7 +145,7 @@ def run_batch_jobs(
             parallel_ids = manager.dict()
             batch_manager = LocalBatchManager(
                 files_dir=files_dir,
-                process_id=process_uuid,
+                batch_uid=batch_uid,
                 multiprocess_lock=multiprocess_lock,
             )
             processes = [
@@ -154,7 +154,7 @@ def run_batch_jobs(
                     args=(
                         base_run_dir,
                         files_dir,
-                        process_uuid,
+                        batch_uid,
                         max_time,
                         max_wait,
                         max_jobs,
@@ -175,7 +175,7 @@ def run_batch_jobs(
 def run_single_batch_jobs(
     base_run_dir: str | Path,
     files_dir: str | Path,
-    process_uuid: str,
+    batch_uid: str,
     max_time: int | None = None,
     max_wait: int = 60,
     max_jobs: int | None = None,
@@ -186,7 +186,7 @@ def run_single_batch_jobs(
 
     # TODO the ID should be somehow linked to the queue job
     if not batch_manager:
-        batch_manager = LocalBatchManager(files_dir=files_dir, process_id=process_uuid)
+        batch_manager = LocalBatchManager(files_dir=files_dir, batch_uid=batch_uid)
 
     if parallel_ids:
         parallel_ids[os.getpid()] = False

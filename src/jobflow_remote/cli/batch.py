@@ -1,3 +1,4 @@
+from itertools import islice
 from typing import Annotated, Optional
 
 import typer
@@ -5,7 +6,11 @@ import typer
 from jobflow_remote.cli.formatting import get_batch_processes_table
 from jobflow_remote.cli.jf import app
 from jobflow_remote.cli.jfr_typer import JFRTyper
-from jobflow_remote.cli.types import verbosity_opt
+from jobflow_remote.cli.types import (
+    max_batches_per_worker_opt,
+    show_all_batches_opt,
+    verbosity_opt,
+)
 from jobflow_remote.cli.utils import (
     exit_with_warning_msg,
     get_config_manager,
@@ -30,6 +35,8 @@ def processes_list(
             help="Select the worker.",
         ),
     ] = None,
+    show_all: show_all_batches_opt = False,
+    max_batches: max_batches_per_worker_opt = 10,
     verbosity: verbosity_opt = 0,
 ) -> None:
     """
@@ -39,29 +46,56 @@ def processes_list(
 
     jc = get_job_controller()
 
-    batch_processes = jc.get_batch_processes(worker)
-    if not batch_processes or not any(wbc for wbc in batch_processes.values()):
-        exit_with_warning_msg("No batch processes running")
-
     cm = get_config_manager()
     project = cm.get_project()
     workers = project.workers
-    running_jobs = {}
-    if verbosity > 0:
-        for worker_name in batch_processes:
-            worker_config = workers[worker_name]
-            host = worker_config.get_host()
-            host.connect()
-            remote_batch_manager = RemoteBatchManager(
-                host, worker_config.batch.jobs_handle_dir
-            )
-            running_jobs[worker_name] = remote_batch_manager.get_running()
 
-    table = get_batch_processes_table(
-        batch_processes=batch_processes,
-        workers=workers,
-        running_jobs=running_jobs,
-        verbosity=verbosity,
-    )
+    batch_processes = jc.get_batch_processes(worker)
+    if not batch_processes or not any(wbc for wbc in batch_processes.values()):
+        if not show_all:
+            exit_with_warning_msg("No batch processes running")
+        out_console.print("No batch processes running", style="italic")
+    else:
+        running_jobs = {}
+        if verbosity > 0:
+            for worker_name in batch_processes:
+                worker_config = workers[worker_name]
+                host = worker_config.get_host()
+                host.connect()
+                remote_batch_manager = RemoteBatchManager(
+                    host, worker_config.batch.jobs_handle_dir
+                )
+                running_jobs[worker_name] = remote_batch_manager.get_running()
 
-    out_console.print(table)
+        table = get_batch_processes_table(
+            batch_processes=batch_processes,
+            workers=workers,
+            running_jobs=running_jobs,
+            verbosity=verbosity,
+        )
+
+        out_console.print(table)
+
+    if show_all:
+        archived_batches = jc.get_archived_batch_processes(worker)
+        if not archived_batches or not any(wb for wb in archived_batches.values()):
+            out_console.print("No archived batch processes", style="italic")
+            raise typer.Exit(0)
+        if verbosity > 0:
+            # TODO: Implement the gathering of the ids of the jobs that were run in this batch
+            #  Questions ... some jobs may have started to run with a batch then go into remote
+            #  error ... should it be mentioned there ? Or only those that completed ?
+            verbosity = 0
+        if max_batches:
+            archived_batches = {
+                wname: dict(islice(batches_data.items(), max_batches))
+                for wname, batches_data in archived_batches.items()
+            }
+        table = get_batch_processes_table(
+            batch_processes=archived_batches,
+            workers=workers,
+            running_jobs={},
+            verbosity=verbosity,
+            title="Archived batches info",
+        )
+        out_console.print(table)

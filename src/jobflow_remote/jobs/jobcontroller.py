@@ -4690,7 +4690,7 @@ class JobController:
         Returns
         -------
         dict
-            A dictionary with the {process_id: process_uuid} of the batch
+            A dictionary with the {process_id: batch_uid} of the batch
             jobs running on the selected worker.
         """
         if worker:
@@ -4703,9 +4703,45 @@ class JobController:
             return result["batch_processes"] or {}
         return {}
 
-    def add_batch_process(
-        self, process_id: str, process_uuid: str, worker: str
-    ) -> dict:
+    def get_archived_batch_processes(
+        self, worker: str | None = None
+    ) -> dict[str, dict[str, str]]:
+        """
+        Get the archived batch processes associated with a given worker.
+
+        Parameters
+        ----------
+        worker
+            The worker name.
+
+        Returns
+        -------
+        dict
+            A dictionary with the {process_id: batch_uid} of the batch
+            jobs that have run on the selected worker.
+        """
+        archived_batches = {}
+        for wname, worker_data in self.project.workers.items():
+            if worker and worker != wname:
+                continue
+            try:
+                if worker_data.batch is not None:
+                    host = worker_data.get_host()
+                    host.connect()
+                    batch_manager = RemoteBatchManager(
+                        host, worker_data.batch.jobs_handle_dir
+                    )
+                    archived_batches[wname] = batch_manager.get_archived_batches()
+                    if worker:
+                        return archived_batches
+            except Exception:
+                logger.warning(
+                    f"Error while getting archived_batches for worker {wname}",
+                    exc_info=True,
+                )
+        return archived_batches
+
+    def add_batch_process(self, process_id: str, batch_uid: str, worker: str) -> dict:
         """
         Add a batch process to the list of running processes.
 
@@ -4717,8 +4753,8 @@ class JobController:
         ----------
         process_id
             The ID of the processes obtained from the QueueManager.
-        process_uuid
-            A unique ID to identify the processes.
+        batch_uid
+            A unique ID to identify the batch process.
         worker
             The worker where the process is being executed.
 
@@ -4729,7 +4765,7 @@ class JobController:
         """
         return self.auxiliary.find_one_and_update(
             {"batch_processes": {"$exists": True}},
-            {"$set": {f"batch_processes.{worker}.{process_id}": process_uuid}},
+            {"$set": {f"batch_processes.{worker}.{process_id}": batch_uid}},
             upsert=True,
         )
 
