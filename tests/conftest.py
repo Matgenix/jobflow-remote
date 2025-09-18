@@ -271,9 +271,14 @@ def shared_test_out_dir(tmp_path_factory):
 
 
 @pytest.fixture()
-def job_controller(random_project_name, request, shared_test_out_dir):
+def job_controller(random_project_name, request, shared_test_out_dir, patch_project):
     """Yields a jobcontroller instance for the test suite that also sets up the
     jobstore, resetting it after every test.
+
+    Notes:
+        This job_controller fixture depends on patch_project to make sure that patch_project
+        is called before initializing the JobController object. The patch_project fixture is
+        not explicitly used within this fixture though.
     """
     from monty.serialization import dumpfn
 
@@ -531,15 +536,28 @@ def update_project_data(
 
 
 @pytest.fixture()
-def patch_project(monkeypatch):
+def patch_project(monkeypatch, request):
     from jobflow_remote.config.manager import ConfigManager
 
     cm = ConfigManager()
     current_project_data = cm.get_project_data()
 
-    yield partial(
-        update_project_data, project_file_path=Path(current_project_data.filepath)
-    )
+    updates = getattr(request, "param", None)
+
+    if updates:
+        # case where patch_project is parametrized in the test (with indirect=True)
+        # this is useful for the job_controller initialization
+        update_project_data(
+            updates,
+            dict_mods=True,
+            project_file_path=Path(current_project_data.filepath),
+        )
+        yield
+    else:
+        # case where patch_project is not parametrized but just used inside the test
+        yield partial(
+            update_project_data, project_file_path=Path(current_project_data.filepath)
+        )
 
     cm.dump_project(current_project_data)
 

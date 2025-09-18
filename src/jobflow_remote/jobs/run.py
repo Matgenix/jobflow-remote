@@ -127,6 +127,7 @@ def run_batch_jobs(
     max_wait: int = 60,
     max_jobs: int | None = None,
     parallel_jobs: int | None = None,
+    sleep_time: float = None,
 ) -> None:
     parallel_jobs = parallel_jobs or 1
 
@@ -138,6 +139,7 @@ def run_batch_jobs(
             max_time=max_time,
             max_wait=max_wait,
             max_jobs=max_jobs,
+            sleep_time=sleep_time,
         )
     else:
         with Manager() as manager:
@@ -160,6 +162,7 @@ def run_batch_jobs(
                         max_jobs,
                         batch_manager,
                         parallel_ids,
+                        sleep_time,
                     ),
                 )
                 for _ in range(parallel_jobs)
@@ -181,6 +184,7 @@ def run_single_batch_jobs(
     max_jobs: int | None = None,
     batch_manager: LocalBatchManager | None = None,
     parallel_ids: dict | None = None,
+    sleep_time: float = None,
 ) -> None:
     initialize_remote_run_log()
 
@@ -192,8 +196,8 @@ def run_single_batch_jobs(
         parallel_ids[os.getpid()] = False
 
     t0 = time.time()
-    wait = 0
-    sleep_time = 10
+    wait = 0.0
+    sleep_time = sleep_time or 10.0
     count = 0
     while True:
         if max_time and max_time < time.time() - t0:
@@ -230,7 +234,7 @@ def run_single_batch_jobs(
             time.sleep(sleep_time)
             wait += sleep_time
         else:
-            wait = 0
+            wait = 0.0
             count += 1
             job_id, _index = job_str.split("_")
             index: int = int(_index)

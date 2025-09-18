@@ -24,7 +24,7 @@ def run(
         ),
     ] = ".",
 ) -> None:
-    """Run the Job in the selected folder based on the."""
+    """Run the Job in the selected folder based on the job files."""
     run_remote_job(run_dir)
 
 
@@ -84,6 +84,16 @@ def run_batch(
             help=("Number of jobs executed in parallel"),
         ),
     ] = None,
+    sleep_time: Annotated[
+        Optional[float],
+        typer.Option(
+            "--sleep-time",
+            "-st",
+            help=(
+                "Sleep time when no submitted job is available to run before checking again (seconds)"
+            ),
+        ),
+    ] = None,
 ) -> None:
     """Run Jobs in batch mode."""
     run_batch_jobs(
@@ -94,4 +104,5 @@ def run_batch(
         max_wait=max_wait,
         max_jobs=max_jobs,
         parallel_jobs=parallel_jobs,
+        sleep_time=sleep_time,
     )

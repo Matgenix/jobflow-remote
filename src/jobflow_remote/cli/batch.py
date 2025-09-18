@@ -1,4 +1,3 @@
-from itertools import islice
 from typing import Annotated, Optional
 
 import typer
@@ -77,25 +76,27 @@ def processes_list(
         out_console.print(table)
 
     if show_all:
-        archived_batches = jc.get_archived_batch_processes(worker)
-        if not archived_batches or not any(wb for wb in archived_batches.values()):
-            out_console.print("No archived batch processes", style="italic")
-            raise typer.Exit(0)
-        if verbosity > 0:
-            # TODO: Implement the gathering of the ids of the jobs that were run in this batch
-            #  Questions ... some jobs may have started to run with a batch then go into remote
-            #  error ... should it be mentioned there ? Or only those that completed ?
-            verbosity = 0
-        if max_batches:
-            archived_batches = {
-                wname: dict(islice(batches_data.items(), max_batches))
-                for wname, batches_data in archived_batches.items()
-            }
-        table = get_batch_processes_table(
-            batch_processes=archived_batches,
-            workers=workers,
-            running_jobs={},
-            verbosity=verbosity,
-            title="Archived batches info",
-        )
-        out_console.print(table)
+        pass
+        # all_batches = jc.get_all_batches()
+        # archived_batches = jc.get_archived_batch_processes(worker)
+        # if not archived_batches or not any(wb for wb in archived_batches.values()):
+        #     out_console.print("No archived batch processes", style="italic")
+        #     raise typer.Exit(0)
+        # if verbosity > 0:
+        #     # TODO: Implement the gathering of the ids of the jobs that were run in this batch
+        #     #  Questions ... some jobs may have started to run with a batch then go into remote
+        #     #  error ... should it be mentioned there ? Or only those that completed ?
+        #     verbosity = 0
+        # if max_batches:
+        #     archived_batches = {
+        #         wname: dict(islice(batches_data.items(), max_batches))
+        #         for wname, batches_data in archived_batches.items()
+        #     }
+        # table = get_batch_processes_table(
+        #     batch_processes=archived_batches,
+        #     workers=workers,
+        #     running_jobs={},
+        #     verbosity=verbosity,
+        #     title="Archived batches info",
+        # )
+        # out_console.print(table)

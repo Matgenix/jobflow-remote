@@ -7,7 +7,6 @@ from contextlib import ExitStack
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from bidict import bidict
 from flufl.lock import Lock, LockError
 
 if TYPE_CHECKING:
@@ -143,34 +142,6 @@ class RemoteBatchManager:
             index = int(_index)
             running.append((job_id, index, batch_uid))
         return running
-
-    def get_archived_batches(self) -> bidict[str, str]:
-        """
-        Get the process ids and unique ids of archived batches
-
-        Returns
-        -------
-        bidict
-            The bidirectional dictionary of process ids (e.g. Slurm id) and batch unique ids of
-            archived batches (completed or killed).
-        """
-        if not self._dir_initialized:
-            self._init_files_dir()
-        archived_batches = bidict()
-        for filename in self.host.listdir(self.batches_history_dir):
-            process_id, batch_uid = filename.split("::")
-            archived_batches[process_id] = batch_uid
-        return archived_batches
-
-    def archive_batch(self, process_id, batch_uid) -> None:
-        """
-        Archive the batch on the worker to keep a history of all previous batches
-        """
-        if not self._dir_initialized:
-            self._init_files_dir()
-        self.host.write_text_file(
-            self.batches_history_dir / f"{process_id}::{batch_uid}", ""
-        )
 
     def delete_terminated(self, ids: list[tuple[str, int, str]]) -> None:
         if not self._dir_initialized:

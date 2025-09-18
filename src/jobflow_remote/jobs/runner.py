@@ -150,6 +150,9 @@ class Runner:
         # create a cached for the jobstores to be used in the get_jobstore method
         self._cached_jobstores: OrderedDict[str, JobStore] = OrderedDict()
 
+        # create a cached for the batches containing batch_uid to process_id
+        self._cached_batches: dict = {}
+
         if connect_interactive:
             for host_name, host in self.hosts.items():
                 if (
@@ -1122,7 +1125,9 @@ class Runner:
             queue_manager = self.get_queue_manager(worker_name)
             # first check the processes that are running from the folder
             # and set them to running if needed
-            running_jobs = self.batch_update_running_jobs(batch_manager, worker_name)
+            running_jobs = self.batch_update_running_jobs(
+                batch_manager, worker_name, worker
+            )
 
             # Check the batch processes that should be running on the remote queue
             # and update the state in the DB if something changed (both for batch processes and
@@ -1140,7 +1145,7 @@ class Runner:
             self.batch_update_terminated_jobs(batch_manager, worker_name, worker)
 
     def batch_update_running_jobs(
-        self, batch_manager: RemoteBatchManager, worker_name: str
+        self, batch_manager: RemoteBatchManager, worker_name: str, worker
     ) -> list[tuple[str, int, str]]:
         """Update the status of running jobs.
 
@@ -1150,6 +1155,8 @@ class Runner:
             Manager of remote files
         worker_name
             Name of the batch worker
+        worker
+            Batch worker
 
         Returns
         -------
@@ -1190,21 +1197,43 @@ class Runner:
                             "state": JobState.BATCH_RUNNING.value,
                             "start_time": datetime.utcnow(),
                             "remote.process_id": self.get_process_id(
-                                batch_processes, batch_uid, batch_manager
+                                batch_processes, batch_uid, worker_name, worker
                             ),
                         }
                     }
                     lock.update_on_release = set_output
         return running_jobs
 
-    @staticmethod
-    def get_process_id(batch_processes, batch_uid, batch_manager=None):
+    def _cache_batch(self, worker_name, worker, batch_uid, process_id):
+        if worker_name not in self._cached_batches:
+            self._cached_batches[worker_name] = OrderedDict()
+        self._cached_batches[worker_name][batch_uid] = process_id
+        while len(self._cached_batches[worker_name]) > 2 * worker.max_jobs + 5:
+            self._cached_batches[worker_name].popitem(last=False)
+
+    def get_process_id(self, batch_processes, batch_uid, worker_name, worker):
+        # First, try to take from the cached batches info
+        if worker_batches := self._cached_batches.get(worker_name):  # noqa: SIM102
+            if batch_uid in worker_batches:
+                return worker_batches[batch_uid]
+        # Then try to take it from the running batch processes
         process_id = batch_processes.inverse.get(batch_uid)
         if process_id is not None:
+            self._cache_batch(
+                worker_name=worker_name,
+                worker=worker,
+                batch_uid=batch_uid,
+                process_id=process_id,
+            )
             return process_id
-        if batch_manager:
-            return batch_manager.get_archived_batches().inverse.get(batch_uid)
-        return None
+        if self.job_controller.batches is not None:
+            doc = self.job_controller.batches.find_one(
+                {"batch_uid": batch_uid}, projection=["process_id"]
+            )
+            return doc["process_id"]
+        # What do we do when we don't have it ? (I'm pretty sure it cannot happen if we have the batches collection,
+        # but if we don't, it could happen, although relatively "unlikely")
+        return "UNKNOWN"
 
     def batch_update_status(
         self, batch_manager, queue_manager, worker_name, worker, running_jobs
@@ -1253,15 +1282,15 @@ class Runner:
                     exc_info=True,
                 )
 
+            for pid in running_processes:
+                self.job_controller.set_running_batch_process(pid, worker_name)
+
             for pid in stopped_processes:
                 self.job_controller.remove_batch_process(pid, worker_name)
-                batch_manager.archive_batch(
-                    process_id=pid, batch_uid=batch_processes_data[pid]
-                )
                 # check if there are jobs that were in the running folder of a
                 # process that finished and set them to remote error
-                for job_id, job_index, process_running_uuid in running_jobs:
-                    if batch_processes_data[pid] == process_running_uuid:
+                for job_id, job_index, batch_uid in running_jobs:
+                    if batch_processes_data[pid] == batch_uid:
                         lock_filter = {
                             "uuid": job_id,
                             "index": job_index,
@@ -1278,7 +1307,7 @@ class Runner:
                             delta_retry=self.runner_options.delta_retry,
                         ) as lock:
                             if lock.locked_document:
-                                err_msg = f"The batch process that was running the job (process_id: {pid}, uuid: {process_running_uuid} was likely killed before terminating the job execution"
+                                err_msg = f"The batch process that was running the job (process_id: {pid}, uuid: {batch_uid} was likely killed before terminating the job execution"
                                 # Note here that this RemoteError is caught by the locking mechanism
                                 # The above loop will thus proceed normally
                                 # This is done to automatically pass down the error message
@@ -1321,22 +1350,20 @@ class Runner:
         )
         for _ in range(n_processes_to_submit):
             resources = worker.resources or {}
-            process_running_uuid = suuid()
-            remote_path = Path(
-                get_job_path(process_running_uuid, None, worker.batch.work_dir)
-            )
+            batch_uid = suuid()
+            remote_path = Path(get_job_path(batch_uid, None, worker.batch.work_dir))
             qout_fpath = remote_path / OUT_FNAME
             qerr_fpath = remote_path / ERR_FNAME
             set_name_out(
                 resources,
-                f"batch_{process_running_uuid}",
+                f"batch_{batch_uid}",
                 out_fpath=qout_fpath,
                 err_fpath=qerr_fpath,
             )
 
             # note that here the worker.work_dir needs to be passed,
             # not the worker.batch.work_dir
-            command = f"jf -fe execution run-batch {worker.work_dir} {worker.batch.jobs_handle_dir} {process_running_uuid}"
+            command = f"jf -fe execution run-batch {worker.work_dir} {worker.batch.jobs_handle_dir} {batch_uid}"
             if worker.batch.max_jobs_per_batch:
                 command += f" -mj {worker.batch.max_jobs_per_batch}"
             if worker.batch.max_time:
@@ -1345,6 +1372,8 @@ class Runner:
                 command += f" -mw {worker.batch.max_wait}"
             if worker.batch.parallel_jobs:
                 command += f" -pj {worker.batch.parallel_jobs}"
+            if worker.batch.sleep_time:
+                command += f" -st {worker.batch.sleep_time}"
 
             submit_result = queue_manager.submit(
                 commands=[command],
@@ -1361,13 +1390,17 @@ class Runner:
                 logger.error(
                     f"submission succeeded but ID not known. Job may be running but status cannot be checked. {submit_result!r}"
                 )
+                # TODO: should there be anything here to check with the uuid somehow on the worker ?
+                #  More specifically, maybe we could just add the batch process to the batches collection with None as an ID ?
+                #  Is it useful somehow ?
 
             elif submit_result.status == SubmissionStatus.SUCCESSFUL:
                 logger.debug(
                     f"Batch job submitted to worker {worker_name} in folder {remote_path}. Queue id: {submit_result.job_id}"
                 )
+                self._cache_batch(worker_name, worker, batch_uid, submit_result.job_id)
                 self.job_controller.add_batch_process(
-                    submit_result.job_id, process_running_uuid, worker_name
+                    submit_result.job_id, batch_uid, worker_name
                 )
             else:
                 logger.error(f"unhandled submission status {submit_result.status}")
@@ -1381,7 +1414,7 @@ class Runner:
                 f"error trying to get the list of terminated batch jobs for worker: {worker_name}",
                 exc_info=True,
             )
-        for job_id, job_index, process_running_uuid in terminated_jobs:
+        for job_id, job_index, batch_uid in terminated_jobs:
             lock_filter = {
                 "uuid": job_id,
                 "index": job_index,
@@ -1405,11 +1438,20 @@ class Runner:
                     set_output = {
                         "$set": {
                             "state": next_state.value,
-                            "remote.process_id": process_running_uuid,
+                            "remote.process_id": self.get_process_id(
+                                bidict(), batch_uid, worker_name, worker
+                            ),
                         }
                     }
+                    self.job_controller.add_job_to_batch(
+                        job_id=job_id,
+                        job_index=job_index,
+                        batch_uid=batch_uid,
+                        worker=worker_name,
+                        info={"state": next_state.value},
+                    )
                     lock.update_on_release = set_output
-            batch_manager.delete_terminated([(job_id, job_index, process_running_uuid)])
+            batch_manager.delete_terminated([(job_id, job_index, batch_uid)])
 
     def ping_running_runner(self):
         ping_result = self.job_controller.ping_running_runner()

@@ -140,6 +140,10 @@ class BatchConfig(BaseModel):
     parallel_jobs: Optional[int] = Field(
         None, description="Number of jobs executed in parallel in the same process"
     )
+    sleep_time: Optional[float] = Field(
+        None,
+        description="Sleep time when no submitted job is available to run before checking again (seconds)",
+    )
     model_config = ConfigDict(extra="forbid")
 
 
@@ -498,6 +502,12 @@ class QueueConfig(BaseModel):
     auxiliary_collection: str = Field(
         "jf_auxiliary",
         description="The name of the collection containing auxiliary information. "
+        "Taken from the same database as the one defined in the store",
+    )
+    batches_collection: Optional[str] = Field(
+        None,
+        description="The name of the collection containing batches information. "
+        "This collection is optional. "
         "Taken from the same database as the one defined in the store",
     )
     db_id_prefix: Optional[str] = Field(
