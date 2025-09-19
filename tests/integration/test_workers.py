@@ -49,23 +49,16 @@ def test_paramiko_ssh_connection(random_project_name, job_controller) -> None:
             )
 
 
-def test_project_check(job_controller) -> None:
+def test_project_check(job_controller, integration_workers, run_check_cli) -> None:
     from jobflow_remote.testing.cli import run_check_cli
 
-    expected = [
-        "✓ Worker test_local_worker",
-        "✓ Worker test_sanitize_local_worker",
-        "✓ Worker test_remote_slurm_worker",
-        "✓ Worker test_remote_sge_worker",
-        "✓ Worker test_remote_limited_worker",
-        "✓ Worker test_batch_remote_worker",
-        "✓ Worker test_max_jobs_worker",
-        "✓ Worker test_sanitize_remote_worker",
-        "✓ Worker test_remote_slurm_worker",
-        "✓ Worker test_remote_sge_worker",
-        "✓ Jobstore",
-        "✓ Queue store",
-    ]
+    expected = [f"✓ Worker {wn}" for wn in integration_workers]
+    expected.extend(
+        [
+            "✓ Jobstore",
+            "✓ Queue store",
+        ]
+    )
     # Here there will be "errors" reported as there likely be a mismatch of the
     # jobflow-remote version between the local environment and the one in the
     # container
@@ -334,11 +327,11 @@ def test_undefined_additional_stores(worker, job_controller) -> None:
 
 
 @pytest.mark.parametrize(
-    "remote_worker_name",
+    "worker",
     ["test_remote_slurm_worker", "test_remote_sge_worker", "test_remote_pbs_worker"],
 )
 def test_submit_flow_with_scheduler_username(
-    remote_worker_name, monkeypatch, job_controller
+    worker, monkeypatch, job_controller
 ) -> None:
     from jobflow import Flow
 
@@ -350,16 +343,16 @@ def test_submit_flow_with_scheduler_username(
 
     job = add(1, 1)
     flow = Flow([job])
-    submit_flow(flow, worker=remote_worker_name)
+    submit_flow(flow, worker=worker)
 
     # modify the runner so that uses a patched version of the worker
     # where the scheduler_username is set
     runner = Runner()
-    patched_worker = runner.get_worker(remote_worker_name).model_copy()
+    patched_worker = runner.get_worker(worker).model_copy()
     patched_worker.scheduler_username = "jobflow"
 
     def patched_get_worker(self, worker_name):
-        if worker_name != remote_worker_name:
+        if worker_name != worker:
             return runner.workers[worker_name]
         return patched_worker
 
@@ -463,14 +456,13 @@ def test_sanitize(worker, job_controller):
     "worker",
     ["test_local_worker", "test_remote_slurm_worker"],
 )
-def test_todir(job_controller, worker):
+def test_todir(job_controller, worker, run_check_cli):
     import subprocess
     import time
 
     from jobflow_remote import submit_flow
     from jobflow_remote.jobs.runner import Runner
     from jobflow_remote.testing import add
-    from jobflow_remote.testing.cli import run_check_cli
 
     j = add(1, 5)
     submit_flow(j, worker=worker)

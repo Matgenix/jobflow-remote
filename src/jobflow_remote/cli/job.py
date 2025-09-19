@@ -642,7 +642,6 @@ def stop(
 ) -> None:
     """
     Stop a Job. Only Jobs that did not complete or had an error can be stopped.
-    The operation is irreversible.
     If possible, the associated job submitted to the remote queue will be cancelled.
     """
     if break_lock:
@@ -1343,9 +1342,15 @@ def files_get(
         worker = cm.get_worker(job_info.worker)
         host = worker.get_host()
 
-        file_name: str
         try:
             host.connect()
+        except Exception as exc:
+            raise RuntimeError(
+                f"Error while connecting to worker {job_info.worker}: {getattr(exc, 'message', str(exc))}"
+            ) from exc
+
+        file_name: str
+        try:
             for file_name in filenames:
                 progress.update(task_id, description=f"Retrieving {file_name}")
                 host.get(str(Path(remote_dir) / file_name), str(save_path / file_name))

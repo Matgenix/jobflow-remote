@@ -15,6 +15,224 @@ from monty.os import cd
 from python_on_whales import DockerClient
 from python_on_whales import docker as docker_pow
 
+# Note that the workers are identified based on the scheduler_type, assuming that
+# "shell" workers are executed locally and not in any container. If this changes
+# the options will need to be modified. The fixtures will need to be updated accordingly.
+WORKER_TYPES = [
+    "shell",
+    "slurm",
+    "sge",
+    "pbs",
+]
+
+
+def pytest_addoption(parser):
+    parser.addoption(
+        "--worker-types",
+        "--wt",
+        dest="worker_types",
+        nargs="+",
+        help="List of workers to be used for the integration tests. All available if not specified.",
+        default=None,
+        action="store",
+        choices=WORKER_TYPES,
+    )
+
+
+@pytest.fixture(scope="session")
+def workers_list(
+    slurm_ssh_port, sge_ssh_port, pbs_ssh_port, tmp_proj_work_dirs, worker_types
+):
+    """
+    Dictionary workers to be set up based on the types of workers selected.
+    """
+    tmp_proj_dir, workdir = tmp_proj_work_dirs
+
+    prerun = (
+        "source /home/jobflow/.venv/bin/activate; "
+        "export COVERAGE_PROCESS_START=/home/jobflow/pyproject.toml; "
+        "export COVERAGE_FILE=/home/jobflow/coverage/.coverage"
+    )
+    workers = {
+        "test_local_worker": dict(
+            type="local",
+            scheduler_type="shell",
+            work_dir=str(workdir),
+            resources={},
+        ),
+        "test_sanitize_local_worker": dict(
+            type="local",
+            scheduler_type="shell",
+            work_dir=str(workdir),
+            resources={},
+            sanitize_command=True,
+        ),
+        "test_remote_slurm_worker": dict(
+            type="remote",
+            host="localhost",
+            port=slurm_ssh_port,
+            scheduler_type="slurm",
+            work_dir="/home/jobflow/jfr",
+            user="jobflow",
+            password="jobflow",
+            pre_run=prerun,
+            resources={"partition": "debug", "ntasks": 1, "time": "00:01:00"},
+            connect_kwargs={"allow_agent": False, "look_for_keys": False},
+        ),
+        "test_remote_sge_worker": dict(
+            type="remote",
+            host="localhost",
+            port=sge_ssh_port,
+            scheduler_type="sge",
+            work_dir="/home/jobflow/jfr",
+            user="jobflow",
+            password="jobflow",
+            scheduler_username="jobflow",
+            pre_run=prerun,
+            connect_kwargs={"allow_agent": False, "look_for_keys": False},
+        ),
+        "test_remote_pbs_worker": dict(
+            type="remote",
+            host="localhost",
+            port=pbs_ssh_port,
+            scheduler_type="pbs",
+            work_dir="/home/jobflow/jfr",
+            user="jobflow",
+            password="jobflow",
+            pre_run=prerun,
+            connect_kwargs={"allow_agent": False, "look_for_keys": False},
+            resources={"walltime": "00:05:00", "select": "nodes=1:ppn=1"},
+        ),
+        "test_remote_limited_worker": dict(
+            type="remote",
+            host="localhost",
+            port=slurm_ssh_port,
+            scheduler_type="slurm",
+            work_dir="/home/jobflow/jfr",
+            user="jobflow",
+            password="jobflow",
+            pre_run=prerun,
+            resources={"partition": "debug", "ntasks": 1, "time": "00:01:00"},
+            connect_kwargs={"allow_agent": False, "look_for_keys": False},
+            max_jobs=1,
+        ),
+        "test_batch_remote_worker": dict(
+            type="remote",
+            host="localhost",
+            port=slurm_ssh_port,
+            scheduler_type="slurm",
+            work_dir="/home/jobflow/jfr",
+            user="jobflow",
+            password="jobflow",
+            pre_run=prerun,
+            resources={"partition": "debug", "ntasks": 1, "time": "00:01:00"},
+            connect_kwargs={"allow_agent": False, "look_for_keys": False},
+            batch={
+                "jobs_handle_dir": "/home/jobflow/jfr/batch_handle",
+                "work_dir": "/home/jobflow/jfr/batch_work",
+                "max_wait": 5,
+            },
+            max_jobs=1,
+        ),
+        "test_batch_multi_remote_worker": dict(
+            type="remote",
+            host="localhost",
+            port=slurm_ssh_port,
+            scheduler_type="slurm",
+            work_dir="/home/jobflow/jfr",
+            user="jobflow",
+            password="jobflow",
+            pre_run=prerun,
+            resources={"partition": "debug", "ntasks": 1, "time": "00:01:00"},
+            connect_kwargs={"allow_agent": False, "look_for_keys": False},
+            batch={
+                "jobs_handle_dir": "/home/jobflow/jfr/batch_multi_handle",
+                "work_dir": "/home/jobflow/jfr/batch_multi_work",
+                "max_wait": 10,
+                "parallel_jobs": 2,
+            },
+            max_jobs=1,
+        ),
+        "test_max_jobs_worker": dict(
+            type="local",
+            scheduler_type="shell",
+            work_dir=str(workdir),
+            resources={},
+            max_jobs=2,
+        ),
+        "test_sanitize_remote_worker": dict(
+            type="remote",
+            host="localhost",
+            port=slurm_ssh_port,
+            scheduler_type="slurm",
+            work_dir="/home/jobflow/jfr",
+            user="jobflow",
+            password="jobflow",
+            pre_run=prerun,
+            resources={"partition": "debug", "ntasks": 1, "time": "00:01:00"},
+            connect_kwargs={"allow_agent": False, "look_for_keys": False},
+            sanitize_command=True,
+        ),
+    }
+    # remove the workers that do not belong to the selected type
+    return {wn: w for wn, w in workers.items() if w["scheduler_type"] in worker_types}
+
+
+@pytest.fixture(scope="session")
+def worker_types(request):
+    """
+    List of worker types activated during the integration tests
+    """
+    wt = request.config.getoption("--worker-types")
+    if wt is None:
+        wt = list(WORKER_TYPES)
+    return wt
+
+
+@pytest.fixture(scope="session")
+def integration_workers(workers_list):
+    """
+    List of worker names activated during the integration tests
+    """
+    return list(workers_list)
+
+
+@pytest.fixture(autouse=True)
+def check_worker_requirements(request, integration_workers):
+    """
+    Automatically check worker requirements and skip if needed.
+
+    Will skip, depending on the selected worker types:
+      * if there is a parametrization with a parameter named "worker" and
+        the value is not among the selected worker. Only the corresponding
+        parameter value will be skipped
+      * if the test is marked with a list of worker names that are used inside
+        the test (e.g. @pytest.mark.workers(["test_max_jobs_worker"])). If not
+        all the workers are among the selected ones the test will be skipped.
+
+    Tests with no "worker" parametrization or mark will be executed.
+    """
+    # Get the workers marker from the test
+    workers_marker = request.node.get_closest_marker("workers")
+
+    if workers_marker is not None:
+        required_workers = workers_marker.args[0] if workers_marker.args else []
+
+        # Check if any required worker is not in selected workers
+        missing_workers = [w for w in required_workers if w not in integration_workers]
+        if missing_workers:
+            pytest.skip(
+                f"Test requires workers {required_workers}, but {missing_workers} not in selected workers {integration_workers}"
+            )
+
+    # Handle parametrized workers
+    if hasattr(request.node, "callspec") and "worker" in request.node.callspec.params:
+        worker_param = request.node.callspec.params["worker"]
+        if worker_param not in integration_workers:
+            pytest.skip(
+                f"Worker '{worker_param}' not in selected workers {integration_workers}"
+            )
+
 
 @pytest.fixture(autouse=True)
 def mock_fabric_run(monkeypatch) -> None:
@@ -76,10 +294,15 @@ def db_port():
 
 
 @pytest.fixture(scope="session", autouse=True)
-def bake_containers():
+def bake_containers(worker_types):
+    # targets here should be a list containing "slurm", "sge", "pbs"
+    targets = [w for w in worker_types if w != "shell"]
+    # don't bake anything if only "shell" is needed.
+    if not targets:
+        return
     hcl_path = Path(__file__).parent.resolve() / "dockerfiles/docker-bake.hcl"
     docker_pow.buildx.bake(
-        targets=["slurm", "sge", "pbs"],
+        targets=targets,
         files=hcl_path,
         set={"*.context": str(Path(__file__).parent.parent.parent.resolve())},
     )
@@ -94,6 +317,7 @@ def compose_containers(
     bake_containers,
     coverage_file,
     pytestconfig,
+    worker_types,
 ):
     compose_yaml = f"""
 name: jobflow_remote_testing
@@ -111,6 +335,9 @@ services:
       retries: 28
       start_period: 2s
 
+"""
+    if "slurm" in worker_types:
+        compose_yaml += f"""
   jobflow_remote_testing_slurm:
     image: ghcr.io/matgenix/jobflow-remote-testing-slurm:latest
     container_name: jobflow_testing_slurm
@@ -125,6 +352,10 @@ services:
       retries: 30
       start_period: 2s
 
+"""
+
+    if "sge" in worker_types:
+        compose_yaml += f"""
   jobflow_remote_testing_sge:
     image: ghcr.io/matgenix/jobflow-remote-testing-sge:latest
     container_name: jobflow_testing_sge
@@ -139,6 +370,10 @@ services:
       retries: 30
       start_period: 2s
 
+"""
+
+    if "pbs" in worker_types:
+        compose_yaml += f"""
   jobflow_remote_testing_pbs:
     image: ghcr.io/matgenix/jobflow-remote-testing-pbs:latest
     container_name: jobflow_testing_pbs
@@ -328,6 +563,7 @@ def write_tmp_settings(
     db_port,
     tmp_proj_work_dirs,
     pytestconfig,
+    workers_list,
 ):
     """Collects the various sub-configs and writes them to a temporary file in a
     temporary directory."""
@@ -340,11 +576,6 @@ def write_tmp_settings(
     # config on import
     from jobflow_remote.config import Project
 
-    prerun = (
-        "source /home/jobflow/.venv/bin/activate; "
-        "export COVERAGE_PROCESS_START=/home/jobflow/pyproject.toml; "
-        "export COVERAGE_FILE=/home/jobflow/coverage/.coverage"
-    )
     project = Project(
         name=random_project_name,
         jobstore={
@@ -376,127 +607,7 @@ def write_tmp_settings(
             "flows_collection": "flows",
         },
         log_level="debug",
-        workers={
-            "test_local_worker": dict(
-                type="local",
-                scheduler_type="shell",
-                work_dir=str(workdir),
-                resources={},
-            ),
-            "test_sanitize_local_worker": dict(
-                type="local",
-                scheduler_type="shell",
-                work_dir=str(workdir),
-                resources={},
-                sanitize_command=True,
-            ),
-            "test_remote_slurm_worker": dict(
-                type="remote",
-                host="localhost",
-                port=slurm_ssh_port,
-                scheduler_type="slurm",
-                work_dir="/home/jobflow/jfr",
-                user="jobflow",
-                password="jobflow",
-                pre_run=prerun,
-                resources={"partition": "debug", "ntasks": 1, "time": "00:01:00"},
-                connect_kwargs={"allow_agent": False, "look_for_keys": False},
-            ),
-            "test_remote_sge_worker": dict(
-                type="remote",
-                host="localhost",
-                port=sge_ssh_port,
-                scheduler_type="sge",
-                work_dir="/home/jobflow/jfr",
-                user="jobflow",
-                password="jobflow",
-                scheduler_username="jobflow",
-                pre_run=prerun,
-                connect_kwargs={"allow_agent": False, "look_for_keys": False},
-            ),
-            "test_remote_pbs_worker": dict(
-                type="remote",
-                host="localhost",
-                port=pbs_ssh_port,
-                scheduler_type="pbs",
-                work_dir="/home/jobflow/jfr",
-                user="jobflow",
-                password="jobflow",
-                pre_run=prerun,
-                connect_kwargs={"allow_agent": False, "look_for_keys": False},
-                resources={"walltime": "00:05:00", "select": "nodes=1:ppn=1"},
-            ),
-            "test_remote_limited_worker": dict(
-                type="remote",
-                host="localhost",
-                port=slurm_ssh_port,
-                scheduler_type="slurm",
-                work_dir="/home/jobflow/jfr",
-                user="jobflow",
-                password="jobflow",
-                pre_run=prerun,
-                resources={"partition": "debug", "ntasks": 1, "time": "00:01:00"},
-                connect_kwargs={"allow_agent": False, "look_for_keys": False},
-                max_jobs=1,
-            ),
-            "test_batch_remote_worker": dict(
-                type="remote",
-                host="localhost",
-                port=slurm_ssh_port,
-                scheduler_type="slurm",
-                work_dir="/home/jobflow/jfr",
-                user="jobflow",
-                password="jobflow",
-                pre_run=prerun,
-                resources={"partition": "debug", "ntasks": 1, "time": "00:01:00"},
-                connect_kwargs={"allow_agent": False, "look_for_keys": False},
-                batch={
-                    "jobs_handle_dir": "/home/jobflow/jfr/batch_handle",
-                    "work_dir": "/home/jobflow/jfr/batch_work",
-                    "max_wait": 5,
-                },
-                max_jobs=1,
-            ),
-            "test_batch_multi_remote_worker": dict(
-                type="remote",
-                host="localhost",
-                port=slurm_ssh_port,
-                scheduler_type="slurm",
-                work_dir="/home/jobflow/jfr",
-                user="jobflow",
-                password="jobflow",
-                pre_run=prerun,
-                resources={"partition": "debug", "ntasks": 1, "time": "00:01:00"},
-                connect_kwargs={"allow_agent": False, "look_for_keys": False},
-                batch={
-                    "jobs_handle_dir": "/home/jobflow/jfr/batch_multi_handle",
-                    "work_dir": "/home/jobflow/jfr/batch_multi_work",
-                    "max_wait": 10,
-                    "parallel_jobs": 2,
-                },
-                max_jobs=1,
-            ),
-            "test_max_jobs_worker": dict(
-                type="local",
-                scheduler_type="shell",
-                work_dir=str(workdir),
-                resources={},
-                max_jobs=2,
-            ),
-            "test_sanitize_remote_worker": dict(
-                type="remote",
-                host="localhost",
-                port=slurm_ssh_port,
-                scheduler_type="slurm",
-                work_dir="/home/jobflow/jfr",
-                user="jobflow",
-                password="jobflow",
-                pre_run=prerun,
-                resources={"partition": "debug", "ntasks": 1, "time": "00:01:00"},
-                connect_kwargs={"allow_agent": False, "look_for_keys": False},
-                sanitize_command=True,
-            ),
-        },
+        workers=workers_list,
         exec_config={
             "test": {"export": {"TESTING_ENV_VAR": random_project_name}},
             "some_pre_run": {
@@ -528,13 +639,18 @@ def write_tmp_settings(
 
 
 @pytest.fixture()
-def clean_slurm_queue(write_tmp_settings, coverage_file):
+def clean_slurm_queue(write_tmp_settings, coverage_file, worker_types):
     """
     Clean the list of Jobs in the SLURM queue at the end of the test.
     """
     from jobflow_remote.remote.queue import QueueManager
 
     yield
+
+    # Skip if slurm has been deselected. In principle, this fixture should never be used in that case.
+    if "slurm" not in worker_types:
+        return
+
     project = write_tmp_settings
     worker = project.workers["test_remote_slurm_worker"]
     queue_manager = QueueManager(worker.get_scheduler_io(), worker.get_host())

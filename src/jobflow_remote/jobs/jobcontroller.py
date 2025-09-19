@@ -850,7 +850,7 @@ class JobController:
         if max_limit != 0 and len(queried_dbs_ids) > max_limit:
             raise ValueError(
                 f"Cannot perform {action_description} on {len(queried_dbs_ids)} Jobs "
-                f"as they exceeds the specified maximum limit ({max_limit})."
+                f"as they exceed the specified maximum limit ({max_limit})."
                 f"Increase the limit to complete the action on this many Jobs."
             )
 
@@ -1745,7 +1745,6 @@ class JobController:
         """
         Stop selected Jobs. Only Jobs in the READY and all the running states
         can be stopped.
-        The action is not reversible.
 
         Parameters
         ----------
@@ -1822,7 +1821,6 @@ class JobController:
         can be stopped.
         Selected by db_id or uuid+index. Only one among db_id
         and job_id should be defined.
-        The action is not reversible.
 
         Parameters
         ----------
@@ -2636,6 +2634,7 @@ class JobController:
         max_limit: int = 10,
         delete_output: bool = False,
         delete_files: bool = False,
+        cancel_processes: bool = True,
     ) -> int:
         """
         Delete a list of Flows based on the flow uuids.
@@ -2651,6 +2650,9 @@ class JobController:
             If True also delete the associated output in the JobStore.
         delete_files
             If True also delete the files on the worker.
+        cancel_processes
+            If True will attempt to delete the processes for SUBMITTED and RUNNING jobs.
+            Failure to cancel will not stop the deletion of the Flow.
 
         Returns
         -------
@@ -2665,7 +2667,7 @@ class JobController:
 
         if max_limit != 0 and len(flow_ids) > max_limit:
             raise ValueError(
-                f"Cannot delete {len(flow_ids)} Flows as they exceeds the specified maximum "
+                f"Cannot delete {len(flow_ids)} Flows as they exceed the specified maximum "
                 f"limit ({max_limit}). Increase the limit to delete the Flows."
             )
         deleted = 0
@@ -2674,7 +2676,10 @@ class JobController:
             for fid in flow_ids:
                 # TODO should it catch errors?
                 if self.delete_flow(
-                    fid, delete_output=delete_output, delete_files=delete_files
+                    fid,
+                    delete_output=delete_output,
+                    delete_files=delete_files,
+                    cancel_processes=cancel_processes,
                 ):
                     deleted += 1
 
@@ -2685,6 +2690,7 @@ class JobController:
         flow_id: str,
         delete_output: bool = False,
         delete_files: bool = False,
+        cancel_processes: bool = True,
     ) -> bool:
         """
         Delete a single Flow based on the uuid.
@@ -2697,6 +2703,9 @@ class JobController:
             If True also delete the associated output in the JobStore.
         delete_files
             If True also delete the files on the worker.
+        cancel_processes
+            If True will attempt to delete the processes for SUBMITTED and RUNNING jobs.
+            Failure to cancel will not stop the deletion of the Flow.
 
         Returns
         -------
@@ -2713,9 +2722,22 @@ class JobController:
             if jobstore_name := flow.get("jobstore"):
                 jobstore = self.optional_jobstores[jobstore_name]
             jobstore.remove_docs({"uuid": {"$in": job_ids}})
-        if delete_files:
+        if delete_files or cancel_processes:
             jobs_info = self.get_jobs_info(flow_ids=[flow_id])
-            self._safe_delete_files(jobs_info)
+            if cancel_processes:
+                for ji in jobs_info:
+                    if ji.state in [JobState.SUBMITTED, JobState.RUNNING]:
+                        # try cancelling the job submitted to the remote queue
+                        try:
+                            self._cancel_queue_process(ji.model_dump(mode="python"))
+                        except Exception:
+                            logger.warning(
+                                f"Failed cancelling the process for Job {ji.uuid} {ji.index} while deleting Flow {flow_id}",
+                                exc_info=True,
+                            )
+            # delete files after cancelling the queue job
+            if delete_files:
+                self._safe_delete_files(jobs_info)
 
         self.jobs.delete_many({"uuid": {"$in": job_ids}})
         self.flows.delete_one({"uuid": flow_id})
@@ -4077,7 +4099,13 @@ class JobController:
         # so this should always be consistent.
         if len(to_ready) > 0:
             self.jobs.update_many(
-                {"db_id": {"$in": to_ready}}, {"$set": {"state": JobState.READY.value}}
+                {"db_id": {"$in": to_ready}},
+                {
+                    "$set": {
+                        "state": JobState.READY.value,
+                        "updated_on": datetime.utcnow(),
+                    }
+                },
             )
         return to_ready
 
@@ -5094,6 +5122,11 @@ class JobController:
                     job_id=job_id,
                     job_index=job_index,
                 )
+                if not job_info:
+                    raise ValueError(
+                        "The Job is not present in the Queue DB, cannot "
+                        "determine the store to fetch the output"
+                    )
             jobstore_name = self.get_flow_store(job_info.hosts[-1])
             if jobstore_name:
                 jobstore = self.optional_jobstores[jobstore_name]

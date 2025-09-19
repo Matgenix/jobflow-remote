@@ -4,9 +4,8 @@ def test_std_operations(
     wait_daemon_shutdown,
     daemon_manager,
     job_controller,
+    run_check_cli,
 ):
-    from jobflow_remote.testing.cli import run_check_cli
-
     run_check_cli(
         ["runner", "status"],
         required_out="Daemon status: shut_down",
@@ -102,9 +101,7 @@ def test_std_operations(
     )
 
 
-def test_reset(wait_daemon_started, daemon_manager, job_controller):
-    from jobflow_remote.testing.cli import run_check_cli
-
+def test_reset(wait_daemon_started, daemon_manager, job_controller, run_check_cli):
     # set some fake value inside the running_runner document
     runner_info = daemon_manager._get_runner_info()
     runner_info["mac_address"] = "XXXXXXX"

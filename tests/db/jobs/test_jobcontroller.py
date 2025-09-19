@@ -77,11 +77,11 @@ def test_queries(job_controller, runner) -> None:
     assert job_controller.count_jobs(db_ids="1") == 1
     assert job_controller.count_jobs(job_ids=(add_first.uuid, 1)) == 1
     jobs_start_date = job_controller.get_jobs_info(start_date=date_create)
-    assert len(jobs_start_date) == 1
-    assert jobs_start_date[0].uuid == add_first.uuid
+    assert len(jobs_start_date) == 2
+    assert {j.uuid for j in jobs_start_date} == {add_first.uuid, add_second.uuid}
 
     jobs_end_date = job_controller.get_jobs_info(end_date=date_create)
-    assert jobs_end_date[0].uuid == add_second.uuid
+    assert {j.uuid for j in jobs_end_date} == {add_third.uuid, add_fourth.uuid}
 
     assert job_controller.count_jobs(metadata={"test_meta": 1}) == 1
 
@@ -1228,3 +1228,122 @@ def test_get_job_output(job_controller, runner, one_job):
     runner.run_all_jobs(max_seconds=20)
 
     assert job_controller.get_job_output(db_id="1") == 6
+
+
+def test_delete_flow(job_controller, runner, caplog):
+    from pathlib import Path
+
+    from jobflow import Flow
+    from qtoolkit.core.data_objects import CancelStatus
+
+    from jobflow_remote import submit_flow
+    from jobflow_remote.jobs.state import JobState
+    from jobflow_remote.testing import add, add_sleep
+
+    j1 = add(5, 6)
+    f1 = Flow([j1])
+    submit_flow(f1, worker="test_local_worker")
+
+    assert job_controller.count_flows() == 1
+    assert job_controller.count_jobs() == 1
+
+    assert job_controller.delete_flow(f1.uuid)
+    assert job_controller.count_flows() == 0
+    assert job_controller.count_jobs() == 0
+
+    # Test delete with output and files
+    completed_job = add(10, 20)
+    completed_flow = Flow([completed_job])
+    submit_flow(completed_flow, worker="test_local_worker")
+
+    # Run to completion to create output and files
+    runner.run_all_jobs(max_seconds=10)
+
+    completed_job_info = job_controller.get_job_info(
+        job_id=completed_job.uuid, job_index=completed_job.index
+    )
+    assert completed_job_info.state == JobState.COMPLETED
+
+    # Verify output exists
+    output = job_controller.get_job_output(job_id=completed_job.uuid)
+    assert output == 30
+
+    # Verify run directory exists
+    run_dir = Path(completed_job_info.run_dir)
+    assert run_dir.exists()
+
+    # Delete with delete_output and delete_files
+    result = job_controller.delete_flow(
+        completed_flow.uuid, delete_output=True, delete_files=True
+    )
+    assert result is True
+
+    # Verify output was deleted
+    with pytest.raises(ValueError, match=".*has no outputs.*"):
+        job_controller.jobstore.get_output(completed_job.uuid)
+
+    # Test process cancellation by simulating jobs in SUBMITTED and RUNNING states
+    j2 = add_sleep(1, 30)
+    f2 = Flow([j2])
+    submit_flow(f2, worker="test_local_worker")
+
+    runner.run_one_job(max_seconds=20, target_state=JobState.RUNNING)
+    j2_info = job_controller.get_job_info(job_id=j2.uuid, job_index=j2.index)
+    assert j2_info.state == JobState.RUNNING
+
+    qm = runner.get_queue_manager("test_local_worker")
+    assert qm.get_jobs_list([j2_info.remote.process_id])
+
+    # delete and cancel the remote processes
+    assert job_controller.delete_flow(f2.uuid, cancel_processes=True)
+
+    assert job_controller.count_flows() == 0
+
+    assert not qm.get_jobs_list([j2_info.remote.process_id])
+
+    # Test cancel_processes=False
+    j3 = add(1, 30)
+    f3 = Flow([j3])
+    submit_flow(f3, worker="test_local_worker")
+
+    runner.run_one_job(max_seconds=20, target_state=JobState.RUNNING)
+    j3_info = job_controller.get_job_info(job_id=j3.uuid, job_index=j3.index)
+    assert j3_info.state == JobState.RUNNING
+
+    assert qm.get_jobs_list([j3_info.remote.process_id])
+
+    assert job_controller.delete_flow(f3.uuid, cancel_processes=False)
+
+    assert qm.get_jobs_list([j3_info.remote.process_id])
+
+    # attempt cancelling the job to speed up the completion of the test. it is not strictly necessary that it succeeds
+    qm.cancel(j3_info.remote.process_id)
+
+    assert job_controller.count_flows() == 0
+
+    # Test cancel_processes=True with already finished Job
+    j4 = add(1, 30)
+    f4 = Flow([j4])
+    submit_flow(f4, worker="test_local_worker")
+
+    runner.run_one_job(max_seconds=20, target_state=JobState.RUNNING)
+    j4_info = job_controller.get_job_info(job_id=j4.uuid, job_index=j4.index)
+    assert j4_info.state == JobState.RUNNING
+
+    assert qm.get_jobs_list([j4_info.remote.process_id])
+    assert qm.cancel(j4_info.remote.process_id).status == CancelStatus.SUCCESSFUL
+    assert not qm.get_jobs_list([j4_info.remote.process_id])
+
+    assert job_controller.delete_flow(f4.uuid, cancel_processes=True)
+
+    warning_records = [
+        r
+        for r in caplog.records
+        if "Failed cancelling the process for Job" in r.message
+    ]
+    assert len(warning_records) == 1
+
+    assert job_controller.count_flows() == 0
+
+    # Test deleting non-existent flow
+    assert not job_controller.delete_flow("non-existent-uuid")

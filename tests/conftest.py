@@ -29,6 +29,13 @@ def patch_cli_consoles(monkeypatch):
             monkeypatch.setattr(module, "out_console", out_console)
 
 
+@pytest.fixture()
+def run_check_cli(patch_cli_consoles):
+    from jobflow_remote.testing.cli import run_check_cli
+
+    return run_check_cli
+
+
 @pytest.fixture(scope="session")
 def test_dir():
     module_dir = Path(__file__).resolve().parent
@@ -593,3 +600,34 @@ def disable_initial_load_plugins(monkeypatch):
     from jobflow_remote import SETTINGS
 
     monkeypatch.setattr(SETTINGS, "cli_load_plugins", False)
+
+
+def reenable_log_propagation(f):
+    def wrapper(*args, **kwargs):
+        for logger_dict in args[0].get("loggers", {}).values():
+            if not logger_dict.get("propagate", True):
+                logger_dict["propagate"] = True
+        # setting disable_existing_loggers to False does not seem strictly
+        # necessary, but doing it anyway.
+        args[0]["disable_existing_loggers"] = False
+
+        return f(*args, **kwargs)
+
+    return wrapper
+
+
+@pytest.fixture(autouse=True)
+def allow_log_propagation_during_dict_config(monkeypatch):
+    """
+    logging utils in jobflow_remote disable log propagation, preventing
+    caplog to properly capture the logs during tests.
+    This fixture intercepts the calls to dictConfig and sets propagate=True
+    for all the loggers.
+    """
+    import logging.config
+
+    monkeypatch.setattr(
+        logging.config,
+        "dictConfig",
+        reenable_log_propagation(logging.config.dictConfig),
+    )

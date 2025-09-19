@@ -2,10 +2,9 @@ import types
 from unittest.mock import MagicMock, Mock
 
 
-def test_mock_load_plugins_with_valid_plugin(mocker):
+def test_mock_load_plugins_with_valid_plugin(mocker, run_check_cli):
     """Test that a valid plugin with setup function is loaded and executed."""
     from jobflow_remote.cli.plugin import PLUGIN_GROUP, load_plugins
-    from jobflow_remote.testing.cli import run_check_cli
 
     # Mock the plugin. Nothing is really added to the CLI
     mock_entry_point = Mock()
@@ -31,10 +30,9 @@ def test_mock_load_plugins_with_valid_plugin(mocker):
     )
 
 
-def test_mock_load_plugins_with_multiple_valid_plugins(mocker):
+def test_mock_load_plugins_with_multiple_valid_plugins(mocker, run_check_cli):
     """Test loading multiple plugins successfully."""
     from jobflow_remote.cli.plugin import PLUGIN_GROUP, load_plugins
-    from jobflow_remote.testing.cli import run_check_cli
 
     # Mock multiple plugins. Nothing is really added to the CLI
     mock_entry_points_list = []
@@ -73,14 +71,13 @@ def test_mock_load_plugins_with_multiple_valid_plugins(mocker):
     )
 
 
-def test_mock_load_plugins_with_plugin_missing_setup_function(mocker):
+def test_mock_load_plugins_with_plugin_missing_setup_function(mocker, run_check_cli):
     """Test a plugin where the setup function is missing."""
     from jobflow_remote.cli.plugin import (
         PLUGIN_GROUP,
         PLUGIN_LOAD_FUNCTION,
         load_plugins,
     )
-    from jobflow_remote.testing.cli import run_check_cli
 
     # Mock the plugin.
     mock_entry_point = Mock()
@@ -126,10 +123,9 @@ def test_mock_load_plugins_with_plugin_missing_setup_function(mocker):
     )
 
 
-def test_mock_load_plugins_with_plugin_load_failure(mocker):
+def test_mock_load_plugins_with_plugin_load_failure(mocker, run_check_cli):
     """Test that plugin load failure is handled."""
     from jobflow_remote.cli.plugin import load_plugins
-    from jobflow_remote.testing.cli import run_check_cli
 
     # Mock entry point that raises exception on load
     mock_entry_point = Mock()
@@ -169,10 +165,9 @@ def test_mock_load_plugins_with_plugin_load_failure(mocker):
     )
 
 
-def test_mock_load_plugins_with_setup_function_failure(mocker):
+def test_mock_load_plugins_with_setup_function_failure(mocker, run_check_cli):
     """Test that setup function failure is handled."""
     from jobflow_remote.cli.plugin import load_plugins
-    from jobflow_remote.testing.cli import run_check_cli
 
     # Mock entry point
     mock_entry_point = Mock()
@@ -218,10 +213,9 @@ def test_mock_load_plugins_with_setup_function_failure(mocker):
     )
 
 
-def test_mock_load_plugins_with_no_plugins(mocker):
+def test_mock_load_plugins_with_no_plugins(mocker, run_check_cli):
     """Test behavior when no plugins are discovered."""
     from jobflow_remote.cli.plugin import PLUGIN_GROUP, load_plugins
-    from jobflow_remote.testing.cli import run_check_cli
 
     mock_entry_points = Mock()
     mock_entry_points.select.return_value = []
@@ -244,10 +238,9 @@ def test_mock_load_plugins_with_no_plugins(mocker):
     )
 
 
-def test_mock_load_plugins_with_entry_points_discovery_failure(mocker):
+def test_mock_load_plugins_with_entry_points_discovery_failure(mocker, run_check_cli):
     """Test that entry points discovery failure is handled gracefully."""
     from jobflow_remote.cli.plugin import load_plugins
-    from jobflow_remote.testing.cli import run_check_cli
 
     # Mock entry_points() to raise exception
     mocker.patch(
@@ -275,10 +268,9 @@ def test_mock_load_plugins_with_entry_points_discovery_failure(mocker):
     )
 
 
-def test_mock_load_plugins_mixed_success_and_failure(mocker):
+def test_mock_load_plugins_mixed_success_and_failure(mocker, run_check_cli):
     """Test loading plugins where some succeed and some fail."""
     from jobflow_remote.cli.plugin import load_plugins
-    from jobflow_remote.testing.cli import run_check_cli
 
     # Mixed scenario: 1 successful, 1 failing load, 1 failing setup
     mock_entry_points_list = []
@@ -351,7 +343,7 @@ def test_mock_load_plugins_mixed_success_and_failure(mocker):
     )
 
 
-def test_plugin_command_injection(mocker, remove_jfremote_modules):
+def test_plugin_command_injection(mocker, remove_jfremote_modules, run_check_cli):
     """
     Test that simulates a plugin actually injecting commands into different
     points of the app.
@@ -359,7 +351,6 @@ def test_plugin_command_injection(mocker, remove_jfremote_modules):
     from jobflow_remote.cli.jfr_typer import JFRTyper
     from jobflow_remote.cli.plugin import load_plugins
     from jobflow_remote.cli.utils import out_console
-    from jobflow_remote.testing.cli import run_check_cli
 
     app_plugin_example = JFRTyper(name="pluginexample")
 
