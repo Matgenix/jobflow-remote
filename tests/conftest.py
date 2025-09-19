@@ -18,8 +18,8 @@ from rich.console import Console
 def patch_cli_consoles(monkeypatch):
     import jobflow_remote.cli
 
-    err_console = Console(force_terminal=True, stderr=True)
-    out_console = Console(force_terminal=True)
+    err_console = Console(force_terminal=True, stderr=True, width=1000)
+    out_console = Console(force_terminal=True, width=1000)
     # The out_console and err_console have to be patched everywhere they are imported
     # Doing this only for the cli
     for _mod_name, module in inspect.getmembers(jobflow_remote.cli, inspect.ismodule):
