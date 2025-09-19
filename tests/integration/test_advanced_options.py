@@ -144,7 +144,7 @@ def test_run_batch_multi_fail(
     wait_daemon_started,
     wait_daemon_shutdown,
     clean_slurm_queue,
-    patch_cli_consoles,
+    run_check_cli,
     request,
 ) -> None:
     from qtoolkit.core.data_objects import CancelStatus
@@ -154,7 +154,6 @@ def test_run_batch_multi_fail(
     from jobflow_remote.jobs.state import BatchState, JobState
     from jobflow_remote.remote.queue import QueueManager
     from jobflow_remote.testing import add_sleep
-    from jobflow_remote.testing.cli import run_check_cli
     from jobflow_remote.utils.data import check_valid_uuid
 
     # First reset everything
