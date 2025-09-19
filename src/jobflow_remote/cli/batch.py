@@ -49,54 +49,73 @@ def processes_list(
     project = cm.get_project()
     workers = project.workers
 
-    batch_processes = jc.get_batch_processes(worker)
-    if not batch_processes or not any(wbc for wbc in batch_processes.values()):
-        if not show_all:
+    if not show_all:
+        batch_processes = jc.get_batch_processes(worker)
+        if not batch_processes or not any(wbc for wbc in batch_processes.values()):
             exit_with_warning_msg("No batch processes running")
-        out_console.print("No batch processes running", style="italic")
+        else:
+            worker_running_jobs = {}
+            if verbosity > 0:
+                for worker_name in batch_processes:
+                    worker_config = workers[worker_name]
+                    host = worker_config.get_host()
+                    host.connect()
+                    remote_batch_manager = RemoteBatchManager(
+                        host, worker_config.batch.jobs_handle_dir
+                    )
+                    worker_running_jobs[worker_name] = (
+                        remote_batch_manager.get_running()
+                    )
+            batch_processes = [
+                {
+                    "batch_uid": batch_uid,
+                    "process_id": process_id,
+                    "worker": worker,
+                }
+                for worker, worker_batches in batch_processes.items()
+                for process_id, batch_uid in worker_batches.items()
+            ]
+            running_jobs = []
+            if verbosity > 0:
+                running_jobs = [
+                    [
+                        (str(jid), str(jidx))
+                        for jid, jidx, batch_uid in worker_running_jobs[batch["worker"]]
+                        if batch_uid == batch["batch_uid"]
+                    ]
+                    for batch in batch_processes
+                ]
+            table = get_batch_processes_table(
+                batch_processes=batch_processes,
+                workers=workers,
+                running_jobs=running_jobs,
+                verbosity=verbosity,
+            )
+
+            out_console.print(table)
     else:
-        running_jobs = {}
+        batch_processes = jc.get_all_batches()
+
+        if not batch_processes:
+            exit_with_warning_msg("No batch processes")
+
+        batches_jobs = []
         if verbosity > 0:
-            for worker_name in batch_processes:
-                worker_config = workers[worker_name]
-                host = worker_config.get_host()
-                host.connect()
-                remote_batch_manager = RemoteBatchManager(
-                    host, worker_config.batch.jobs_handle_dir
-                )
-                running_jobs[worker_name] = remote_batch_manager.get_running()
+            for batch in batch_processes:
+                batch_jobs = [
+                    (jid, str(jidx))
+                    for jid, jid_dict in batch.get("jobs", {}).items()
+                    for jidx in jid_dict
+                ]
+                batches_jobs.append(batch_jobs)
 
         table = get_batch_processes_table(
             batch_processes=batch_processes,
             workers=workers,
-            running_jobs=running_jobs,
+            running_jobs=batches_jobs,
             verbosity=verbosity,
+            status=True,
+            title="Batches info",
         )
 
         out_console.print(table)
-
-    if show_all:
-        pass
-        # all_batches = jc.get_all_batches()
-        # archived_batches = jc.get_archived_batch_processes(worker)
-        # if not archived_batches or not any(wb for wb in archived_batches.values()):
-        #     out_console.print("No archived batch processes", style="italic")
-        #     raise typer.Exit(0)
-        # if verbosity > 0:
-        #     # TODO: Implement the gathering of the ids of the jobs that were run in this batch
-        #     #  Questions ... some jobs may have started to run with a batch then go into remote
-        #     #  error ... should it be mentioned there ? Or only those that completed ?
-        #     verbosity = 0
-        # if max_batches:
-        #     archived_batches = {
-        #         wname: dict(islice(batches_data.items(), max_batches))
-        #         for wname, batches_data in archived_batches.items()
-        #     }
-        # table = get_batch_processes_table(
-        #     batch_processes=archived_batches,
-        #     workers=workers,
-        #     running_jobs={},
-        #     verbosity=verbosity,
-        #     title="Archived batches info",
-        # )
-        # out_console.print(table)

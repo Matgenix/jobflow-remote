@@ -1192,6 +1192,13 @@ class Runner:
                 delta_retry=self.runner_options.delta_retry,
             ) as lock:
                 if lock.locked_document:
+                    self.job_controller.add_job_to_batch(
+                        job_id=job_id,
+                        job_index=job_index,
+                        batch_uid=batch_uid,
+                        worker=worker_name,
+                        info={"state": JobState.BATCH_RUNNING.value},
+                    )
                     set_output = {
                         "$set": {
                             "state": JobState.BATCH_RUNNING.value,

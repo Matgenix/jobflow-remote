@@ -162,10 +162,10 @@ def test_run_batch_multi_fail(
         required_out_colored="[gold1]No batch processes running[/gold1]",
         excluded_out="Running batches info",
     )
-    # run_check_cli(
-    #     ["batch", "list", "--all"],
-    #     required_out_colored="[italic]No batch processes running[/italic]",
-    # )
+    run_check_cli(
+        ["batch", "list", "--all"],
+        required_out_colored="[gold1]No batch processes[/gold1]",
+    )
 
     def submit_jobs(n: int, sleep: int):
         job_ids = []
@@ -204,9 +204,11 @@ def test_run_batch_multi_fail(
     run_check_cli(
         ["batch", "list"],
         required_out="Running batches info",
-        excluded_out="No archived batch processes",
     )
-    # run_check_cli(["batch", "list", "-a"], required_out="No archived batch processes")
+    if request.node.callspec.id == "with_batches_collection":
+        run_check_cli(
+            ["batch", "list", "-a", "-v"], required_out=["Batches info", *job_ids]
+        )
 
     daemon_manager.shut_down()
     wait_daemon_shutdown(daemon_manager)
@@ -277,10 +279,11 @@ def test_run_batch_multi_fail(
         raise RuntimeError("The Jobs were not set to REMOTE_ERROR state")
 
     run_check_cli(["batch", "list"], required_out="No batch processes running")
-    # run_check_cli(
-    #     ["batch", "list", "-a"],
-    #     required_out=["No batch processes running", "Archived batches info"],
-    # )
+    if request.node.callspec.id == "with_batches_collection":
+        run_check_cli(
+            ["batch", "list", "-a"],
+            required_out=["Batches info", "Status"],
+        )
 
     assert len(batch_manager.get_running()) == 0
     assert len(batch_manager.get_terminated()) == 0
@@ -316,12 +319,7 @@ def test_run_batch_multi_fail(
     run_check_cli(
         ["batch", "list"],
         required_out="Running batches info",
-        excluded_out=["Archived batches info", "No archived batch processes"],
     )
-    # run_check_cli(
-    #     ["batch", "list", "-a"],
-    #     required_out=["Running batches info", "Archived batches info"],
-    # )
 
     daemon_manager.shut_down()
     wait_daemon_shutdown(daemon_manager)
