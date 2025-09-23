@@ -17,6 +17,7 @@ from jobflow_remote.cli.utils import (
     out_console,
 )
 from jobflow_remote.jobs.batch import RemoteBatchManager
+from jobflow_remote.jobs.state import BatchState
 
 app_batch = JFRTyper(
     name="batch", help="Helper utils handling batch jobs", no_args_is_help=True
@@ -94,8 +95,22 @@ def processes_list(
 
             out_console.print(table)
     else:
-        batch_processes = jc.get_all_batches()
+        if jc.batches is None:
+            exit_with_warning_msg(
+                "No batches collection defined for your project. "
+                'You can get running batches without the "--all" option.'
+            )
+        batch_processes = jc.get_all_batches(
+            batch_state=[BatchState.SUBMITTED, BatchState.RUNNING]
+        )
 
+        finished_batch_processes = jc.get_all_batches(
+            batch_state=BatchState.FINISHED,
+            max_batches_per_worker=max_batches,
+            sort={"finished_on": -1},
+        )
+
+        batch_processes.extend(finished_batch_processes)
         if not batch_processes:
             exit_with_warning_msg("No batch processes")
 

@@ -367,7 +367,9 @@ max_batches_per_worker_opt = Annotated[
     typer.Option(
         "--max-batches-per-worker",
         "-m",
-        help="Limit the maximum number of returned results per worker. Set 0 for no limit",
+        help="Limit the maximum number of returned results per worker. "
+        "Only applies to batches that are finished (submitted/running are all shown). "
+        "Set 0 for no limit",
     ),
 ]
 

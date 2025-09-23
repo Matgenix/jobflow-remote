@@ -125,6 +125,18 @@ def write_tmp_settings(
                 work_dir=str(workdir),
                 resources={},
             ),
+            "test_local_batch_worker": dict(
+                type="local",
+                scheduler_type="shell",
+                work_dir=str(workdir),
+                batch={
+                    "jobs_handle_dir": str(workdir / "batch_handle"),
+                    "work_dir": str(workdir / "batch_work"),
+                    "max_wait": 3,
+                    "sleep_time": 0.5,
+                },
+                max_jobs=4,
+            ),
         },
         exec_config={"test": {"export": {"TESTING_ENV_VAR": random_project_name}}},
         runner=dict(

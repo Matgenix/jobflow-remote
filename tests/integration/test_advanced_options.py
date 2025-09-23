@@ -164,10 +164,16 @@ def test_run_batch_multi_fail(
         required_out_colored="[gold1]No batch processes running[/gold1]",
         excluded_out="Running batches info",
     )
-    run_check_cli(
-        ["batch", "list", "--all"],
-        required_out_colored="[gold1]No batch processes[/gold1]",
-    )
+    if request.node.callspec.id == "with_batches_collection":
+        run_check_cli(
+            ["batch", "list", "--all"],
+            required_out_colored="[gold1]No batch processes[/gold1]",
+        )
+    if request.node.callspec.id == "without_batches_collection":
+        run_check_cli(
+            ["batch", "list", "--all"],
+            required_out="No batches collection defined for your project",
+        )
 
     def submit_jobs(n: int, sleep: int):
         job_ids = []

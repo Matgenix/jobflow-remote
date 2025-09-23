@@ -49,7 +49,7 @@ def run_batch(
         ),
     ],
     max_time: Annotated[
-        Optional[int],
+        Optional[float],
         typer.Option(
             "--max-time",
             "-mt",
@@ -59,7 +59,7 @@ def run_batch(
         ),
     ] = None,
     max_wait: Annotated[
-        Optional[int],
+        Optional[float],
         typer.Option(
             "--max-wait",
             "-mw",

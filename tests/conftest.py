@@ -191,7 +191,7 @@ def daemon_manager(random_project_name, job_controller):
 
 
 @pytest.fixture()
-def runner():
+def runner(patch_project):
     from jobflow_remote.jobs.runner import Runner
 
     runner = Runner()

@@ -1,0 +1,92 @@
+import time
+
+import pytest
+
+
+@pytest.mark.parametrize(
+    "patch_project",
+    [
+        {
+            "_set": {
+                "queue->batches_collection": "the_batches",
+                "runner->delay_update_batch": 0.2,
+                "runner->delay_advance_status": 0.2,
+                "runner->delay_check_run_status": 0.2,
+                "runner->delay_checkout": 0.2,
+            }
+        },
+    ],
+    indirect=True,
+)
+# def test_batch_worker(job_controller, runner, patch_project, run_check_cli, mocker):
+def test_batch_worker(
+    job_controller,
+    runner,
+    daemon_manager,
+    wait_daemon_started,
+    wait_daemon_stopped,
+    patch_project,
+    run_check_cli,
+):
+    from jobflow_remote import submit_flow
+    from jobflow_remote.jobs.state import BatchState, JobState
+    from jobflow_remote.testing import add_sleep
+
+    for _ in range(8):
+        add_j = add_sleep(2, 1)
+        submit_flow(add_j, worker="test_local_batch_worker")
+
+    assert job_controller.count_flows() == 8
+    assert job_controller.count_jobs() == 8
+
+    daemon_manager.start()
+    wait_daemon_started(daemon_manager)
+
+    for _ in range(20):
+        if job_controller.count_jobs(states=JobState.COMPLETED) == 8:
+            break
+        time.sleep(1)
+    else:
+        raise RuntimeError("Jobs did not complete")
+
+    for _ in range(20):
+        if not job_controller.get_all_batches(
+            batch_state=[BatchState.RUNNING, BatchState.SUBMITTED]
+        ):
+            break
+        time.sleep(1)
+    else:
+        raise RuntimeError("Batch processes did not finish")
+
+    daemon_manager.stop()
+    wait_daemon_stopped(daemon_manager)
+
+    batches = job_controller.get_all_batches()
+    assert len(batches) == 4
+    ordered_batches = sorted(batches, key=lambda x: x["finished_on"])
+
+    run_check_cli(
+        ["batch", "list", "--all"],
+        required_out="Batches info",
+        excluded_out=["Running batches info", "RUNNING"],
+    )
+
+    run_check_cli(
+        ["batch", "list", "--all", "-m", "2"],
+        required_out=[
+            "Batches info",
+            "FINISHED",
+            ordered_batches[-1]["process_id"],
+            ordered_batches[-2]["process_id"],
+            ordered_batches[-1]["batch_uid"],
+            ordered_batches[-2]["batch_uid"],
+        ],
+        excluded_out=[
+            "Running batches info",
+            "RUNNING",
+            ordered_batches[0]["process_id"],
+            ordered_batches[1]["process_id"],
+            ordered_batches[0]["batch_uid"],
+            ordered_batches[1]["batch_uid"],
+        ],
+    )
