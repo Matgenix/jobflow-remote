@@ -4393,7 +4393,7 @@ class JobController:
         self,
         query: dict,
         max_step_attempts: int,
-        delta_retry: tuple[int, ...],
+        delta_retry: tuple[float, ...],
         next_step_delay: int | None = None,
         **kwargs,
     ) -> Generator[MongoLock, None, None]:
