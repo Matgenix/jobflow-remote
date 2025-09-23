@@ -51,13 +51,15 @@ def processes_list(
     workers = project.workers
 
     if not show_all:
-        batch_processes = jc.get_batch_processes(worker)
-        if not batch_processes or not any(wbc for wbc in batch_processes.values()):
+        batch_processes_data = jc.get_batch_processes(worker)
+        if not batch_processes_data or not any(
+            wbc for wbc in batch_processes_data.values()
+        ):
             exit_with_warning_msg("No batch processes running")
         else:
             worker_running_jobs = {}
             if verbosity > 0:
-                for worker_name in batch_processes:
+                for worker_name in batch_processes_data:
                     worker_config = workers[worker_name]
                     host = worker_config.get_host()
                     host.connect()
@@ -73,7 +75,7 @@ def processes_list(
                     "process_id": process_id,
                     "worker": worker,
                 }
-                for worker, worker_batches in batch_processes.items()
+                for worker, worker_batches in batch_processes_data.items()
                 for process_id, batch_uid in worker_batches.items()
             ]
             running_jobs = []
@@ -107,7 +109,7 @@ def processes_list(
         finished_batch_processes = jc.get_all_batches(
             batch_state=BatchState.FINISHED,
             max_batches_per_worker=max_batches,
-            sort={"finished_on": -1},
+            sort={"end_time": -1},
         )
 
         batch_processes.extend(finished_batch_processes)
@@ -131,6 +133,7 @@ def processes_list(
             verbosity=verbosity,
             status=True,
             title="Batches info",
+            job_ids_column_name="Job ids (Index)",
         )
 
         out_console.print(table)

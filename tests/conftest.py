@@ -559,12 +559,10 @@ def patch_project(monkeypatch, request):
             dict_mods=True,
             project_file_path=Path(current_project_data.filepath),
         )
-        yield
-    else:
-        # case where patch_project is not parametrized but just used inside the test
-        yield partial(
-            update_project_data, project_file_path=Path(current_project_data.filepath)
-        )
+    # you can always reparametrize inside the test
+    yield partial(
+        update_project_data, project_file_path=Path(current_project_data.filepath)
+    )
 
     cm.dump_project(current_project_data)
 

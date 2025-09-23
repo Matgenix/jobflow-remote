@@ -6,6 +6,7 @@ import importlib.metadata
 import logging
 import shutil
 import traceback
+import typing
 import warnings
 from collections import defaultdict
 from contextlib import ExitStack
@@ -133,6 +134,7 @@ class JobController:
             Uses the DB defined in the queue_store.
         batches_collection
             The name of the collection used to store the batch processes.
+            This batches collection is optional.
         project
             The project where the Stores were defined.
         optional_jobstores
@@ -4815,6 +4817,10 @@ class JobController:
                     "batch_state": BatchState.SUBMITTED.value,
                     "worker": worker,
                     "created_on": datetime.now(),
+                    "updated_on": datetime.now(),
+                    "start_time": None,
+                    "end_time": None,
+                    "jobs": {},
                 }
             )
         return self.auxiliary.find_one_and_update(
@@ -4823,18 +4829,31 @@ class JobController:
             upsert=True,
         )
 
-    def add_job_to_batch(self, job_id, job_index, batch_uid, worker, info):
+    def update_job_in_batch(
+        self, job_id: str, job_index: int, batch_uid: str, worker: str, info: typing.Any
+    ):
         if self.batches is not None:
             self.batches.update_one(
                 {"batch_uid": batch_uid, "worker": worker},
-                {"$set": {f"jobs.{job_id}.{job_index}": info}},
+                {
+                    "$set": {
+                        f"jobs.{job_id}.{job_index}": info,
+                        "updated_on": datetime.now(),
+                    }
+                },
             )
 
     def set_running_batch_process(self, process_id: str, worker: str):
         if self.batches is not None:
             self.batches.update_one(
-                {"worker": worker, "process_id": process_id},
-                {"$set": {"batch_state": BatchState.RUNNING.value}},
+                {"worker": worker, "process_id": process_id, "start_time": None},
+                {
+                    "$set": {
+                        "batch_state": BatchState.RUNNING.value,
+                        "updated_on": datetime.now(),
+                        "start_time": datetime.now(),
+                    }
+                },
             )
 
     def remove_batch_process(self, process_id: str, worker: str) -> dict:
@@ -4859,7 +4878,8 @@ class JobController:
                 {
                     "$set": {
                         "batch_state": BatchState.FINISHED.value,
-                        "finished_on": datetime.now(),
+                        "updated_on": datetime.now(),
+                        "end_time": datetime.now(),
                     }
                 },
             )

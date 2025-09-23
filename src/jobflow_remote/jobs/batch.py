@@ -24,8 +24,6 @@ RUNNING_DIR = "running"
 
 SUBMITTED_DIR = "submitted"
 
-BATCHES_HISTORY_DIR = "batches_history"
-
 
 class RemoteBatchManager:
     """
@@ -55,7 +53,6 @@ class RemoteBatchManager:
         self.running_dir = self.files_dir / RUNNING_DIR
         self.terminated_dir = self.files_dir / TERMINATED_DIR
         self.lock_dir = self.files_dir / LOCK_DIR
-        self.batches_history_dir = self.files_dir / BATCHES_HISTORY_DIR
         # All the directories need to be initialized to check that they exist
         # and the host connected.
         # Doing it here has two downsides: 1) it slows down the
@@ -73,7 +70,6 @@ class RemoteBatchManager:
         self.host.mkdir(self.running_dir)
         self.host.mkdir(self.terminated_dir)
         self.host.mkdir(self.lock_dir)
-        self.host.mkdir(self.batches_history_dir)
         self._dir_initialized = True
 
     def submit_job(self, job_id: str, index: int) -> None:

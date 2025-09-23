@@ -63,7 +63,7 @@ def test_batch_worker(
 
     batches = job_controller.get_all_batches()
     assert len(batches) == 4
-    ordered_batches = sorted(batches, key=lambda x: x["finished_on"])
+    ordered_batches = sorted(batches, key=lambda x: x["end_time"])
 
     run_check_cli(
         ["batch", "list", "--all"],

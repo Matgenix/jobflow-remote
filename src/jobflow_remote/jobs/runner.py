@@ -15,7 +15,6 @@ from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from bidict import bidict
 from monty.json import MontyDecoder
 from monty.os import makedirs_p
 from qtoolkit.core.data_objects import QState, SubmissionStatus
@@ -1132,13 +1131,15 @@ class Runner:
             # Check the batch processes that should be running on the remote queue
             # and update the state in the DB if something changed (both for batch processes and
             # for the states of the jobs that were running in these batch processes)
-            processes = self.batch_update_status(
+            running_batch_processes = self.batch_update_status(
                 batch_manager, queue_manager, worker_name, worker, running_jobs
             )
 
             # check that enough processes are submitted and submit the required
             # amount to reach max_jobs, if needed.
-            self.submit_batch_processes(queue_manager, worker_name, worker, processes)
+            self.submit_batch_processes(
+                queue_manager, worker_name, worker, running_batch_processes
+            )
 
             # check for jobs that have terminated in the batch runner and
             # update the DB state accordingly
@@ -1164,8 +1165,8 @@ class Runner:
             The list of job ids, job indexes and batch unique ids in the host
             running directory.
         """
-        batch_processes = bidict(
-            self.job_controller.get_batch_processes(worker_name).get(worker_name, {})
+        batch_processes = self.job_controller.get_batch_processes(worker_name).get(
+            worker_name, {}
         )
         running_jobs = []
         try:
@@ -1192,7 +1193,7 @@ class Runner:
                 delta_retry=self.runner_options.delta_retry,
             ) as lock:
                 if lock.locked_document:
-                    self.job_controller.add_job_to_batch(
+                    self.job_controller.update_job_in_batch(
                         job_id=job_id,
                         job_index=job_index,
                         batch_uid=batch_uid,
@@ -1203,7 +1204,7 @@ class Runner:
                         "$set": {
                             "state": JobState.BATCH_RUNNING.value,
                             "start_time": datetime.utcnow(),
-                            "remote.process_id": self.get_process_id(
+                            "remote.process_id": self.batch_get_process_id(
                                 batch_processes, batch_uid, worker_name, worker
                             ),
                         }
@@ -1211,20 +1212,31 @@ class Runner:
                     lock.update_on_release = set_output
         return running_jobs
 
-    def _cache_batch(self, worker_name, worker, batch_uid, process_id):
+    def _cache_batch(
+        self, worker_name: str, worker: WorkerBase, batch_uid: str, process_id: str
+    ):
         if worker_name not in self._cached_batches:
             self._cached_batches[worker_name] = OrderedDict()
         self._cached_batches[worker_name][batch_uid] = process_id
         while len(self._cached_batches[worker_name]) > 2 * worker.max_jobs + 5:
             self._cached_batches[worker_name].popitem(last=False)
 
-    def get_process_id(self, batch_processes, batch_uid, worker_name, worker):
+    def batch_get_process_id(
+        self,
+        batch_processes: dict,
+        batch_uid: str,
+        worker_name: str,
+        worker: WorkerBase,
+    ):
         # First, try to take from the cached batches info
         if worker_batches := self._cached_batches.get(worker_name):  # noqa: SIM102
             if batch_uid in worker_batches:
                 return worker_batches[batch_uid]
         # Then try to take it from the running batch processes
-        process_id = batch_processes.inverse.get(batch_uid)
+        process_id = next(
+            (pid for pid, uid in batch_processes.items() if uid == batch_uid),
+            None,  # value to return if not found
+        )
         if process_id is not None:
             self._cache_batch(
                 worker_name=worker_name,
@@ -1238,12 +1250,15 @@ class Runner:
                 {"batch_uid": batch_uid}, projection=["process_id"]
             )
             return doc["process_id"]
-        # What do we do when we don't have it ? (I'm pretty sure it cannot happen if we have the batches collection,
-        # but if we don't, it could happen, although relatively "unlikely")
-        return "UNKNOWN"
+        raise RuntimeError("Could not get batch process id from batch unique id.")
 
     def batch_update_status(
-        self, batch_manager, queue_manager, worker_name, worker, running_jobs
+        self,
+        batch_manager: RemoteBatchManager,
+        queue_manager: QueueManager,
+        worker_name: str,
+        worker: WorkerBase,
+        running_jobs: list[tuple[str, int, str]],
     ) -> list[str]:
         """Update the status of the batch processes.
 
@@ -1268,8 +1283,8 @@ class Runner:
             List of running batch process ids (e.g. Slurm ids)
 
         """
-        batch_processes_data = bidict(
-            self.job_controller.get_batch_processes(worker_name).get(worker_name, {})
+        batch_processes_data = self.job_controller.get_batch_processes(worker_name).get(
+            worker_name, {}
         )
         processes = list(batch_processes_data)
         if processes:
@@ -1325,7 +1340,13 @@ class Runner:
             return list(running_processes)
         return []
 
-    def submit_batch_processes(self, queue_manager, worker_name, worker, processes):
+    def submit_batch_processes(
+        self,
+        queue_manager: QueueManager,
+        worker_name: str,
+        worker: WorkerBase,
+        running_batch_processes: list[str],
+    ):
         dict_n_jobs = self.job_controller.count_jobs_states(
             [JobState.BATCH_SUBMITTED, JobState.BATCH_RUNNING],
             worker=worker_name,
@@ -1333,7 +1354,7 @@ class Runner:
         n_jobs_submitted = dict_n_jobs[JobState.BATCH_SUBMITTED]
         n_jobs_running = dict_n_jobs[JobState.BATCH_RUNNING]
 
-        n_processes = len(processes)
+        n_processes_running = len(running_batch_processes)
         n_parallel = worker.batch.parallel_jobs or 1
         # TODO for n_parallel > 1 here a new job is submitted to the queue even if only
         # one jobflow Job is available to run. This may result in the submitted job
@@ -1345,11 +1366,12 @@ class Runner:
         # In principle it should not happen but if happening it will keep submitting
         # batch processes to the queue.
         available_jobs = max(
-            n_jobs_submitted - max((n_processes * n_parallel) - n_jobs_running, 0),
+            n_jobs_submitted
+            - max((n_processes_running * n_parallel) - n_jobs_running, 0),
             0,
         )
         n_processes_to_submit = min(
-            max(worker.max_jobs - n_processes, 0),
+            max(worker.max_jobs - n_processes_running, 0),
             math.ceil(available_jobs / n_parallel),
         )
         logger.debug(
@@ -1445,12 +1467,16 @@ class Runner:
                     set_output = {
                         "$set": {
                             "state": next_state.value,
-                            "remote.process_id": self.get_process_id(
-                                bidict(), batch_uid, worker_name, worker
+                            "remote.process_id": self.batch_get_process_id(
+                                {},
+                                batch_uid,
+                                worker_name,
+                                worker,
+                                # bidict(), batch_uid, worker_name, worker
                             ),
                         }
                     }
-                    self.job_controller.add_job_to_batch(
+                    self.job_controller.update_job_in_batch(
                         job_id=job_id,
                         job_index=job_index,
                         batch_uid=batch_uid,

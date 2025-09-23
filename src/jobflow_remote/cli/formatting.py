@@ -592,6 +592,7 @@ def get_batch_processes_table(
     verbosity: int = 0,
     title: str = "Running batches info",
     status: bool = False,
+    job_ids_column_name: str = "Running Job ids (Index)",
 ):
     table = Table(title=title)
     table.add_column("Process ID")
@@ -601,7 +602,7 @@ def get_batch_processes_table(
     if status:
         table.add_column("Status")
     if verbosity > 0:
-        table.add_column("Running Job ids (Index)")
+        table.add_column(job_ids_column_name)
 
     for ibatch, batch_data in enumerate(batch_processes):
         worker = workers[batch_data["worker"]]

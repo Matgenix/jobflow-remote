@@ -66,19 +66,19 @@ def test_run_batch(
     assert not check_valid_uuid(slurm_job_id, raise_on_error=False)
 
     if request.node.callspec.id == "with_batches_collection":
-        assert runner.job_controller.batches is not None
+        assert job_controller.batches is not None
         assert insert_batch_process_spy.call_count == 1
     elif request.node.callspec.id == "without_batches_collection":
-        assert runner.job_controller.batches is None
+        assert job_controller.batches is None
     else:
-        pytest.fail("Should not be here!")
-    assert runner.job_controller.count_jobs(states=JobState.COMPLETED) == 6
+        pytest.fail(f"Wrong parametrization id: {request.node.callspec.id}")
+    assert job_controller.count_jobs(states=JobState.COMPLETED) == 6
 
     # verify that only one job was executed at the time. start_time of a job
     # is after the end_time of the one preceding it.
     # This should test that the batch runner is not running with multiple
     # parallel processes
-    jobs_info = runner.job_controller.get_jobs_info()
+    jobs_info = job_controller.get_jobs_info()
     jobs_info = sorted(jobs_info, key=lambda x: x.start_time)
     for i in range(len(jobs_info) - 1):
         assert jobs_info[i].end_time < jobs_info[i + 1].start_time
@@ -296,7 +296,6 @@ def test_run_batch_multi_fail(
     assert len(batch_manager.get_running()) == 0
     assert len(batch_manager.get_terminated()) == 0
     assert len(batch_manager.get_submitted()) == 0
-    assert len(batch_manager.get_running()) == 0
     all_batches = job_controller.get_all_batches()
     if request.node.callspec.id == "with_batches_collection":
         assert len(all_batches) == 1
