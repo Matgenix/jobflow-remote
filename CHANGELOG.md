@@ -1,5 +1,36 @@
 # Changelog
 
+## [v0.1.8](https://github.com/Matgenix/jobflow-remote/tree/v0.1.8) (2025-09-23)
+
+[Full Changelog](https://github.com/Matgenix/jobflow-remote/compare/v0.1.7...v0.1.8)
+
+**Closed issues:**
+
+- UnboundLocalError when running `jf job files get` [\#350](https://github.com/Matgenix/jobflow-remote/issues/350)
+- Allow for the omission of a `jobstore` altogether [\#332](https://github.com/Matgenix/jobflow-remote/issues/332)
+- Parallel batch job shows fewer `BATCH_RUNNING` jobs than expected after `jf admin reset` [\#326](https://github.com/Matgenix/jobflow-remote/issues/326)
+- The built docs render `--` as `–` [\#322](https://github.com/Matgenix/jobflow-remote/issues/322)
+- Feature Request: Flow\_DB\_ID option for jf job list command [\#320](https://github.com/Matgenix/jobflow-remote/issues/320)
+- Unexpected keyword argument 'sort' [\#298](https://github.com/Matgenix/jobflow-remote/issues/298)
+- Freshly created replaced jobs should be stopped as well [\#291](https://github.com/Matgenix/jobflow-remote/issues/291)
+- `Using atomate2 with jobflow-remote` example failed to run: NBANDS seems to be too high. [\#280](https://github.com/Matgenix/jobflow-remote/issues/280)
+
+**Merged pull requests:**
+
+- Bump actions/download-artifact from 4 to 5 [\#349](https://github.com/Matgenix/jobflow-remote/pull/349) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Small fixes and tests improvements [\#347](https://github.com/Matgenix/jobflow-remote/pull/347) ([gpetretto](https://github.com/gpetretto))
+- Fixture for run\_check\_cli that includes patching the consoles [\#346](https://github.com/Matgenix/jobflow-remote/pull/346) ([davidwaroquiers](https://github.com/davidwaroquiers))
+- Bump actions/setup-python from 5 to 6 [\#342](https://github.com/Matgenix/jobflow-remote/pull/342) ([dependabot[bot]](https://github.com/apps/dependabot))
+- CLI plugins [\#339](https://github.com/Matgenix/jobflow-remote/pull/339) ([gpetretto](https://github.com/gpetretto))
+- Bump actions/upload-pages-artifact from 3 to 4 [\#336](https://github.com/Matgenix/jobflow-remote/pull/336) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Fix batch worker [\#334](https://github.com/Matgenix/jobflow-remote/pull/334) ([gpetretto](https://github.com/gpetretto))
+- Bump actions/checkout from 4 to 5 [\#330](https://github.com/Matgenix/jobflow-remote/pull/330) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Optional jobstores [\#327](https://github.com/Matgenix/jobflow-remote/pull/327) ([gpetretto](https://github.com/gpetretto))
+- Dw/test cli colors [\#324](https://github.com/Matgenix/jobflow-remote/pull/324) ([davidwaroquiers](https://github.com/davidwaroquiers))
+- Merge custom and automatic queries [\#321](https://github.com/Matgenix/jobflow-remote/pull/321) ([FabiPi3](https://github.com/FabiPi3))
+- Minor updates: color job list, allow resuming STOPPED jobs [\#316](https://github.com/Matgenix/jobflow-remote/pull/316) ([gpetretto](https://github.com/gpetretto))
+- Include coverage from code executed remotely [\#255](https://github.com/Matgenix/jobflow-remote/pull/255) ([davidwaroquiers](https://github.com/davidwaroquiers))
+
 ## [v0.1.7](https://github.com/Matgenix/jobflow-remote/tree/v0.1.7) (2025-06-25)
 
 [Full Changelog](https://github.com/Matgenix/jobflow-remote/compare/v0.1.6...v0.1.7)
