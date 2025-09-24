@@ -31,7 +31,12 @@ from jobflow_remote.config.base import (
 )
 from jobflow_remote.config.manager import ConfigManager
 from jobflow_remote.jobs.batch import RemoteBatchManager
-from jobflow_remote.jobs.data import IN_FILENAME, OUT_FILENAME, RemoteError
+from jobflow_remote.jobs.data import (
+    BATCH_INFO_FILENAME,
+    IN_FILENAME,
+    OUT_FILENAME,
+    RemoteError,
+)
 from jobflow_remote.jobs.state import JobState
 from jobflow_remote.remote.data import (
     get_job_path,
@@ -1305,10 +1310,35 @@ class Runner:
                 )
 
             for pid in running_processes:
-                self.job_controller.set_running_batch_process(pid, worker_name)
+                batch_dir = get_job_path(
+                    job_id=batch_processes_data[pid],
+                    index=None,
+                    base_path=worker.batch.work_dir,
+                )
+                batch_info = batch_manager.get_batch_info(
+                    batch_dir, BATCH_INFO_FILENAME
+                )
+                start_time = batch_info.get("start_time", None)
+                self.job_controller.set_running_batch_process(
+                    pid, worker_name, start_time=start_time
+                )
 
             for pid in stopped_processes:
-                self.job_controller.remove_batch_process(pid, worker_name)
+                batch_dir = get_job_path(
+                    job_id=batch_processes_data[pid],
+                    index=None,
+                    base_path=worker.batch.work_dir,
+                )
+                batch_info = batch_manager.get_batch_info(
+                    batch_dir, BATCH_INFO_FILENAME
+                )
+                # If the batch process was killed abruptly, there may be no end_time in the batch info file
+                end_time = batch_info.get(
+                    "end_time", batch_info.get("last_ping_time", None)
+                )
+                self.job_controller.remove_batch_process(
+                    pid, worker_name, end_time=end_time
+                )
                 # check if there are jobs that were in the running folder of a
                 # process that finished and set them to remote error
                 for job_id, job_index, batch_uid in running_jobs:

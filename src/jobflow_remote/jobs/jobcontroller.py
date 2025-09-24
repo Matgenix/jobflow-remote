@@ -4843,7 +4843,9 @@ class JobController:
                 },
             )
 
-    def set_running_batch_process(self, process_id: str, worker: str):
+    def set_running_batch_process(
+        self, process_id: str, worker: str, start_time: datetime | None = None
+    ):
         if self.batches is not None:
             self.batches.update_one(
                 {"worker": worker, "process_id": process_id, "start_time": None},
@@ -4851,12 +4853,14 @@ class JobController:
                     "$set": {
                         "batch_state": BatchState.RUNNING.value,
                         "updated_on": datetime.now(),
-                        "start_time": datetime.now(),
+                        "start_time": start_time or datetime.now(),
                     }
                 },
             )
 
-    def remove_batch_process(self, process_id: str, worker: str) -> dict:
+    def remove_batch_process(
+        self, process_id: str, worker: str, end_time: datetime | None = None
+    ) -> dict:
         """
         Remove a process from the list of running batch processes.
 
@@ -4866,6 +4870,8 @@ class JobController:
             The ID of the processes obtained from the QueueManager.
         worker
             The worker where the process was being executed.
+        end_time
+            The time at which the batch process ended.
 
         Returns
         -------
@@ -4879,7 +4885,7 @@ class JobController:
                     "$set": {
                         "batch_state": BatchState.FINISHED.value,
                         "updated_on": datetime.now(),
-                        "end_time": datetime.now(),
+                        "end_time": end_time or datetime.now(),
                     }
                 },
             )

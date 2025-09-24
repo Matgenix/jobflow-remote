@@ -74,6 +74,9 @@ class LocalHost(BaseHost):
     def write_text_file(self, filepath, content) -> None:
         Path(filepath).write_text(content)
 
+    def read_text_file(self, filepath) -> str:
+        return Path(filepath).read_text()
+
     def connect(self) -> None:
         pass
 

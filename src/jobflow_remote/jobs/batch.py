@@ -8,10 +8,12 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from flufl.lock import Lock, LockError
+from monty.json import MontyDecoder
 
 if TYPE_CHECKING:
     from jobflow_remote.remote.host import BaseHost
 
+from jobflow_remote.jobs.data import BATCH_INFO_FILENAME
 
 logger = logging.getLogger(__name__)
 
@@ -175,6 +177,13 @@ class RemoteBatchManager:
         if self.host.exists(self.files_dir):
             return self.host.rmtree(self.files_dir, raise_on_error=False)
         return True
+
+    def get_batch_info(
+        self, batch_dir: Path | str, batch_info_file: str = BATCH_INFO_FILENAME
+    ):
+        batch_info_path = Path(batch_dir) / batch_info_file
+        json_str = self.host.read_text_file(batch_info_path)
+        return MontyDecoder().decode(json_str)
 
 
 class LocalBatchManager:

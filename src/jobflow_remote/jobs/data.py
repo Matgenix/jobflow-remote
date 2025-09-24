@@ -14,6 +14,7 @@ from jobflow_remote.jobs.state import FlowState, JobState
 
 IN_FILENAME = "jfremote_in.json"
 OUT_FILENAME = "jfremote_out.json"
+BATCH_INFO_FILENAME = "batch_info.json"
 
 
 def get_initial_job_doc_dict(
