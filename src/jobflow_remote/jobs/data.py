@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 from qtoolkit.core.data_objects import QResources, QState
 
 from jobflow_remote.config.base import ExecutionConfig
-from jobflow_remote.jobs.state import FlowState, JobState
+from jobflow_remote.jobs.state import BatchState, FlowState, JobState
 
 IN_FILENAME = "jfremote_in.json"
 OUT_FILENAME = "jfremote_out.json"
@@ -116,6 +116,34 @@ def get_initial_flow_doc_dict(
     )
 
     return flow_doc.as_db_dict()
+
+
+def get_initial_batch_doc_dict(batch_uid, process_id, worker):
+    """
+    Generate a serialized FlowDoc for initial insertion in the DB.
+
+    Parameters
+    ----------
+    flow
+        The Flow used to generate the FlowDoc.
+    job_dicts
+        The dictionaries of the Jobs composing the Flow.
+    jobstore
+        The name of the JobStore used for the output of the submitted Flow.
+        If None the default is used.
+
+    Returns
+    -------
+    dict
+        A serialized version of a new FlowDoc.
+    """
+    batch_doc = BatchDoc(
+        batch_uid=batch_uid,
+        process_id=process_id,
+        batch_state=BatchState.SUBMITTED,
+        worker=worker,
+    )
+    return batch_doc.as_db_dict()
 
 
 class RemoteInfo(BaseModel):
@@ -377,6 +405,37 @@ class FlowDoc(BaseModel):
             d[job_id][int(index)] = db_id
 
         return dict(d)
+
+
+class BatchDoc(BaseModel):
+    """Model for the standard representation of a batch process in the batch database."""
+
+    batch_uid: str
+    process_id: str
+    batch_state: BatchState
+    worker: str
+    jobs: dict = Field(default_factory=dict)
+    created_on: datetime = Field(default_factory=datetime.utcnow)
+    updated_on: datetime = Field(default_factory=datetime.utcnow)
+    start_time: Optional[datetime] = None
+    end_time: Optional[datetime] = None
+    last_ping_time: Optional[datetime] = None
+
+    def as_db_dict(self) -> dict:
+        """
+        Generate a dict representation suitable to be inserted in the database.
+
+        Returns
+        -------
+        dict
+            The dict representing the BatchDoc.
+        """
+        return jsanitize(
+            self.model_dump(mode="python"),
+            strict=True,
+            allow_bson=True,
+            enum_values=True,
+        )
 
 
 class RemoteError(RuntimeError):

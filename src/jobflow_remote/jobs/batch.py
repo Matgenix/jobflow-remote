@@ -182,6 +182,8 @@ class RemoteBatchManager:
         self, batch_dir: Path | str, batch_info_file: str = BATCH_INFO_FILENAME
     ):
         batch_info_path = Path(batch_dir) / batch_info_file
+        if not self.host.exists(batch_info_path):
+            return None
         json_str = self.host.read_text_file(batch_info_path)
         return MontyDecoder().decode(json_str)
 

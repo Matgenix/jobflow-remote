@@ -588,7 +588,7 @@ def format_upgrade_actions(actions: list[UpgradeAction]):
 def get_batch_processes_table(
     batch_processes: list,
     workers: dict[str, WorkerBase],
-    running_jobs: list[list[tuple[str, str]]],
+    batches_jobs: list[list[tuple[str, str]]],
     verbosity: int = 0,
     title: str = "Running batches info",
     status: bool = False,
@@ -616,7 +616,7 @@ def get_batch_processes_table(
             row.append(batch_data.get("batch_state", "UNKNOWN"))
 
         if verbosity > 0:
-            row.append("\n".join([f"{jb[0]} ({jb[1]})" for jb in running_jobs[ibatch]]))
+            row.append("\n".join([f"{jb[0]} ({jb[1]})" for jb in batches_jobs[ibatch]]))
 
         table.add_row(*row)
 

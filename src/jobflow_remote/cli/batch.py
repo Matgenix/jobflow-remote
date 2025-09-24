@@ -91,7 +91,7 @@ def processes_list(
             table = get_batch_processes_table(
                 batch_processes=batch_processes,
                 workers=workers,
-                running_jobs=running_jobs,
+                batches_jobs=running_jobs,
                 verbosity=verbosity,
             )
 
@@ -129,7 +129,7 @@ def processes_list(
         table = get_batch_processes_table(
             batch_processes=batch_processes,
             workers=workers,
-            running_jobs=batches_jobs,
+            batches_jobs=batches_jobs,
             verbosity=verbosity,
             status=True,
             title="Batches info",

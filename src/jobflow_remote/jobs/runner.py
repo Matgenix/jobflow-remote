@@ -37,7 +37,7 @@ from jobflow_remote.jobs.data import (
     OUT_FILENAME,
     RemoteError,
 )
-from jobflow_remote.jobs.state import JobState
+from jobflow_remote.jobs.state import BatchState, JobState
 from jobflow_remote.remote.data import (
     get_job_path,
     get_local_data_path,
@@ -156,6 +156,9 @@ class Runner:
 
         # create a cached for the batches containing batch_uid to process_id
         self._cached_batches: dict = {}
+
+        # create a cache of running batch pids: set of running pids for each worker name
+        self._cached_running_batch_pids: dict[str, set] = {}
 
         if connect_interactive:
             for host_name, host in self.hosts.items():
@@ -401,6 +404,7 @@ class Runner:
     def run_all_jobs(
         self,
         max_seconds: int | None = None,
+        wait_for_batches: bool = False,
     ) -> None:
         """
         Use the runner to run all the jobs in the DB.
@@ -462,10 +466,19 @@ class Runner:
         ]
         query = {"state": {"$in": running_states}}
         jobs_available = 1
-        while jobs_available:
+        unfinished_batches = 1 if wait_for_batches else 0
+        while jobs_available + unfinished_batches:
             scheduler.run_pending()
             time.sleep(0.2)
             jobs_available = self.job_controller.count_jobs(query=query)
+            if self.job_controller.batches is None:
+                unfinished_batches = 0
+            else:
+                unfinished_batches = len(
+                    self.job_controller.get_all_batches(
+                        batch_state=[BatchState.SUBMITTED, BatchState.RUNNING]
+                    )
+                )
             if max_seconds and time.time() - t0 > max_seconds:
                 raise RuntimeError(
                     "Could not execute all the jobs within the selected amount of time"
@@ -1310,6 +1323,8 @@ class Runner:
                 )
 
             for pid in running_processes:
+                if pid in self._cached_running_batch_pids.get(worker_name, set()):
+                    continue
                 batch_dir = get_job_path(
                     job_id=batch_processes_data[pid],
                     index=None,
@@ -1318,10 +1333,14 @@ class Runner:
                 batch_info = batch_manager.get_batch_info(
                     batch_dir, BATCH_INFO_FILENAME
                 )
-                start_time = batch_info.get("start_time", None)
+                start_time = batch_info.get("start_time", None) if batch_info else None
                 self.job_controller.set_running_batch_process(
                     pid, worker_name, start_time=start_time
                 )
+                if start_time:
+                    if worker_name not in self._cached_running_batch_pids:
+                        self._cached_running_batch_pids[worker_name] = set()
+                    self._cached_running_batch_pids[worker_name].add(pid)
 
             for pid in stopped_processes:
                 batch_dir = get_job_path(
@@ -1332,13 +1351,18 @@ class Runner:
                 batch_info = batch_manager.get_batch_info(
                     batch_dir, BATCH_INFO_FILENAME
                 )
-                # If the batch process was killed abruptly, there may be no end_time in the batch info file
-                end_time = batch_info.get(
-                    "end_time", batch_info.get("last_ping_time", None)
-                )
+                if batch_info:
+                    # If the batch process was killed abruptly, there may be no end_time in the batch info file
+                    end_time = batch_info.get(
+                        "end_time", batch_info.get("last_ping_time", None)
+                    )
+                else:
+                    end_time = None
                 self.job_controller.remove_batch_process(
                     pid, worker_name, end_time=end_time
                 )
+                if pid in self._cached_running_batch_pids.get(worker_name, set()):
+                    self._cached_running_batch_pids[worker_name].remove(pid)
                 # check if there are jobs that were in the running folder of a
                 # process that finished and set them to remote error
                 for job_id, job_index, batch_uid in running_jobs:
@@ -1502,7 +1526,6 @@ class Runner:
                                 batch_uid,
                                 worker_name,
                                 worker,
-                                # bidict(), batch_uid, worker_name, worker
                             ),
                         }
                     }
@@ -1511,7 +1534,7 @@ class Runner:
                         job_index=job_index,
                         batch_uid=batch_uid,
                         worker=worker_name,
-                        info={"state": next_state.value},
+                        info={"state": JobState.TERMINATED.value},
                     )
                     lock.update_on_release = set_output
             batch_manager.delete_terminated([(job_id, job_index, batch_uid)])

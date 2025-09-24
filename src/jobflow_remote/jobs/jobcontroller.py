@@ -39,6 +39,7 @@ from jobflow_remote.jobs.data import (
     JobDoc,
     JobInfo,
     RemoteError,
+    get_initial_batch_doc_dict,
     get_initial_flow_doc_dict,
     get_initial_job_doc_dict,
     get_reset_job_base_dict,
@@ -4810,19 +4811,10 @@ class JobController:
             The updated document.
         """
         if self.batches is not None:
-            self.batches.insert_one(
-                {
-                    "batch_uid": batch_uid,
-                    "process_id": process_id,
-                    "batch_state": BatchState.SUBMITTED.value,
-                    "worker": worker,
-                    "created_on": datetime.now(),
-                    "updated_on": datetime.now(),
-                    "start_time": None,
-                    "end_time": None,
-                    "jobs": {},
-                }
+            batch_doc_dict = get_initial_batch_doc_dict(
+                batch_uid=batch_uid, process_id=process_id, worker=worker
             )
+            self.batches.insert_one(batch_doc_dict)
         return self.auxiliary.find_one_and_update(
             {"batch_processes": {"$exists": True}},
             {"$set": {f"batch_processes.{worker}.{process_id}": batch_uid}},
