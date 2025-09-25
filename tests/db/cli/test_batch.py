@@ -18,7 +18,6 @@ import pytest
     ],
     indirect=True,
 )
-# def test_batch_worker(job_controller, runner, patch_project, run_check_cli, mocker):
 def test_batch_worker(
     job_controller,
     runner,
@@ -63,7 +62,7 @@ def test_batch_worker(
 
     batches = job_controller.get_all_batches()
     assert len(batches) == 4
-    ordered_batches = sorted(batches, key=lambda x: x["end_time"])
+    ordered_batches = sorted(batches, key=lambda x: x["updated_on"])
 
     run_check_cli(
         ["batch", "list", "--all"],
