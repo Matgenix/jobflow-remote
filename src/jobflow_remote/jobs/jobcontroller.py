@@ -4752,41 +4752,28 @@ class JobController:
 
     def get_all_batches(
         self,
-        worker: str | None = None,
+        worker: str | list[str] | None = None,
         batch_state: BatchState | list[BatchState] | None = None,
-        max_batches_per_worker=None,
-        sort=None,
+        max_results: int = 20,
+        sort: dict | None = None,
     ):
         if self.batches is None:
             return None
 
         query: dict = {}
         if worker:
-            query["worker"] = worker
+            if not isinstance(batch_state, list):
+                query["worker"] = worker
+            else:
+                query["worker"] = {"$in": worker}
         if batch_state:
             if not isinstance(batch_state, list):
                 query["batch_state"] = batch_state.value
             else:
                 query["batch_state"] = {"$in": [bs.value for bs in batch_state]}
-        sort = sort or {"created_on": -1}
+        sort = sort or {"updated_on": -1}
 
-        if max_batches_per_worker is not None:
-            pipeline = [
-                {"$match": query},
-                {"$sort": {"worker": 1, **sort}},
-                {
-                    "$setWindowFields": {
-                        "partitionBy": "$worker",
-                        "sortBy": {**sort},
-                        "output": {"rank": {"$rank": {}}},
-                    }
-                },
-                {"$match": {"rank": {"$lte": max_batches_per_worker}}},
-                {"$unset": "rank"},
-            ]
-            return list(self.batches.aggregate(pipeline))
-
-        return list(self.batches.find(query, sort=sort))
+        return list(self.batches.find(query, sort=sort).limit(max_results))
 
     def add_batch_process(self, process_id: str, batch_uid: str, worker: str) -> dict:
         """

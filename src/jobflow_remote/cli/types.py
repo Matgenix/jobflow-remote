@@ -12,7 +12,7 @@ from jobflow_remote.cli.utils import (
     tree_callback,
 )
 from jobflow_remote.config.base import LogLevel
-from jobflow_remote.jobs.state import FlowState, JobState
+from jobflow_remote.jobs.state import BatchState, FlowState, JobState
 
 tree_opt = Annotated[
     bool,
@@ -87,6 +87,16 @@ flow_state_opt = Annotated[
 ]
 
 
+batch_state_opt = Annotated[
+    Optional[list[BatchState]],
+    typer.Option(
+        "--state",
+        "-s",
+        help="One or more of the batch states",
+    ),
+]
+
+
 name_opt = Annotated[
     Optional[str],
     typer.Option(
@@ -97,6 +107,7 @@ name_opt = Annotated[
         "enclosing the search string in quotation marks.",
     ),
 ]
+
 
 worker_name_opt = Annotated[
     Optional[list[str]],
@@ -360,17 +371,6 @@ delete_all_opt = Annotated[
 
 show_all_batches_opt = Annotated[
     bool, typer.Option("--all", "-a", help="Show all batches (running and stopped)")
-]
-
-max_batches_per_worker_opt = Annotated[
-    int,
-    typer.Option(
-        "--max-batches-per-worker",
-        "-m",
-        help="Limit the maximum number of returned results per worker. "
-        "Only applies to batches that are finished (submitted/running are all shown). "
-        "Set 0 for no limit",
-    ),
 ]
 
 foreground_index_opt = Annotated[

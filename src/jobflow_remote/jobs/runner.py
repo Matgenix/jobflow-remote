@@ -1245,7 +1245,7 @@ class Runner:
         batch_uid: str,
         worker_name: str,
         worker: WorkerBase,
-    ):
+    ) -> str:
         # First, try to take from the cached batches info
         if worker_batches := self._cached_batches.get(worker_name):  # noqa: SIM102
             if batch_uid in worker_batches:

@@ -1,14 +1,12 @@
-from typing import Annotated, Optional
-
-import typer
-
 from jobflow_remote.cli.formatting import get_batch_processes_table
 from jobflow_remote.cli.jf import app
 from jobflow_remote.cli.jfr_typer import JFRTyper
 from jobflow_remote.cli.types import (
-    max_batches_per_worker_opt,
+    batch_state_opt,
+    max_results_opt,
     show_all_batches_opt,
     verbosity_opt,
+    worker_name_opt,
 )
 from jobflow_remote.cli.utils import (
     exit_with_warning_msg,
@@ -17,7 +15,6 @@ from jobflow_remote.cli.utils import (
     out_console,
 )
 from jobflow_remote.jobs.batch import RemoteBatchManager
-from jobflow_remote.jobs.state import BatchState
 
 app_batch = JFRTyper(
     name="batch", help="Helper utils handling batch jobs", no_args_is_help=True
@@ -27,16 +24,10 @@ app.add_typer(app_batch)
 
 @app_batch.command(name="list")
 def processes_list(
-    worker: Annotated[
-        Optional[str],
-        typer.Option(
-            "--worker",
-            "-w",
-            help="Select the worker.",
-        ),
-    ] = None,
+    worker_name: worker_name_opt = None,
     show_all: show_all_batches_opt = False,
-    max_batches: max_batches_per_worker_opt = 10,
+    max_results: max_results_opt = 20,
+    batch_state: batch_state_opt = None,
     verbosity: verbosity_opt = 0,
 ) -> None:
     """
@@ -51,7 +42,7 @@ def processes_list(
     workers = project.workers
 
     if not show_all:
-        batch_processes_data = jc.get_batch_processes(worker)
+        batch_processes_data = jc.get_batch_processes(worker_name)
         if not batch_processes_data or not any(
             wbc for wbc in batch_processes_data.values()
         ):
@@ -102,17 +93,12 @@ def processes_list(
                 "No batches collection defined for your project. "
                 'You can get running batches without the "--all" option.'
             )
+
         batch_processes = jc.get_all_batches(
-            batch_state=[BatchState.SUBMITTED, BatchState.RUNNING]
+            worker=worker_name,
+            batch_state=batch_state,
+            max_results=max_results,
         )
-
-        finished_batch_processes = jc.get_all_batches(
-            batch_state=BatchState.FINISHED,
-            max_batches_per_worker=max_batches,
-            sort={"end_time": -1},
-        )
-
-        batch_processes.extend(finished_batch_processes)
         if not batch_processes:
             exit_with_warning_msg("No batch processes")
 
