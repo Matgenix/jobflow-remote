@@ -50,16 +50,14 @@ def processes_list(
         else:
             worker_running_jobs = {}
             if verbosity > 0:
-                for worker_name in batch_processes_data:
-                    worker_config = workers[worker_name]
+                for wname in batch_processes_data:
+                    worker_config = workers[wname]
                     host = worker_config.get_host()
                     host.connect()
                     remote_batch_manager = RemoteBatchManager(
                         host, worker_config.batch.jobs_handle_dir
                     )
-                    worker_running_jobs[worker_name] = (
-                        remote_batch_manager.get_running()
-                    )
+                    worker_running_jobs[wname] = remote_batch_manager.get_running()
             batch_processes = [
                 {
                     "batch_uid": batch_uid,
