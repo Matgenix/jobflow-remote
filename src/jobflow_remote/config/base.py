@@ -511,6 +511,8 @@ class QueueConfig(BaseModel):
     def check_store(cls, store: dict) -> dict:
         """Check that the queue configuration could be converted to a Store."""
         if store:
+            if isinstance(store, dict) and store.get("type", "").lower() == "sqlite":
+                return store
             try:
                 deserialized_store = store_from_dict(store)
             except Exception as e:

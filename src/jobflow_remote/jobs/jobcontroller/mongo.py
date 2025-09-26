@@ -27,7 +27,6 @@ from qtoolkit.core.data_objects import CancelStatus, QResources
 
 import jobflow_remote
 from jobflow_remote.config.base import ConfigError, ExecutionConfig, Project
-from jobflow_remote.config.manager import ConfigManager
 from jobflow_remote.jobs.batch import RemoteBatchManager
 from jobflow_remote.jobs.data import (
     OUT_FILENAME,
@@ -44,6 +43,7 @@ from jobflow_remote.jobs.data import (
     projection_flow_info_jobs,
     projection_job_info,
 )
+from jobflow_remote.jobs.jobcontroller.base import JobController
 from jobflow_remote.jobs.state import (
     DELETABLE_STATES,
     PAUSABLE_STATES,
@@ -93,7 +93,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class JobController:
+class MongoJobController(JobController):
     """
     Main entry point for all the interactions with the Stores.
 
@@ -150,58 +150,6 @@ class JobController:
         self.flows = self.db[self.flows_collection]
         self.auxiliary = self.db[self.auxiliary_collection]
         self.project = project
-
-    @classmethod
-    def from_project_name(cls, project_name: str | None = None) -> JobController:
-        """
-        Generate an instance of JobController from the project name.
-
-        Parameters
-        ----------
-        project_name
-            The name of the project. If None the default project will be used.
-
-        Returns
-        -------
-        JobController
-            An instance of JobController associated with the project.
-        """
-        config_manager: ConfigManager = ConfigManager()
-        project: Project = config_manager.get_project(project_name)
-        return cls.from_project(project=project)
-
-    @classmethod
-    def from_project(cls, project: Project) -> JobController:
-        """
-        Generate an instance of JobController from a Project object.
-
-        Parameters
-        ----------
-        project
-            The project used to generate the JobController. If None the default
-            project will be used.
-
-        Returns
-        -------
-        JobController
-            An instance of JobController associated with the project.
-        """
-        queue_store = project.get_queue_store()
-        flows_collection = project.queue.flows_collection
-        auxiliary_collection = project.queue.auxiliary_collection
-        jobstore = project.get_jobstore()
-        optional_jobstores = {}
-        if project.optional_jobstores:
-            for js_name in project.optional_jobstores:
-                optional_jobstores[js_name] = project.get_jobstore(name=js_name)
-        return cls(
-            queue_store=queue_store,
-            jobstore=jobstore,
-            flows_collection=flows_collection,
-            auxiliary_collection=auxiliary_collection,
-            project=project,
-            optional_jobstores=optional_jobstores,
-        )
 
     def close(self) -> None:
         """Close the connections to all the Stores in JobController."""

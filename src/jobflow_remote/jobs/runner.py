@@ -595,6 +595,7 @@ class Runner:
         states
             The state of the Jobs that can be queried.
         """
+        logger.debug("advance state")
         states_methods = {
             JobState.CHECKED_OUT: self.upload,
             JobState.UPLOADED: self.submit,
@@ -613,6 +614,7 @@ class Runner:
             if filter:
                 query.update(filter)
 
+            logger.debug(f"advance state for states: {states}")
             with self.job_controller.lock_job_for_update(
                 query=query,
                 max_step_attempts=self.runner_options.max_step_attempts,
