@@ -4762,7 +4762,7 @@ class JobController:
 
         query: dict = {}
         if worker:
-            if not isinstance(batch_state, list):
+            if not isinstance(worker, list):
                 query["worker"] = worker
             else:
                 query["worker"] = {"$in": worker}
