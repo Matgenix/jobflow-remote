@@ -505,6 +505,13 @@ class QueueConfig(BaseModel):
         description="a string defining the prefix added to the integer ID associated "
         "to each Job in the database",
     )
+    use_mongodb_pipelines: bool = Field(
+        default=True,
+        description="If True, use MongoDB aggregation pipelines for complex queries and updates. "
+        "If False, use alternative implementations that work with MongoDB versions without "
+        "pipeline support. Note: Setting to False may impact performance and atomicity of some "
+        "operations, while some minor functionalities may not be available.",
+    )
 
     @field_validator("store")
     @classmethod

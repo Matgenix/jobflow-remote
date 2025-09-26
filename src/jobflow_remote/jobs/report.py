@@ -103,6 +103,12 @@ class JobsReport:
         JobsReport
             A report of the job states.
         """
+        if not job_controller.use_mongodb_pipelines:
+            raise ValueError(
+                "generate_report requires MongoDB aggregation pipelines. "
+                "Either set use_mongodb_pipelines=True or avoid using this method."
+            )
+
         now = datetime.utcnow()
 
         state_counts = job_controller.count_jobs_states(list(JobState))
@@ -227,6 +233,12 @@ class FlowsReport:
         FlowsReport
             A report of the flow states.
         """
+        if not job_controller.use_mongodb_pipelines:
+            raise ValueError(
+                "generate_report requires MongoDB aggregation pipelines. "
+                "Either set use_mongodb_pipelines=True or avoid using this method."
+            )
+
         state_counts = job_controller.count_flows_states(list(FlowState))
 
         trends_dict = job_controller.get_trends(

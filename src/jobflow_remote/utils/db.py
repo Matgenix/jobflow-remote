@@ -118,6 +118,7 @@ class MongoLock:
         max_wait: int = 600,
         projection: Mapping[str, Any] | Iterable[str] | None = None,
         get_locked_doc: bool = False,
+        use_mongodb_pipelines: bool = True,
         **kwargs,
     ) -> None:
         """
@@ -146,6 +147,9 @@ class MongoLock:
             If True, if the lock cannot be acquired because the document matching
             the filter is already locked, the locked document will be fetched and
             set in the unavailable_document attribute.
+        use_mongodb_pipelines
+            If True, use MongoDB aggregation pipelines for conditional updates.
+            If False, use alternative implementation without pipelines.
         kwargs
             All the other args are passed to find_one_and_update.
         """
@@ -163,6 +167,7 @@ class MongoLock:
         self.max_wait = max_wait
         self.projection = projection
         self.get_locked_doc = get_locked_doc
+        self.use_mongodb_pipelines = use_mongodb_pipelines
 
     @property
     def update_on_release(self) -> dict | list:
@@ -263,6 +268,15 @@ class MongoLock:
             projection = list(projection)
             projection.extend([self.LOCK_KEY, self.lock_id])
 
+        # Non-pipeline mode: alternative implementation without conditional updates
+        # in the cases where the pipeline is actually used in the standard implementation
+        if (
+            not self.use_mongodb_pipelines
+            and (self.sleep or self.get_locked_doc)
+            and not self.break_lock
+        ):
+            return self._acquire_non_pipeline()
+
         # Modify the filter if the document should not be fetched if
         # the lock cannot be acquired. Otherwise, keep the original filter.
         if not self.break_lock and not self.sleep and not self.get_locked_doc:
@@ -326,6 +340,72 @@ class MongoLock:
                 # Either the requested filter does not find match a document
                 # or those fitting are locked.
                 break
+
+    def _acquire_non_pipeline(self) -> None:
+        """
+        Acquire the lock without using MongoDB pipelines.
+
+        This method is used when use_mongodb_pipelines is False and either
+        sleep or get_locked_doc is True. It implements a two-phase approach:
+        1. Try to acquire the lock with a filter that includes {LOCK_KEY: None}
+        2. If that fails and sleep/get_locked_doc is enabled, fetch the document
+           to check if it's locked and handle accordingly.
+        """
+        now = datetime.utcnow()
+        db_filter = copy.deepcopy(dict(self.filter))
+
+        # Prepare the update to be performed when acquiring the lock
+        lock_set = {self.LOCK_KEY: self.lock_id, self.LOCK_TIME_KEY: now}
+        update: dict[str, dict] = defaultdict(dict)
+        if self.update:
+            update.update(copy.deepcopy(self.update))
+        update["$set"].update(lock_set)
+
+        t0 = time.time()
+        while True:
+            # First attempt: try to acquire lock on unlocked document
+            db_filter_unlocked = copy.deepcopy(db_filter)
+            db_filter_unlocked[self.LOCK_KEY] = None
+
+            result = self.collection.find_one_and_update(
+                db_filter_unlocked,
+                update,
+                upsert=False,
+                return_document=ReturnDocument.AFTER,
+                projection=self.projection,
+                **self.kwargs,
+            )
+
+            if result:
+                # Successfully acquired the lock
+                self.locked_document = result
+                break
+
+            # Lock acquisition failed - check if document exists and is locked
+            if self.sleep or self.get_locked_doc:
+                # Find the document without the lock constraint to check its status
+                existing_doc = self.collection.find_one(
+                    db_filter,
+                    projection=self.projection,
+                )
+
+                if existing_doc:
+                    # Document exists but is locked
+                    if self.sleep and (time.time() - t0) < self.max_wait:
+                        logger.debug("Document is locked, sleeping before retry")
+                        time.sleep(self.sleep)
+                        continue
+
+                    # Set the unavailable document for inspection since
+                    # get_locked_doc or max wait time exceeded
+                    self.unavailable_document = existing_doc
+                    break
+
+                # No document matches the filter
+                break
+
+            # No sleep or get_locked_doc, just exit
+            break
 
     def release(self, exc_type, exc_val, exc_tb) -> None:
         """Release the lock."""

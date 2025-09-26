@@ -113,6 +113,7 @@ class JobController:
         auxiliary_collection: str = "jf_auxiliary",
         project: Project | None = None,
         optional_jobstores: dict[str, JobStore] | None = None,
+        use_mongodb_pipelines: bool = True,
     ) -> None:
         """
         Parameters
@@ -126,6 +127,9 @@ class JobController:
         flows_collection
             The name of the collection used to store the Flows data.
             Uses the DB defined in the queue_store.
+        use_mongodb_pipelines
+            If True, use MongoDB aggregation pipelines for complex queries.
+            If False, use alternative implementations without pipelines.
         auxiliary_collection
             The name of the collection used to store other auxiliary data.
             Uses the DB defined in the queue_store.
@@ -140,6 +144,7 @@ class JobController:
         self.flows_collection = flows_collection
         self.auxiliary_collection = auxiliary_collection
         self.optional_jobstores = optional_jobstores or {}
+        self.use_mongodb_pipelines = use_mongodb_pipelines
         # TODO should it connect here? Or the passed stores should be connected?
         self.queue_store.connect()
         self.jobstore.connect()
@@ -189,6 +194,7 @@ class JobController:
         queue_store = project.get_queue_store()
         flows_collection = project.queue.flows_collection
         auxiliary_collection = project.queue.auxiliary_collection
+        use_mongodb_pipelines = project.queue.use_mongodb_pipelines
         jobstore = project.get_jobstore()
         optional_jobstores = {}
         if project.optional_jobstores:
@@ -201,6 +207,7 @@ class JobController:
             auxiliary_collection=auxiliary_collection,
             project=project,
             optional_jobstores=optional_jobstores,
+            use_mongodb_pipelines=use_mongodb_pipelines,
         )
 
     def close(self) -> None:
@@ -1410,6 +1417,11 @@ class JobController:
                     )
                 values = dict(values)
                 # values["updated_on"] = datetime.utcnow()
+                if use_pipeline and not self.use_mongodb_pipelines:
+                    raise ValueError(
+                        "Pipeline operations require MongoDB pipelines. "
+                        "Either set use_mongodb_pipelines=True or use use_pipeline=False"
+                    )
                 lock.update_on_release = (
                     [{"$set": values}] if use_pipeline else {"$set": values}
                 )
@@ -2336,6 +2348,11 @@ class JobController:
             if update and isinstance(exec_config, dict):
                 # if the content is a string replace even if it is an update,
                 # merging is meaningless
+                if not self.use_mongodb_pipelines:
+                    raise ValueError(
+                        "Updating exec_config with merge requires MongoDB pipelines. "
+                        "Either set use_mongodb_pipelines=True or use update=False"
+                    )
                 cond = {
                     "$cond": {
                         "if": {"$eq": [{"$type": "$exec_config"}, "string"]},
@@ -2357,6 +2374,11 @@ class JobController:
                 # almost surely lead to failures
                 update = False
             if update:
+                if not self.use_mongodb_pipelines:
+                    raise ValueError(
+                        "Updating resources with merge requires MongoDB pipelines. "
+                        "Either set use_mongodb_pipelines=True or use update=False"
+                    )
                 set_dict["resources"] = {"$mergeObjects": ["$resources", resources]}
             else:
                 set_dict["resources"] = resources
@@ -2424,43 +2446,66 @@ class JobController:
         list
             The list of dictionaries resulting from the query.
         """
-        pipeline: list[dict] = [
-            {
-                "$lookup": {
-                    "from": self.jobs_collection,
-                    "localField": "jobs",
-                    "foreignField": "uuid",
-                    "as": "jobs_list",
+        if self.use_mongodb_pipelines:
+            pipeline: list[dict] = [
+                {
+                    "$lookup": {
+                        "from": self.jobs_collection,
+                        "localField": "jobs",
+                        "foreignField": "uuid",
+                        "as": "jobs_list",
+                    }
                 }
-            }
-        ]
+            ]
 
-        if query:
-            pipeline.append({"$match": query})
+            if query:
+                pipeline.append({"$match": query})
 
-        if projection_flow:
-            pipeline.append({"$project": projection_flow})
-
-        if projection_job:
-            # insert the pipeline for the projection of the Job fields
-            # to reduce the impact of the size of the documents.
-            # This can help reducing the size of the fetched documents and
-            # avoid exceeding the maximum size allowed. Adding the projection
-            # in the general pipeline does not have the same effect.
-            pipeline[0]["$lookup"]["pipeline"] = [{"$project": projection_job}]
-            # if the additional projection is set, the keys need to be specified
-            # in that part of the pipeline as well.
             if projection_flow:
-                for k in projection_job:
-                    pipeline[-1]["$project"][f"jobs_list.{k}"] = 1
+                pipeline.append({"$project": projection_flow})
+
+            if projection_job:
+                # insert the pipeline for the projection of the Job fields
+                # to reduce the impact of the size of the documents.
+                # This can help reducing the size of the fetched documents and
+                # avoid exceeding the maximum size allowed. Adding the projection
+                # in the general pipeline does not have the same effect.
+                pipeline[0]["$lookup"]["pipeline"] = [{"$project": projection_job}]
+                # if the additional projection is set, the keys need to be specified
+                # in that part of the pipeline as well.
+                if projection_flow:
+                    for k in projection_job:
+                        pipeline[-1]["$project"][f"jobs_list.{k}"] = 1
+
+            if sort:
+                pipeline.append({"$sort": dict(sort)})
+
+            if limit:
+                pipeline.append({"$limit": limit})
+
+            return list(self.flows.aggregate(pipeline))
+
+        # Non-pipeline implementation: manually join flows and jobs
+        flows_cursor = self.flows.find(query or {}, projection_flow)
 
         if sort:
-            pipeline.append({"$sort": dict(sort)})
+            flows_cursor = flows_cursor.sort(sort)
 
         if limit:
-            pipeline.append({"$limit": limit})
+            flows_cursor = flows_cursor.limit(limit)
 
-        return list(self.flows.aggregate(pipeline))
+        result = []
+        for flow in flows_cursor:
+            # Fetch associated jobs
+            if "jobs" in flow:
+                jobs_query = {"uuid": {"$in": flow["jobs"]}}
+                jobs_list = list(self.jobs.find(jobs_query, projection_job))
+                flow["jobs_list"] = jobs_list
+            else:
+                flow["jobs_list"] = []
+            result.append(flow)
+
+        return result
 
     def get_flows_info(
         self,
@@ -2973,7 +3018,12 @@ class JobController:
         self.auxiliary.insert_one({"next_id": 1})
         self.auxiliary.insert_one({"running_runner": None})
         self.update_version_information()
-        self.build_indexes(drop=True)
+        try:
+            self.build_indexes(drop=True)
+        except NotImplementedError:
+            logger.warning(
+                "The queue database does not support indexes. Indexes are not created"
+            )
 
         # handle the case that self.project is None, since it is a possibility
         if self.project:
@@ -3360,14 +3410,24 @@ class JobController:
         query: dict[str, Any] = {"state": {"$in": [s.value for s in states]}}
         if worker:
             query["worker"] = worker
-        pipeline = [
-            {"$match": query},
-            {"$group": {"_id": "$state", "count": {"$sum": 1}}},
-        ]
-        result = self.jobs.aggregate(pipeline) or []
-        out = {}
-        for r in result:
-            out[JobState(r["_id"])] = r["count"]
+
+        if self.use_mongodb_pipelines:
+            pipeline = [
+                {"$match": query},
+                {"$group": {"_id": "$state", "count": {"$sum": 1}}},
+            ]
+            result = self.jobs.aggregate(pipeline) or []
+            out = {}
+            for r in result:
+                out[JobState(r["_id"])] = r["count"]
+        else:
+            # Non-pipeline implementation: count each state separately
+            out = {}
+            for state in states:
+                state_query = dict(query)
+                state_query["state"] = state.value
+                count = self.jobs.count_documents(state_query)
+                out[state] = count
 
         for state in states:
             out[state] = out.get(state, 0)
@@ -3388,14 +3448,21 @@ class JobController:
         dict[FlowState, int]
             A dictionary with the count of flows in each state.
         """
-        pipeline = [
-            {"$match": {"state": {"$in": [s.value for s in states]}}},
-            {"$group": {"_id": "$state", "count": {"$sum": 1}}},
-        ]
-        result = self.flows.aggregate(pipeline) or []
-        out = {}
-        for r in result:
-            out[FlowState(r["_id"])] = r["count"]
+        if self.use_mongodb_pipelines:
+            pipeline = [
+                {"$match": {"state": {"$in": [s.value for s in states]}}},
+                {"$group": {"_id": "$state", "count": {"$sum": 1}}},
+            ]
+            result = self.flows.aggregate(pipeline) or []
+            out = {}
+            for r in result:
+                out[FlowState(r["_id"])] = r["count"]
+        else:
+            # Non-pipeline implementation: count each state separately
+            out = {}
+            for state in states:
+                count = self.flows.count_documents({"state": state.value})
+                out[state] = count
 
         for state in states:
             out[state] = out.get(state, 0)
@@ -3430,6 +3497,11 @@ class JobController:
             A dictionary with the date in the local timezone as key, and another dictionary as value.
             The inner dictionary contains the state as key and the number of jobs in that state as value.
         """
+        if not self.use_mongodb_pipelines:
+            raise ValueError(
+                "get_trends requires MongoDB aggregation pipelines. "
+                "Either set use_mongodb_pipelines=True or avoid using this method."
+            )
 
         tz = gettz(interval_timezone)
         utc_now = datetime.now(timezone.utc)
@@ -3805,23 +3877,9 @@ class JobController:
         # update flow state. If it is READY switch its state, otherwise no change
         # to the state. The operation is atomic.
         # Filtering on the index is not needed
-        state_cond = {
-            "$cond": {
-                "if": {"$eq": ["$state", "READY"]},
-                "then": "RUNNING",
-                "else": "$state",
-            }
-        }
-        updated_cond = {
-            "$cond": {
-                "if": {"$eq": ["$state", "READY"]},
-                "then": datetime.utcnow(),
-                "else": "$updated_on",
-            }
-        }
         self.flows.find_one_and_update(
-            {"jobs": reserved_uuid},
-            [{"$set": {"state": state_cond, "updated_on": updated_cond}}],
+            {"jobs": reserved_uuid, "state": "READY"},
+            {"$set": {"state": "RUNNING", "updated_on": datetime.utcnow()}},
         )
 
         return reserved_uuid, reserved_index
@@ -4202,30 +4260,59 @@ class JobController:
         -------
             A list of dictionaries with the result of the query.
         """
-        pipeline: list[dict] = [
-            {
-                "$lookup": {
-                    "from": self.jobs_collection,
-                    "localField": "jobs",
-                    "foreignField": "uuid",
-                    "as": "jobs",
+        if self.use_mongodb_pipelines:
+            pipeline: list[dict] = [
+                {
+                    "$lookup": {
+                        "from": self.jobs_collection,
+                        "localField": "jobs",
+                        "foreignField": "uuid",
+                        "as": "jobs",
+                    }
                 }
-            }
-        ]
+            ]
 
-        if query:
-            pipeline.append({"$match": query})
+            if query:
+                pipeline.append({"$match": query})
 
-        if projection:
-            pipeline.append({"$project": projection})
+            if projection:
+                pipeline.append({"$project": projection})
 
+            if sort:
+                pipeline.append({"$sort": dict(sort)})
+
+            if limit:
+                pipeline.append({"$limit": limit})
+
+            return list(self.flows.aggregate(pipeline))
+
+        # Non-pipeline implementation has limitations
         if sort:
-            pipeline.append({"$sort": dict(sort)})
+            raise ValueError(
+                "Sorting in get_flow_jobs_data requires MongoDB pipelines. "
+                "Either set use_mongodb_pipelines=True or avoid using sort parameter."
+            )
 
-        if limit:
-            pipeline.append({"$limit": limit})
+        # Manually join flows and jobs
+        flows_cursor = self.flows.find(query or {}, projection, limit=limit)
 
-        return list(self.flows.aggregate(pipeline))
+        result = []
+        for flow in flows_cursor:
+            # Fetch associated jobs
+            jobs_query = {"uuid": {"$in": flow["jobs"]}}
+            # Extract job projection if specified in the main projection
+            job_projection = None
+            if (
+                projection
+                and "jobs" in projection
+                and isinstance(projection["jobs"], dict)
+            ):
+                job_projection = projection["jobs"]
+            jobs_list = list(self.jobs.find(jobs_query, job_projection))
+            flow["jobs"] = jobs_list
+            result.append(flow)
+
+        return result
 
     def get_running_runner(self) -> dict | str:
         """Get the running runner information from the auxiliary collection."""
@@ -4319,17 +4406,24 @@ class JobController:
         )
 
         # update flow state. If it is changed update the updated_on
-        updated_cond = {
-            "$cond": {
-                "if": {"$eq": ["$state", flow_state.value]},
-                "then": "$updated_on",
-                "else": datetime.utcnow(),
+        if self.use_mongodb_pipelines:
+            updated_cond = {
+                "$cond": {
+                    "if": {"$eq": ["$state", flow_state.value]},
+                    "then": "$updated_on",
+                    "else": datetime.utcnow(),
+                }
             }
-        }
-        self.flows.find_one_and_update(
-            {"uuid": flow_uuid},
-            [{"$set": {"state": flow_state.value, "updated_on": updated_cond}}],
-        )
+            self.flows.find_one_and_update(
+                {"uuid": flow_uuid},
+                [{"$set": {"state": flow_state.value, "updated_on": updated_cond}}],
+            )
+        else:
+            # Without pipelines, always change the updated_on for simplicity
+            self.flows.find_one_and_update(
+                {"uuid": flow_uuid},
+                {"$set": {"state": flow_state.value, "updated_on": datetime.utcnow()}},
+            )
         return flow_state
 
     @contextlib.contextmanager
@@ -4349,7 +4443,11 @@ class JobController:
         MongoLock
             An instance of MongoLock.
         """
-        with MongoLock(collection=self.jobs, **lock_kwargs) as lock:
+        with MongoLock(
+            collection=self.jobs,
+            use_mongodb_pipelines=self.use_mongodb_pipelines,
+            **lock_kwargs,
+        ) as lock:
             yield lock
 
     @contextlib.contextmanager
@@ -4369,7 +4467,11 @@ class JobController:
         MongoLock
             An instance of MongoLock.
         """
-        with MongoLock(collection=self.flows, **lock_kwargs) as lock:
+        with MongoLock(
+            collection=self.flows,
+            use_mongodb_pipelines=self.use_mongodb_pipelines,
+            **lock_kwargs,
+        ) as lock:
             yield lock
 
     @contextlib.contextmanager
@@ -4613,7 +4715,11 @@ class JobController:
         MongoLock
             An instance of MongoLock.
         """
-        with MongoLock(collection=self.auxiliary, **lock_kwargs) as lock:
+        with MongoLock(
+            collection=self.auxiliary,
+            use_mongodb_pipelines=self.use_mongodb_pipelines,
+            **lock_kwargs,
+        ) as lock:
             yield lock
 
     def _get_downloaded_queue_files(
@@ -5343,6 +5449,8 @@ class JobController:
         """
         installed_packages = importlib.metadata.distributions()
         jobflow_remote_version = jobflow_remote_version or jobflow_remote.__version__
+        # old versions of MongoDB may not support dots inside the key values, that
+        # can present in same packages names. Sanitize before inserting
         self.auxiliary.find_one_and_update(
             filter={"jobflow_remote_version": {"$exists": True}},
             update={
@@ -5350,7 +5458,7 @@ class JobController:
                     "jobflow_remote_version": str(jobflow_remote_version),
                     "jobflow_version": jobflow.__version__,
                     "full_environment": {
-                        package.metadata["Name"]: package.version
+                        package.metadata["Name"].replace(".", "_"): package.version
                         for package in installed_packages
                     },
                 }
