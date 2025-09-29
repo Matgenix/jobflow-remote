@@ -32,6 +32,7 @@ from jobflow_remote.config.manager import ConfigManager
 from jobflow_remote.jobs.batch import RemoteBatchManager
 from jobflow_remote.jobs.data import (
     OUT_FILENAME,
+    BatchDoc,
     DbCollection,
     DynamicResponseType,
     FlowDoc,
@@ -4756,7 +4757,7 @@ class JobController:
         batch_state: BatchState | list[BatchState] | None = None,
         max_results: int = 20,
         sort: dict | None = None,
-    ):
+    ) -> list[BatchDoc] | None:
         if self.batches is None:
             return None
 
@@ -4773,7 +4774,10 @@ class JobController:
                 query["batch_state"] = {"$in": [bs.value for bs in batch_state]}
         sort = sort or {"updated_on": -1}
 
-        return list(self.batches.find(query, sort=sort).limit(max_results))
+        return [
+            BatchDoc.model_validate(bd_dict)
+            for bd_dict in self.batches.find(query, sort=sort).limit(max_results)
+        ]
 
     def add_batch_process(self, process_id: str, batch_uid: str, worker: str) -> dict:
         """

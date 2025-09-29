@@ -224,11 +224,7 @@ class QueueManager:
         # list of job ids, if the user is passed ignore the job ids.
         if user is not None:
             jobs = None
-        # Old versions of qtoolkit just returned the command.
-        # New versions of qtoolkit return the command and the list of stringified job_ids.
-        # This ensures backward compatibility.
-        result = self.scheduler_io.get_jobs_list_cmd(jobs, user)
-        job_cmd = result[0] if isinstance(result, tuple) else result
+        job_cmd = self.scheduler_io.get_jobs_list_cmd(jobs, user)
         stdout, stderr, returncode = self.execute_cmd(job_cmd, timeout=timeout)
         return self.scheduler_io.parse_jobs_list_output(
             exit_code=returncode, stdout=stdout, stderr=stderr

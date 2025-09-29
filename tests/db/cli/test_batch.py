@@ -62,7 +62,7 @@ def test_batch_worker(
 
     batches = job_controller.get_all_batches()
     assert len(batches) == 4
-    ordered_batches = sorted(batches, key=lambda x: x["updated_on"])
+    ordered_batches = sorted(batches, key=lambda x: x.updated_on)
 
     run_check_cli(
         ["batch", "list", "--all"],
@@ -75,17 +75,17 @@ def test_batch_worker(
         required_out=[
             "Batches info",
             "FINISHED",
-            ordered_batches[-1]["process_id"],
-            ordered_batches[-2]["process_id"],
-            ordered_batches[-1]["batch_uid"],
-            ordered_batches[-2]["batch_uid"],
+            ordered_batches[-1].process_id,
+            ordered_batches[-2].process_id,
+            ordered_batches[-1].batch_uid,
+            ordered_batches[-2].batch_uid,
         ],
         excluded_out=[
             "Running batches info",
             "RUNNING",
-            ordered_batches[0]["process_id"],
-            ordered_batches[1]["process_id"],
-            ordered_batches[0]["batch_uid"],
-            ordered_batches[1]["batch_uid"],
+            ordered_batches[0].process_id,
+            ordered_batches[1].process_id,
+            ordered_batches[0].batch_uid,
+            ordered_batches[1].batch_uid,
         ],
     )

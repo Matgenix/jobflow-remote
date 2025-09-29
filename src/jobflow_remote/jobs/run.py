@@ -125,7 +125,7 @@ def run_remote_job(run_dir: str | Path = ".") -> None:
             JfrState().reset()
 
 
-def ping(start_time, interval=60, filename=BATCH_INFO_FILENAME):
+def ping(start_time, interval=600, filename=BATCH_INFO_FILENAME):
     while True:
         dumpfn(
             {"start_time": start_time, "last_ping_time": datetime.datetime.utcnow()},
@@ -134,7 +134,7 @@ def ping(start_time, interval=60, filename=BATCH_INFO_FILENAME):
         time.sleep(interval)
 
 
-PING_TIME = 60
+PING_TIME = 600
 
 
 def run_batch_jobs(
@@ -146,73 +146,70 @@ def run_batch_jobs(
     max_jobs: int | None = None,
     parallel_jobs: int | None = None,
     sleep_time: float = None,
-    batch_dir: str | Path = None,
     batch_info_fname: str | Path = BATCH_INFO_FILENAME,
 ) -> None:
-    # Here we suppose that we are in the batch work directory where a batch process is executed/submitted
-    batch_dir = batch_dir or os.getcwd()
+    # Here we assume that we are in the batch work directory where a batch process is executed/submitted
     start_time = datetime.datetime.utcnow()
-    with cd(batch_dir):
-        dumpfn({"start_time": start_time}, batch_info_fname)
+    dumpfn({"start_time": start_time}, batch_info_fname)
 
-        threading.Thread(
-            target=ping,
-            args=(start_time, PING_TIME, batch_info_fname),  # dump every 60 seconds
-            daemon=True,
-        ).start()
+    threading.Thread(
+        target=ping,
+        args=(start_time, PING_TIME, batch_info_fname),  # dump every 600 seconds
+        daemon=True,
+    ).start()
 
-        parallel_jobs = parallel_jobs or 1
+    parallel_jobs = parallel_jobs or 1
 
-        if parallel_jobs == 1:
-            run_single_batch_jobs(
-                base_run_dir=base_run_dir,
+    if parallel_jobs == 1:
+        run_single_batch_jobs(
+            base_run_dir=base_run_dir,
+            files_dir=files_dir,
+            batch_uid=batch_uid,
+            max_time=max_time,
+            max_wait=max_wait,
+            max_jobs=max_jobs,
+            sleep_time=sleep_time,
+        )
+    else:
+        with Manager() as manager:
+            multiprocess_lock = manager.Lock()
+            parallel_ids = manager.dict()
+            batch_manager = LocalBatchManager(
                 files_dir=files_dir,
                 batch_uid=batch_uid,
-                max_time=max_time,
-                max_wait=max_wait,
-                max_jobs=max_jobs,
-                sleep_time=sleep_time,
+                multiprocess_lock=multiprocess_lock,
             )
-        else:
-            with Manager() as manager:
-                multiprocess_lock = manager.Lock()
-                parallel_ids = manager.dict()
-                batch_manager = LocalBatchManager(
-                    files_dir=files_dir,
-                    batch_uid=batch_uid,
-                    multiprocess_lock=multiprocess_lock,
+            processes = [
+                Process(
+                    target=run_single_batch_jobs,
+                    args=(
+                        base_run_dir,
+                        files_dir,
+                        batch_uid,
+                        max_time,
+                        max_wait,
+                        max_jobs,
+                        batch_manager,
+                        parallel_ids,
+                        sleep_time,
+                    ),
                 )
-                processes = [
-                    Process(
-                        target=run_single_batch_jobs,
-                        args=(
-                            base_run_dir,
-                            files_dir,
-                            batch_uid,
-                            max_time,
-                            max_wait,
-                            max_jobs,
-                            batch_manager,
-                            parallel_ids,
-                            sleep_time,
-                        ),
-                    )
-                    for _ in range(parallel_jobs)
-                ]
-                for p in processes:
-                    p.start()
-                    time.sleep(0.5)
+                for _ in range(parallel_jobs)
+            ]
+            for p in processes:
+                p.start()
+                time.sleep(0.5)
 
-                for p in processes:
-                    p.join()
-        dumpfn(
-            {
-                "start_time": start_time,
-                "last_ping_time": datetime.datetime.utcnow(),
-                "end_time": datetime.datetime.utcnow(),
-            },
-            batch_info_fname,
-        )
+            for p in processes:
+                p.join()
+    dumpfn(
+        {
+            "start_time": start_time,
+            "last_ping_time": datetime.datetime.utcnow(),
+            "end_time": datetime.datetime.utcnow(),
+        },
+        batch_info_fname,
+    )
 
 
 def run_single_batch_jobs(

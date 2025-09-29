@@ -605,15 +605,15 @@ def get_batch_processes_table(
         table.add_column(job_ids_column_name)
 
     for ibatch, batch_data in enumerate(batch_processes):
-        worker = workers[batch_data["worker"]]
+        worker = workers[batch_data.worker]
         row = [
-            batch_data["process_id"],
-            batch_data["batch_uid"],
-            batch_data["worker"],
-            get_job_path(batch_data["batch_uid"], None, worker.batch.work_dir),
+            batch_data.process_id,
+            batch_data.batch_uid,
+            batch_data.worker,
+            get_job_path(batch_data.batch_uid, None, worker.batch.work_dir),
         ]
         if status:
-            row.append(batch_data.get("batch_state", "UNKNOWN"))
+            row.append(batch_data.batch_state.value)
 
         if verbosity > 0:
             row.append("\n".join([f"{jb[0]} ({jb[1]})" for jb in batches_jobs[ibatch]]))

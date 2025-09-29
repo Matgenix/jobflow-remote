@@ -180,7 +180,7 @@ class RemoteBatchManager:
 
     def get_batch_info(
         self, batch_dir: Path | str, batch_info_file: str = BATCH_INFO_FILENAME
-    ):
+    ) -> dict | None:
         batch_info_path = Path(batch_dir) / batch_info_file
         if not self.host.exists(batch_info_path):
             return None

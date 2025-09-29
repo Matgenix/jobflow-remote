@@ -1,3 +1,5 @@
+from monty.collections import AttrDict
+
 from jobflow_remote.cli.formatting import get_batch_processes_table
 from jobflow_remote.cli.jf import app
 from jobflow_remote.cli.jfr_typer import JFRTyper
@@ -59,11 +61,13 @@ def processes_list(
                     )
                     worker_running_jobs[wname] = remote_batch_manager.get_running()
             batch_processes = [
-                {
-                    "batch_uid": batch_uid,
-                    "process_id": process_id,
-                    "worker": worker,
-                }
+                AttrDict(
+                    {
+                        "batch_uid": batch_uid,
+                        "process_id": process_id,
+                        "worker": worker,
+                    }
+                )
                 for worker, worker_batches in batch_processes_data.items()
                 for process_id, batch_uid in worker_batches.items()
             ]
@@ -105,7 +109,7 @@ def processes_list(
             for batch in batch_processes:
                 batch_jobs = [
                     (jid, str(jidx))
-                    for jid, jid_dict in batch.get("jobs", {}).items()
+                    for jid, jid_dict in batch.jobs.items()
                     for jidx in jid_dict
                 ]
                 batches_jobs.append(batch_jobs)
