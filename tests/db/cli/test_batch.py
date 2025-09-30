@@ -8,7 +8,6 @@ import pytest
     [
         {
             "_set": {
-                "queue->batches_collection": "the_batches",
                 "runner->delay_update_batch": 0.2,
                 "runner->delay_advance_status": 0.2,
                 "runner->delay_check_run_status": 0.2,
@@ -65,13 +64,13 @@ def test_batch_worker(
     ordered_batches = sorted(batches, key=lambda x: x.updated_on)
 
     run_check_cli(
-        ["batch", "list", "--all"],
+        ["batch", "list"],
         required_out="Batches info",
         excluded_out=["Running batches info", "RUNNING"],
     )
 
     run_check_cli(
-        ["batch", "list", "--all", "-m", "2"],
+        ["batch", "list", "-m", "2"],
         required_out=[
             "Batches info",
             "FINISHED",

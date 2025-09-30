@@ -4724,33 +4724,6 @@ class JobController:
                     f"stdout: {cancel_result.stdout}. stderr: {cancel_result.stderr}"
                 )
 
-    def get_batch_processes(
-        self, worker: str | None = None
-    ) -> dict[str, dict[str, str]]:
-        """
-        Get the batch processes associated with a given worker.
-
-        Parameters
-        ----------
-        worker
-            The worker name.
-
-        Returns
-        -------
-        dict
-            A dictionary with the {process_id: batch_uid} of the batch
-            jobs running on the selected worker.
-        """
-        if worker:
-            query = {f"batch_processes.{worker}": {"$exists": True}}
-        else:
-            query = {"batch_processes": {"$exists": True}}
-
-        result = self.auxiliary.find_one(query)
-        if result:
-            return result["batch_processes"] or {}
-        return {}
-
     def get_all_batches(
         self,
         worker: str | list[str] | None = None,
@@ -4781,7 +4754,7 @@ class JobController:
 
     def add_batch_process(self, process_id: str, batch_uid: str, worker: str) -> dict:
         """
-        Add a batch process to the list of running processes.
+        Add a batch process to the list of batch processes.
 
         Two IDs are defined, one to keep track of the actual process number and one
         to be associated to the Jobs that are being executed. The need for two IDs
@@ -4801,58 +4774,63 @@ class JobController:
         dict
             The updated document.
         """
-        if self.batches is not None:
-            batch_doc_dict = get_initial_batch_doc_dict(
-                batch_uid=batch_uid, process_id=process_id, worker=worker
-            )
-            self.batches.insert_one(batch_doc_dict)
-        return self.auxiliary.find_one_and_update(
-            {"batch_processes": {"$exists": True}},
-            {"$set": {f"batch_processes.{worker}.{process_id}": batch_uid}},
-            upsert=True,
+        batch_doc_dict = get_initial_batch_doc_dict(
+            batch_uid=batch_uid, process_id=process_id, worker=worker
         )
+        return self.batches.insert_one(batch_doc_dict)
 
     def update_job_in_batch(
         self, job_id: str, job_index: int, batch_uid: str, worker: str, info: typing.Any
     ):
-        if self.batches is not None:
-            self.batches.update_one(
-                {"batch_uid": batch_uid, "worker": worker},
-                {
-                    "$set": {
-                        f"jobs.{job_id}.{job_index}": info,
-                        "updated_on": datetime.now(),
-                    }
-                },
-            )
+        self.batches.update_one(
+            {"batch_uid": batch_uid, "worker": worker},
+            {
+                "$set": {
+                    f"jobs.{job_id}.{job_index}": info,
+                    "updated_on": datetime.now(),
+                }
+            },
+        )
 
     def set_running_batch_process(
-        self, process_id: str, worker: str, start_time: datetime | None = None
+        self, process_id: str, start_time: datetime | None = None
     ):
-        if self.batches is not None:
-            self.batches.update_one(
-                {"worker": worker, "process_id": process_id, "start_time": None},
-                {
-                    "$set": {
-                        "batch_state": BatchState.RUNNING.value,
-                        "updated_on": datetime.now(),
-                        "start_time": start_time or datetime.now(),
-                    }
-                },
-            )
-
-    def remove_batch_process(
-        self, process_id: str, worker: str, end_time: datetime | None = None
-    ) -> dict:
         """
-        Remove a process from the list of running batch processes.
+        Sets state of batch process as running.
 
         Parameters
         ----------
         process_id
             The ID of the processes obtained from the QueueManager.
-        worker
-            The worker where the process was being executed.
+        start_time
+            The time at which the batch process started.
+
+        Returns
+        -------
+        dict
+            The updated document.
+        """
+        return self.batches.update_one(
+            {"process_id": process_id, "start_time": None},
+            {
+                "$set": {
+                    "batch_state": BatchState.RUNNING.value,
+                    "updated_on": datetime.now(),
+                    "start_time": start_time or datetime.now(),
+                }
+            },
+        )
+
+    def set_finished_batch_process(
+        self, process_id: str, end_time: datetime | None = None
+    ) -> dict:
+        """
+        Sets state of batch process as finished.
+
+        Parameters
+        ----------
+        process_id
+            The ID of the processes obtained from the QueueManager.
         end_time
             The time at which the batch process ended.
 
@@ -4861,21 +4839,15 @@ class JobController:
         dict
             The updated document.
         """
-        if self.batches is not None:
-            self.batches.update_one(
-                {"process_id": process_id},
-                {
-                    "$set": {
-                        "batch_state": BatchState.FINISHED.value,
-                        "updated_on": datetime.now(),
-                        "end_time": end_time or datetime.now(),
-                    }
-                },
-            )
-        return self.auxiliary.find_one_and_update(
-            {"batch_processes": {"$exists": True}},
-            {"$unset": {f"batch_processes.{worker}.{process_id}": ""}},
-            upsert=True,
+        return self.batches.update_one(
+            {"process_id": process_id},
+            {
+                "$set": {
+                    "batch_state": BatchState.FINISHED.value,
+                    "updated_on": datetime.now(),
+                    "end_time": end_time or datetime.now(),
+                }
+            },
         )
 
     def delete_job(

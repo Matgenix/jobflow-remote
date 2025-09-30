@@ -504,10 +504,9 @@ class QueueConfig(BaseModel):
         description="The name of the collection containing auxiliary information. "
         "Taken from the same database as the one defined in the store",
     )
-    batches_collection: Optional[str] = Field(
-        None,
+    batches_collection: str = Field(
+        "batches",
         description="The name of the collection containing batches information. "
-        "This collection is optional. "
         "Taken from the same database as the one defined in the store",
     )
     db_id_prefix: Optional[str] = Field(

@@ -1183,8 +1183,10 @@ class Runner:
             The list of job ids, job indexes and batch unique ids in the host
             running directory.
         """
-        batch_processes = self.job_controller.get_batch_processes(worker_name).get(
-            worker_name, {}
+        batch_processes = self.job_controller.get_all_batches(
+            worker=worker_name,
+            batch_state=[BatchState.SUBMITTED, BatchState.RUNNING],
+            max_results=0,
         )
         running_jobs = []
         try:
@@ -1241,7 +1243,7 @@ class Runner:
 
     def batch_get_process_id(
         self,
-        batch_processes: dict,
+        batch_processes: list,
         batch_uid: str,
         worker_name: str,
         worker: WorkerBase,
@@ -1252,8 +1254,7 @@ class Runner:
                 return worker_batches[batch_uid]
         # Then try to take it from the running batch processes
         process_id = next(
-            (pid for pid, uid in batch_processes.items() if uid == batch_uid),
-            None,  # value to return if not found
+            (bp.process_id for bp in batch_processes if bp.batch_uid == batch_uid), None
         )
         if process_id is not None:
             self._cache_batch(
@@ -1263,10 +1264,10 @@ class Runner:
                 process_id=process_id,
             )
             return process_id
-        if self.job_controller.batches is not None:
-            doc = self.job_controller.batches.find_one(
-                {"batch_uid": batch_uid}, projection=["process_id"]
-            )
+        doc = self.job_controller.batches.find_one(
+            {"batch_uid": batch_uid}, projection=["process_id"]
+        )
+        if doc:
             return doc["process_id"]
         raise RuntimeError("Could not get batch process id from batch unique id.")
 
@@ -1301,10 +1302,14 @@ class Runner:
             List of running batch process ids (e.g. Slurm ids)
 
         """
-        batch_processes_data = self.job_controller.get_batch_processes(worker_name).get(
-            worker_name, {}
+        batch_processes_data = self.job_controller.get_all_batches(
+            worker=worker_name,
+            batch_state=[BatchState.SUBMITTED, BatchState.RUNNING],
+            max_results=0,
         )
-        processes = list(batch_processes_data)
+        if not batch_processes_data:
+            return []
+        processes = [batch_process.process_id for batch_process in batch_processes_data]
         if processes:
             stopped_processes = set()
             running_processes = set()
@@ -1325,8 +1330,12 @@ class Runner:
             for pid in running_processes:
                 if pid in self._cached_running_batch_pids.get(worker_name, set()):
                     continue
+                batch_uid = next(
+                    (b.batch_uid for b in batch_processes_data if b.process_id == pid),
+                    None,
+                )
                 batch_dir = get_job_path(
-                    job_id=batch_processes_data[pid],
+                    job_id=batch_uid,
                     index=None,
                     base_path=worker.batch.work_dir,
                 )
@@ -1335,7 +1344,7 @@ class Runner:
                 )
                 start_time = batch_info.get("start_time", None) if batch_info else None
                 self.job_controller.set_running_batch_process(
-                    pid, worker_name, start_time=start_time
+                    pid, start_time=start_time
                 )
                 if start_time:
                     if worker_name not in self._cached_running_batch_pids:
@@ -1343,8 +1352,12 @@ class Runner:
                     self._cached_running_batch_pids[worker_name].add(pid)
 
             for pid in stopped_processes:
+                batch_uid = next(
+                    (b.batch_uid for b in batch_processes_data if b.process_id == pid),
+                    None,
+                )
                 batch_dir = get_job_path(
-                    job_id=batch_processes_data[pid],
+                    job_id=batch_uid,
                     index=None,
                     base_path=worker.batch.work_dir,
                 )
@@ -1358,15 +1371,13 @@ class Runner:
                     )
                 else:
                     end_time = None
-                self.job_controller.remove_batch_process(
-                    pid, worker_name, end_time=end_time
-                )
+                self.job_controller.set_finished_batch_process(pid, end_time=end_time)
                 if pid in self._cached_running_batch_pids.get(worker_name, set()):
                     self._cached_running_batch_pids[worker_name].remove(pid)
                 # check if there are jobs that were in the running folder of a
                 # process that finished and set them to remote error
-                for job_id, job_index, batch_uid in running_jobs:
-                    if batch_processes_data[pid] == batch_uid:
+                for job_id, job_index, job_batch_uid in running_jobs:
+                    if batch_uid == job_batch_uid:
                         lock_filter = {
                             "uuid": job_id,
                             "index": job_index,
@@ -1389,7 +1400,7 @@ class Runner:
                                 # This is done to automatically pass down the error message
                                 raise RemoteError(err_msg, no_retry=True)
                 # Also remove the corresponding files from the running folder of batch manager
-                batch_manager.delete_running(batch_processes_data[pid])
+                batch_manager.delete_running(batch_uid)
 
             return list(running_processes)
         return []
@@ -1417,7 +1428,7 @@ class Runner:
 
         # The purpose of dealing with running and submitted jobs separately is to avoid
         # submitting processes if a job remains stuck in a SBATCH_RUNNING state.
-        # In principle it should not happen but if happening it will keep submitting
+        # In principle, it should not happen but if happening it will keep submitting
         # batch processes to the queue.
         available_jobs = max(
             n_jobs_submitted
@@ -1522,7 +1533,7 @@ class Runner:
                         "$set": {
                             "state": next_state.value,
                             "remote.process_id": self.batch_get_process_id(
-                                {},
+                                [],
                                 batch_uid,
                                 worker_name,
                                 worker,
