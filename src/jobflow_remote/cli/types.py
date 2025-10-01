@@ -369,6 +369,10 @@ delete_all_opt = Annotated[
     ),
 ]
 
+show_all_batches_opt = Annotated[
+    bool, typer.Option("--all", "-a", help="Show all batches (running and stopped)")
+]
+
 foreground_index_opt = Annotated[
     bool,
     typer.Option(
