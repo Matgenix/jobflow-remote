@@ -19,34 +19,34 @@ DEFAULT_JOBSTORE = {"docs_store": {"type": "MemoryStore"}}
 class RunnerOptions(BaseModel):
     """Options to tune the execution of the Runner."""
 
-    delay_checkout: int = Field(
+    delay_checkout: float = Field(
         30,
         description="Delay between subsequent execution of the checkout from database (seconds)",
     )
-    delay_check_run_status: int = Field(
+    delay_check_run_status: float = Field(
         30,
         description="Delay between subsequent execution of the checking the status of "
         "jobs that are submitted to the scheduler (seconds)",
     )
-    delay_advance_status: int = Field(
+    delay_advance_status: float = Field(
         30,
         description="Delay between subsequent advancement of the job's remote state (seconds)",
     )
-    delay_refresh_limited: int = Field(
+    delay_refresh_limited: float = Field(
         600,
         description="Delay between subsequent refresh from the DB of the number of submitted "
         "and running jobs (seconds). Only used if a worker with max_jobs is present",
     )
-    delay_update_batch: int = Field(
+    delay_update_batch: float = Field(
         60,
         description="Delay between subsequent refresh from the DB of the number of submitted "
         "and running jobs (seconds). Only used if a batch worker is present",
     )
-    delay_ping_db: int = Field(
+    delay_ping_db: float = Field(
         7200,
         description="Delay between subsequent pings to the running runner document.",
     )
-    lock_timeout: Optional[int] = Field(
+    lock_timeout: Optional[float] = Field(
         86400,
         description="Time to consider the lock on a document expired and can be overridden (seconds)",
     )
@@ -59,13 +59,13 @@ class RunnerOptions(BaseModel):
         description="Maximum number of attempt performed before failing an "
         "advancement of a remote state",
     )
-    delta_retry: tuple[int, ...] = Field(
+    delta_retry: tuple[float, ...] = Field(
         (30, 300, 1200),
         description="List of increasing delay between subsequent attempts when the "
         "advancement of a remote step fails",
     )
 
-    def get_delta_retry(self, step_attempts: int) -> int:
+    def get_delta_retry(self, step_attempts: int) -> float:
         """
         The time to wait before retrying a failed advancement of the remote state,
         based on the number of attempts.
@@ -129,16 +129,20 @@ class BatchConfig(BaseModel):
     max_jobs_per_batch: Optional[int] = Field(
         None, description="Maximum number of jobs executed in a single batch process"
     )
-    max_wait: Optional[int] = Field(
+    max_wait: Optional[float] = Field(
         60,
         description="Maximum time to wait before stopping if no new jobs are available to run (seconds)",
     )
-    max_time: Optional[int] = Field(
+    max_time: Optional[float] = Field(
         None,
         description="Maximum time after which a job will not start more jobs (seconds). To help avoid hitting the walltime",
     )
     parallel_jobs: Optional[int] = Field(
         None, description="Number of jobs executed in parallel in the same process"
+    )
+    sleep_time: Optional[float] = Field(
+        None,
+        description="Sleep time when no submitted job is available to run before checking again (seconds)",
     )
     model_config = ConfigDict(extra="forbid")
 
@@ -498,6 +502,12 @@ class QueueConfig(BaseModel):
     auxiliary_collection: str = Field(
         "jf_auxiliary",
         description="The name of the collection containing auxiliary information. "
+        "Taken from the same database as the one defined in the store",
+    )
+    batches_collection: Optional[str] = Field(
+        None,
+        description="The name of the collection containing batches information. "
+        "This collection is optional. "
         "Taken from the same database as the one defined in the store",
     )
     db_id_prefix: Optional[str] = Field(

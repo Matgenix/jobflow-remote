@@ -8,10 +8,12 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from flufl.lock import Lock, LockError
+from monty.json import MontyDecoder
 
 if TYPE_CHECKING:
     from jobflow_remote.remote.host import BaseHost
 
+from jobflow_remote.jobs.data import BATCH_INFO_FILENAME
 
 logger = logging.getLogger(__name__)
 
@@ -114,9 +116,9 @@ class RemoteBatchManager:
             self._init_files_dir()
         terminated = []
         for i in self.host.listdir(self.terminated_dir):
-            job_id, _index, process_uuid = i.split("_")
+            job_id, _index, batch_uid = i.split("_")
             index = int(_index)
-            terminated.append((job_id, index, process_uuid))
+            terminated.append((job_id, index, batch_uid))
         return terminated
 
     def get_running(self) -> list[tuple[str, int, str]]:
@@ -134,9 +136,9 @@ class RemoteBatchManager:
             self._init_files_dir()
         running = []
         for filename in self.host.listdir(self.running_dir):
-            job_id, _index, process_uuid = filename.split("_")
+            job_id, _index, batch_uid = filename.split("_")
             index = int(_index)
-            running.append((job_id, index, process_uuid))
+            running.append((job_id, index, batch_uid))
         return running
 
     def delete_terminated(self, ids: list[tuple[str, int, str]]) -> None:
@@ -176,6 +178,15 @@ class RemoteBatchManager:
             return self.host.rmtree(self.files_dir, raise_on_error=False)
         return True
 
+    def get_batch_info(
+        self, batch_dir: Path | str, batch_info_file: str = BATCH_INFO_FILENAME
+    ) -> dict | None:
+        batch_info_path = Path(batch_dir) / batch_info_file
+        if not self.host.exists(batch_info_path):
+            return None
+        json_str = self.host.read_text_file(batch_info_path)
+        return MontyDecoder().decode(json_str)
+
 
 class LocalBatchManager:
     """
@@ -188,7 +199,7 @@ class LocalBatchManager:
     def __init__(
         self,
         files_dir: str | Path,
-        process_id: str,
+        batch_uid: str,
         multiprocess_lock=None,
     ) -> None:
         """
@@ -197,13 +208,13 @@ class LocalBatchManager:
         files_dir
             The full path to directory where the files to handle the jobs
             to be executed in batch processes are stored.
-        process_id
+        batch_uid
             The uuid associated to the batch process.
         multiprocess_lock
             A lock from the multiprocessing module to be used when executing jobs in
             parallel with other processes of the same worker.
         """
-        self.process_id = process_id
+        self.batch_uid = batch_uid
         self.files_dir = Path(files_dir)
         self.multiprocess_lock = multiprocess_lock
         self.submitted_dir = self.files_dir / SUBMITTED_DIR
@@ -242,7 +253,7 @@ class LocalBatchManager:
                         )
                     )
                     os.remove(self.submitted_dir / selected)
-                    (self.running_dir / f"{selected}_{self.process_id}").touch()
+                    (self.running_dir / f"{selected}_{self.batch_uid}").touch()
                     return selected
             except (LockError, FileNotFoundError):
                 logger.exception(
@@ -263,5 +274,5 @@ class LocalBatchManager:
         index
             The index of the job to terminate.
         """
-        os.remove(self.running_dir / f"{job_id}_{index}_{self.process_id}")
-        (self.terminated_dir / f"{job_id}_{index}_{self.process_id}").touch()
+        os.remove(self.running_dir / f"{job_id}_{index}_{self.batch_uid}")
+        (self.terminated_dir / f"{job_id}_{index}_{self.batch_uid}").touch()

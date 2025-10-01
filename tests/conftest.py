@@ -18,8 +18,8 @@ from rich.console import Console
 def patch_cli_consoles(monkeypatch):
     import jobflow_remote.cli
 
-    err_console = Console(force_terminal=True, stderr=True)
-    out_console = Console(force_terminal=True)
+    err_console = Console(force_terminal=True, stderr=True, width=1000)
+    out_console = Console(force_terminal=True, width=1000)
     # The out_console and err_console have to be patched everywhere they are imported
     # Doing this only for the cli
     for _mod_name, module in inspect.getmembers(jobflow_remote.cli, inspect.ismodule):
@@ -191,7 +191,7 @@ def daemon_manager(random_project_name, job_controller):
 
 
 @pytest.fixture()
-def runner():
+def runner(patch_project):
     from jobflow_remote.jobs.runner import Runner
 
     runner = Runner()
@@ -278,9 +278,14 @@ def shared_test_out_dir(tmp_path_factory):
 
 
 @pytest.fixture()
-def job_controller(random_project_name, request, shared_test_out_dir):
+def job_controller(random_project_name, request, shared_test_out_dir, patch_project):
     """Yields a jobcontroller instance for the test suite that also sets up the
     jobstore, resetting it after every test.
+
+    Notes:
+        This job_controller fixture depends on patch_project to make sure that patch_project
+        is called before initializing the JobController object. The patch_project fixture is
+        not explicitly used within this fixture though.
     """
     from monty.serialization import dumpfn
 
@@ -538,12 +543,23 @@ def update_project_data(
 
 
 @pytest.fixture()
-def patch_project(monkeypatch):
+def patch_project(monkeypatch, request):
     from jobflow_remote.config.manager import ConfigManager
 
     cm = ConfigManager()
     current_project_data = cm.get_project_data()
 
+    updates = getattr(request, "param", None)
+
+    if updates:
+        # case where patch_project is parametrized in the test (with indirect=True)
+        # this is useful for the job_controller initialization
+        update_project_data(
+            updates,
+            dict_mods=True,
+            project_file_path=Path(current_project_data.filepath),
+        )
+    # you can always reparametrize inside the test
     yield partial(
         update_project_data, project_file_path=Path(current_project_data.filepath)
     )

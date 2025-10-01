@@ -128,3 +128,16 @@ class FlowState(Enum):
         if any(js == JobState.PAUSED for js in jobs_states):
             return cls.PAUSED
         return cls.RUNNING
+
+
+class BatchState(Enum):
+    """States of a batch submission."""
+
+    # Should there be a STOPPED or CANCELLED state here ? Or other ? I think I would keep it simple
+    # It's either SUBMITTED (i.e. in the queue but not running), RUNNING (i.e. in the queue and running)
+    # or FINISHED/OTHERNAME (not in the queue anymore, be it from a "normal" termination or a hard stop)
+    # but maybe one additional state (for manual or external stops) could be useful ? Question then
+    # is how to detect that state ?
+    SUBMITTED = "SUBMITTED"
+    RUNNING = "RUNNING"
+    FINISHED = "FINISHED"

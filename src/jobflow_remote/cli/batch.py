@@ -1,11 +1,15 @@
-from typing import Annotated, Optional
-
-import typer
+from monty.collections import AttrDict
 
 from jobflow_remote.cli.formatting import get_batch_processes_table
 from jobflow_remote.cli.jf import app
 from jobflow_remote.cli.jfr_typer import JFRTyper
-from jobflow_remote.cli.types import verbosity_opt
+from jobflow_remote.cli.types import (
+    batch_state_opt,
+    max_results_opt,
+    show_all_batches_opt,
+    verbosity_opt,
+    worker_name_opt,
+)
 from jobflow_remote.cli.utils import (
     exit_with_warning_msg,
     get_config_manager,
@@ -22,14 +26,10 @@ app.add_typer(app_batch)
 
 @app_batch.command(name="list")
 def processes_list(
-    worker: Annotated[
-        Optional[str],
-        typer.Option(
-            "--worker",
-            "-w",
-            help="Select the worker.",
-        ),
-    ] = None,
+    worker_name: worker_name_opt = None,
+    show_all: show_all_batches_opt = False,
+    max_results: max_results_opt = 20,
+    batch_state: batch_state_opt = None,
     verbosity: verbosity_opt = 0,
 ) -> None:
     """
@@ -39,29 +39,89 @@ def processes_list(
 
     jc = get_job_controller()
 
-    batch_processes = jc.get_batch_processes(worker)
-    if not batch_processes or not any(wbc for wbc in batch_processes.values()):
-        exit_with_warning_msg("No batch processes running")
-
     cm = get_config_manager()
     project = cm.get_project()
     workers = project.workers
-    running_jobs = {}
-    if verbosity > 0:
-        for worker_name in batch_processes:
-            worker_config = workers[worker_name]
-            host = worker_config.get_host()
-            host.connect()
-            remote_batch_manager = RemoteBatchManager(
-                host, worker_config.batch.jobs_handle_dir
+
+    if not show_all:
+        batch_processes_data = jc.get_batch_processes(worker_name)
+        if not batch_processes_data or not any(
+            wbc for wbc in batch_processes_data.values()
+        ):
+            exit_with_warning_msg("No batch processes running")
+        else:
+            worker_running_jobs = {}
+            if verbosity > 0:
+                for wname in batch_processes_data:
+                    worker_config = workers[wname]
+                    host = worker_config.get_host()
+                    host.connect()
+                    remote_batch_manager = RemoteBatchManager(
+                        host, worker_config.batch.jobs_handle_dir
+                    )
+                    worker_running_jobs[wname] = remote_batch_manager.get_running()
+            batch_processes = [
+                AttrDict(
+                    {
+                        "batch_uid": batch_uid,
+                        "process_id": process_id,
+                        "worker": worker,
+                    }
+                )
+                for worker, worker_batches in batch_processes_data.items()
+                for process_id, batch_uid in worker_batches.items()
+            ]
+            running_jobs = []
+            if verbosity > 0:
+                running_jobs = [
+                    [
+                        (str(jid), str(jidx))
+                        for jid, jidx, batch_uid in worker_running_jobs[batch["worker"]]
+                        if batch_uid == batch["batch_uid"]
+                    ]
+                    for batch in batch_processes
+                ]
+            table = get_batch_processes_table(
+                batch_processes=batch_processes,
+                workers=workers,
+                batches_jobs=running_jobs,
+                verbosity=verbosity,
             )
-            running_jobs[worker_name] = remote_batch_manager.get_running()
 
-    table = get_batch_processes_table(
-        batch_processes=batch_processes,
-        workers=workers,
-        running_jobs=running_jobs,
-        verbosity=verbosity,
-    )
+            out_console.print(table)
+    else:
+        if jc.batches is None:
+            exit_with_warning_msg(
+                "No batches collection defined for your project. "
+                'You can get running batches without the "--all" option.'
+            )
 
-    out_console.print(table)
+        batch_processes = jc.get_all_batches(
+            worker=worker_name,
+            batch_state=batch_state,
+            max_results=max_results,
+        )
+        if not batch_processes:
+            exit_with_warning_msg("No batch processes")
+
+        batches_jobs = []
+        if verbosity > 0:
+            for batch in batch_processes:
+                batch_jobs = [
+                    (jid, str(jidx))
+                    for jid, jid_dict in batch.jobs.items()
+                    for jidx in jid_dict
+                ]
+                batches_jobs.append(batch_jobs)
+
+        table = get_batch_processes_table(
+            batch_processes=batch_processes,
+            workers=workers,
+            batches_jobs=batches_jobs,
+            verbosity=verbosity,
+            status=True,
+            title="Batches info",
+            job_ids_column_name="Job ids (Index)",
+        )
+
+        out_console.print(table)

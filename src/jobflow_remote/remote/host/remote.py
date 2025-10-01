@@ -238,6 +238,17 @@ class RemoteHost(BaseHost):
 
         self._execute_remote_func(lambda host: host.connection.put, f, str(filepath))
 
+    def read_text_file(self, filepath: str | Path) -> str:
+        """Read content from a file on the host."""
+        self._check_connected()
+
+        buf = io.BytesIO()
+
+        self._execute_remote_func(lambda host: host.connection.get, str(filepath), buf)
+
+        buf.seek(0)
+        return buf.read().decode()
+
     def connect(self) -> None:
         self.connection.open()
         if self.keepalive:

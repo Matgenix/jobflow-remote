@@ -5,6 +5,7 @@ import glob
 import logging
 import os
 import subprocess
+import threading
 import time
 import traceback
 from multiprocessing import Manager, Process
@@ -18,7 +19,12 @@ from monty.serialization import dumpfn, loadfn
 from monty.shutil import decompress_file
 
 from jobflow_remote.jobs.batch import LocalBatchManager
-from jobflow_remote.jobs.data import IN_FILENAME, OUT_FILENAME, JobDoc
+from jobflow_remote.jobs.data import (
+    BATCH_INFO_FILENAME,
+    IN_FILENAME,
+    OUT_FILENAME,
+    JobDoc,
+)
 from jobflow_remote.remote.data import get_job_path, get_store_file_paths
 from jobflow_remote.utils.log import initialize_remote_run_log
 
@@ -119,25 +125,50 @@ def run_remote_job(run_dir: str | Path = ".") -> None:
             JfrState().reset()
 
 
+def ping(start_time, interval=600, filename=BATCH_INFO_FILENAME):
+    while True:
+        dumpfn(
+            {"start_time": start_time, "last_ping_time": datetime.datetime.utcnow()},
+            fn=filename,
+        )
+        time.sleep(interval)
+
+
+PING_TIME = 600
+
+
 def run_batch_jobs(
     base_run_dir: str | Path,
     files_dir: str | Path,
-    process_uuid: str,
-    max_time: int | None = None,
-    max_wait: int = 60,
+    batch_uid: str,
+    max_time: float | None = None,
+    max_wait: float = 60,
     max_jobs: int | None = None,
     parallel_jobs: int | None = None,
+    sleep_time: float = None,
+    batch_info_fname: str | Path = BATCH_INFO_FILENAME,
 ) -> None:
+    # Here we assume that we are in the batch work directory where a batch process is executed/submitted
+    start_time = datetime.datetime.utcnow()
+    dumpfn({"start_time": start_time}, batch_info_fname)
+
+    threading.Thread(
+        target=ping,
+        args=(start_time, PING_TIME, batch_info_fname),  # dump every 600 seconds
+        daemon=True,
+    ).start()
+
     parallel_jobs = parallel_jobs or 1
 
     if parallel_jobs == 1:
         run_single_batch_jobs(
             base_run_dir=base_run_dir,
             files_dir=files_dir,
-            process_uuid=process_uuid,
+            batch_uid=batch_uid,
             max_time=max_time,
             max_wait=max_wait,
             max_jobs=max_jobs,
+            sleep_time=sleep_time,
         )
     else:
         with Manager() as manager:
@@ -145,7 +176,7 @@ def run_batch_jobs(
             parallel_ids = manager.dict()
             batch_manager = LocalBatchManager(
                 files_dir=files_dir,
-                process_id=process_uuid,
+                batch_uid=batch_uid,
                 multiprocess_lock=multiprocess_lock,
             )
             processes = [
@@ -154,12 +185,13 @@ def run_batch_jobs(
                     args=(
                         base_run_dir,
                         files_dir,
-                        process_uuid,
+                        batch_uid,
                         max_time,
                         max_wait,
                         max_jobs,
                         batch_manager,
                         parallel_ids,
+                        sleep_time,
                     ),
                 )
                 for _ in range(parallel_jobs)
@@ -170,30 +202,39 @@ def run_batch_jobs(
 
             for p in processes:
                 p.join()
+    dumpfn(
+        {
+            "start_time": start_time,
+            "last_ping_time": datetime.datetime.utcnow(),
+            "end_time": datetime.datetime.utcnow(),
+        },
+        batch_info_fname,
+    )
 
 
 def run_single_batch_jobs(
     base_run_dir: str | Path,
     files_dir: str | Path,
-    process_uuid: str,
-    max_time: int | None = None,
-    max_wait: int = 60,
+    batch_uid: str,
+    max_time: float | None = None,
+    max_wait: float = 60,
     max_jobs: int | None = None,
     batch_manager: LocalBatchManager | None = None,
     parallel_ids: dict | None = None,
+    sleep_time: float = None,
 ) -> None:
     initialize_remote_run_log()
 
     # TODO the ID should be somehow linked to the queue job
     if not batch_manager:
-        batch_manager = LocalBatchManager(files_dir=files_dir, process_id=process_uuid)
+        batch_manager = LocalBatchManager(files_dir=files_dir, batch_uid=batch_uid)
 
     if parallel_ids:
         parallel_ids[os.getpid()] = False
 
     t0 = time.time()
-    wait = 0
-    sleep_time = 10
+    wait = 0.0
+    sleep_time = sleep_time or 10.0
     count = 0
     while True:
         if max_time and max_time < time.time() - t0:
@@ -230,7 +271,7 @@ def run_single_batch_jobs(
             time.sleep(sleep_time)
             wait += sleep_time
         else:
-            wait = 0
+            wait = 0.0
             count += 1
             job_id, _index = job_str.split("_")
             index: int = int(_index)

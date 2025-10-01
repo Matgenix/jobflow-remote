@@ -6,6 +6,7 @@ import importlib.metadata
 import logging
 import shutil
 import traceback
+import typing
 import warnings
 from collections import defaultdict
 from contextlib import ExitStack
@@ -31,6 +32,7 @@ from jobflow_remote.config.manager import ConfigManager
 from jobflow_remote.jobs.batch import RemoteBatchManager
 from jobflow_remote.jobs.data import (
     OUT_FILENAME,
+    BatchDoc,
     DbCollection,
     DynamicResponseType,
     FlowDoc,
@@ -38,6 +40,7 @@ from jobflow_remote.jobs.data import (
     JobDoc,
     JobInfo,
     RemoteError,
+    get_initial_batch_doc_dict,
     get_initial_flow_doc_dict,
     get_initial_job_doc_dict,
     get_reset_job_base_dict,
@@ -49,6 +52,7 @@ from jobflow_remote.jobs.state import (
     PAUSABLE_STATES,
     RESETTABLE_STATES,
     RUNNING_STATES,
+    BatchState,
     FlowState,
     JobState,
 )
@@ -111,6 +115,7 @@ class JobController:
         jobstore: JobStore,
         flows_collection: str = "flows",
         auxiliary_collection: str = "jf_auxiliary",
+        batches_collection: str | None = None,
         project: Project | None = None,
         optional_jobstores: dict[str, JobStore] | None = None,
     ) -> None:
@@ -129,6 +134,9 @@ class JobController:
         auxiliary_collection
             The name of the collection used to store other auxiliary data.
             Uses the DB defined in the queue_store.
+        batches_collection
+            The name of the collection used to store the batch processes.
+            This batches collection is optional.
         project
             The project where the Stores were defined.
         optional_jobstores
@@ -139,6 +147,7 @@ class JobController:
         self.jobs_collection = self.queue_store.collection_name
         self.flows_collection = flows_collection
         self.auxiliary_collection = auxiliary_collection
+        self.batches_collection = batches_collection
         self.optional_jobstores = optional_jobstores or {}
         # TODO should it connect here? Or the passed stores should be connected?
         self.queue_store.connect()
@@ -149,6 +158,9 @@ class JobController:
         self.jobs = self.queue_store._collection
         self.flows = self.db[self.flows_collection]
         self.auxiliary = self.db[self.auxiliary_collection]
+        self.batches = (
+            self.db[self.batches_collection] if self.batches_collection else None
+        )
         self.project = project
 
     @classmethod
@@ -189,6 +201,7 @@ class JobController:
         queue_store = project.get_queue_store()
         flows_collection = project.queue.flows_collection
         auxiliary_collection = project.queue.auxiliary_collection
+        batches_collection = project.queue.batches_collection
         jobstore = project.get_jobstore()
         optional_jobstores = {}
         if project.optional_jobstores:
@@ -199,6 +212,7 @@ class JobController:
             jobstore=jobstore,
             flows_collection=flows_collection,
             auxiliary_collection=auxiliary_collection,
+            batches_collection=batches_collection,
             project=project,
             optional_jobstores=optional_jobstores,
         )
@@ -2236,8 +2250,8 @@ class JobController:
                     n_updated_jobs += 1
 
             # no need for updated states, since all the Jobs have been already updated separately
-            final_state = self.update_flow_state(flow_uuid=flow_doc.uuid)
-            if final_state in [FlowState.PAUSED, FlowState.STOPPED]:
+            final_flow_state = self.update_flow_state(flow_uuid=flow_doc.uuid)
+            if final_flow_state in [FlowState.PAUSED, FlowState.STOPPED]:
                 logger.warning(
                     "The Flow was not fully resumed. Consider running resume again"
                 )
@@ -2972,6 +2986,8 @@ class JobController:
         self.auxiliary.drop()
         self.auxiliary.insert_one({"next_id": 1})
         self.auxiliary.insert_one({"running_runner": None})
+        if self.batches is not None:
+            self.batches.drop()
         self.update_version_information()
         self.build_indexes(drop=True)
 
@@ -3065,6 +3081,10 @@ class JobController:
         if flow_custom_indexes:
             for idx in flow_custom_indexes:
                 self.flows.create_index(idx, background=background)
+
+        if self.batches is not None:
+            # Here should there be an index on worker ?? in principle the batch unique id should be sufficient
+            self.batches.create_index(["batch_uid", "worker"], unique=True)
 
         def create_jobstore_indices(jobstore: JobStore, name: str):
             # if the docs_store is a MongoStore with a collection, create a proper composed
@@ -4377,7 +4397,7 @@ class JobController:
         self,
         query: dict,
         max_step_attempts: int,
-        delta_retry: tuple[int, ...],
+        delta_retry: tuple[float, ...],
         next_step_delay: int | None = None,
         **kwargs,
     ) -> Generator[MongoLock, None, None]:
@@ -4718,7 +4738,7 @@ class JobController:
         Returns
         -------
         dict
-            A dictionary with the {process_id: process_uuid} of the batch
+            A dictionary with the {process_id: batch_uid} of the batch
             jobs running on the selected worker.
         """
         if worker:
@@ -4731,9 +4751,35 @@ class JobController:
             return result["batch_processes"] or {}
         return {}
 
-    def add_batch_process(
-        self, process_id: str, process_uuid: str, worker: str
-    ) -> dict:
+    def get_all_batches(
+        self,
+        worker: str | list[str] | None = None,
+        batch_state: BatchState | list[BatchState] | None = None,
+        max_results: int = 20,
+        sort: dict | None = None,
+    ) -> list[BatchDoc] | None:
+        if self.batches is None:
+            return None
+
+        query: dict = {}
+        if worker:
+            if not isinstance(worker, list):
+                query["worker"] = worker
+            else:
+                query["worker"] = {"$in": worker}
+        if batch_state:
+            if not isinstance(batch_state, list):
+                query["batch_state"] = batch_state.value
+            else:
+                query["batch_state"] = {"$in": [bs.value for bs in batch_state]}
+        sort = sort or {"updated_on": -1}
+
+        return [
+            BatchDoc.model_validate(bd_dict)
+            for bd_dict in self.batches.find(query, sort=sort).limit(max_results)
+        ]
+
+    def add_batch_process(self, process_id: str, batch_uid: str, worker: str) -> dict:
         """
         Add a batch process to the list of running processes.
 
@@ -4745,8 +4791,8 @@ class JobController:
         ----------
         process_id
             The ID of the processes obtained from the QueueManager.
-        process_uuid
-            A unique ID to identify the processes.
+        batch_uid
+            A unique ID to identify the batch process.
         worker
             The worker where the process is being executed.
 
@@ -4755,13 +4801,49 @@ class JobController:
         dict
             The updated document.
         """
+        if self.batches is not None:
+            batch_doc_dict = get_initial_batch_doc_dict(
+                batch_uid=batch_uid, process_id=process_id, worker=worker
+            )
+            self.batches.insert_one(batch_doc_dict)
         return self.auxiliary.find_one_and_update(
             {"batch_processes": {"$exists": True}},
-            {"$set": {f"batch_processes.{worker}.{process_id}": process_uuid}},
+            {"$set": {f"batch_processes.{worker}.{process_id}": batch_uid}},
             upsert=True,
         )
 
-    def remove_batch_process(self, process_id: str, worker: str) -> dict:
+    def update_job_in_batch(
+        self, job_id: str, job_index: int, batch_uid: str, worker: str, info: typing.Any
+    ):
+        if self.batches is not None:
+            self.batches.update_one(
+                {"batch_uid": batch_uid, "worker": worker},
+                {
+                    "$set": {
+                        f"jobs.{job_id}.{job_index}": info,
+                        "updated_on": datetime.now(),
+                    }
+                },
+            )
+
+    def set_running_batch_process(
+        self, process_id: str, worker: str, start_time: datetime | None = None
+    ):
+        if self.batches is not None:
+            self.batches.update_one(
+                {"worker": worker, "process_id": process_id, "start_time": None},
+                {
+                    "$set": {
+                        "batch_state": BatchState.RUNNING.value,
+                        "updated_on": datetime.now(),
+                        "start_time": start_time or datetime.now(),
+                    }
+                },
+            )
+
+    def remove_batch_process(
+        self, process_id: str, worker: str, end_time: datetime | None = None
+    ) -> dict:
         """
         Remove a process from the list of running batch processes.
 
@@ -4771,12 +4853,25 @@ class JobController:
             The ID of the processes obtained from the QueueManager.
         worker
             The worker where the process was being executed.
+        end_time
+            The time at which the batch process ended.
 
         Returns
         -------
         dict
             The updated document.
         """
+        if self.batches is not None:
+            self.batches.update_one(
+                {"process_id": process_id},
+                {
+                    "$set": {
+                        "batch_state": BatchState.FINISHED.value,
+                        "updated_on": datetime.now(),
+                        "end_time": end_time or datetime.now(),
+                    }
+                },
+            )
         return self.auxiliary.find_one_and_update(
             {"batch_processes": {"$exists": True}},
             {"$unset": {f"batch_processes.{worker}.{process_id}": ""}},

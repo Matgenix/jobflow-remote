@@ -65,6 +65,11 @@ class BaseHost(MSONable):
         raise NotImplementedError
 
     @abc.abstractmethod
+    def read_text_file(self, filepath) -> str:
+        """Read content from a file on the host."""
+        raise NotImplementedError
+
+    @abc.abstractmethod
     def connect(self):
         raise NotImplementedError
 

@@ -586,39 +586,38 @@ def format_upgrade_actions(actions: list[UpgradeAction]):
 
 
 def get_batch_processes_table(
-    batch_processes: dict,
+    batch_processes: list,
     workers: dict[str, WorkerBase],
-    running_jobs: dict[str, list[tuple[str, int, str]]],
+    batches_jobs: list[list[tuple[str, str]]],
     verbosity: int = 0,
+    title: str = "Running batches info",
+    status: bool = False,
+    job_ids_column_name: str = "Running Job ids (Index)",
 ):
-    table = Table(title="Flows info")
+    table = Table(title=title)
     table.add_column("Process ID")
-    table.add_column("Process UUID")
+    table.add_column("Batch UID")
     table.add_column("Worker")
     table.add_column("Process folder")
+    if status:
+        table.add_column("Status")
     if verbosity > 0:
-        table.add_column("Running Job ids (Index)")
+        table.add_column(job_ids_column_name)
 
-    for worker_name, processes_data in batch_processes.items():
-        worker = workers[worker_name]
-        for process_id, process_uuid in processes_data.items():
-            row = [
-                process_id,
-                process_uuid,
-                worker_name,
-                get_job_path(process_uuid, None, worker.batch.work_dir),
-            ]
+    for ibatch, batch_data in enumerate(batch_processes):
+        worker = workers[batch_data.worker]
+        row = [
+            batch_data.process_id,
+            batch_data.batch_uid,
+            batch_data.worker,
+            get_job_path(batch_data.batch_uid, None, worker.batch.work_dir),
+        ]
+        if status:
+            row.append(batch_data.batch_state.value)
 
-            if verbosity > 0:
-                jobs_data = running_jobs.get(worker_name, [])
-                process_jobs = [
-                    f"{job_data[0]} ({job_data[1]})"
-                    for job_data in jobs_data
-                    if job_data[2] == process_uuid
-                ]
+        if verbosity > 0:
+            row.append("\n".join([f"{jb[0]} ({jb[1]})" for jb in batches_jobs[ibatch]]))
 
-                row.append("\n".join(process_jobs))
-
-            table.add_row(*row)
+        table.add_row(*row)
 
     return table
