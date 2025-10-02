@@ -163,3 +163,5 @@ cython_debug/
 .DS_store
 
 .sesskey
+
+doc/source/_static/_tmp/
