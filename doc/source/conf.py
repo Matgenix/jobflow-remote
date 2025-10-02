@@ -17,7 +17,16 @@ import sys
 sys.path.insert(
     0, os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 )
+import json
+
+from json_schema_for_humans.generate import (
+    GenerationConfiguration,
+    generate_from_filename,
+)
+
 import jobflow_remote
+from jobflow_remote.config.base import Project
+from jobflow_remote.config.settings import JobflowRemoteSettings
 
 # -- Project information -----------------------------------------------------
 
@@ -216,3 +225,24 @@ autoclass_content = "both"
 
 autodoc_pydantic_model_show_json = True
 # autodoc_pydantic_model_erdantic_figure = True
+
+# Auto-generate a nice schema for the Project
+os.makedirs("_static/_tmp", exist_ok=True)
+
+project_schema = Project.model_json_schema()
+with open("_static/_tmp/project_schema.json", "w") as f:
+    json.dump(project_schema, f)
+generate_from_filename(
+    "_static/_tmp/project_schema.json",
+    "_static/_tmp/project_schema.html",
+    config=GenerationConfiguration(with_footer=False),
+)
+
+settings_schema = JobflowRemoteSettings.model_json_schema()
+with open("_static/_tmp/jfremote_settings.json", "w") as f:
+    json.dump(settings_schema, f)
+generate_from_filename(
+    "_static/_tmp/jfremote_settings.json",
+    "_static/_tmp/jfremote_settings.html",
+    config=GenerationConfiguration(with_footer=False),
+)
