@@ -413,7 +413,7 @@ Project specs
 =============
 
 .. raw:: html
-   :file: ../_static/project_schema.html
+   :file: ../_static/_tmp/project_schema.html
 
 .. _projectconf general:
 
@@ -443,3 +443,8 @@ file itself (``JFREMOTE_CONFIG_FILE``).
 
 Some customization options are also available for the behaviour of the CLI.
 For more details see the API documentation :py:class:`jobflow_remote.config.settings.JobflowRemoteSettings`.
+
+Here after is the list of possible general settings:
+
+.. raw:: html
+   :file: ../_static/_tmp/jfremote_settings.html
