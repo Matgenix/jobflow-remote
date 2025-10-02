@@ -193,6 +193,9 @@ def check(
             "The following JFREMOTE_ prefixed environment variables were found:\n - "
         )
         out_console.print("\n - ".join(extra_vars))
+        out_console.print(
+            "\nCheck documentation of Jobflow-Remote for the available settings in https://matgenix.github.io/jobflow-remote/user/projectconf.html#general-settings-environment-variables\n"
+        )
         suggestions = {}
         for ev in extra_vars:
             if close_matches := difflib.get_close_matches(
