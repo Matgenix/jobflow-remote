@@ -84,6 +84,28 @@ def test_check(job_controller, monkeypatch, tmp_dir, run_check_cli) -> None:
         run_check_cli(["project", "check"], required_out=[*output, duplicated_msg])
 
 
+def test_check_env_vars(run_check_cli):
+    import os
+
+    # explicit typo in variable (should be with an "S" on PROJECT)
+    os.environ["JFREMOTE_PROJECT_FOLDER"] = "my project folder"
+    # random variable (should not be suggested)
+    os.environ["JFREMOTE_ZZZZZZZZZZZZZZZ"] = "zzz"
+
+    output = [
+        "The following JFREMOTE_ prefixed environment variables were found",
+        " - JFREMOTE_PROJECT_FOLDER",
+        " - JFREMOTE_ZZZZZZZZZZZZZZZ",
+        "Suggested environment variables",
+        "JFREMOTE_PROJECT_FOLDER -> JFREMOTE_PROJECTS_FOLDER",
+    ]
+    run_check_cli(
+        ["project", "check"],
+        required_out=output,
+        excluded_out="JFREMOTE_ZZZZZZZZZZZZZZZ -> ",
+    )
+
+
 def test_check_fail(job_controller, monkeypatch, tmp_dir, run_check_cli) -> None:
     import json
     import os
