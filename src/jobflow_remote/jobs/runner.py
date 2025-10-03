@@ -1265,8 +1265,8 @@ class Runner:
                 process_id=process_id,
             )
             return process_id
-        process_id, worker = self.job_controller.get_batch_process_id(batch_uid)
-        if worker != worker_name:
+        process_id, wk_name = self.job_controller.get_batch_process_id(batch_uid)
+        if wk_name != worker_name:
             raise RuntimeError("Wrong worker")
         return process_id
 
