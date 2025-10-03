@@ -1183,6 +1183,7 @@ class Runner:
             The list of job ids, job indexes and batch unique ids in the host
             running directory.
         """
+        logger.debug("update batch jobs: update running jobs")
         batch_processes = self.job_controller.get_all_batches(
             worker=worker_name,
             batch_state=[BatchState.SUBMITTED, BatchState.RUNNING],
@@ -1264,12 +1265,10 @@ class Runner:
                 process_id=process_id,
             )
             return process_id
-        doc = self.job_controller.batches.find_one(
-            {"batch_uid": batch_uid}, projection=["process_id"]
-        )
-        if doc:
-            return doc["process_id"]
-        raise RuntimeError("Could not get batch process id from batch unique id.")
+        process_id, worker = self.job_controller.get_batch_process_id(batch_uid)
+        if worker != worker_name:
+            raise RuntimeError("Wrong worker")
+        return process_id
 
     def batch_update_status(
         self,
@@ -1302,6 +1301,7 @@ class Runner:
             List of running batch process ids (e.g. Slurm ids)
 
         """
+        logger.debug("update batch jobs: update status")
         batch_processes_data = self.job_controller.get_all_batches(
             worker=worker_name,
             batch_state=[BatchState.SUBMITTED, BatchState.RUNNING],
@@ -1334,6 +1334,11 @@ class Runner:
                     (b.batch_uid for b in batch_processes_data if b.process_id == pid),
                     None,
                 )
+                if batch_uid is None:
+                    logger.warning(
+                        f"failed to find batch unique id for running batch with process id: {pid}",
+                    )
+                    continue
                 batch_dir = get_job_path(
                     job_id=batch_uid,
                     index=None,
@@ -1344,7 +1349,7 @@ class Runner:
                 )
                 start_time = batch_info.get("start_time", None) if batch_info else None
                 self.job_controller.set_running_batch_process(
-                    pid, start_time=start_time
+                    batch_uid, start_time=start_time
                 )
                 if start_time:
                     if worker_name not in self._cached_running_batch_pids:
@@ -1356,6 +1361,11 @@ class Runner:
                     (b.batch_uid for b in batch_processes_data if b.process_id == pid),
                     None,
                 )
+                if batch_uid is None:
+                    logger.warning(
+                        f"failed to find batch unique id for stopped batch with process id: {pid}",
+                    )
+                    continue
                 batch_dir = get_job_path(
                     job_id=batch_uid,
                     index=None,
@@ -1371,7 +1381,9 @@ class Runner:
                     )
                 else:
                     end_time = None
-                self.job_controller.set_finished_batch_process(pid, end_time=end_time)
+                self.job_controller.set_finished_batch_process(
+                    batch_uid, end_time=end_time
+                )
                 if pid in self._cached_running_batch_pids.get(worker_name, set()):
                     self._cached_running_batch_pids[worker_name].remove(pid)
                 # check if there are jobs that were in the running folder of a
@@ -1412,6 +1424,7 @@ class Runner:
         worker: WorkerBase,
         running_batch_processes: list[str],
     ):
+        logger.debug("update batch jobs: submit batch processes")
         dict_n_jobs = self.job_controller.count_jobs_states(
             [JobState.BATCH_SUBMITTED, JobState.BATCH_RUNNING],
             worker=worker_name,
@@ -1500,6 +1513,7 @@ class Runner:
                 logger.error(f"unhandled submission status {submit_result.status}")
 
     def batch_update_terminated_jobs(self, batch_manager, worker_name, worker):
+        logger.debug("update batch jobs: update terminated jobs")
         terminated_jobs = []
         try:
             terminated_jobs = batch_manager.get_terminated()

@@ -2986,8 +2986,7 @@ class JobController:
         self.auxiliary.drop()
         self.auxiliary.insert_one({"next_id": 1})
         self.auxiliary.insert_one({"running_runner": None})
-        if self.batches is not None:
-            self.batches.drop()
+        self.batches.drop()
         self.update_version_information()
         self.build_indexes(drop=True)
 
@@ -3041,6 +3040,7 @@ class JobController:
             self.jobs.drop_indexes()
             self.flows.drop_indexes()
             self.auxiliary.drop_indexes()
+            self.batches.drop_indexes()
 
         self.jobs.create_index("db_id", unique=True, background=background)
         self.jobs.create_index(
@@ -3082,13 +3082,23 @@ class JobController:
             for idx in flow_custom_indexes:
                 self.flows.create_index(idx, background=background)
 
-        if self.batches is not None:
-            # Here should there be an index on worker ?? in principle the batch unique id should be sufficient
-            self.batches.create_index(["batch_uid", "worker"], unique=True)
+        # Here should there be an index on worker ?? in principle the batch unique id should be sufficient
+        self.batches.create_index(
+            [("batch_uid", 1)], unique=True, background=background
+        )
+        self.batches.create_index(
+            [("batch_uid", 1), ("start_time", 1)], unique=True, background=background
+        )
+        self.batches.create_index(
+            [("worker", 1), ("batch_state", 1)], background=background
+        )
+        self.batches.create_index([("worker", 1)], background=background)
+        self.batches.create_index([("batch_state", 1)], background=background)
+        self.batches.create_index([("updated_on", -1)], background=background)
 
         def create_jobstore_indices(jobstore: JobStore, name: str):
             # if the docs_store is a MongoStore with a collection, create a proper composed
-            # index that is the most effective for retrieving outputs. Otherwise create a simple
+            # index that is the most effective for retrieving outputs. Otherwise, create a simple
             # index based on the maggma interface for the two indexes separately.
             # In any case trap all exceptions, as this should not be a blocking point
             try:
@@ -4731,9 +4741,6 @@ class JobController:
         max_results: int = 20,
         sort: dict | None = None,
     ) -> list[BatchDoc] | None:
-        if self.batches is None:
-            return None
-
         query: dict = {}
         if worker:
             if not isinstance(worker, list):
@@ -4751,6 +4758,19 @@ class JobController:
             BatchDoc.model_validate(bd_dict)
             for bd_dict in self.batches.find(query, sort=sort).limit(max_results)
         ]
+
+    def get_batch_process_id(self, batch_uid: str) -> tuple[str, str]:
+        """Get the process id and worker of a batch process from its unique id.
+
+        Parameters
+        ----------
+        batch_uid
+            The batch unique id.
+        """
+        doc = self.batches.find_one(
+            {"batch_uid": batch_uid}, projection=["process_id", "worker"]
+        )
+        return doc["process_id"], doc["worker"]
 
     def add_batch_process(self, process_id: str, batch_uid: str, worker: str) -> dict:
         """
@@ -4783,7 +4803,7 @@ class JobController:
         self, job_id: str, job_index: int, batch_uid: str, worker: str, info: typing.Any
     ):
         self.batches.update_one(
-            {"batch_uid": batch_uid, "worker": worker},
+            {"batch_uid": batch_uid},
             {
                 "$set": {
                     f"jobs.{job_id}.{job_index}": info,
@@ -4793,15 +4813,15 @@ class JobController:
         )
 
     def set_running_batch_process(
-        self, process_id: str, start_time: datetime | None = None
+        self, batch_uid: str, start_time: datetime | None = None
     ):
         """
         Sets state of batch process as running.
 
         Parameters
         ----------
-        process_id
-            The ID of the processes obtained from the QueueManager.
+        batch_uid
+            The batch unique id.
         start_time
             The time at which the batch process started.
 
@@ -4811,7 +4831,7 @@ class JobController:
             The updated document.
         """
         return self.batches.update_one(
-            {"process_id": process_id, "start_time": None},
+            {"batch_uid": batch_uid, "start_time": None},
             {
                 "$set": {
                     "batch_state": BatchState.RUNNING.value,
@@ -4822,15 +4842,15 @@ class JobController:
         )
 
     def set_finished_batch_process(
-        self, process_id: str, end_time: datetime | None = None
+        self, batch_uid: str, end_time: datetime | None = None
     ) -> dict:
         """
         Sets state of batch process as finished.
 
         Parameters
         ----------
-        process_id
-            The ID of the processes obtained from the QueueManager.
+        batch_uid
+            The batch unique id.
         end_time
             The time at which the batch process ended.
 
@@ -4840,7 +4860,7 @@ class JobController:
             The updated document.
         """
         return self.batches.update_one(
-            {"process_id": process_id},
+            {"batch_uid": batch_uid},
             {
                 "$set": {
                     "batch_state": BatchState.FINISHED.value,
