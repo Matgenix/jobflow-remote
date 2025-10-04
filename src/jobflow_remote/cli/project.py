@@ -190,11 +190,13 @@ def check(
     ]
     if extra_vars:
         out_console.print(
-            "The following JFREMOTE_ prefixed environment variables were found:\n - "
+            "The following environment variables with the JFREMOTE_ prefix were found, "
+            "but they don't match any recognized configuration variables and may be incorrect.:\n - "
         )
         out_console.print("\n - ".join(extra_vars))
         out_console.print(
-            "\nCheck documentation of Jobflow-Remote for the available settings in https://matgenix.github.io/jobflow-remote/user/projectconf.html#general-settings-environment-variables\n"
+            "\nCheck documentation of Jobflow-Remote for the available settings in "
+            "https://matgenix.github.io/jobflow-remote/user/projectconf.html#general-settings-environment-variables\n"
         )
         suggestions = {}
         for ev in extra_vars:

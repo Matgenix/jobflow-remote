@@ -164,4 +164,5 @@ cython_debug/
 
 .sesskey
 
+# temporary folder for the generation of nice schemas in html
 doc/source/_static/_tmp/
