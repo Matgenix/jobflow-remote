@@ -4739,7 +4739,7 @@ class JobController:
         worker: str | list[str] | None = None,
         batch_state: BatchState | list[BatchState] | None = None,
         max_results: int = 20,
-        sort: dict | None = None,
+        sort: str | list | None = None,
     ) -> list[BatchDoc] | None:
         query: dict = {}
         if worker:
@@ -4752,7 +4752,13 @@ class JobController:
                 query["batch_state"] = batch_state.value
             else:
                 query["batch_state"] = {"$in": [bs.value for bs in batch_state]}
-        sort = sort or {"updated_on": -1}
+        # Some batches may have updated at exactly the same time (up to ms precision of MongoDB)
+        # To make sure we have always same order (in particular when limiting number of results),
+        # we add a sort on process_id as well.
+        sort = sort or [
+            ("updated_on", pymongo.DESCENDING),
+            ("process_id", pymongo.ASCENDING),
+        ]
 
         return [
             BatchDoc.model_validate(bd_dict)
