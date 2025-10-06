@@ -120,6 +120,7 @@ header_name_data_getter_map = {
         if ji.lock_time
         else None,
     ),
+    "metadata": ("Metadata", lambda ji: render_scope(ji.metadata)),
 }
 
 
@@ -139,7 +140,7 @@ def get_job_info_table(
         if verbosity == 1:
             output_keys.append(all_output_keys[10])
         if verbosity >= 2:
-            output_keys += all_output_keys[11:13]
+            output_keys += all_output_keys[11:14]
     all_display_keys = output_keys + stored_data_keys
 
     # Use a dictionary to determine how to extract the value to print from each
