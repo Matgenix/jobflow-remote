@@ -192,6 +192,7 @@ def get_flow_info_table(flows_info: list[FlowInfo], verbosity: int) -> Table:
         table.add_column("Workers")
 
         table.add_column("Job states")
+        table.add_column("Flow metadata")
 
     for fi in flows_info:
         # show the smallest Job db_id as db_id
@@ -211,6 +212,7 @@ def get_flow_info_table(flows_info: list[FlowInfo], verbosity: int) -> Table:
             row.append(", ".join(workers))
             job_states = "-".join(js.short_value for js in fi.job_states)
             row.append(job_states)
+            row.append(render_scope(fi.flow_metadata))
 
         table.add_row(*row)
 
