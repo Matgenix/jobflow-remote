@@ -4772,10 +4772,19 @@ class JobController:
         ----------
         batch_uid
             The batch unique id.
+
+        Raises
+        ------
+        MissingDocumentError
+            If no batch with the give unique id exists in the database.
         """
         doc = self.batches.find_one(
             {"batch_uid": batch_uid}, projection=["process_id", "worker"]
         )
+        if doc is None:
+            raise MissingDocumentError(
+                f"No batch process matching batch_uid {batch_uid}"
+            )
         return doc["process_id"], doc["worker"]
 
     def add_batch_process(self, process_id: str, batch_uid: str, worker: str) -> dict:

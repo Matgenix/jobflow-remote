@@ -48,6 +48,7 @@ from jobflow_remote.remote.data import (
 )
 from jobflow_remote.remote.queue import ERR_FNAME, OUT_FNAME, QueueManager, set_name_out
 from jobflow_remote.utils.data import suuid
+from jobflow_remote.utils.db import MissingDocumentError
 from jobflow_remote.utils.log import initialize_runner_logger
 from jobflow_remote.utils.remote import UnsafeDeletionError, safe_remove_job_files
 from jobflow_remote.utils.schedule import SafeScheduler
@@ -1248,7 +1249,7 @@ class Runner:
         batch_uid: str,
         worker_name: str,
         worker: WorkerBase,
-    ) -> str:
+    ) -> str | None:
         # First, try to take from the cached batches info
         if worker_batches := self._cached_batches.get(worker_name):  # noqa: SIM102
             if batch_uid in worker_batches:
@@ -1265,9 +1266,16 @@ class Runner:
                 process_id=process_id,
             )
             return process_id
-        process_id, wk_name = self.job_controller.get_batch_process_id(batch_uid)
-        if wk_name != worker_name:
-            raise RuntimeError("Wrong worker")
+        try:
+            process_id, wk_name = self.job_controller.get_batch_process_id(batch_uid)
+            if wk_name != worker_name:
+                raise RuntimeError("Wrong worker")
+        except MissingDocumentError:
+            process_id = None
+            logger.warning(
+                f"error trying to get the process id and worker for batch with unique id: {batch_uid}",
+                exc_info=True,
+            )
         return process_id
 
     def batch_update_status(
