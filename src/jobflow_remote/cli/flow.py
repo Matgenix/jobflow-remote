@@ -256,6 +256,7 @@ def delete(
 def flow_info(
     flow_db_id: flow_db_id_arg,
     job_id_flag: job_flow_id_flag_opt = False,
+    verbosity: verbosity_opt = 0,
 ) -> None:
     """Provide detailed information on a Flow."""
     db_id, jf_id = get_job_db_ids(flow_db_id, None)
@@ -280,7 +281,7 @@ def flow_info(
     if not flows_info:
         exit_with_error_msg("No data matching the request")
 
-    out_console.print(format_flow_info(flows_info[0]))
+    out_console.print(format_flow_info(flows_info[0], verbosity=verbosity))
 
 
 @app_flow.command()
