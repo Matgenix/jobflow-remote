@@ -301,35 +301,14 @@ def format_job_info(
     return render_scope_jfr(sorted_d, sort_keys=False, overflow="fold")
 
 
-def format_flow_info(flow_info: FlowInfo, verbosity=0) -> Table:
+def format_flow_info(flow_info: FlowInfo, verbosity=0, output_keys=None) -> Table:
     title = f"Flow: {flow_info.name} - {flow_info.flow_id} - {flow_info.state.name}"
     if verbosity > 0:
         title += f"\nMetadata: {flow_info.flow_metadata}"
-    table = Table(title=title)
-    table.title_style = "bold"
-    table.add_column("DB id")
-    table.add_column("Name")
-    table.add_column("State")
-    table.add_column("Job id  (Index)")
-    table.add_column("Worker")
-    if verbosity > 1:
-        table.add_column("Metadata")
-
-    for i, job_id in enumerate(flow_info.job_ids):
-        state = flow_info.job_states[i].name
-
-        row = [
-            str(flow_info.db_ids[i]),
-            flow_info.job_names[i],
-            state,
-            f"{job_id}  ({flow_info.job_indexes[i]})",
-            flow_info.workers[i],
-        ]
-        if verbosity > 1:
-            row.append(render_scope(flow_info.jobs_metadata[i]))
-
-        table.add_row(*row)
-
+    table = get_job_info_table(
+        flow_info.jobs_info, verbosity=verbosity, output_keys=output_keys
+    )
+    table.title = title
     return table
 
 

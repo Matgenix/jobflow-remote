@@ -2491,6 +2491,7 @@ class JobController:
         limit: int = 0,
         skip: int = 0,
         full: bool = False,
+        with_jobs_info: bool = False,
     ) -> list[FlowInfo]:
         """
         Query for Flows based on standard parameters and return a list of FlowInfo.
@@ -2530,6 +2531,8 @@ class JobController:
             document will be used.
         skip
             The number of documents to omit (from the start of the result set).
+        with_jobs_info
+            If True, JobInfo for each job will be created.
 
         Returns
         -------
@@ -2564,7 +2567,9 @@ class JobController:
         else:
             data = list(self.flows.find(query, sort=sort, limit=limit, skip=skip))
 
-        return [FlowInfo.from_query_dict(d) for d in data]
+        return [
+            FlowInfo.from_query_dict(d, with_jobs_info=with_jobs_info) for d in data
+        ]
 
     def get_flow_store(self, flow_id: str) -> str | None:
         """
