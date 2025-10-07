@@ -301,12 +301,17 @@ def format_job_info(
     return render_scope_jfr(sorted_d, sort_keys=False, overflow="fold")
 
 
-def format_flow_info(flow_info: FlowInfo, verbosity=0, output_keys=None) -> Table:
+def format_flow_info(
+    flow_info: FlowInfo, verbosity=0, output_keys=None, stored_data_keys=None
+) -> Table:
     title = f"Flow: {flow_info.name} - {flow_info.flow_id} - {flow_info.state.name}"
     if verbosity > 0:
         title += f"\nMetadata: {flow_info.flow_metadata}"
     table = get_job_info_table(
-        flow_info.jobs_info, verbosity=verbosity, output_keys=output_keys
+        flow_info.jobs_info,
+        verbosity=verbosity,
+        output_keys=output_keys,
+        stored_data_keys=stored_data_keys,
     )
     table.title = title
     return table

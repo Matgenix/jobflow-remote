@@ -259,6 +259,14 @@ def flow_info(
     flow_db_id: flow_db_id_arg,
     job_id_flag: job_flow_id_flag_opt = False,
     verbosity: verbosity_opt = 0,
+    stored_data_keys: Annotated[
+        Optional[list[str]],
+        typer.Option(
+            "--stored-data-key",
+            "-sdk",
+            help="Key to be shown from the stored_data field.",
+        ),
+    ] = None,
     cli_output_keys: Annotated[
         Optional[str],
         typer.Option(
@@ -279,6 +287,14 @@ def flow_info(
         if cli_output_keys
         else SETTINGS.cli_job_list_columns or []
     )
+    if not set(output_keys).issubset(header_name_data_getter_map):
+        exit_with_error_msg(
+            f"Header keys not supported: {set(output_keys).difference(header_name_data_getter_map)}"
+        )
+    if stored_data_keys and not set(output_keys).isdisjoint(stored_data_keys):
+        exit_with_error_msg(
+            "Specifying a stored data key which is a standard column is disallowed."
+        )
 
     db_id, jf_id = get_job_db_ids(flow_db_id, None)
     db_ids = job_ids = flow_ids = None
@@ -304,7 +320,12 @@ def flow_info(
         exit_with_error_msg("No data matching the request")
 
     out_console.print(
-        format_flow_info(flows_info[0], verbosity=verbosity, output_keys=output_keys)
+        format_flow_info(
+            flows_info[0],
+            verbosity=verbosity,
+            output_keys=output_keys,
+            stored_data_keys=stored_data_keys,
+        )
     )
 
 
