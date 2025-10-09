@@ -175,6 +175,48 @@ def check(
     """Check that the connection to the different elements of the projects are working."""
     check_incompatible_opt({"jobstore": jobstore, "queue": queue, "worker": worker})
 
+    # Check environment variables starting with jfremote_ prefix
+    import difflib
+    import os
+
+    from jobflow_remote import SETTINGS
+
+    prefix = SETTINGS.model_config["env_prefix"]
+    extra_vars = [
+        k
+        for k in os.environ
+        if k.lower().startswith(prefix)
+        and k[len(prefix) :].lower() not in SETTINGS.model_fields
+    ]
+    if extra_vars:
+        out_console.print(
+            "The following environment variables with the JFREMOTE_ prefix were found, "
+            "but they don't match any recognized configuration variables and may be incorrect.:\n - "
+        )
+        out_console.print("\n - ".join(extra_vars))
+        out_console.print(
+            "\nCheck documentation of Jobflow-Remote for the available settings in "
+            "https://matgenix.github.io/jobflow-remote/user/projectconf.html#general-settings-environment-variables\n"
+        )
+        suggestions = {}
+        for ev in extra_vars:
+            if close_matches := difflib.get_close_matches(
+                ev[len(prefix) :].upper(),
+                [f.upper() for f in SETTINGS.model_fields],
+                n=1,
+            ):
+                suggestions[ev] = close_matches[0]
+        if suggestions:
+            out_console.print("Suggested environment variables:\n - ")
+            out_console.print(
+                "\n - ".join(
+                    [
+                        f"{ev} -> JFREMOTE_{suggestion}"
+                        for ev, suggestion in suggestions.items()
+                    ]
+                )
+            )
+
     cm = get_config_manager()
     project = cm.get_project()
 

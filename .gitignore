@@ -163,3 +163,6 @@ cython_debug/
 .DS_store
 
 .sesskey
+
+# temporary folder for the generation of nice schemas in html
+doc/source/_static/_tmp/
