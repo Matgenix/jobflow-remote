@@ -1271,6 +1271,10 @@ class Runner:
             if wk_name != worker_name:
                 raise RuntimeError("Wrong worker")
         except MissingDocumentError:
+            # This situation should not normally occur unless multiple runners are active at once.
+            # Although running multiple runners is currently disallowed, we keep this fallback to
+            # handle unexpected cases, either due to a bug or if multiple runners are intentionally
+            # started by the user.
             process_id = None
             logger.warning(
                 f"error trying to get the process id and worker for batch with unique id: {batch_uid}",
