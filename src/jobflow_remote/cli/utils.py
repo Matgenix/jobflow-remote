@@ -210,6 +210,28 @@ def check_only_one_opt(d: dict) -> None:
         )
 
 
+def check_output_stored_data_keys(
+    cli_output_keys, stored_data_keys, verbosity, header_name_data_getter_map
+):
+    check_incompatible_opt({"output": cli_output_keys, "verbosity": verbosity})
+    from jobflow_remote import SETTINGS
+
+    output_keys = (
+        cli_output_keys.split(",")
+        if cli_output_keys
+        else SETTINGS.cli_job_list_columns or []
+    )
+    if not set(output_keys).issubset(header_name_data_getter_map):
+        exit_with_error_msg(
+            f"Header keys not supported: {set(output_keys).difference(header_name_data_getter_map)}"
+        )
+    if stored_data_keys and not set(output_keys).isdisjoint(stored_data_keys):
+        exit_with_error_msg(
+            "Specifying a stored data key which is a standard column is disallowed."
+        )
+    return output_keys
+
+
 @contextmanager
 def loading_spinner(processing: bool = True):
     with Progress(

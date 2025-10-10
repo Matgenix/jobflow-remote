@@ -480,8 +480,6 @@ class FlowInfo(BaseModel):
     job_names: list[str]
     parents: list[list[str]]
     hosts: list[list[str]]
-    flow_metadata: dict
-    jobs_metadata: list[dict]
     jobs_info: Optional[list[JobInfo]] = None
 
     @classmethod
@@ -496,7 +494,6 @@ class FlowInfo(BaseModel):
         job_names = []
         parents = []
         job_hosts = []
-        jobs_metadata = []
         jobs_info = []
 
         if jobs_data:
@@ -513,7 +510,6 @@ class FlowInfo(BaseModel):
                 workers.append(job_doc["worker"])
                 parents.append(job_doc["parents"] or [])
                 job_hosts.append(job_doc["job"]["hosts"] or [])
-                jobs_metadata.append(job_doc["job"]["metadata"])
                 if with_jobs_info:
                     jobs_info.append(JobInfo.from_query_output(job_doc))
         else:
@@ -540,8 +536,6 @@ class FlowInfo(BaseModel):
             job_names=job_names,
             parents=parents,
             hosts=job_hosts,
-            flow_metadata=d["metadata"],
-            jobs_metadata=jobs_metadata,
             jobs_info=jobs_info or None,
         )
 

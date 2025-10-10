@@ -21,6 +21,7 @@ from jobflow_remote.cli.jfr_typer import JFRTyper
 from jobflow_remote.cli.types import (
     OptionalStr,
     break_lock_opt,
+    cli_output_keys_opt,
     count_opt,
     days_opt,
     db_ids_opt,
@@ -45,6 +46,7 @@ from jobflow_remote.cli.types import (
     reverse_sort_flag_opt,
     sort_opt,
     start_date_opt,
+    stored_data_keys_opt,
     verbosity_opt,
     wait_lock_opt,
     worker_name_opt,
@@ -53,6 +55,7 @@ from jobflow_remote.cli.utils import (
     ReportInterval,
     SortOption,
     check_incompatible_opt,
+    check_output_stored_data_keys,
     check_stopped_runner,
     execute_multi_jobs_cmd,
     exit_with_error_msg,
@@ -115,24 +118,8 @@ def jobs_list(
         ),
     ] = False,
     count: count_opt = False,
-    stored_data_keys: Annotated[
-        Optional[list[str]],
-        typer.Option(
-            "--stored-data-key",
-            "-sdk",
-            help="Key to be shown from the stored_data field.",
-        ),
-    ] = None,
-    cli_output_keys: Annotated[
-        Optional[str],
-        typer.Option(
-            "--output",
-            "-o",
-            help=f"Table columns to be shown. Needs to be specified as string with comma separated keys, e.g."
-            f"'state,db_id,name'. Overrides the verbosity option. Can also be set in the config file. "
-            f"Available options are: {', '.join(header_name_data_getter_map)}",
-        ),
-    ] = None,
+    stored_data_keys: stored_data_keys_opt = None,
+    cli_output_keys: cli_output_keys_opt = None,
     color: Annotated[
         bool,
         typer.Option(
@@ -151,20 +138,23 @@ def jobs_list(
     check_incompatible_opt({"end_date": end_date, "days": days, "hours": hours})
     # check_incompatible_opt({"state": state, "error": error})
     # check_incompatible_opt({"state": state, "running": running})
-    check_incompatible_opt({"output": cli_output_keys, "verbosity": verbosity})
-    output_keys = (
-        cli_output_keys.split(",")
-        if cli_output_keys
-        else SETTINGS.cli_job_list_columns or []
+    output_keys = check_output_stored_data_keys(
+        cli_output_keys, stored_data_keys, verbosity, header_name_data_getter_map
     )
-    if not set(output_keys).issubset(header_name_data_getter_map):
-        exit_with_error_msg(
-            f"Header keys not supported: {set(output_keys).difference(header_name_data_getter_map)}"
-        )
-    if stored_data_keys and not set(output_keys).isdisjoint(stored_data_keys):
-        exit_with_error_msg(
-            "Specifying a stored data key which is a standard column is disallowed."
-        )
+    # check_incompatible_opt({"output": cli_output_keys, "verbosity": verbosity})
+    # output_keys = (
+    #     cli_output_keys.split(",")
+    #     if cli_output_keys
+    #     else SETTINGS.cli_job_list_columns or []
+    # )
+    # if not set(output_keys).issubset(header_name_data_getter_map):
+    #     exit_with_error_msg(
+    #         f"Header keys not supported: {set(output_keys).difference(header_name_data_getter_map)}"
+    #     )
+    # if stored_data_keys and not set(output_keys).isdisjoint(stored_data_keys):
+    #     exit_with_error_msg(
+    #         "Specifying a stored data key which is a standard column is disallowed."
+    #     )
 
     job_ids_indexes = get_job_ids_indexes(job_id)
 

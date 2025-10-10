@@ -17,6 +17,7 @@ from jobflow_remote.cli.formatting import (
 from jobflow_remote.cli.jf import app
 from jobflow_remote.cli.jfr_typer import JFRTyper
 from jobflow_remote.cli.types import (
+    cli_output_keys_opt,
     count_opt,
     days_opt,
     db_ids_opt,
@@ -38,12 +39,14 @@ from jobflow_remote.cli.types import (
     reverse_sort_flag_opt,
     sort_opt,
     start_date_opt,
+    stored_data_keys_opt,
     verbosity_opt,
 )
 from jobflow_remote.cli.utils import (
     ReportInterval,
     SortOption,
     check_incompatible_opt,
+    check_output_stored_data_keys,
     exit_with_error_msg,
     exit_with_warning_msg,
     get_job_controller,
@@ -259,42 +262,30 @@ def flow_info(
     flow_db_id: flow_db_id_arg,
     job_id_flag: job_flow_id_flag_opt = False,
     verbosity: verbosity_opt = 0,
-    stored_data_keys: Annotated[
-        Optional[list[str]],
-        typer.Option(
-            "--stored-data-key",
-            "-sdk",
-            help="Key to be shown from the stored_data field.",
-        ),
-    ] = None,
-    cli_output_keys: Annotated[
-        Optional[str],
-        typer.Option(
-            "--output",
-            "-o",
-            help=f"Table columns to be shown. Needs to be specified as string with comma separated keys, e.g."
-            f"'state,db_id,name'. Overrides the verbosity option. Can also be set in the config file. "
-            f"Available options are: {', '.join(header_name_data_getter_map)}",
-        ),
-    ] = None,
+    stored_data_keys: stored_data_keys_opt = None,
+    cli_output_keys: cli_output_keys_opt = None,
 ) -> None:
     """Provide detailed information on a Flow."""
-    from jobflow_remote import SETTINGS
 
-    check_incompatible_opt({"output": cli_output_keys, "verbosity": verbosity})
-    output_keys = (
-        cli_output_keys.split(",")
-        if cli_output_keys
-        else SETTINGS.cli_job_list_columns or []
+    output_keys = check_output_stored_data_keys(
+        cli_output_keys, stored_data_keys, verbosity, header_name_data_getter_map
     )
-    if not set(output_keys).issubset(header_name_data_getter_map):
-        exit_with_error_msg(
-            f"Header keys not supported: {set(output_keys).difference(header_name_data_getter_map)}"
-        )
-    if stored_data_keys and not set(output_keys).isdisjoint(stored_data_keys):
-        exit_with_error_msg(
-            "Specifying a stored data key which is a standard column is disallowed."
-        )
+    # from jobflow_remote import SETTINGS
+    #
+    # check_incompatible_opt({"output": cli_output_keys, "verbosity": verbosity})
+    # output_keys = (
+    #     cli_output_keys.split(",")
+    #     if cli_output_keys
+    #     else SETTINGS.cli_job_list_columns or []
+    # )
+    # if not set(output_keys).issubset(header_name_data_getter_map):
+    #     exit_with_error_msg(
+    #         f"Header keys not supported: {set(output_keys).difference(header_name_data_getter_map)}"
+    #     )
+    # if stored_data_keys and not set(output_keys).isdisjoint(stored_data_keys):
+    #     exit_with_error_msg(
+    #         "Specifying a stored data key which is a standard column is disallowed."
+    #     )
 
     db_id, jf_id = get_job_db_ids(flow_db_id, None)
     db_ids = job_ids = flow_ids = None

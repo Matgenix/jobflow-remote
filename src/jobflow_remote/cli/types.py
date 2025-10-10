@@ -4,6 +4,7 @@ from typing import Annotated, Optional
 import click
 import typer
 
+from jobflow_remote.cli.formatting import header_name_data_getter_map
 from jobflow_remote.cli.utils import (
     IndexDirection,
     SerializeFileFormat,
@@ -403,6 +404,26 @@ count_opt = Annotated[
     typer.Option(
         "--count",
         help="Just return the count of the selected elements",
+    ),
+]
+
+
+stored_data_keys_opt = Annotated[
+    Optional[list[str]],
+    typer.Option(
+        "--stored-data-key",
+        "-sdk",
+        help="Key to be shown from the stored_data field.",
+    ),
+]
+cli_output_keys_opt = Annotated[
+    Optional[str],
+    typer.Option(
+        "--output",
+        "-o",
+        help=f"Table columns to be shown. Needs to be specified as string with comma separated keys, e.g."
+        f"'state,db_id,name'. Overrides the verbosity option. Can also be set in the config file. "
+        f"Available options are: {', '.join(header_name_data_getter_map)}",
     ),
 ]
 

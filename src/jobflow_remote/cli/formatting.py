@@ -20,7 +20,7 @@ from jobflow_remote.remote.data import get_job_path
 from jobflow_remote.utils.data import convert_utc_time
 
 if TYPE_CHECKING:
-    from rich.console import RenderableType
+    from rich.console import ConsoleRenderable, RenderableType
 
     from jobflow_remote.config.base import ExecutionConfig, WorkerBase
     from jobflow_remote.jobs.data import FlowInfo, JobDoc, JobInfo
@@ -369,7 +369,7 @@ def get_worker_table(workers: dict[str, WorkerBase], verbosity: int = 0) -> Tabl
         table.add_column("details")
 
     for name in sorted(workers):
-        row = [Text(name, style="bold")]
+        row: list[Text | str | ConsoleRenderable] = [Text(name, style="bold")]
         worker = workers[name]
         if verbosity > 0:
             row.append(worker.type)
