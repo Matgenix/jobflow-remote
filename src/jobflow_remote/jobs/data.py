@@ -480,6 +480,7 @@ class FlowInfo(BaseModel):
     job_names: list[str]
     parents: list[list[str]]
     hosts: list[list[str]]
+    flow_metadata: dict
     jobs_info: Optional[list[JobInfo]] = None
 
     @classmethod
@@ -536,6 +537,7 @@ class FlowInfo(BaseModel):
             job_names=job_names,
             parents=parents,
             hosts=job_hosts,
+            flow_metadata=d["metadata"],
             jobs_info=jobs_info or None,
         )
 
