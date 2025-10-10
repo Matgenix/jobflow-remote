@@ -228,26 +228,35 @@ Queue Store
 -----------
 
 The ``queue`` element contains the definition of the database containing the
-state of the Jobs and Flows.  The subelement ``store`` should contain the
+state of the Jobs and Flows. The subelement ``store`` should contain the
 representation of a `maggma <https://materialsproject.github.io/maggma/>`_ ``Store``.
 As for the ``JobStore`` it can be either its serialization or the same kind
 of representation used for the ``docs_store`` in jobflow's configuration file.
 
-The collection defined by the ``Store`` will contain the information about the
-state of the ``Job``, while two more collections will be created. The name
-of these two collections can also be customized.
+The main collection defined by the ``Store`` will contain the information about the
+state of the ``Jobs``. In addition to this Jobs collection, jobflow-remote also relies on several
+other collections within the same database to  manage and track different aspects of the system:
+
+- **Flows collection**: keeps track of the state of Flows and their relationship to Jobs.
+- **Auxiliary collection**: stores additional internal metadata required by jobflow-remote.
+- **Batches collection**: stores information about *batch processes* (see :ref:`Batch submission`),
+  including their state, associated worker, start and end times, and the list of Jobs
+  executed within each batch. This collection allows for monitoring both active and
+  past batch executions.
+
+The names of these collections can be customized in the configuration file.
 
 .. warning::
 
     The queue ``Store`` should be a subclass of the ``MongoStore`` and currently
     it should be based on a real MongoDB (e.g. not a ``JSONStore``).
     Some key operations required by jobflow-remote on the collections are not
-    supported by any file based MongoDB implementation at the moment.
+    supported by any file-based MongoDB implementation at the moment.
 
 .. warning::
 
     If the ``JobStore`` is also based on a MongoDB, it is often convenient to have
-    its main ``docs_store`` in the same database as the ``queue`` store, in that
+    its main ``docs_store`` in the same database as the ``queue`` store. In that
     case it is important that the two do **not point to the same collection**.
     Unexpected errors may happen otherwise.
 
@@ -255,7 +264,7 @@ of these two collections can also be customized.
 
     Define a queue store as maggma store. It is possible to use the same syntax
     as for the ``JobStore``. Customizing the names of the additional collections
-    is also possible but not necessary
+    is also possible but not necessary.
 
     .. code-block:: yaml
 
@@ -270,6 +279,7 @@ of these two collections can also be customized.
             collection_name: jobs
           flows_collection: flows
           auxiliary_collection: jf_auxiliary
+          batches_collection: jf_batches
 
 
 .. _projectconf execconfig:
