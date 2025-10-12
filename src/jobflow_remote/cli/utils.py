@@ -290,7 +290,8 @@ def cli_error_handler(func):
             raise  # Do not capture click or typer exceptions
         except ProjectUndefinedError:
             exit_with_error_msg(
-                "The active project could not be determined and it is required to execute this command"
+                "The active project could not be determined and it is required to execute this command. Please "
+                "check the formatting of your YAML."
             )
         except Exception as e:
             from jobflow_remote import SETTINGS
