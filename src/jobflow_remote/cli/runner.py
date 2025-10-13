@@ -213,10 +213,11 @@ def stop(
     """
     cm = get_config_manager()
     dm = DaemonManager.from_project(cm.get_project())
+    stop_sent = False
     with loading_spinner(processing=False) as progress:
         progress.add_task(description="Stopping the daemon...", total=None)
         try:
-            dm.stop(wait=wait, raise_on_error=True)
+            stop_sent = dm.stop(wait=wait, raise_on_error=True)
         except RunningDaemonError as e:
             exit_with_error_msg(
                 f"Error while stopping the daemon: {getattr(e, 'message', e)}{_running_daemon_error_msg}"
@@ -227,7 +228,7 @@ def stop(
             )
     from jobflow_remote import SETTINGS
 
-    if not wait and SETTINGS.cli_suggestions:
+    if stop_sent and not wait and SETTINGS.cli_suggestions:
         out_console.print(
             "The stop signal has been sent to the Runner. Run 'jf runner status' to verify if it stopped",
             style="yellow",
@@ -438,5 +439,10 @@ def reset(
     with loading_spinner(processing=False) as progress:
         progress.add_task(description="Resetting runner information...", total=None)
         jc.clean_running_runner(break_lock=break_lock)
+
+        # Also clean supervisord files, if they exist.
+        cm = get_config_manager()
+        dm = DaemonManager.from_project(cm.get_project())
+        dm.clean_files()
 
     out_console.print("The running runner document was reset")

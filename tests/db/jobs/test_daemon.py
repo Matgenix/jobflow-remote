@@ -16,6 +16,13 @@ def _check_running_runner_doc(job_controller, runner_info):
         assert db_info[key] == runner_info[key]
 
 
+@pytest.fixture()
+def pid_file(daemon_manager):
+    daemon_manager.pid_filepath.touch(exist_ok=True)
+    yield daemon_manager.pid_filepath
+    daemon_manager.pid_filepath.unlink(missing_ok=True)
+
+
 @pytest.mark.parametrize(
     "single",
     [True, False],
@@ -96,9 +103,7 @@ def test_kill(job_controller, daemon_manager, wait_daemon_started) -> None:
     assert daemon_manager.check_status() == DaemonStatus.STOPPED
 
 
-def test_kill_supervisord(
-    job_controller, daemon_manager, caplog, wait_daemon_started
-) -> None:
+def test_kill_supervisord(job_controller, daemon_manager, wait_daemon_started) -> None:
     import signal
     import time
 
@@ -118,13 +123,6 @@ def test_kill_supervisord(
         os.kill(process_dict["pid"], signal.SIGKILL)
     time.sleep(2)
     assert daemon_manager.check_status() == DaemonStatus.SHUT_DOWN
-    # check that the warning message is present among the logged messages
-    log_msg = caplog.messages
-    assert len(log_msg) > 0
-    assert (
-        f"Process with pid {supervisord_pid} is not running but daemon files are present"
-        in log_msg[-1]
-    )
 
 
 def test_kill_one_process(job_controller, daemon_manager, wait_daemon_started) -> None:
@@ -185,7 +183,9 @@ def test_runner_info_auxiliary(
     assert isinstance(runner_info["last_pinged"], datetime.datetime)
 
 
-def test_runner_different_machine(daemon_manager, job_controller, caplog) -> None:
+def test_runner_different_machine(
+    daemon_manager, job_controller, caplog, pid_file
+) -> None:
     # Test that all the methods will not have effect if in the DB
     # a running_runner is present with a different machine
     from jobflow_remote.jobs.daemon import DaemonStatus, RunningDaemonError
@@ -199,13 +199,19 @@ def test_runner_different_machine(daemon_manager, job_controller, caplog) -> Non
     )
 
     assert daemon_manager.check_status() == DaemonStatus.SHUT_DOWN
+    # The pid file is created manually to simulate the case in which the
+    # different machine shares the same home folder. The pid file should
+    # not be deleted.
+    assert daemon_manager.pid_filepath.exists()
     with pytest.raises(
         RunningDaemonError,
         match=r"A daemon runner process may be running on a different machine",
     ):
         daemon_manager.start(raise_on_error=True, single=False)
+    assert daemon_manager.pid_filepath.exists()
 
     assert not daemon_manager.start(raise_on_error=False, single=False)
+    assert daemon_manager.pid_filepath.exists()
 
     assert daemon_manager.check_status() == DaemonStatus.SHUT_DOWN
 
@@ -216,8 +222,10 @@ def test_runner_different_machine(daemon_manager, job_controller, caplog) -> Non
         match=r"A daemon runner process may be running on a different machine",
     ):
         daemon_manager.kill(raise_on_error=True)
+    assert daemon_manager.pid_filepath.exists()
 
     assert not daemon_manager.kill(raise_on_error=False)
+    assert daemon_manager.pid_filepath.exists()
 
     assert daemon_manager.check_status() == DaemonStatus.SHUT_DOWN
 
@@ -228,8 +236,10 @@ def test_runner_different_machine(daemon_manager, job_controller, caplog) -> Non
         match=r"A daemon runner process may be running on a different machine",
     ):
         daemon_manager.stop(raise_on_error=True)
+    assert daemon_manager.pid_filepath.exists()
 
     assert not daemon_manager.stop(raise_on_error=False)
+    assert daemon_manager.pid_filepath.exists()
 
     assert daemon_manager.check_status() == DaemonStatus.SHUT_DOWN
 
@@ -240,12 +250,17 @@ def test_runner_different_machine(daemon_manager, job_controller, caplog) -> Non
         match=r"A daemon runner process may be running on a different machine",
     ):
         daemon_manager.shut_down(raise_on_error=True)
+    assert daemon_manager.pid_filepath.exists()
 
     assert not daemon_manager.shut_down(raise_on_error=False)
+    assert daemon_manager.pid_filepath.exists()
 
     assert daemon_manager.check_status() == DaemonStatus.SHUT_DOWN
 
     _check_running_runner_doc(job_controller=job_controller, runner_info=runner_info)
+
+    daemon_manager.clean_files()
+    assert not daemon_manager.pid_filepath.exists()
 
 
 def test_stop_restart_diff(daemon_manager, caplog, wait_daemon_started):

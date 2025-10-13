@@ -2385,6 +2385,8 @@ class JobController:
             JobState.FAILED,
             JobState.PAUSED,
             JobState.REMOTE_ERROR,
+            JobState.STOPPED,
+            JobState.USER_STOPPED,
         ]
 
         return self._many_jobs_action(
