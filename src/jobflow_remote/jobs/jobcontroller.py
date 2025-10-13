@@ -2971,8 +2971,8 @@ class JobController:
             if n_flows >= max_limit and today != validation:
                 logger.warning(
                     f"The database contains {n_flows} flows and will not be reset. "
-                    "Pass today's date in the YYYY-MM-DD format to validate the reset "
-                    "or change the max_limit value."
+                    "Pass today's date as `jf admin reset YYYY-MM-DD` to validate "
+                    "the reset or change the max_limit value."
                 )
                 return False
 
