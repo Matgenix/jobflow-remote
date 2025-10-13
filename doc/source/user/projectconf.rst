@@ -11,6 +11,14 @@ of a single project. The handling of :ref:`projectconf multi` will be described 
 Aside from the project options, a set of :ref:`projectconf general` can be also be
 configured through environment variables or an additional configuration file.
 
+.. warning::
+
+    As this is a common source of error, it is important to note that the jobflow-remote
+    ``Runner`` **reads all the configurations when the processes is started** and does
+    not attempt to refresh them during the execution. Whenever any configuration is changed
+    the ``Runner`` should be restarted.
+
+
 Project options
 ===============
 
@@ -38,7 +46,13 @@ section below, while an example for a full configuration file can be generated r
 Note that, while the default file format is YAML, JSON and TOML are also acceptable format.
 You can generate the example in the other formats using the ``--format`` option.
 
+.. note::
 
+    In case of failed validation of any of the configuration options, the file will not be
+    recognized as a project at all. To check the errors in the validation the easiest
+    option is to run::
+
+        jf project list --warn
 
 Name and folders
 ----------------
@@ -221,6 +235,11 @@ in this project.
             password: <password>
             database: <database name>
             collection_name: outputs
+
+.. note::
+
+    For compatibility with the original jobflow configuration file, the field can
+    also be defined as ``JOB_STORE`` instead of ``jobstore`.
 
 .. _projectconf queuestore:
 
@@ -448,7 +467,7 @@ The most useful variable to set is the ``project`` one, allowing to select the
 default project to be used in a multi-project environment.
 
 Other generic options are the location of the projects folder, instead of
-``~/.jfremote`` (``JFREMOTE_PROJECT_FOLDER``) and the path to the ``~/.jfremote.yaml``
+``~/.jfremote`` (``JFREMOTE_PROJECTS_FOLDER``) and the path to the ``~/.jfremote.yaml``
 file itself (``JFREMOTE_CONFIG_FILE``).
 
 Some customization options are also available for the behaviour of the CLI.

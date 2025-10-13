@@ -7,6 +7,7 @@ import shutil
 import sys
 import time
 import warnings
+from contextlib import contextmanager
 from functools import partial
 from pathlib import Path
 
@@ -540,6 +541,35 @@ def update_project_data(
     Project.model_validate(d)
 
     dumpfn(d, project_file_path)
+
+
+@contextmanager
+def update_project_data_ctx(
+    update: dict, dict_mods: bool = True, project_file_path: Path = None
+):
+    from jobflow_remote.config.manager import ConfigManager
+
+    cm = ConfigManager()
+    current_project_data = cm.get_project_data()
+
+    update_project_data(
+        update=update, dict_mods=dict_mods, project_file_path=project_file_path
+    )
+    yield
+
+    cm.dump_project(current_project_data)
+
+
+@pytest.fixture()
+def patch_project_ctx():
+    from jobflow_remote.config.manager import ConfigManager
+
+    cm = ConfigManager()
+    current_project_data = cm.get_project_data()
+
+    return partial(
+        update_project_data_ctx, project_file_path=Path(current_project_data.filepath)
+    )
 
 
 @pytest.fixture()
