@@ -123,7 +123,7 @@ def flows_list(
                 locked=locked,
                 limit=max_results,
                 sort=db_sort,
-                full=verbosity > 0,
+                with_jobs_info=verbosity > 0,
             )
 
             table = get_flow_info_table(flows_info, verbosity=verbosity)
@@ -207,7 +207,7 @@ def delete(
             start_date=start_date,
             end_date=end_date,
             name=name,
-            full=verbosity > 1,
+            with_jobs_info=verbosity > 1,
         )
 
     if not flows_info:
@@ -272,22 +272,6 @@ def flow_info(
     output_keys = check_output_stored_data_keys(
         cli_output_keys, stored_data_keys, verbosity, header_name_data_getter_map
     )
-    # from jobflow_remote import SETTINGS
-    #
-    # check_incompatible_opt({"output": cli_output_keys, "verbosity": verbosity})
-    # output_keys = (
-    #     cli_output_keys.split(",")
-    #     if cli_output_keys
-    #     else SETTINGS.cli_job_list_columns or []
-    # )
-    # if not set(output_keys).issubset(header_name_data_getter_map):
-    #     exit_with_error_msg(
-    #         f"Header keys not supported: {set(output_keys).difference(header_name_data_getter_map)}"
-    #     )
-    # if stored_data_keys and not set(output_keys).isdisjoint(stored_data_keys):
-    #     exit_with_error_msg(
-    #         "Specifying a stored data key which is a standard column is disallowed."
-    #     )
 
     db_id, jf_id = get_job_db_ids(flow_db_id, None)
     db_ids = job_ids = flow_ids = None
@@ -309,7 +293,6 @@ def flow_info(
             flow_ids=flow_ids,
             sort=db_sort,
             limit=1,
-            full=True,
             with_jobs_info=True,
         )
     if not flows_info:
@@ -381,7 +364,7 @@ def graph(
             db_ids=db_ids,
             flow_ids=flow_ids,
             limit=1,
-            full=True,
+            with_jobs_info=True,
         )
     if not flows_info:
         exit_with_error_msg("No data matching the request")

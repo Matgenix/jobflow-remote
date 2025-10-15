@@ -2469,6 +2469,9 @@ class JobController:
                     pipeline[-1]["$project"][f"jobs_list.{k}"] = 1
 
         if sort:
+            pipeline_sort = dict(sort)
+            if "db_id" not in pipeline_sort:
+                pipeline_sort["db_id"] = 1
             pipeline.append({"$sort": dict(sort)})
 
         if limit:
@@ -2490,7 +2493,6 @@ class JobController:
         sort: list[tuple] | None = None,
         limit: int = 0,
         skip: int = 0,
-        full: bool = False,
         with_jobs_info: bool = False,
     ) -> list[FlowInfo]:
         """
@@ -2525,14 +2527,12 @@ class JobController:
             query. Follows pymongo conventions.
         limit
             Maximum number of entries to retrieve. 0 means no limit.
-        full
-            If True data is fetched from both the Flow collection and Job collection
-            with an aggregate. Otherwise, only the Job information in the Flow
-            document will be used.
         skip
             The number of documents to omit (from the start of the result set).
         with_jobs_info
-            If True, JobInfo for each job will be created.
+            If True, data is fetched from both the Flow collection and Job collection
+            with an aggregate and JobInfo for each job will be created.
+            Otherwise, only the Job information in the Flow document will be used.
 
         Returns
         -------
@@ -2553,7 +2553,7 @@ class JobController:
 
         # Only use the full aggregation if more job details are needed.
         # The single flow document is enough for basic information
-        if full:
+        if with_jobs_info:
             projection_job = {f: 1 for f in projection_flow_info_jobs}
             projection_flow = {k: 1 for k in FlowDoc.model_fields}
 
@@ -2567,9 +2567,7 @@ class JobController:
         else:
             data = list(self.flows.find(query, sort=sort, limit=limit, skip=skip))
 
-        return [
-            FlowInfo.from_query_dict(d, with_jobs_info=with_jobs_info) for d in data
-        ]
+        return [FlowInfo.from_query_dict(d) for d in data]
 
     def get_flow_store(self, flow_id: str) -> str | None:
         """

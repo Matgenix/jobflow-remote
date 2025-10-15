@@ -484,7 +484,7 @@ class FlowInfo(BaseModel):
     jobs_info: Optional[list[JobInfo]] = None
 
     @classmethod
-    def from_query_dict(cls, d, with_jobs_info=False) -> "FlowInfo":
+    def from_query_dict(cls, d) -> "FlowInfo":
         created_on = d["created_on"]
         updated_on = d["updated_on"]
         flow_id = d["uuid"]
@@ -511,8 +511,7 @@ class FlowInfo(BaseModel):
                 workers.append(job_doc["worker"])
                 parents.append(job_doc["parents"] or [])
                 job_hosts.append(job_doc["job"]["hosts"] or [])
-                if with_jobs_info:
-                    jobs_info.append(JobInfo.from_query_output(job_doc))
+                jobs_info.append(JobInfo.from_query_output(job_doc))
         else:
             db_ids, job_ids, job_indexes = list(  # type:ignore[assignment]
                 zip(*d["ids"])
