@@ -310,8 +310,6 @@ class DaemonManager:
         """
         Check if the supervisord process is running and belongs to the same user.
 
-        If the supervisord process is not running but the daemon files are present, clean them up.
-
         Returns
         -------
         bool
@@ -340,11 +338,8 @@ class DaemonManager:
         except psutil.NoSuchProcess:
             running = False
 
-        if not running and pid is not None:
-            logger.warning(
-                f"Process with pid {pid} is not running but daemon files are present. Cleaning them up."
-            )
-            self.clean_files()
+        # Here it used to delete the pid files in case they existed and running==False.
+        # This can cause issues with multiple machines sharing the same home.
 
         return running
 
@@ -727,7 +722,8 @@ class DaemonManager:
                 DaemonStatus.SHUT_DOWN,
             ):
                 lock.update_on_release = {"$set": {"running_runner": None}}
-                return True
+                logger.info("The runner is not running")
+                return False
 
             if status in (DaemonStatus.RUNNING, DaemonStatus.PARTIALLY_RUNNING):
                 interface = self.get_interface()

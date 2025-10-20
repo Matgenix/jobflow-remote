@@ -189,3 +189,33 @@ to execute multiple processes in parallel outside jobflow-remote.
     There is currently no way of obtaining a list of nodes/cores assigned to each Job
     from jobflow-remote. If this might be needed to run in the parallel batch mode,
     consider opening an issue on `Github <https://github.com/Matgenix/jobflow-remote/issues>`_.
+
+Listing batch processes
+-----------------------
+
+It is possible to list all *batch processes* that have been submitted, including both
+currently running and completed ones.
+This is useful for monitoring ongoing activity and reviewing previous *batch* executions.
+
+To list the *batch processes*, use the command:
+
+.. code-block:: bash
+
+    jfr batch list
+
+By default, this shows up to 20 recent batch processes across all batch workers.
+You can customize the output using the following options:
+
+- ``--worker-name``: show only batches from a specific worker
+- ``--max-results``: limit the number of results shown (default: 20)
+- ``--batch-state``: filter by batch state (e.g. ``RUNNING``, ``TERMINATED``, ``FAILED``)
+- ``--verbosity``: increase the verbosity level to include more details
+
+For example, to list all running batches from a specific worker:
+
+.. code-block:: bash
+
+    jfr batch list --worker-name my_batch_worker --batch-state RUNNING
+
+Increasing the verbosity (``-v`` or ``--verbosity 1``) will also show which jobflow Jobs
+were (or are being) executed within each batch process.

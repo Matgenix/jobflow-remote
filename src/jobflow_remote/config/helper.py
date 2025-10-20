@@ -167,6 +167,11 @@ def check_worker(
         from jobflow_remote.remote.queue import QueueManager
 
         qm = QueueManager(scheduler_io=worker.get_scheduler_io(), host=host)
+
+        if worker.resources:
+            # check that the default resources are properly defined.
+            qm.get_submission_script('echo "test"', options=worker.resources)
+
         qm.get_jobs_list()
 
         workdir_err = _check_workdir(worker=worker, host=host)

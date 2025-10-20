@@ -2385,6 +2385,8 @@ class JobController:
             JobState.FAILED,
             JobState.PAUSED,
             JobState.REMOTE_ERROR,
+            JobState.STOPPED,
+            JobState.USER_STOPPED,
         ]
 
         return self._many_jobs_action(
@@ -2974,8 +2976,8 @@ class JobController:
             if n_flows >= max_limit and today != validation:
                 logger.warning(
                     f"The database contains {n_flows} flows and will not be reset. "
-                    "Pass today's date in the YYYY-MM-DD format to validate the reset "
-                    "or change the max_limit value."
+                    "Pass today's date as `jf admin reset YYYY-MM-DD` to validate "
+                    "the reset or change the max_limit value."
                 )
                 return False
 
@@ -2989,8 +2991,7 @@ class JobController:
         self.auxiliary.drop()
         self.auxiliary.insert_one({"next_id": 1})
         self.auxiliary.insert_one({"running_runner": None})
-        if self.batches is not None:
-            self.batches.drop()
+        self.batches.drop()
         self.update_version_information()
         self.build_indexes(drop=True)
 
@@ -3044,6 +3045,7 @@ class JobController:
             self.jobs.drop_indexes()
             self.flows.drop_indexes()
             self.auxiliary.drop_indexes()
+            self.batches.drop_indexes()
 
         self.jobs.create_index("db_id", unique=True, background=background)
         self.jobs.create_index(
@@ -3085,13 +3087,23 @@ class JobController:
             for idx in flow_custom_indexes:
                 self.flows.create_index(idx, background=background)
 
-        if self.batches is not None:
-            # Here should there be an index on worker ?? in principle the batch unique id should be sufficient
-            self.batches.create_index(["batch_uid", "worker"], unique=True)
+        # Here should there be an index on worker ?? in principle the batch unique id should be sufficient
+        self.batches.create_index(
+            [("batch_uid", 1)], unique=True, background=background
+        )
+        self.batches.create_index(
+            [("batch_uid", 1), ("start_time", 1)], unique=True, background=background
+        )
+        self.batches.create_index(
+            [("worker", 1), ("batch_state", 1)], background=background
+        )
+        self.batches.create_index([("worker", 1)], background=background)
+        self.batches.create_index([("batch_state", 1)], background=background)
+        self.batches.create_index([("updated_on", -1)], background=background)
 
         def create_jobstore_indices(jobstore: JobStore, name: str):
             # if the docs_store is a MongoStore with a collection, create a proper composed
-            # index that is the most effective for retrieving outputs. Otherwise create a simple
+            # index that is the most effective for retrieving outputs. Otherwise, create a simple
             # index based on the maggma interface for the two indexes separately.
             # In any case trap all exceptions, as this should not be a blocking point
             try:
@@ -4727,43 +4739,13 @@ class JobController:
                     f"stdout: {cancel_result.stdout}. stderr: {cancel_result.stderr}"
                 )
 
-    def get_batch_processes(
-        self, worker: str | None = None
-    ) -> dict[str, dict[str, str]]:
-        """
-        Get the batch processes associated with a given worker.
-
-        Parameters
-        ----------
-        worker
-            The worker name.
-
-        Returns
-        -------
-        dict
-            A dictionary with the {process_id: batch_uid} of the batch
-            jobs running on the selected worker.
-        """
-        if worker:
-            query = {f"batch_processes.{worker}": {"$exists": True}}
-        else:
-            query = {"batch_processes": {"$exists": True}}
-
-        result = self.auxiliary.find_one(query)
-        if result:
-            return result["batch_processes"] or {}
-        return {}
-
     def get_all_batches(
         self,
         worker: str | list[str] | None = None,
         batch_state: BatchState | list[BatchState] | None = None,
         max_results: int = 20,
-        sort: dict | None = None,
+        sort: str | list | None = None,
     ) -> list[BatchDoc] | None:
-        if self.batches is None:
-            return None
-
         query: dict = {}
         if worker:
             if not isinstance(worker, list):
@@ -4775,16 +4757,44 @@ class JobController:
                 query["batch_state"] = batch_state.value
             else:
                 query["batch_state"] = {"$in": [bs.value for bs in batch_state]}
-        sort = sort or {"updated_on": -1}
+        # Some batches may have updated at exactly the same time (up to ms precision of MongoDB)
+        # To make sure we have always same order (in particular when limiting number of results),
+        # we add a sort on process_id as well.
+        sort = sort or [
+            ("updated_on", pymongo.DESCENDING),
+            ("process_id", pymongo.ASCENDING),
+        ]
 
         return [
             BatchDoc.model_validate(bd_dict)
             for bd_dict in self.batches.find(query, sort=sort).limit(max_results)
         ]
 
+    def get_batch_process_id(self, batch_uid: str) -> tuple[str, str]:
+        """Get the process id and worker of a batch process from its unique id.
+
+        Parameters
+        ----------
+        batch_uid
+            The batch unique id.
+
+        Raises
+        ------
+        MissingDocumentError
+            If no batch with the give unique id exists in the database.
+        """
+        doc = self.batches.find_one(
+            {"batch_uid": batch_uid}, projection=["process_id", "worker"]
+        )
+        if doc is None:
+            raise MissingDocumentError(
+                f"No batch process matching batch_uid {batch_uid}"
+            )
+        return doc["process_id"], doc["worker"]
+
     def add_batch_process(self, process_id: str, batch_uid: str, worker: str) -> dict:
         """
-        Add a batch process to the list of running processes.
+        Add a batch process to the list of batch processes.
 
         Two IDs are defined, one to keep track of the actual process number and one
         to be associated to the Jobs that are being executed. The need for two IDs
@@ -4804,58 +4814,63 @@ class JobController:
         dict
             The updated document.
         """
-        if self.batches is not None:
-            batch_doc_dict = get_initial_batch_doc_dict(
-                batch_uid=batch_uid, process_id=process_id, worker=worker
-            )
-            self.batches.insert_one(batch_doc_dict)
-        return self.auxiliary.find_one_and_update(
-            {"batch_processes": {"$exists": True}},
-            {"$set": {f"batch_processes.{worker}.{process_id}": batch_uid}},
-            upsert=True,
+        batch_doc_dict = get_initial_batch_doc_dict(
+            batch_uid=batch_uid, process_id=process_id, worker=worker
         )
+        return self.batches.insert_one(batch_doc_dict)
 
     def update_job_in_batch(
         self, job_id: str, job_index: int, batch_uid: str, worker: str, info: typing.Any
     ):
-        if self.batches is not None:
-            self.batches.update_one(
-                {"batch_uid": batch_uid, "worker": worker},
-                {
-                    "$set": {
-                        f"jobs.{job_id}.{job_index}": info,
-                        "updated_on": datetime.now(),
-                    }
-                },
-            )
+        self.batches.update_one(
+            {"batch_uid": batch_uid},
+            {
+                "$set": {
+                    f"jobs.{job_id}.{job_index}": info,
+                    "updated_on": datetime.now(),
+                }
+            },
+        )
 
     def set_running_batch_process(
-        self, process_id: str, worker: str, start_time: datetime | None = None
+        self, batch_uid: str, start_time: datetime | None = None
     ):
-        if self.batches is not None:
-            self.batches.update_one(
-                {"worker": worker, "process_id": process_id, "start_time": None},
-                {
-                    "$set": {
-                        "batch_state": BatchState.RUNNING.value,
-                        "updated_on": datetime.now(),
-                        "start_time": start_time or datetime.now(),
-                    }
-                },
-            )
-
-    def remove_batch_process(
-        self, process_id: str, worker: str, end_time: datetime | None = None
-    ) -> dict:
         """
-        Remove a process from the list of running batch processes.
+        Sets state of batch process as running.
 
         Parameters
         ----------
-        process_id
-            The ID of the processes obtained from the QueueManager.
-        worker
-            The worker where the process was being executed.
+        batch_uid
+            The batch unique id.
+        start_time
+            The time at which the batch process started.
+
+        Returns
+        -------
+        dict
+            The updated document.
+        """
+        return self.batches.update_one(
+            {"batch_uid": batch_uid, "start_time": None},
+            {
+                "$set": {
+                    "batch_state": BatchState.RUNNING.value,
+                    "updated_on": datetime.now(),
+                    "start_time": start_time or datetime.now(),
+                }
+            },
+        )
+
+    def set_finished_batch_process(
+        self, batch_uid: str, end_time: datetime | None = None
+    ) -> dict:
+        """
+        Sets state of batch process as finished.
+
+        Parameters
+        ----------
+        batch_uid
+            The batch unique id.
         end_time
             The time at which the batch process ended.
 
@@ -4864,21 +4879,15 @@ class JobController:
         dict
             The updated document.
         """
-        if self.batches is not None:
-            self.batches.update_one(
-                {"process_id": process_id},
-                {
-                    "$set": {
-                        "batch_state": BatchState.FINISHED.value,
-                        "updated_on": datetime.now(),
-                        "end_time": end_time or datetime.now(),
-                    }
-                },
-            )
-        return self.auxiliary.find_one_and_update(
-            {"batch_processes": {"$exists": True}},
-            {"$unset": {f"batch_processes.{worker}.{process_id}": ""}},
-            upsert=True,
+        return self.batches.update_one(
+            {"batch_uid": batch_uid},
+            {
+                "$set": {
+                    "batch_state": BatchState.FINISHED.value,
+                    "updated_on": datetime.now(),
+                    "end_time": end_time or datetime.now(),
+                }
+            },
         )
 
     def delete_job(

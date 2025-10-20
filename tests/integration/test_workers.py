@@ -49,7 +49,9 @@ def test_paramiko_ssh_connection(random_project_name, job_controller) -> None:
             )
 
 
-def test_project_check(job_controller, integration_workers, run_check_cli) -> None:
+def test_project_check(
+    job_controller, integration_workers, run_check_cli, patch_project_ctx
+) -> None:
     from jobflow_remote.testing.cli import run_check_cli
 
     expected = [f"✓ Worker {wn}" for wn in integration_workers]
@@ -63,6 +65,27 @@ def test_project_check(job_controller, integration_workers, run_check_cli) -> No
     # jobflow-remote version between the local environment and the one in the
     # container
     run_check_cli(["project", "check", "-e"], required_out=expected)
+
+    # Set wrong resources for a batch worker. Should give an error.
+    # Only test if the batch worker is present (may be absent in case a subset of
+    # the workers is used in local tests)
+    if "test_batch_remote_worker" in job_controller.project.workers:
+        with patch_project_ctx(
+            update={
+                "_set": {
+                    "workers->test_batch_remote_worker->resources->wrong_key": "some value"
+                }
+            }
+        ):
+            errors = [
+                "Errors",
+                "x Worker test_batch_remote_worker",
+                "The following keys are not present in the template: wrong_key",
+            ]
+            run_check_cli(
+                ["project", "check", "-e", "-w" "test_batch_remote_worker"],
+                required_out=errors,
+            )
 
 
 @pytest.mark.parametrize(

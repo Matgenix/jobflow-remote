@@ -7,7 +7,14 @@ from typing import Annotated, Any, Literal, Optional, Union
 
 from jobflow import JobStore
 from maggma.stores import MongoStore
-from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator
+from pydantic import (
+    AliasChoices,
+    BaseModel,
+    ConfigDict,
+    Field,
+    ValidationInfo,
+    field_validator,
+)
 from qtoolkit.io import BaseSchedulerIO, scheduler_mapping
 
 from jobflow_remote.remote.host import BaseHost, LocalHost, RemoteHost
@@ -504,10 +511,9 @@ class QueueConfig(BaseModel):
         description="The name of the collection containing auxiliary information. "
         "Taken from the same database as the one defined in the store",
     )
-    batches_collection: Optional[str] = Field(
-        None,
+    batches_collection: str = Field(
+        "batches",
         description="The name of the collection containing batches information. "
-        "This collection is optional. "
         "Taken from the same database as the one defined in the store",
     )
     db_id_prefix: Optional[str] = Field(
@@ -586,6 +592,7 @@ class Project(BaseModel):
         description="The JobStore used for the output. Can contain the monty "
         "serialized dictionary or the Store in the Jobflow format",
         validate_default=True,
+        validation_alias=AliasChoices("jobstore", "JOB_STORE"),
     )
     remote_jobstore: Optional[dict] = Field(
         None,

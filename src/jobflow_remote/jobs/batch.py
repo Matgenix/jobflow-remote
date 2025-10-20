@@ -103,7 +103,7 @@ class RemoteBatchManager:
 
     def get_terminated(self) -> list[tuple[str, int, str]]:
         """
-        Get job ids and process ids of the terminated jobs from the corresponding
+        Get job ids and batch unique ids of the terminated jobs from the corresponding
         directory on the host.
 
         Returns
@@ -123,7 +123,7 @@ class RemoteBatchManager:
 
     def get_running(self) -> list[tuple[str, int, str]]:
         """
-        Get job ids and process ids of the running jobs from the corresponding
+        Get job ids and batch unique ids of the running jobs from the corresponding
         directory on the host.
 
         Returns
@@ -144,25 +144,25 @@ class RemoteBatchManager:
     def delete_terminated(self, ids: list[tuple[str, int, str]]) -> None:
         if not self._dir_initialized:
             self._init_files_dir()
-        for job_id, index, process_uuid in ids:
-            self.host.remove(self.terminated_dir / f"{job_id}_{index}_{process_uuid}")
+        for job_id, index, batch_uid in ids:
+            self.host.remove(self.terminated_dir / f"{job_id}_{index}_{batch_uid}")
 
-    def delete_running(self, process_id: str) -> None:
+    def delete_running(self, batch_uid: str) -> None:
         """
-        Remove job files from the running folder for a specific process uuid.
+        Remove job files from the running folder for a specific batch unique id.
 
         Should be used only for jobs that failed and left dangling running files.
 
         Parameters
         ----------
-        process_id
-            The uuid of the process for the running files to be removed.
+        batch_uid
+            The uuid of the batch process for the running files to be removed.
         """
         if not self._dir_initialized:
             self._init_files_dir()
         running_files = self.host.listdir(self.running_dir)
         for filename in running_files:
-            if filename.endswith(process_id):
+            if filename.endswith(batch_uid):
                 self.host.remove(self.running_dir / filename)
 
     def cleanup(self) -> bool:

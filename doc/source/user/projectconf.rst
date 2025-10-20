@@ -11,6 +11,14 @@ of a single project. The handling of :ref:`projectconf multi` will be described 
 Aside from the project options, a set of :ref:`projectconf general` can be also be
 configured through environment variables or an additional configuration file.
 
+.. warning::
+
+    As this is a common source of error, it is important to note that the jobflow-remote
+    ``Runner`` **reads all the configurations when the processes is started** and does
+    not attempt to refresh them during the execution. Whenever any configuration is changed
+    the ``Runner`` should be restarted.
+
+
 Project options
 ===============
 
@@ -38,7 +46,13 @@ section below, while an example for a full configuration file can be generated r
 Note that, while the default file format is YAML, JSON and TOML are also acceptable format.
 You can generate the example in the other formats using the ``--format`` option.
 
+.. note::
 
+    In case of failed validation of any of the configuration options, the file will not be
+    recognized as a project at all. To check the errors in the validation the easiest
+    option is to run::
+
+        jf project list --warn
 
 Name and folders
 ----------------
@@ -222,32 +236,46 @@ in this project.
             database: <database name>
             collection_name: outputs
 
+.. note::
+
+    For compatibility with the original jobflow configuration file, the field can
+    also be defined as ``JOB_STORE`` instead of ``jobstore`.
+
 .. _projectconf queuestore:
 
 Queue Store
 -----------
 
 The ``queue`` element contains the definition of the database containing the
-state of the Jobs and Flows.  The subelement ``store`` should contain the
+state of the Jobs and Flows. The subelement ``store`` should contain the
 representation of a `maggma <https://materialsproject.github.io/maggma/>`_ ``Store``.
 As for the ``JobStore`` it can be either its serialization or the same kind
 of representation used for the ``docs_store`` in jobflow's configuration file.
 
-The collection defined by the ``Store`` will contain the information about the
-state of the ``Job``, while two more collections will be created. The name
-of these two collections can also be customized.
+The main collection defined by the ``Store`` will contain the information about the
+state of the ``Jobs``. In addition to this Jobs collection, jobflow-remote also relies on several
+other collections within the same database to  manage and track different aspects of the system:
+
+- **Flows collection**: keeps track of the state of Flows and their relationship to Jobs.
+- **Auxiliary collection**: stores additional internal metadata required by jobflow-remote.
+- **Batches collection**: stores information about *batch processes* (see :ref:`Batch submission`),
+  including their state, associated worker, start and end times, and the list of Jobs
+  executed within each batch. This collection allows for monitoring both active and
+  past batch executions.
+
+The names of these collections can be customized in the configuration file.
 
 .. warning::
 
     The queue ``Store`` should be a subclass of the ``MongoStore`` and currently
     it should be based on a real MongoDB (e.g. not a ``JSONStore``).
     Some key operations required by jobflow-remote on the collections are not
-    supported by any file based MongoDB implementation at the moment.
+    supported by any file-based MongoDB implementation at the moment.
 
 .. warning::
 
     If the ``JobStore`` is also based on a MongoDB, it is often convenient to have
-    its main ``docs_store`` in the same database as the ``queue`` store, in that
+    its main ``docs_store`` in the same database as the ``queue`` store. In that
     case it is important that the two do **not point to the same collection**.
     Unexpected errors may happen otherwise.
 
@@ -255,7 +283,7 @@ of these two collections can also be customized.
 
     Define a queue store as maggma store. It is possible to use the same syntax
     as for the ``JobStore``. Customizing the names of the additional collections
-    is also possible but not necessary
+    is also possible but not necessary.
 
     .. code-block:: yaml
 
@@ -270,6 +298,7 @@ of these two collections can also be customized.
             collection_name: jobs
           flows_collection: flows
           auxiliary_collection: jf_auxiliary
+          batches_collection: jf_batches
 
 
 .. _projectconf execconfig:
@@ -438,7 +467,7 @@ The most useful variable to set is the ``project`` one, allowing to select the
 default project to be used in a multi-project environment.
 
 Other generic options are the location of the projects folder, instead of
-``~/.jfremote`` (``JFREMOTE_PROJECT_FOLDER``) and the path to the ``~/.jfremote.yaml``
+``~/.jfremote`` (``JFREMOTE_PROJECTS_FOLDER``) and the path to the ``~/.jfremote.yaml``
 file itself (``JFREMOTE_CONFIG_FILE``).
 
 Some customization options are also available for the behaviour of the CLI.

@@ -10,18 +10,7 @@ pytestmark = pytest.mark.skipif(
 
 
 @pytest.mark.workers(["test_batch_remote_worker"])
-@pytest.mark.parametrize(
-    "patch_project",
-    [
-        {"_set": {"queue->batches_collection": "the_batches"}},
-        {"_set": {"queue->batches_collection": None}},
-    ],
-    ids=["with_batches_collection", "without_batches_collection"],
-    indirect=True,
-)
-def test_run_batch(
-    job_controller, monkeypatch, clean_slurm_queue, mocker, patch_project, request
-) -> None:
+def test_run_batch(job_controller, monkeypatch, clean_slurm_queue, mocker) -> None:
     from jobflow import Flow
 
     from jobflow_remote import submit_flow
@@ -42,10 +31,7 @@ def test_run_batch(
     runner = Runner()
 
     add_batch_process_spy = mocker.spy(runner.job_controller, "add_batch_process")
-    if request.node.callspec.id == "with_batches_collection":
-        insert_batch_process_spy = mocker.spy(
-            runner.job_controller.batches, "insert_one"
-        )
+    insert_batch_process_spy = mocker.spy(runner.job_controller.batches, "insert_one")
 
     # set this so it will be called
     monkeypatch.setattr(runner.runner_options, "delay_update_batch", 0.05)
@@ -65,13 +51,8 @@ def test_run_batch(
     # make sure the process id is not a uuid (we could check that it is a "valid" slurm id also)
     assert not check_valid_uuid(slurm_job_id, raise_on_error=False)
 
-    if request.node.callspec.id == "with_batches_collection":
-        assert job_controller.batches is not None
-        assert insert_batch_process_spy.call_count == 1
-    elif request.node.callspec.id == "without_batches_collection":
-        assert job_controller.batches is None
-    else:
-        pytest.fail(f"Wrong parametrization id: {request.node.callspec.id}")
+    assert job_controller.batches is not None
+    assert insert_batch_process_spy.call_count == 1
     assert job_controller.count_jobs(states=JobState.COMPLETED) == 6
 
     # verify that only one job was executed at the time. start_time of a job
@@ -123,20 +104,6 @@ def test_run_batch_multi(job_controller, monkeypatch, clean_slurm_queue) -> None
 
 
 @pytest.mark.workers(["test_batch_multi_remote_worker"])
-@pytest.mark.parametrize(
-    "patch_project",
-    [
-        {
-            "_set": {
-                "queue->batches_collection": "the_batches",
-                "runner->delay_update_batch": 1,
-            }
-        },
-        {"_set": {"queue->batches_collection": None, "runner->delay_update_batch": 1}},
-    ],
-    ids=["with_batches_collection", "without_batches_collection"],
-    indirect=True,
-)
 def test_run_batch_multi_fail(
     patch_project,
     job_controller,
@@ -145,7 +112,6 @@ def test_run_batch_multi_fail(
     wait_daemon_shutdown,
     clean_slurm_queue,
     run_check_cli,
-    request,
 ) -> None:
     from qtoolkit.core.data_objects import CancelStatus
 
@@ -156,24 +122,16 @@ def test_run_batch_multi_fail(
     from jobflow_remote.testing import add_sleep
     from jobflow_remote.utils.data import check_valid_uuid
 
+    patch_project({"_set": {"runner->delay_update_batch": 1}})
+
     # First reset everything
     assert job_controller.reset(max_limit=0)
 
     run_check_cli(
         ["batch", "list"],
-        required_out_colored="[gold1]No batch processes running[/gold1]",
-        excluded_out="Running batches info",
+        required_out_colored="[gold1]No batch processes[/gold1]",
+        excluded_out="Batches info",
     )
-    if request.node.callspec.id == "with_batches_collection":
-        run_check_cli(
-            ["batch", "list", "--all"],
-            required_out_colored="[gold1]No batch processes[/gold1]",
-        )
-    if request.node.callspec.id == "without_batches_collection":
-        run_check_cli(
-            ["batch", "list", "--all"],
-            required_out="No batches collection defined for your project",
-        )
 
     def submit_jobs(n: int, sleep: int):
         job_ids = []
@@ -211,12 +169,9 @@ def test_run_batch_multi_fail(
 
     run_check_cli(
         ["batch", "list"],
-        required_out="Running batches info",
+        required_out="Batches info",
     )
-    if request.node.callspec.id == "with_batches_collection":
-        run_check_cli(
-            ["batch", "list", "-a", "-v"], required_out=["Batches info", *job_ids]
-        )
+    run_check_cli(["batch", "list", "-v"], required_out=["Batches info", *job_ids])
 
     daemon_manager.shut_down()
     wait_daemon_shutdown(daemon_manager)
@@ -231,24 +186,19 @@ def test_run_batch_multi_fail(
         == 2
     )
 
-    # check that jobs were submitted only for the correct worker
+    # check that the two jobs were submitted only for the correct worker
     # (a bug submitted jobs for the wrong worker as well)
-    full_dict_batch_processes = job_controller.get_batch_processes()
-    for batch_worker_name, submitted_jobs in full_dict_batch_processes.items():
-        n_submitted = 1 if batch_worker_name == worker_name else 0
-        assert (
-            len(submitted_jobs) == n_submitted
-        ), f"wrong number of jobs for worker {batch_worker_name}"
+    batch_processes = job_controller.get_all_batches()
+    assert len(batch_processes) == 1
+    assert len(batch_processes[0].jobs) == 2
 
     worker = proj.workers[worker_name]
     host = worker.get_host()
     host.connect()
     batch_manager = RemoteBatchManager(host, worker.batch.jobs_handle_dir)
     queue_manager = QueueManager(worker.get_scheduler_io(), host)
-    dict_batch_processes = job_controller.get_batch_processes(worker_name)
-    assert len(dict_batch_processes[worker_name]) == 1
     assert (
-        queue_manager.cancel(next(iter(dict_batch_processes[worker_name]))).status
+        queue_manager.cancel(batch_processes[0].process_id).status
         == CancelStatus.SUCCESSFUL
     )
     assert len(queue_manager.get_jobs_list()) == 0
@@ -260,15 +210,10 @@ def test_run_batch_multi_fail(
     batch_uid = next(iter(batch_ids))
     assert check_valid_uuid(batch_uid)
 
-    if request.node.callspec.id == "with_batches_collection":
-        assert len(job_controller.get_all_batches()) == 1
+    assert len(job_controller.get_all_batches()) == 1
 
-        assert len(job_controller.get_all_batches(batch_state=BatchState.FINISHED)) == 0
-        assert (
-            len(job_controller.get_all_batches(batch_state=[BatchState.RUNNING])) == 1
-        )
-    else:
-        assert job_controller.get_all_batches() is None
+    assert len(job_controller.get_all_batches(batch_state=BatchState.FINISHED)) == 0
+    assert len(job_controller.get_all_batches(batch_state=[BatchState.RUNNING])) == 1
 
     # now restart the runner and verify that the job is set to remote error
     # and running files are properly cleaned
@@ -286,22 +231,18 @@ def test_run_batch_multi_fail(
     else:
         raise RuntimeError("The Jobs were not set to REMOTE_ERROR state")
 
-    run_check_cli(["batch", "list"], required_out="No batch processes running")
-    if request.node.callspec.id == "with_batches_collection":
-        run_check_cli(
-            ["batch", "list", "-a"],
-            required_out=["Batches info", "Status"],
-        )
+    run_check_cli(["batch", "list", "-s", "RUNNING"], required_out="No batch processes")
+    run_check_cli(
+        ["batch", "list"],
+        required_out=["Batches info", "Status"],
+    )
 
     assert len(batch_manager.get_running()) == 0
     assert len(batch_manager.get_terminated()) == 0
     assert len(batch_manager.get_submitted()) == 0
     all_batches = job_controller.get_all_batches()
-    if request.node.callspec.id == "with_batches_collection":
-        assert len(all_batches) == 1
-        assert len(job_controller.get_all_batches(batch_state=BatchState.FINISHED)) == 1
-    else:
-        assert all_batches is None
+    assert len(all_batches) == 1
+    assert len(job_controller.get_all_batches(batch_state=BatchState.FINISHED)) == 1
 
     # submit more jobs, will also be used to check that the files are cleaned during the reset
     job_ids = submit_jobs(4, 15)
@@ -325,7 +266,7 @@ def test_run_batch_multi_fail(
 
     run_check_cli(
         ["batch", "list"],
-        required_out="Running batches info",
+        required_out="Batches info",
     )
 
     daemon_manager.shut_down()
@@ -358,8 +299,7 @@ def test_run_batch_multi_fail(
     assert len(batch_manager.get_submitted()) == 0
     assert len(batch_manager.get_running()) == 0
 
-    if request.node.callspec.id == "with_batches_collection":
-        assert len(job_controller.get_all_batches()) == 0
+    assert len(job_controller.get_all_batches()) == 0
 
 
 @pytest.mark.workers(["test_max_jobs_worker"])

@@ -8,7 +8,6 @@ import pytest
     [
         {
             "_set": {
-                "queue->batches_collection": "the_batches",
                 "runner->delay_update_batch": 0.2,
                 "runner->delay_advance_status": 0.2,
                 "runner->delay_check_run_status": 0.2,
@@ -41,7 +40,7 @@ def test_batch_worker(
     daemon_manager.start()
     wait_daemon_started(daemon_manager)
 
-    for _ in range(20):
+    for _ in range(30):
         if job_controller.count_jobs(states=JobState.COMPLETED) == 8:
             break
         time.sleep(1)
@@ -62,30 +61,32 @@ def test_batch_worker(
 
     batches = job_controller.get_all_batches()
     assert len(batches) == 4
-    ordered_batches = sorted(batches, key=lambda x: x.updated_on)
+    # sorting on update time and process id as update time may be the same (ms precision in MongoDB)
+    ordered_batches = sorted(batches, key=lambda x: (x.updated_on, x.process_id))
+    ordered_batches.sort(key=lambda x: x.updated_on, reverse=True)
 
     run_check_cli(
-        ["batch", "list", "--all"],
+        ["batch", "list"],
         required_out="Batches info",
         excluded_out=["Running batches info", "RUNNING"],
     )
 
     run_check_cli(
-        ["batch", "list", "--all", "-m", "2"],
+        ["batch", "list", "-m", "2"],
         required_out=[
             "Batches info",
             "FINISHED",
-            ordered_batches[-1].process_id,
-            ordered_batches[-2].process_id,
-            ordered_batches[-1].batch_uid,
-            ordered_batches[-2].batch_uid,
-        ],
-        excluded_out=[
-            "Running batches info",
-            "RUNNING",
             ordered_batches[0].process_id,
             ordered_batches[1].process_id,
             ordered_batches[0].batch_uid,
             ordered_batches[1].batch_uid,
+        ],
+        excluded_out=[
+            "Running batches info",
+            "RUNNING",
+            ordered_batches[-1].process_id,
+            ordered_batches[-2].process_id,
+            ordered_batches[-1].batch_uid,
+            ordered_batches[-2].batch_uid,
         ],
     )
