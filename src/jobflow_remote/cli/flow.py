@@ -271,7 +271,7 @@ def flow_info(
             "--jobs-sort",
             help="The field on which the jobs will be sorted. In descending order",
         ),
-    ] = SortOption.UPDATED_ON,
+    ] = None,
     reverse_sort: reverse_sort_flag_opt = False,
     reverse_jobs_sort: Annotated[
         bool,
@@ -298,9 +298,9 @@ def flow_info(
         flow_ids = [jf_id]
 
     db_sort: list[tuple[str, int]] = [(sort.value, 1 if reverse_sort else -1)]
-    db_jobs_sort: list[tuple[str, int]] = [
-        (jobs_sort.value, 1 if reverse_jobs_sort else -1)
-    ]
+    db_jobs_sort: list[tuple[str, int]] | None = None
+    if jobs_sort:
+        db_jobs_sort = [(jobs_sort.value, 1 if reverse_jobs_sort else -1)]
 
     with loading_spinner():
         jc = get_job_controller()
