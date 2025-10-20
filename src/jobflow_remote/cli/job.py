@@ -136,25 +136,9 @@ def jobs_list(
 
     check_incompatible_opt({"start_date": start_date, "days": days, "hours": hours})
     check_incompatible_opt({"end_date": end_date, "days": days, "hours": hours})
-    # check_incompatible_opt({"state": state, "error": error})
-    # check_incompatible_opt({"state": state, "running": running})
     output_keys = check_output_stored_data_keys(
         cli_output_keys, stored_data_keys, verbosity, header_name_data_getter_map
     )
-    # check_incompatible_opt({"output": cli_output_keys, "verbosity": verbosity})
-    # output_keys = (
-    #     cli_output_keys.split(",")
-    #     if cli_output_keys
-    #     else SETTINGS.cli_job_list_columns or []
-    # )
-    # if not set(output_keys).issubset(header_name_data_getter_map):
-    #     exit_with_error_msg(
-    #         f"Header keys not supported: {set(output_keys).difference(header_name_data_getter_map)}"
-    #     )
-    # if stored_data_keys and not set(output_keys).isdisjoint(stored_data_keys):
-    #     exit_with_error_msg(
-    #         "Specifying a stored data key which is a standard column is disallowed."
-    #     )
 
     job_ids_indexes = get_job_ids_indexes(job_id)
 

@@ -2414,6 +2414,7 @@ class JobController:
         projection_flow: dict | None = None,
         projection_job: dict | None = None,
         sort: list[tuple] | None = None,
+        jobs_sort: list[tuple] | None = None,
         limit: int = 0,
     ) -> list[dict]:
         """
@@ -2463,7 +2464,14 @@ class JobController:
             # This can help reducing the size of the fetched documents and
             # avoid exceeding the maximum size allowed. Adding the projection
             # in the general pipeline does not have the same effect.
-            pipeline[0]["$lookup"]["pipeline"] = [{"$project": projection_job}]
+            if jobs_sort:
+                job_pipeline = [
+                    {"$sort": dict(jobs_sort)},
+                    {"$project": projection_job},
+                ]
+            else:
+                job_pipeline = [{"$project": projection_job}]
+            pipeline[0]["$lookup"]["pipeline"] = job_pipeline
             # if the additional projection is set, the keys need to be specified
             # in that part of the pipeline as well.
             if projection_flow:
@@ -2471,9 +2479,6 @@ class JobController:
                     pipeline[-1]["$project"][f"jobs_list.{k}"] = 1
 
         if sort:
-            pipeline_sort = dict(sort)
-            if "db_id" not in pipeline_sort:
-                pipeline_sort["db_id"] = 1
             pipeline.append({"$sort": dict(sort)})
 
         if limit:
@@ -2493,6 +2498,7 @@ class JobController:
         metadata: dict | None = None,
         locked: bool = False,
         sort: list[tuple] | None = None,
+        jobs_sort: list[tuple] | None = None,
         limit: int = 0,
         skip: int = 0,
         with_jobs_info: bool = False,
@@ -2562,6 +2568,7 @@ class JobController:
             data = self.get_flow_job_aggreg(
                 query=query,
                 sort=sort,
+                jobs_sort=jobs_sort,
                 limit=limit,
                 projection_flow=projection_flow,
                 projection_job=projection_job,

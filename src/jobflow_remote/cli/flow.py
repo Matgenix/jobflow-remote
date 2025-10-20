@@ -265,7 +265,22 @@ def flow_info(
     stored_data_keys: stored_data_keys_opt = None,
     cli_output_keys: cli_output_keys_opt = None,
     sort: sort_opt = SortOption.UPDATED_ON,
+    jobs_sort: Annotated[
+        SortOption,
+        typer.Option(
+            "--jobs-sort",
+            help="The field on which the jobs will be sorted. In descending order",
+        ),
+    ] = SortOption.UPDATED_ON,
     reverse_sort: reverse_sort_flag_opt = False,
+    reverse_jobs_sort: Annotated[
+        bool,
+        typer.Option(
+            "--reverse-jobs-sort",
+            "-jrevs",
+            help="Reverse the sorting order of the jobs",
+        ),
+    ] = False,
 ) -> None:
     """Provide detailed information on a Flow."""
 
@@ -283,6 +298,9 @@ def flow_info(
         flow_ids = [jf_id]
 
     db_sort: list[tuple[str, int]] = [(sort.value, 1 if reverse_sort else -1)]
+    db_jobs_sort: list[tuple[str, int]] = [
+        (jobs_sort.value, 1 if reverse_jobs_sort else -1)
+    ]
 
     with loading_spinner():
         jc = get_job_controller()
@@ -292,6 +310,7 @@ def flow_info(
             db_ids=db_ids,
             flow_ids=flow_ids,
             sort=db_sort,
+            jobs_sort=db_jobs_sort,
             limit=1,
             with_jobs_info=True,
         )
