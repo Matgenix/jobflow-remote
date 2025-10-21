@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 LOCK_DIR = "lock"
 
-TERMINATED_DIR = "terminated"
+RUN_FINISHED_DIR = "run_finished"
 
 RUNNING_DIR = "running"
 
@@ -53,7 +53,7 @@ class RemoteBatchManager:
         self.files_dir = Path(files_dir)
         self.submitted_dir = self.files_dir / SUBMITTED_DIR
         self.running_dir = self.files_dir / RUNNING_DIR
-        self.terminated_dir = self.files_dir / TERMINATED_DIR
+        self.run_finished_dir = self.files_dir / RUN_FINISHED_DIR
         self.lock_dir = self.files_dir / LOCK_DIR
         # All the directories need to be initialized to check that they exist
         # and the host connected.
@@ -70,7 +70,7 @@ class RemoteBatchManager:
         self.host.mkdir(self.files_dir)
         self.host.mkdir(self.submitted_dir)
         self.host.mkdir(self.running_dir)
-        self.host.mkdir(self.terminated_dir)
+        self.host.mkdir(self.run_finished_dir)
         self.host.mkdir(self.lock_dir)
         self._dir_initialized = True
 
@@ -101,25 +101,25 @@ class RemoteBatchManager:
             self._init_files_dir()
         return self.host.listdir(self.submitted_dir)
 
-    def get_terminated(self) -> list[tuple[str, int, str]]:
+    def get_run_finished(self) -> list[tuple[str, int, str]]:
         """
-        Get job ids and batch unique ids of the terminated jobs from the corresponding
+        Get job ids and batch unique ids of the jobs that finished to run from the corresponding
         directory on the host.
 
         Returns
         -------
         list
             The list of job ids, job indexes and batch process uuids in the host
-            terminated directory.
+            "run_finished" directory.
         """
         if not self._dir_initialized:
             self._init_files_dir()
-        terminated = []
-        for i in self.host.listdir(self.terminated_dir):
+        run_finished = []
+        for i in self.host.listdir(self.run_finished_dir):
             job_id, _index, batch_uid = i.split("_")
             index = int(_index)
-            terminated.append((job_id, index, batch_uid))
-        return terminated
+            run_finished.append((job_id, index, batch_uid))
+        return run_finished
 
     def get_running(self) -> list[tuple[str, int, str]]:
         """
@@ -141,11 +141,11 @@ class RemoteBatchManager:
             running.append((job_id, index, batch_uid))
         return running
 
-    def delete_terminated(self, ids: list[tuple[str, int, str]]) -> None:
+    def delete_run_finished(self, ids: list[tuple[str, int, str]]) -> None:
         if not self._dir_initialized:
             self._init_files_dir()
         for job_id, index, batch_uid in ids:
-            self.host.remove(self.terminated_dir / f"{job_id}_{index}_{batch_uid}")
+            self.host.remove(self.run_finished_dir / f"{job_id}_{index}_{batch_uid}")
 
     def delete_running(self, batch_uid: str) -> None:
         """
@@ -219,7 +219,7 @@ class LocalBatchManager:
         self.multiprocess_lock = multiprocess_lock
         self.submitted_dir = self.files_dir / SUBMITTED_DIR
         self.running_dir = self.files_dir / RUNNING_DIR
-        self.terminated_dir = self.files_dir / TERMINATED_DIR
+        self.run_finished_dir = self.files_dir / RUN_FINISHED_DIR
         self.lock_dir = self.files_dir / LOCK_DIR
 
     def get_job(self) -> str | None:
@@ -262,17 +262,17 @@ class LocalBatchManager:
                 files.remove(selected)
         return None
 
-    def terminate_job(self, job_id: str, index: int) -> None:
+    def set_job_finished(self, job_id: str, index: int) -> None:
         """
-        Terminate a job by removing the corresponding file from the running
-        directory and adding a new file in the terminated directory.
+        Set a job as run_finished by removing the corresponding file from the running
+        directory and adding a new file in the "run_finished" directory.
 
         Parameters
         ----------
         job_id
-            The uuid of the job to terminate.
+            The uuid of the job to set as run_finished.
         index
-            The index of the job to terminate.
+            The index of the job to set as run_finished.
         """
         os.remove(self.running_dir / f"{job_id}_{index}_{self.batch_uid}")
-        (self.terminated_dir / f"{job_id}_{index}_{self.batch_uid}").touch()
+        (self.run_finished_dir / f"{job_id}_{index}_{self.batch_uid}").touch()

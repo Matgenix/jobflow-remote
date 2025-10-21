@@ -436,7 +436,7 @@ def get_job_report_components(report: JobsReport) -> list[RenderableType]:
         JobState.UPLOADED: "deep_sky_blue1",
         JobState.SUBMITTED: "blue",
         JobState.RUNNING: "green",
-        JobState.TERMINATED: "red",
+        JobState.RUN_FINISHED: "red",
         JobState.DOWNLOADED: "blue_violet",
         JobState.REMOTE_ERROR: "yellow",
         JobState.COMPLETED: "green",

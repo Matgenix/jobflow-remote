@@ -12,7 +12,7 @@ class JobState(Enum):
     UPLOADED = "UPLOADED"
     SUBMITTED = "SUBMITTED"
     RUNNING = "RUNNING"
-    TERMINATED = "TERMINATED"
+    RUN_FINISHED = "RUN_FINISHED"
     DOWNLOADED = "DOWNLOADED"
     REMOTE_ERROR = "REMOTE_ERROR"
     COMPLETED = "COMPLETED"
@@ -35,7 +35,7 @@ short_state_mapping = {
     JobState.UPLOADED: "U",
     JobState.SUBMITTED: "SU",
     JobState.RUNNING: "RU",
-    JobState.TERMINATED: "T",
+    JobState.RUN_FINISHED: "RF",
     JobState.DOWNLOADED: "D",
     JobState.REMOTE_ERROR: "RERR",
     JobState.COMPLETED: "C",
@@ -60,7 +60,7 @@ RUNNING_STATES = [
     JobState.UPLOADED,
     JobState.SUBMITTED,
     JobState.RUNNING,
-    JobState.TERMINATED,
+    JobState.RUN_FINISHED,
     JobState.DOWNLOADED,
 ]
 

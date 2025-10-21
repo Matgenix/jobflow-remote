@@ -67,8 +67,8 @@ RUNNING
 Running state. The ``Runner`` verified that the Job has started is being
 executed on the worker.
 
-TERMINATED
-----------
+RUN_FINISHED
+------------
 
 Running state. The process executing the Job on the worked has finished
 running. No knowledge of whether this happened for an error or because
@@ -153,9 +153,9 @@ to intermediate or final error states.
         CHECKED_OUT --> UPLOADED
         UPLOADED --> SUBMITTED
         SUBMITTED --> RUNNING
-        RUNNING --> TERMINATED
-        SUBMITTED --> TERMINATED
-        TERMINATED --> DOWNLOADED
+        RUNNING --> RUN_FINISHED
+        SUBMITTED --> RUN_FINISHED
+        RUN_FINISHED --> DOWNLOADED
         DOWNLOADED --> COMPLETED
         DOWNLOADED --> FAILED
 
@@ -163,7 +163,7 @@ to intermediate or final error states.
         UPLOADED --> REMOTE_ERROR
         SUBMITTED --> REMOTE_ERROR
         RUNNING --> REMOTE_ERROR
-        TERMINATED --> REMOTE_ERROR
+        RUN_FINISHED --> REMOTE_ERROR
         DOWNLOADED --> REMOTE_ERROR
 
 
@@ -175,7 +175,7 @@ to intermediate or final error states.
         classDef wait fill:#eae433
 
         class REMOTE_ERROR,FAILED error
-        class CHECKED_OUT,UPLOADED,SUBMITTED,RUNNING,TERMINATED,DOWNLOADED running
+        class CHECKED_OUT,UPLOADED,SUBMITTED,RUNNING,RUN_FINISHED,DOWNLOADED running
         class COMPLETED success
         class READY ready
         class WAITING wait

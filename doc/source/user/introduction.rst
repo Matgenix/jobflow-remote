@@ -76,7 +76,7 @@ perform and updates the state of Jobs in the database performing some actions on
   executes its ``run`` method. Since all references are already resolved no access to the database
   is needed. The output of the Job is also stored as JSON files and does not need access the database.
 * Meanwhile, the Runner keeps monitoring the state of the process (e.g. a SLURM job).
-  When it is completed marks the Job as ``TERMINATED``.
+  When it is completed marks the Job as ``RUN_FINISHED``.
 * In the next step the Runner fetches the JSON file containing the outputs from the worker
   and sets the Job's state to ``DOWNLOADED``.
 

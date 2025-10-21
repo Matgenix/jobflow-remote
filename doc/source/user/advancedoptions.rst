@@ -102,7 +102,7 @@ preserves the requirement of avoiding direct connections to the queue database f
 worker process.
 
 Once the Job has been executed a file will be created in a different folder, that will
-signal the runner that the Job has ``TERMINATED``. From this point onward the processing
+signal the runner that the Job has ``RUN_FINISHED``. From this point onward the processing
 of the Job by the runner proceeds in the standard way.
 
 In order to define a *batch* worker the ``batch`` section for that worker should be filled
@@ -208,7 +208,7 @@ You can customize the output using the following options:
 
 - ``--worker-name``: show only batches from a specific worker
 - ``--max-results``: limit the number of results shown (default: 20)
-- ``--batch-state``: filter by batch state (e.g. ``RUNNING``, ``TERMINATED``, ``FAILED``)
+- ``--batch-state``: filter by batch state (i.e. ``SUBMITTED``, ``RUNNING`` or ``FINISHED``)
 - ``--verbosity``: increase the verbosity level to include more details
 
 For example, to list all running batches from a specific worker:

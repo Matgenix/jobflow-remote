@@ -238,7 +238,7 @@ def test_run_batch_multi_fail(
     )
 
     assert len(batch_manager.get_running()) == 0
-    assert len(batch_manager.get_terminated()) == 0
+    assert len(batch_manager.get_run_finished()) == 0
     assert len(batch_manager.get_submitted()) == 0
     all_batches = job_controller.get_all_batches()
     assert len(all_batches) == 1
@@ -295,7 +295,7 @@ def test_run_batch_multi_fail(
 
     # now reset the DB, the files should also be cleaned up
     job_controller.reset()
-    assert len(batch_manager.get_terminated()) == 0
+    assert len(batch_manager.get_run_finished()) == 0
     assert len(batch_manager.get_submitted()) == 0
     assert len(batch_manager.get_running()) == 0
 
