@@ -8,8 +8,10 @@ from itertools import cycle
 from typing import TYPE_CHECKING
 
 from monty.json import jsanitize
+from rich.console import Group
 from rich.markdown import Markdown
 from rich.panel import Panel
+from rich.pretty import Pretty
 from rich.scope import render_scope
 from rich.table import Table
 from rich.text import Text
@@ -120,7 +122,10 @@ header_name_data_getter_map = {
         if ji.lock_time
         else None,
     ),
-    "metadata": ("Metadata", lambda ji: render_scope(ji.metadata)),
+    "metadata": (
+        "Metadata",
+        lambda ji: Pretty(ji.metadata, max_length=10, max_string=500, max_depth=3),
+    ),
 }
 
 
@@ -213,7 +218,9 @@ def get_flow_info_table(flows_info: list[FlowInfo], verbosity: int) -> Table:
             row.append(", ".join(workers))
             job_states = "-".join(js.short_value for js in fi.job_states)
             row.append(job_states)
-            row.append(render_scope(fi.flow_metadata))
+            row.append(
+                Pretty(fi.flow_metadata, max_length=10, max_string=500, max_depth=3)
+            )
 
         table.add_row(*row)
 
@@ -304,11 +311,13 @@ def format_job_info(
 def format_flow_info(
     flow_info: FlowInfo, verbosity=0, output_keys=None, stored_data_keys=None
 ) -> Table:
-    title = f"Flow: {flow_info.name} - {flow_info.flow_id} - {flow_info.state.name}"
+    title = Text(
+        f"Flow: {flow_info.name} - {flow_info.flow_id} - {flow_info.state.name}"
+    )
     if verbosity > 0:
-        title += f"\nMetadata: {flow_info.flow_metadata}"
+        title = Group(title, Text("Metadata:"), Pretty(flow_info.flow_metadata))
     table = get_job_info_table(
-        flow_info.jobs_info,
+        flow_info.jobs_info or [],
         verbosity=verbosity,
         output_keys=output_keys,
         stored_data_keys=stored_data_keys,
