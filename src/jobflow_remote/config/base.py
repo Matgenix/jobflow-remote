@@ -234,9 +234,8 @@ class WorkerBase(BaseModel):
                 sched = MontyDecoder().process_decoded(scheduler_type)
             except Exception as exc:
                 raise ValueError(f"Invalid serialized MSONable object: {exc}") from exc
-            print(sched)
             if not isinstance(sched, BaseSchedulerIO):
-                raise TypeError(
+                raise ValueError(  # noqa: TRY004
                     "The scheduler_type should either be a str or an as_dict of a subclass of BaseSchedulerIO"
                 )
         return scheduler_type
