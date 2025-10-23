@@ -212,6 +212,7 @@ def two_flows_four_jobs(random_project_name):
 
     flow = Flow([add_first, add_second])
     flow.name = "f1"
+    flow.metadata["f1_metadata"] = "some_info"
     submit_flow(flow, worker="test_local_worker")
 
     add_third = add(1, 5)

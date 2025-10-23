@@ -159,7 +159,7 @@ def test_delete(job_controller, two_flows_four_jobs, run_check_cli) -> None:
 def test_flow_info(job_controller, two_flows_four_jobs, run_check_cli) -> None:
     columns = ["DB id", "Name", "State", "Job id", "(Index)", "Worker"]
     outputs = columns + [f"add{i}" for i in range(1, 3)] + ["READY", "WAITING"]
-    excluded = [f"add{i}" for i in range(3, 5)]
+    excluded = [f"add{i}" for i in range(3, 5)] + ["{'f1_metadata': 'some_info'}"]
     res_flow_info = run_check_cli(
         ["flow", "info", "-j", "1", "--jobs-sort", "db_id"],
         required_out=outputs,
@@ -172,7 +172,8 @@ def test_flow_info(job_controller, two_flows_four_jobs, run_check_cli) -> None:
     assert table_flow_info == table_job_list
 
     res_flow_info_v = run_check_cli(
-        ["flow", "info", "-j", "1", "-v", "--jobs-sort", "db_id"]
+        ["flow", "info", "-j", "1", "-v", "--jobs-sort", "db_id"],
+        required_out=["{'f1_metadata': 'some_info'}"],
     )
     res_job_list_v = run_check_cli(
         ["job", "list", "-fid", "1", "-v", "--sort", "db_id"]
@@ -182,7 +183,8 @@ def test_flow_info(job_controller, two_flows_four_jobs, run_check_cli) -> None:
     assert table_flow_info_v == table_job_list_v
 
     res_flow_info_vv = run_check_cli(
-        ["flow", "info", "-j", "1", "-vv", "--jobs-sort", "db_id"]
+        ["flow", "info", "-j", "1", "-vv", "--jobs-sort", "db_id"],
+        required_out=["{'f1_metadata': 'some_info'}"],
     )
     res_job_list_vv = run_check_cli(
         ["job", "list", "-fid", "1", "-vv", "--sort", "db_id"]
@@ -192,7 +194,8 @@ def test_flow_info(job_controller, two_flows_four_jobs, run_check_cli) -> None:
     assert table_flow_info_vv == table_job_list_vv
 
     res_flow_info_vvv = run_check_cli(
-        ["flow", "info", "-j", "1", "-vvv", "--jobs-sort", "db_id"]
+        ["flow", "info", "-j", "1", "-vvv", "--jobs-sort", "db_id"],
+        required_out=["{'f1_metadata': 'some_info'}"],
     )
     res_job_list_vvv = run_check_cli(
         ["job", "list", "-fid", "1", "-vvv", "--sort", "db_id"]
@@ -200,6 +203,8 @@ def test_flow_info(job_controller, two_flows_four_jobs, run_check_cli) -> None:
     table_flow_info_vvv = re.search(r"(┏[\s\S]+?┘)", res_flow_info_vvv.output).group(1)
     table_job_list_vvv = re.search(r"(┏[\s\S]+?┘)", res_job_list_vvv.output).group(1)
     assert table_flow_info_vvv == table_job_list_vvv
+
+    run_check_cli(["flow", "info", "-j", "3", "-v"], required_out=["Metadata: {}"])
 
 
 def test_report(job_controller, run_check_cli) -> None:
