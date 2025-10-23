@@ -8,6 +8,7 @@ from itertools import cycle
 from typing import TYPE_CHECKING
 
 from monty.json import jsanitize
+from rich.console import Group
 from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.pretty import Pretty
@@ -310,9 +311,11 @@ def format_job_info(
 def format_flow_info(
     flow_info: FlowInfo, verbosity=0, output_keys=None, stored_data_keys=None
 ) -> Table:
-    title = f"Flow: {flow_info.name} - {flow_info.flow_id} - {flow_info.state.name}"
+    title = Text(
+        f"Flow: {flow_info.name} - {flow_info.flow_id} - {flow_info.state.name}"
+    )
     if verbosity > 0:
-        title += f"\nMetadata:\n{Pretty(flow_info.flow_metadata)}"
+        title = Group(title, Text("Metadata:"), Pretty(flow_info.flow_metadata))
     table = get_job_info_table(
         flow_info.jobs_info or [],
         verbosity=verbosity,
