@@ -5,6 +5,7 @@ from enum import Enum
 from typing import Callable, NoReturn, Optional, Union
 
 from jobflow import Job, JobConfig, Maker, OnMissing, Response, job
+from qtoolkit.io.shell import ShellIO
 
 
 @job
@@ -154,3 +155,7 @@ class EnumMaker(Maker):
     @job
     def make(self):
         assert isinstance(self.e, TestEnum)
+
+
+class MyShellIO(ShellIO):
+    USERNAME_MAXCHARS = 1
