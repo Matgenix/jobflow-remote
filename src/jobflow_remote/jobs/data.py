@@ -451,10 +451,13 @@ projection_flow_info_jobs = [
     "uuid",
     "index",
     "state",
+    "job.metadata",
     "job.name",
     "worker",
     "parents",
     "job.hosts",
+    "created_on",
+    "updated_on",
 ]
 
 
@@ -477,6 +480,8 @@ class FlowInfo(BaseModel):
     job_names: list[str]
     parents: list[list[str]]
     hosts: list[list[str]]
+    flow_metadata: dict
+    jobs_info: Optional[list[JobInfo]] = None
 
     @classmethod
     def from_query_dict(cls, d) -> "FlowInfo":
@@ -490,6 +495,7 @@ class FlowInfo(BaseModel):
         job_names = []
         parents = []
         job_hosts = []
+        jobs_info = []
 
         if jobs_data:
             db_ids = []
@@ -505,6 +511,7 @@ class FlowInfo(BaseModel):
                 workers.append(job_doc["worker"])
                 parents.append(job_doc["parents"] or [])
                 job_hosts.append(job_doc["job"]["hosts"] or [])
+                jobs_info.append(JobInfo.from_query_output(job_doc))
         else:
             db_ids, job_ids, job_indexes = list(  # type:ignore[assignment]
                 zip(*d["ids"])
@@ -529,6 +536,8 @@ class FlowInfo(BaseModel):
             job_names=job_names,
             parents=parents,
             hosts=job_hosts,
+            flow_metadata=d["metadata"],
+            jobs_info=jobs_info or None,
         )
 
     @cached_property

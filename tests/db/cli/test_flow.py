@@ -1,4 +1,5 @@
 import os.path
+import re
 
 import pytest
 
@@ -158,10 +159,52 @@ def test_delete(job_controller, two_flows_four_jobs, run_check_cli) -> None:
 def test_flow_info(job_controller, two_flows_four_jobs, run_check_cli) -> None:
     columns = ["DB id", "Name", "State", "Job id", "(Index)", "Worker"]
     outputs = columns + [f"add{i}" for i in range(1, 3)] + ["READY", "WAITING"]
-    excluded = [f"add{i}" for i in range(3, 5)]
-    run_check_cli(
-        ["flow", "info", "-j", "1"], required_out=outputs, excluded_out=excluded
+    excluded = [f"add{i}" for i in range(3, 5)] + ["{'f1_metadata': 'some_info'}"]
+    res_flow_info = run_check_cli(
+        ["flow", "info", "-j", "1", "--jobs-sort", "db_id"],
+        required_out=outputs,
+        excluded_out=excluded,
     )
+    res_job_list = run_check_cli(["job", "list", "-fid", "1", "--sort", "db_id"])
+    # Check that the job tables are the same between jf flow info and jf job list for the same flow
+    table_flow_info = re.search(r"(┏[\s\S]+?┘)", res_flow_info.output).group(1)
+    table_job_list = re.search(r"(┏[\s\S]+?┘)", res_job_list.output).group(1)
+    assert table_flow_info == table_job_list
+
+    res_flow_info_v = run_check_cli(
+        ["flow", "info", "-j", "1", "-v", "--jobs-sort", "db_id"],
+        required_out=["{'f1_metadata': 'some_info'}"],
+    )
+    res_job_list_v = run_check_cli(
+        ["job", "list", "-fid", "1", "-v", "--sort", "db_id"]
+    )
+    table_flow_info_v = re.search(r"(┏[\s\S]+?┘)", res_flow_info_v.output).group(1)
+    table_job_list_v = re.search(r"(┏[\s\S]+?┘)", res_job_list_v.output).group(1)
+    assert table_flow_info_v == table_job_list_v
+
+    res_flow_info_vv = run_check_cli(
+        ["flow", "info", "-j", "1", "-vv", "--jobs-sort", "db_id"],
+        required_out=["{'f1_metadata': 'some_info'}"],
+    )
+    res_job_list_vv = run_check_cli(
+        ["job", "list", "-fid", "1", "-vv", "--sort", "db_id"]
+    )
+    table_flow_info_vv = re.search(r"(┏[\s\S]+?┘)", res_flow_info_vv.output).group(1)
+    table_job_list_vv = re.search(r"(┏[\s\S]+?┘)", res_job_list_vv.output).group(1)
+    assert table_flow_info_vv == table_job_list_vv
+
+    res_flow_info_vvv = run_check_cli(
+        ["flow", "info", "-j", "1", "-vvv", "--jobs-sort", "db_id"],
+        required_out=["{'f1_metadata': 'some_info'}"],
+    )
+    res_job_list_vvv = run_check_cli(
+        ["job", "list", "-fid", "1", "-vvv", "--sort", "db_id"]
+    )
+    table_flow_info_vvv = re.search(r"(┏[\s\S]+?┘)", res_flow_info_vvv.output).group(1)
+    table_job_list_vvv = re.search(r"(┏[\s\S]+?┘)", res_job_list_vvv.output).group(1)
+    assert table_flow_info_vvv == table_job_list_vvv
+
+    run_check_cli(["flow", "info", "-j", "3", "-v"], required_out=["Metadata: {}"])
 
 
 def test_report(job_controller, run_check_cli) -> None:
