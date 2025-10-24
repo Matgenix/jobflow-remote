@@ -8,8 +8,10 @@ from itertools import cycle
 from typing import TYPE_CHECKING
 
 from monty.json import jsanitize
+from rich.console import Group
 from rich.markdown import Markdown
 from rich.panel import Panel
+from rich.pretty import Pretty
 from rich.scope import render_scope
 from rich.table import Table
 from rich.text import Text
@@ -20,7 +22,7 @@ from jobflow_remote.remote.data import get_job_path
 from jobflow_remote.utils.data import convert_utc_time
 
 if TYPE_CHECKING:
-    from rich.console import RenderableType
+    from rich.console import ConsoleRenderable, RenderableType
 
     from jobflow_remote.config.base import ExecutionConfig, WorkerBase
     from jobflow_remote.jobs.data import FlowInfo, JobDoc, JobInfo
@@ -120,6 +122,10 @@ header_name_data_getter_map = {
         if ji.lock_time
         else None,
     ),
+    "metadata": (
+        "Metadata",
+        lambda ji: Pretty(ji.metadata, max_length=10, max_string=500, max_depth=3),
+    ),
 }
 
 
@@ -139,7 +145,7 @@ def get_job_info_table(
         if verbosity == 1:
             output_keys.append(all_output_keys[10])
         if verbosity >= 2:
-            output_keys += all_output_keys[11:13]
+            output_keys += all_output_keys[11:14]
     all_display_keys = output_keys + stored_data_keys
 
     # Use a dictionary to determine how to extract the value to print from each
@@ -192,6 +198,7 @@ def get_flow_info_table(flows_info: list[FlowInfo], verbosity: int) -> Table:
         table.add_column("Workers")
 
         table.add_column("Job states")
+        table.add_column("Flow metadata")
 
     for fi in flows_info:
         # show the smallest Job db_id as db_id
@@ -211,6 +218,9 @@ def get_flow_info_table(flows_info: list[FlowInfo], verbosity: int) -> Table:
             row.append(", ".join(workers))
             job_states = "-".join(js.short_value for js in fi.job_states)
             row.append(job_states)
+            row.append(
+                Pretty(fi.flow_metadata, max_length=10, max_string=500, max_depth=3)
+            )
 
         table.add_row(*row)
 
@@ -298,29 +308,21 @@ def format_job_info(
     return render_scope_jfr(sorted_d, sort_keys=False, overflow="fold")
 
 
-def format_flow_info(flow_info: FlowInfo) -> Table:
-    title = f"Flow: {flow_info.name} - {flow_info.flow_id} - {flow_info.state.name}"
-    table = Table(title=title)
-    table.title_style = "bold"
-    table.add_column("DB id")
-    table.add_column("Name")
-    table.add_column("State")
-    table.add_column("Job id  (Index)")
-    table.add_column("Worker")
-
-    for i, job_id in enumerate(flow_info.job_ids):
-        state = flow_info.job_states[i].name
-
-        row = [
-            str(flow_info.db_ids[i]),
-            flow_info.job_names[i],
-            state,
-            f"{job_id}  ({flow_info.job_indexes[i]})",
-            flow_info.workers[i],
-        ]
-
-        table.add_row(*row)
-
+def format_flow_info(
+    flow_info: FlowInfo, verbosity=0, output_keys=None, stored_data_keys=None
+) -> Table:
+    title = Text(
+        f"Flow: {flow_info.name} - {flow_info.flow_id} - {flow_info.state.name}"
+    )
+    if verbosity > 0:
+        title = Group(title, Text("Metadata:"), Pretty(flow_info.flow_metadata))
+    table = get_job_info_table(
+        flow_info.jobs_info or [],
+        verbosity=verbosity,
+        output_keys=output_keys,
+        stored_data_keys=stored_data_keys,
+    )
+    table.title = title
     return table
 
 
@@ -376,7 +378,7 @@ def get_worker_table(workers: dict[str, WorkerBase], verbosity: int = 0) -> Tabl
         table.add_column("details")
 
     for name in sorted(workers):
-        row = [Text(name, style="bold")]
+        row: list[Text | str | ConsoleRenderable] = [Text(name, style="bold")]
         worker = workers[name]
         if verbosity > 0:
             row.append(worker.type)

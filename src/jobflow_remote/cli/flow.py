@@ -8,15 +8,16 @@ from jobflow.utils.graph import draw_graph
 from rich.prompt import Confirm
 from rich.text import Text
 
-from jobflow_remote import SETTINGS
 from jobflow_remote.cli.formatting import (
     format_flow_info,
     get_flow_info_table,
     get_flow_report_components,
+    header_name_data_getter_map,
 )
 from jobflow_remote.cli.jf import app
 from jobflow_remote.cli.jfr_typer import JFRTyper
 from jobflow_remote.cli.types import (
+    cli_output_keys_opt,
     count_opt,
     days_opt,
     db_ids_opt,
@@ -38,12 +39,14 @@ from jobflow_remote.cli.types import (
     reverse_sort_flag_opt,
     sort_opt,
     start_date_opt,
+    stored_data_keys_opt,
     verbosity_opt,
 )
 from jobflow_remote.cli.utils import (
     ReportInterval,
     SortOption,
     check_incompatible_opt,
+    check_output_stored_data_keys,
     exit_with_error_msg,
     exit_with_warning_msg,
     get_job_controller,
@@ -81,6 +84,8 @@ def flows_list(
     reverse_sort: reverse_sort_flag_opt = False,
 ) -> None:
     """Get the list of Flows in the database."""
+    from jobflow_remote import SETTINGS
+
     check_incompatible_opt({"start_date": start_date, "days": days, "hours": hours})
     check_incompatible_opt({"end_date": end_date, "days": days, "hours": hours})
 
@@ -118,7 +123,7 @@ def flows_list(
                 locked=locked,
                 limit=max_results,
                 sort=db_sort,
-                full=verbosity > 0,
+                with_jobs_info=verbosity > 0,
             )
 
             table = get_flow_info_table(flows_info, verbosity=verbosity)
@@ -202,7 +207,7 @@ def delete(
             start_date=start_date,
             end_date=end_date,
             name=name,
-            full=verbosity > 1,
+            with_jobs_info=verbosity > 1,
         )
 
     if not flows_info:
@@ -256,8 +261,33 @@ def delete(
 def flow_info(
     flow_db_id: flow_db_id_arg,
     job_id_flag: job_flow_id_flag_opt = False,
+    verbosity: verbosity_opt = 0,
+    stored_data_keys: stored_data_keys_opt = None,
+    cli_output_keys: cli_output_keys_opt = None,
+    sort: sort_opt = SortOption.UPDATED_ON,
+    jobs_sort: Annotated[
+        SortOption,
+        typer.Option(
+            "--jobs-sort",
+            help="The field on which the jobs will be sorted. In descending order",
+        ),
+    ] = None,
+    reverse_sort: reverse_sort_flag_opt = False,
+    reverse_jobs_sort: Annotated[
+        bool,
+        typer.Option(
+            "--reverse-jobs-sort",
+            "-jrevs",
+            help="Reverse the sorting order of the jobs",
+        ),
+    ] = False,
 ) -> None:
     """Provide detailed information on a Flow."""
+
+    output_keys = check_output_stored_data_keys(
+        cli_output_keys, stored_data_keys, verbosity, header_name_data_getter_map
+    )
+
     db_id, jf_id = get_job_db_ids(flow_db_id, None)
     db_ids = job_ids = flow_ids = None
     if db_id is not None:
@@ -267,6 +297,11 @@ def flow_info(
     else:
         flow_ids = [jf_id]
 
+    db_sort: list[tuple[str, int]] = [(sort.value, 1 if reverse_sort else -1)]
+    db_jobs_sort: list[tuple[str, int]] | None = None
+    if jobs_sort:
+        db_jobs_sort = [(jobs_sort.value, 1 if reverse_jobs_sort else -1)]
+
     with loading_spinner():
         jc = get_job_controller()
 
@@ -274,13 +309,22 @@ def flow_info(
             job_ids=job_ids,
             db_ids=db_ids,
             flow_ids=flow_ids,
+            sort=db_sort,
+            jobs_sort=db_jobs_sort,
             limit=1,
-            full=True,
+            with_jobs_info=True,
         )
     if not flows_info:
         exit_with_error_msg("No data matching the request")
 
-    out_console.print(format_flow_info(flows_info[0]))
+    out_console.print(
+        format_flow_info(
+            flows_info[0],
+            verbosity=verbosity,
+            output_keys=output_keys,
+            stored_data_keys=stored_data_keys,
+        )
+    )
 
 
 @app_flow.command()
@@ -339,7 +383,7 @@ def graph(
             db_ids=db_ids,
             flow_ids=flow_ids,
             limit=1,
-            full=True,
+            with_jobs_info=True,
         )
     if not flows_info:
         exit_with_error_msg("No data matching the request")

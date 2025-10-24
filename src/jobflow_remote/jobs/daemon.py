@@ -366,7 +366,7 @@ class DaemonManager:
         interface = self.get_interface()
         try:
             proc_info = interface.supervisor.getAllProcessInfo()
-        except ConnectionResetError:
+        except (ConnectionResetError, FileNotFoundError):
             process_active = self.check_supervisord_process()
 
             if not process_active:

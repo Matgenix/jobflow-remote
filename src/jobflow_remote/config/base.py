@@ -7,6 +7,7 @@ from typing import Annotated, Any, Literal, Optional, Union
 
 from jobflow import JobStore
 from maggma.stores import MongoStore
+from monty.json import MontyDecoder
 from pydantic import (
     AliasChoices,
     BaseModel,
@@ -161,8 +162,9 @@ class WorkerBase(BaseModel):
         description="The discriminator field to determine the worker type"
     )
 
-    scheduler_type: str = Field(
-        description="Type of the scheduler. Depending on the values supported by QToolKit"
+    scheduler_type: Union[str, dict] = Field(
+        description="Type of the scheduler. Either a string depending on the values supported by QToolKit "
+        "or a serialized representation of a (subclass of) BaseSchedulerIO"
     )
     work_dir: Path = Field(
         description="Absolute path of the directory of the worker where subfolders for "
@@ -223,10 +225,19 @@ class WorkerBase(BaseModel):
 
     @field_validator("scheduler_type")
     @classmethod
-    def check_scheduler_type(cls, scheduler_type: str) -> str:
+    def check_scheduler_type(cls, scheduler_type: Union[str, dict]) -> Union[str, dict]:
         """Validator to set the default of scheduler_type."""
-        if scheduler_type not in scheduler_mapping:
+        if isinstance(scheduler_type, str) and scheduler_type not in scheduler_mapping:
             raise ValueError(f"Unknown scheduler type {scheduler_type}")
+        if isinstance(scheduler_type, dict):
+            try:
+                sched = MontyDecoder().process_decoded(scheduler_type)
+            except Exception as exc:
+                raise ValueError(f"Invalid serialized MSONable object: {exc}") from exc
+            if not isinstance(sched, BaseSchedulerIO):
+                raise ValueError(  # noqa: TRY004
+                    "The scheduler_type should either be a str or an as_dict of a subclass of BaseSchedulerIO"
+                )
         return scheduler_type
 
     @field_validator("work_dir")
@@ -254,9 +265,11 @@ class WorkerBase(BaseModel):
         -------
         The instance of the scheduler_type.
         """
-        if self.scheduler_type not in scheduler_mapping:
-            raise ConfigError(f"Unknown scheduler type {self.scheduler_type}")
-        return scheduler_mapping[self.scheduler_type]()
+        if isinstance(self.scheduler_type, str):
+            if self.scheduler_type not in scheduler_mapping:
+                raise ConfigError(f"Unknown scheduler type {self.scheduler_type}")
+            return scheduler_mapping[self.scheduler_type]()
+        return MontyDecoder().process_decoded(self.scheduler_type)
 
     @abc.abstractmethod
     def get_host(self) -> BaseHost:

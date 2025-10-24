@@ -2414,6 +2414,7 @@ class JobController:
         projection_flow: dict | None = None,
         projection_job: dict | None = None,
         sort: list[tuple] | None = None,
+        jobs_sort: list[tuple] | None = None,
         limit: int = 0,
     ) -> list[dict]:
         """
@@ -2463,7 +2464,14 @@ class JobController:
             # This can help reducing the size of the fetched documents and
             # avoid exceeding the maximum size allowed. Adding the projection
             # in the general pipeline does not have the same effect.
-            pipeline[0]["$lookup"]["pipeline"] = [{"$project": projection_job}]
+            if jobs_sort:
+                job_pipeline = [
+                    {"$sort": dict(jobs_sort)},
+                    {"$project": projection_job},
+                ]
+            else:
+                job_pipeline = [{"$project": projection_job}]
+            pipeline[0]["$lookup"]["pipeline"] = job_pipeline
             # if the additional projection is set, the keys need to be specified
             # in that part of the pipeline as well.
             if projection_flow:
@@ -2490,9 +2498,10 @@ class JobController:
         metadata: dict | None = None,
         locked: bool = False,
         sort: list[tuple] | None = None,
+        jobs_sort: list[tuple] | None = None,
         limit: int = 0,
         skip: int = 0,
-        full: bool = False,
+        with_jobs_info: bool = False,
     ) -> list[FlowInfo]:
         """
         Query for Flows based on standard parameters and return a list of FlowInfo.
@@ -2526,12 +2535,12 @@ class JobController:
             query. Follows pymongo conventions.
         limit
             Maximum number of entries to retrieve. 0 means no limit.
-        full
-            If True data is fetched from both the Flow collection and Job collection
-            with an aggregate. Otherwise, only the Job information in the Flow
-            document will be used.
         skip
             The number of documents to omit (from the start of the result set).
+        with_jobs_info
+            If True, data is fetched from both the Flow collection and Job collection
+            with an aggregate and JobInfo for each job will be created.
+            Otherwise, only the Job information in the Flow document will be used.
 
         Returns
         -------
@@ -2552,13 +2561,14 @@ class JobController:
 
         # Only use the full aggregation if more job details are needed.
         # The single flow document is enough for basic information
-        if full:
+        if with_jobs_info:
             projection_job = {f: 1 for f in projection_flow_info_jobs}
             projection_flow = {k: 1 for k in FlowDoc.model_fields}
 
             data = self.get_flow_job_aggreg(
                 query=query,
                 sort=sort,
+                jobs_sort=jobs_sort,
                 limit=limit,
                 projection_flow=projection_flow,
                 projection_job=projection_job,
