@@ -285,3 +285,70 @@ def test_set_store(job_controller, runner, one_job, run_check_cli):
     )
 
     assert job_controller.get_flow_store(one_job.uuid) is None
+
+
+def test_clean(job_controller, two_flows_four_jobs, run_check_cli) -> None:
+    from jobflow_remote.jobs.runner import Runner
+
+    run_check_cli(
+        ["flow", "delete", "-fid", "wrong_uuid"],
+        required_out="No flows matching criteria",
+        cli_input="y",
+    )
+
+    # run one of the jobs to check that the output is not deleted
+    runner = Runner()
+    runner.run_all_jobs(max_seconds=30)
+    job_1_uuid = two_flows_four_jobs[0].jobs[0].uuid
+    job_1_doc = job_controller.get_job_doc(job_id=job_1_uuid)
+    job_2_doc = job_controller.get_job_doc(job_id=two_flows_four_jobs[1].jobs[0].uuid)
+    job_3_doc = job_controller.get_job_doc(job_id=two_flows_four_jobs[1].jobs[1].uuid)
+
+    assert os.path.isdir(job_1_doc.run_dir)
+
+    required_out_1 = [
+        "This operation will delete the files of the following 1 Flow(s)",
+        two_flows_four_jobs[0].uuid,
+        "Deleted execution folders of 2 Jobs",
+    ]
+    run_check_cli(
+        ["flow", "clean", "-v", "-fid", two_flows_four_jobs[0].uuid],
+        required_out=required_out_1,
+        cli_input="y",
+    )
+    assert job_controller.count_flows() == 2
+
+    # check that the directory was deleted
+    assert not os.path.isdir(job_1_doc.run_dir)
+
+    assert os.path.isdir(job_2_doc.run_dir)
+    assert os.path.isdir(job_3_doc.run_dir)
+
+    # don't confirm and no verbose option
+    required_out_2 = [
+        "This operation will delete the files of 1 Flow(s)",
+    ]
+    run_check_cli(
+        ["flow", "clean", "-fid", two_flows_four_jobs[1].uuid],
+        required_out=required_out_2,
+        cli_input="n",
+    )
+    assert os.path.isdir(job_2_doc.run_dir)
+    assert os.path.isdir(job_3_doc.run_dir)
+
+    os.unlink(os.path.join(job_3_doc.run_dir, "jfremote_in.json"))
+
+    required_out_3 = [
+        "Deleted execution folders of 1 Jobs",
+        "Folder was not deleted for the following jobs:",
+        f"- {job_3_doc.db_id}",
+    ]
+    excluded_out = ["Proceed anyway"]
+    run_check_cli(
+        ["flow", "clean", "-fid", two_flows_four_jobs[1].uuid, "-f"],
+        required_out=required_out_3,
+        excluded_out=excluded_out,
+    )
+
+    assert not os.path.isdir(job_2_doc.run_dir)
+    assert os.path.isdir(job_3_doc.run_dir)

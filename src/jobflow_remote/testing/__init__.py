@@ -116,6 +116,14 @@ def no_resolve(ref):
     return ref
 
 
+@job(config=JobConfig(on_missing_references=OnMissing.NONE))
+def onmissing_none(args):
+    """
+    A job that can run even if references are missing
+    """
+    return args
+
+
 @job
 def replace_and_stop_jobflow(a=1, b=1) -> Response[None]:
     from jobflow import Flow

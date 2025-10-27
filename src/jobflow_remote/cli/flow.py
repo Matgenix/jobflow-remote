@@ -462,6 +462,92 @@ def resume(
     out_console.print(f"{n_jobs} Job(s) resumed")
 
 
+@app_flow.command()
+def clean(
+    job_id: job_ids_opt = None,
+    db_id: db_ids_opt = None,
+    flow_id: flow_ids_opt = None,
+    state: flow_state_opt = None,
+    start_date: start_date_opt = None,
+    end_date: end_date_opt = None,
+    name: name_opt = None,
+    days: days_opt = None,
+    hours: hours_opt = None,
+    metadata: metadata_opt = None,
+    locked: locked_flow_opt = False,
+    verbosity: verbosity_opt = 0,
+    force: force_opt = False,
+):
+    check_incompatible_opt({"start_date": start_date, "days": days, "hours": hours})
+    check_incompatible_opt({"end_date": end_date, "days": days, "hours": hours})
+
+    jc = get_job_controller()
+
+    start_date = get_start_date(start_date, days, hours)
+
+    with loading_spinner():
+        with_jobs_info = ["run_dir"]
+        flows_info = jc.get_flows_info(
+            job_ids=job_id,
+            db_ids=db_id,
+            flow_ids=flow_id,
+            states=state,
+            start_date=start_date,
+            end_date=end_date,
+            name=name,
+            metadata=metadata,
+            locked=locked,
+            with_jobs_info=with_jobs_info,
+        )
+
+    if not flows_info:
+        exit_with_warning_msg("No flows matching criteria")
+
+    if not force:
+        if verbosity:
+            preamble = Text.from_markup(
+                f"[red]This operation will [bold]delete the files of the following {len(flows_info)} Flow(s)[/bold][/red]"
+            )
+            out_console.print(preamble)
+            table = get_flow_info_table(flows_info, verbosity=verbosity - 1)
+            out_console.print(table)
+            text = Text.from_markup("[red]Proceed anyway?[/red]")
+        else:
+            text = Text.from_markup(
+                f"[red]This operation will [bold]delete the files of {len(flows_info)} Flow(s)[/bold]. Proceed anyway?[/red]"
+            )
+
+        confirmed = Confirm.ask(text, default=False)
+        if not confirmed:
+            raise typer.Exit(0)
+
+    # if potentially interactive do not start the spinner.
+    spinner_cm: contextlib.AbstractContextManager
+    if jc.project.has_interactive_workers:
+        spinner_cm = contextlib.nullcontext()
+        out_console.print("Deleting files...")
+    else:
+        spinner_cm = loading_spinner(processing=False)
+    with spinner_cm as progress:
+        if progress:
+            progress.add_task(description="Deleting files...", total=None)
+        jobs_info = {}
+        for fi in flows_info:
+            for ji in fi.jobs_info:
+                if ji.run_dir:
+                    jobs_info[ji.db_id] = ji
+        deleted = jc.safe_delete_files(list(jobs_info.values()))
+
+    deleted_dict = {ji.db_id: ji for ji in deleted}
+    not_deleted = set(jobs_info) - set(deleted_dict)
+    if not_deleted:
+        out_console.print("Folder was not deleted for the following jobs:")
+        for db_id in not_deleted:
+            out_console.print(f" - {db_id}: {jobs_info[db_id].run_dir}")
+
+    out_console.print(f"Deleted execution folders of {len(deleted)} Jobs")
+
+
 app_flow_set = JFRTyper(
     name="set", help="Commands for setting properties for flows", no_args_is_help=True
 )
