@@ -1343,13 +1343,6 @@ def files_get(
 def files_delete(
     job_db_id: job_db_id_arg,
     job_index: job_index_opt = None,
-    filenames: Annotated[
-        Optional[list[str]],
-        typer.Argument(
-            help="A list of file names to be retrieved from the job run dir",
-            metavar="FILE_NAMES",
-        ),
-    ] = None,
 ) -> None:
     """
     Delete files from the Job's execution folder.
