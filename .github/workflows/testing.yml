@@ -194,7 +194,7 @@ jobs:
           pip install .[tests]
 
       - name: Get files from artifact
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v6
         with:
           name: coverage-files-artifact-3.12
 
