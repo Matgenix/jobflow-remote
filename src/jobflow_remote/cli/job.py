@@ -1337,3 +1337,48 @@ def files_get(
                 host.close()
             except Exception:
                 pass
+
+
+@app_job_files.command(name="delete")
+def files_delete(
+    job_db_id: job_db_id_arg,
+    job_index: job_index_opt = None,
+    filenames: Annotated[
+        Optional[list[str]],
+        typer.Argument(
+            help="A list of file names to be retrieved from the job run dir",
+            metavar="FILE_NAMES",
+        ),
+    ] = None,
+) -> None:
+    """
+    Delete files from the Job's execution folder.
+    """
+    db_id, job_id = get_job_db_ids(job_db_id, job_index)
+
+    jc = get_job_controller()
+
+    with loading_spinner(processing=False) as progress:
+        progress.add_task(description="Retrieving info...", total=None)
+        job_info = jc.get_job_info(
+            job_id=job_id,
+            job_index=job_index,
+            db_id=db_id,
+        )
+
+    if not job_info:
+        exit_with_error_msg("No data matching the request")
+
+    remote_dir = job_info.run_dir
+
+    if not remote_dir:
+        exit_with_warning_msg("The remote folder has not been created yet")
+
+    with loading_spinner(processing=False) as progress:
+        progress.add_task(description="Deleting files...", total=None)
+        deleted = jc.safe_delete_files([job_info])
+
+    if not deleted:
+        exit_with_error_msg(f"The files were not deleted in folder: {job_info.run_dir}")
+
+    out_console.print(f"Folder deleted {job_info.run_dir}")

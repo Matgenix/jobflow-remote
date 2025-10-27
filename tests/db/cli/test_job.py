@@ -481,6 +481,47 @@ def test_files_get(job_controller, one_job, tmp_dir, run_check_cli) -> None:
     )
 
 
+def test_files_delete(job_controller, two_flows_four_jobs, run_check_cli) -> None:
+    import os
+
+    from jobflow_remote.jobs.runner import Runner
+
+    run_check_cli(
+        ["job", "files", "get", "1", "queue.err"],
+        required_out="The remote folder has not been created yet",
+    )
+
+    runner = Runner()
+    runner.run_one_job(db_id="1")
+    runner.run_one_job(db_id="2")
+
+    run_check_cli(
+        ["job", "files", "delete", "10"],
+        required_out="No data matching the request",
+        error=True,
+    )
+
+    job_info1 = job_controller.get_job_info(db_id="1")
+    assert os.path.exists(job_info1.run_dir)
+    run_check_cli(["job", "files", "delete", "1"], required_out="Folder deleted")
+    assert not os.path.exists(job_info1.run_dir)
+
+    job_info2 = job_controller.get_job_info(db_id="2")
+    assert os.path.exists(job_info2.run_dir)
+    os.unlink(os.path.join(job_info2.run_dir, "jfremote_in.json"))
+    run_check_cli(
+        ["job", "files", "delete", "2"],
+        required_out=["The files were not deleted in folder"],
+        error=True,
+    )
+    assert os.path.exists(job_info2.run_dir)
+
+    run_check_cli(
+        ["job", "files", "delete", "3"],
+        required_out=["The remote folder has not been created yet"],
+    )
+
+
 def test_delete(job_controller, two_flows_four_jobs, run_check_cli) -> None:
     run_check_cli(
         ["job", "delete", "-did", "2", "--output"],

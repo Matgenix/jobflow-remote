@@ -1370,3 +1370,28 @@ def test_delete_flow(job_controller, runner, caplog):
 
     # Test deleting non-existent flow
     assert not job_controller.delete_flow("non-existent-uuid")
+
+
+def test_complete_onmissing_none(job_controller, runner):
+    from jobflow import Flow
+
+    from jobflow_remote import submit_flow
+    from jobflow_remote.jobs.state import JobState
+    from jobflow_remote.testing import always_fails, onmissing_none
+
+    j1 = always_fails()
+    j2 = onmissing_none(j1.output)
+    flow = Flow([j1, j2])
+
+    submit_flow(flow, worker="test_local_worker")
+
+    runner.run_one_job(max_seconds=20)
+
+    assert job_controller.get_job_info(job_id=j1.uuid).state == JobState.FAILED
+    assert job_controller.get_job_info(job_id=j2.uuid).state == JobState.READY
+
+    runner.run_one_job(max_seconds=20)
+
+    assert job_controller.get_job_info(job_id=j2.uuid).state == JobState.COMPLETED
+    # The job returns the input argument, so it should be None
+    assert job_controller.get_job_output(job_id=j2.uuid) is None
