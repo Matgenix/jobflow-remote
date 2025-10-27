@@ -478,6 +478,9 @@ def clean(
     verbosity: verbosity_opt = 0,
     force: force_opt = False,
 ):
+    """
+    Remove the files of the executed Jobs.
+    """
     check_incompatible_opt({"start_date": start_date, "days": days, "hours": hours})
     check_incompatible_opt({"end_date": end_date, "days": days, "hours": hours})
 
