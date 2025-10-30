@@ -291,6 +291,10 @@ class WorkerBase(BaseModel):
     def is_local(self) -> bool:
         return self.type == "local"
 
+    @property
+    def is_batch(self) -> bool:
+        return self.batch is not None
+
 
 class LocalWorker(WorkerBase):
     """

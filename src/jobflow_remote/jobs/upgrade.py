@@ -37,19 +37,38 @@ class UpgradeAction:
     required: bool = False
 
 
+@dataclass
+class UpgradeCondition:
+    """Details of an upgrade condition"""
+
+    description: str
+    collection: str
+    filter: dict
+
+    def check(self, job_controller: JobController) -> dict | None:
+        collection = getattr(job_controller, self.collection)
+        if collection is None:
+            return None
+        count = collection.count_documents(self.filter)
+        if count == 0:
+            return None
+        return {"condition": self, "count": count}
+
+
 class DatabaseUpgrader:
     """
     Object to handle the upgrade of the database between different versions
     """
 
     _upgrade_registry: ClassVar[dict[Version, Callable]] = {}
+    _upgrade_conditions_registry: ClassVar[dict[Version, list]] = {}
 
     def __init__(self, job_controller: JobController):
         self.job_controller = job_controller
         self.current_version = parse_version(jobflow_remote.__version__)
 
     @classmethod
-    def register_upgrade(cls, version: str):
+    def register_upgrade(cls, version: str, upgrade_conditions: list | None = None):
         """Decorator to register upgrade functions.
 
         This decorator should be used to register functions that implement the upgrades for each
@@ -59,6 +78,9 @@ class DatabaseUpgrader:
         ----------
         version
             The version to register the upgrade function for
+        upgrade_conditions
+            Conditions required to perform the upgrade (e.g. no jobs in a RUNNING state or no batch process
+            submitted or running, ...)
         """
 
         def decorator(func: Callable):
@@ -71,7 +93,10 @@ class DatabaseUpgrader:
                 logger.info(f"Completed upgrade to {version} in {duration:.2f}s")
                 return result
 
-            cls._upgrade_registry[parse_version(version)] = wrapper
+            vv = parse_version(version)
+            cls._upgrade_registry[vv] = wrapper
+            if upgrade_conditions:
+                cls._upgrade_conditions_registry[vv] = upgrade_conditions
             return wrapper
 
         return decorator
@@ -112,6 +137,17 @@ class DatabaseUpgrader:
             upsert=True,
             session=session,
         )
+
+    def check_upgrade_conditions(
+        self, versions: list[Version]
+    ) -> list[tuple[Version, dict]]:
+        failed_conditions = []
+        for version in versions:
+            upgrade_conditions = self._upgrade_conditions_registry.get(version, [])
+            for upgrade_condition in upgrade_conditions:
+                if (check := upgrade_condition.check(self.job_controller)) is not None:
+                    failed_conditions.append((version, check))  # noqa: PERF401
+        return failed_conditions
 
     def dry_run(
         self, from_version: str | None = None, target_version: str | None = None
@@ -204,6 +240,15 @@ class DatabaseUpgrader:
 
         versions_needing_upgrade = self.collect_upgrades(db_version, target_version)
 
+        if failed_conditions := self.check_upgrade_conditions(versions_needing_upgrade):
+            err = ["Some upgrade conditions were not satisfied:"]
+            for vv, failed_cond in failed_conditions:
+                err.append(
+                    f" - {failed_cond['cond'].description} (for version {vv}), found {failed_cond['count']}"
+                )
+            logger.error("\n".join(err))
+            return False
+
         logger.info(f"Starting upgrade from version {db_version} to {target_version}")
 
         for version in versions_needing_upgrade:
@@ -266,4 +311,75 @@ def upgrade_to_0_1_5(
         )
 
     actions.append(action)
+    return actions
+
+
+@DatabaseUpgrader.register_upgrade(
+    "1.0",
+    upgrade_conditions=[
+        UpgradeCondition(
+            description="There should not be any batch process in the auxiliary collection (old batch management)",
+            collection="auxiliary",
+            filter={
+                "$or": [
+                    {"batch_processes": {"$exists": False}},
+                    {
+                        "$expr": {
+                            "$allElementsTrue": {
+                                "$map": {
+                                    "input": {"$objectToArray": "$batch_processes"},
+                                    "as": "worker",
+                                    "in": {
+                                        "$eq": [
+                                            {"$size": {"$objectToArray": "$$worker.v"}},
+                                            0,
+                                        ]
+                                    },
+                                }
+                            }
+                        }
+                    },
+                ]
+            },
+        ),
+        UpgradeCondition(
+            description="There should not be any SUBMITTED or RUNNING batch process in the batches collection",
+            collection="batches",
+            filter={"batch_state": {"$in": ["SUBMITTED", "RUNNING"]}},
+        ),
+    ],
+)
+def upgrade_to_1_0(
+    job_controller: JobController,
+    session: ClientSession | None = None,
+    dry_run: bool = False,
+) -> list[UpgradeAction]:
+    actions = []
+    action = UpgradeAction(
+        description="Update all TERMINATED job states to RUN_FINISHED",
+        collection="jobs",
+        action_type="update",
+        details={
+            "filter": {"state": "TERMINATED"},
+            "update": {"$set": {"state": "RUN_FINISHED"}},
+            "upsert": False,
+            "required": True,
+        },
+    )
+
+    if not dry_run:
+        job_controller.jobs.update_many(
+            filter=action.details["filter"],
+            update=action.details["update"],
+            upsert=action.details["upsert"],
+            session=session,
+        )
+
+    actions.append(action)
+
+    # if not dry_run:
+    #     for worker_name, worker_config in job_controller.project.workers.items():
+    #         if worker_config.is_batch:
+    #             host = worker_config
+
     return actions

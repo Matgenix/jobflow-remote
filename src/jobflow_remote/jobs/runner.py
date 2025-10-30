@@ -1129,13 +1129,18 @@ class Runner:
             }
             state["current"] = self.job_controller.count_jobs(query)
 
-    def update_batch_jobs(self) -> None:
+    def update_batch_jobs(self, submit: bool = True) -> None:
         """
         Update the status of batch jobs.
 
         Includes submitting to the remote queue, checking the status of
         running jobs in the queue and handle the files with the Jobs information
         about their status.
+
+        Parameters
+        ----------
+        submit
+            Whether to submit new batch processes.
         """
         logger.debug("update batch jobs")
         for worker_name, batch_manager in self.batch_workers.items():
@@ -1156,9 +1161,10 @@ class Runner:
 
             # check that enough processes are submitted and submit the required
             # amount to reach max_jobs, if needed.
-            self.submit_batch_processes(
-                queue_manager, worker_name, worker, running_batch_processes
-            )
+            if submit:
+                self.submit_batch_processes(
+                    queue_manager, worker_name, worker, running_batch_processes
+                )
 
             # check for jobs that have finished to run in the batch runner and
             # update the DB state accordingly

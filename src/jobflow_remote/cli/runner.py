@@ -446,3 +446,39 @@ def reset(
         dm.clean_files()
 
     out_console.print("The running runner document was reset")
+
+
+@app_runner.command()
+def update_status(
+    log_level: log_level_opt = LogLevel.INFO,
+    set_pid: Annotated[
+        bool,
+        typer.Option(
+            "--set-pid",
+            "-pid",
+            help="Set the runner id to the current process pid",
+        ),
+    ] = False,
+    connect_interactive: Annotated[
+        bool,
+        typer.Option(
+            "--connect-interactive",
+            "-i",
+            help="Activate the connection for interactive remote host",
+        ),
+    ] = False,
+) -> None:
+    """ """
+    runner_id = os.getpid() if set_pid else None
+    runner = Runner(
+        log_level=log_level,
+        runner_id=str(runner_id),
+        connect_interactive=connect_interactive,
+    )
+
+    try:
+        runner.check_run_status()
+        if runner.batch_workers:
+            runner.update_batch_jobs(submit=False)
+    finally:
+        runner.cleanup()

@@ -4746,13 +4746,11 @@ class JobController:
                     f"stdout: {cancel_result.stdout}. stderr: {cancel_result.stderr}"
                 )
 
-    def get_all_batches(
-        self,
+    @staticmethod
+    def _build_query_batch(
         worker: str | list[str] | None = None,
         batch_state: BatchState | list[BatchState] | None = None,
-        max_results: int = 20,
-        sort: str | list | None = None,
-    ) -> list[BatchDoc] | None:
+    ) -> dict:
         query: dict = {}
         if worker:
             if not isinstance(worker, list):
@@ -4764,6 +4762,16 @@ class JobController:
                 query["batch_state"] = batch_state.value
             else:
                 query["batch_state"] = {"$in": [bs.value for bs in batch_state]}
+        return query
+
+    def get_all_batches(
+        self,
+        worker: str | list[str] | None = None,
+        batch_state: BatchState | list[BatchState] | None = None,
+        max_results: int = 20,
+        sort: str | list | None = None,
+    ) -> list[BatchDoc] | None:
+        query = self._build_query_batch(worker=worker, batch_state=batch_state)
         # Some batches may have updated at exactly the same time (up to ms precision of MongoDB)
         # To make sure we have always same order (in particular when limiting number of results),
         # we add a sort on process_id as well.
@@ -4776,6 +4784,14 @@ class JobController:
             BatchDoc.model_validate(bd_dict)
             for bd_dict in self.batches.find(query, sort=sort).limit(max_results)
         ]
+
+    def count_batches(
+        self,
+        worker: str | list[str] | None = None,
+        batch_state: BatchState | list[BatchState] | None = None,
+    ) -> list[BatchDoc] | None:
+        query = self._build_query_batch(worker=worker, batch_state=batch_state)
+        return self.batches.count_documents(query)
 
     def get_batch_process_id(self, batch_uid: str) -> tuple[str, str]:
         """Get the process id and worker of a batch process from its unique id.
