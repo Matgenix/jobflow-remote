@@ -109,7 +109,7 @@ def tmp_dir():
     old_cwd = os.getcwd()
     new_path = tempfile.mkdtemp()
     os.chdir(new_path)
-    yield
+    yield Path(new_path)
     os.chdir(old_cwd)
     shutil.rmtree(new_path)
 
