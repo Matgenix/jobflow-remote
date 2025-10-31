@@ -1,7 +1,11 @@
+import difflib
+from pathlib import Path
 from typing import TYPE_CHECKING, Annotated
 
 import typer
+from rich.panel import Panel
 from rich.prompt import Confirm
+from rich.syntax import Syntax
 from rich.text import Text
 
 from jobflow_remote.cli.formatting import get_exec_config_table, get_worker_table
@@ -387,3 +391,113 @@ def list_worker(
     project = cm.get_project()
     table = get_worker_table(project.workers, verbosity)
     out_console.print(table)
+
+
+#####################################
+# Edit app
+#####################################
+
+
+app_edit = JFRTyper(
+    name="edit",
+    help="Edit the project files",
+    no_args_is_help=True,
+)
+app_project.add_typer(app_edit)
+
+
+@app_edit.command()
+def replace(
+    old_string: Annotated[str, typer.Argument(help="String to search for and replace")],
+    new_string: Annotated[str, typer.Argument(help="String to replace with")],
+    all_projects: Annotated[
+        bool,
+        typer.Option(
+            "--all",
+            "-a",
+            help="Apply replacement to all project files",
+        ),
+    ] = False,
+    force: force_opt = False,
+) -> None:
+    """
+    Replace a string in one or more project files.
+
+    This command performs a text replacement in the YAML project files,
+    replacing all instances of old_string with new_string.
+    """
+    cm = get_config_manager()
+
+    # Determine which projects to process
+    if all_projects:
+        projects_to_process = list(cm.projects_data)
+
+        if not projects_to_process:
+            exit_with_error_msg("No valid project files found that can be parsed")
+
+    else:
+        project_data = cm.get_project_data()
+        projects_to_process = [project_data.project.name]
+
+    modified_count = 0
+
+    for project_name in projects_to_process:
+        try:
+            project_data = cm.get_project_data(project_name)
+            filepath = Path(project_data.filepath)
+
+            # Read the file as text
+            original_content = filepath.read_text()
+
+            modified_content = original_content.replace(old_string, new_string)
+
+            if original_content != modified_content:
+                # Show diff and ask for confirmation if not forced
+                if not force:
+                    out_console.print(
+                        f"\n[bold]File: {filepath.name} (Project: {project_name})[/bold]"
+                    )
+                    out_console.print(f"[dim]Path: {filepath}[/dim]\n")
+
+                    diff_lines = list(
+                        difflib.unified_diff(
+                            original_content.splitlines(keepends=True),
+                            modified_content.splitlines(keepends=True),
+                            fromfile=f"{filepath.name} (original)",
+                            tofile=f"{filepath.name} (modified)",
+                        )
+                    )
+
+                    diff_text = "".join(diff_lines)
+                    syntax = Syntax(
+                        diff_text, "diff", theme="monokai", line_numbers=False
+                    )
+                    out_console.print(
+                        Panel(
+                            syntax,
+                            title="[bold]Changes Preview[/bold]",
+                            border_style="blue",
+                        )
+                    )
+
+                    if not Confirm.ask(f"Apply these changes to {project_name}?"):
+                        continue
+
+                # Write back the modified content
+                filepath.write_text(modified_content)
+                modified_count += 1
+                out_console.print(
+                    f"  ✓ Modified: {project_name} ({filepath.name})", style="green"
+                )
+            else:
+                out_console.print(
+                    f"  - No changes: {project_name} ({filepath.name})", style="yellow"
+                )
+
+        except Exception as e:
+            out_console.print(f"  ✗ Error processing {project_name}: {e}", style="red")
+
+    if modified_count > 0:
+        print_success_msg(f"Successfully modified {modified_count} project file(s)")
+    if modified_count == 0:
+        out_console.print("No replacements were made in any files", style="yellow")
