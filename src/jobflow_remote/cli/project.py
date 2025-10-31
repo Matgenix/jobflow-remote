@@ -430,7 +430,8 @@ def replace(
 
     # Determine which projects to process
     if all_projects:
-        projects_to_process = list(cm.projects_data)
+        # sort to make it reproducible
+        projects_to_process = sorted(cm.projects_data)
 
         if not projects_to_process:
             exit_with_error_msg("No valid project files found that can be parsed")
