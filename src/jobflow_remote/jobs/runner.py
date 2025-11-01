@@ -1324,7 +1324,6 @@ class Runner:
         processes = [batch_process.process_id for batch_process in batch_processes_data]
         if processes:
             stopped_processes = set()
-            running_processes = set()
             try:
                 qjobs = queue_manager.get_jobs_list(
                     jobs=processes, user=worker.scheduler_username
@@ -1338,6 +1337,9 @@ class Runner:
                     f"error trying to get the list of batch processes for worker: {worker_name}",
                     exc_info=True,
                 )
+                # Without being able to get the actual list of batch processes from the worker, we assume
+                # that all the processes are still running (running or submitted)
+                running_processes = set(processes)
 
             for pid in running_processes:
                 if pid in self._cached_running_batch_pids.get(worker_name, set()):
