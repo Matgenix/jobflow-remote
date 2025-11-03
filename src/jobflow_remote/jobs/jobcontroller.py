@@ -115,7 +115,7 @@ class JobController:
         jobstore: JobStore,
         flows_collection: str = "flows",
         auxiliary_collection: str = "jf_auxiliary",
-        batches_collection: str | None = None,
+        batches_collection: str = "batches",
         project: Project | None = None,
         optional_jobstores: dict[str, JobStore] | None = None,
     ) -> None:
@@ -136,7 +136,6 @@ class JobController:
             Uses the DB defined in the queue_store.
         batches_collection
             The name of the collection used to store the batch processes.
-            This batches collection is optional.
         project
             The project where the Stores were defined.
         optional_jobstores
@@ -158,9 +157,7 @@ class JobController:
         self.jobs = self.queue_store._collection
         self.flows = self.db[self.flows_collection]
         self.auxiliary = self.db[self.auxiliary_collection]
-        self.batches = (
-            self.db[self.batches_collection] if self.batches_collection else None
-        )
+        self.batches = self.db[self.batches_collection]
         self.project = project
 
     @classmethod
@@ -5238,10 +5235,11 @@ class JobController:
         """
         dir_path = Path(dir_path)
         doc_count = {}
-        standard_collection_names = ["jobs", "flows", "jf_auxiliary"]
+        standard_collection_names = ["jobs", "flows", "jf_auxiliary", "batches"]
         if python:
             for std_name, collection in zip(
-                standard_collection_names, [self.jobs, self.flows, self.auxiliary]
+                standard_collection_names,
+                [self.jobs, self.flows, self.auxiliary, self.batches],
             ):
                 doc_count[std_name] = pymongo_dump(
                     collection=collection, output_path=dir_path, compress=compress
@@ -5253,6 +5251,7 @@ class JobController:
                     self.jobs_collection,
                     self.flows_collection,
                     self.auxiliary_collection,
+                    self.batches,
                 ],
             ):
                 doc_count[std_name] = mongodump_from_store(
@@ -5266,7 +5265,12 @@ class JobController:
         # move the files produced to match the standard names
         for std_name, collection_name in zip(
             standard_collection_names,
-            [self.jobs_collection, self.flows_collection, self.auxiliary_collection],
+            [
+                self.jobs_collection,
+                self.flows_collection,
+                self.auxiliary_collection,
+                self.batches_collection,
+            ],
         ):
             if collection_name != std_name:
                 full_dir_path = dir_path / self.queue_store.database
@@ -5322,14 +5326,19 @@ class JobController:
             command. WARNING: In this case metadata of the collections will not be restored.
         """
         dir_path = Path(dir_path)
-        collection_names = ["jobs", "flows", "jf_auxiliary"]
+        collection_names = ["jobs", "flows", "jf_auxiliary", "batches"]
         for name, db_name, collection in zip(
             collection_names,
-            [self.jobs_collection, self.flows_collection],
-            [self.jobs, self.flows],
+            [
+                self.jobs_collection,
+                self.flows_collection,
+                self.auxiliary_collection,
+                self.batches_collection,
+            ],
+            [self.jobs, self.flows, self.auxiliary, self.batches],
         ):
             count = collection.count_documents({})
-            if count > 0:
+            if count > 0 and name != "jf_auxiliary":
                 raise RuntimeError(
                     f"The collection named {db_name} for {name} contains {count} documents."
                     "Choose an empty collection."
@@ -5343,8 +5352,13 @@ class JobController:
         self.auxiliary.delete_many({})
         for name, db_name, collection in zip(
             collection_names,
-            [self.jobs_collection, self.flows_collection, self.auxiliary_collection],
-            [self.jobs, self.flows, self.auxiliary],
+            [
+                self.jobs_collection,
+                self.flows_collection,
+                self.auxiliary_collection,
+                self.batches_collection,
+            ],
+            [self.jobs, self.flows, self.auxiliary, self.batches],
         ):
             file_name = f"{name}.bson"
             # compress may be set automatically in the restore functions, but if
@@ -5353,9 +5367,19 @@ class JobController:
                 file_name += ".gz"
             files_paths = list(dir_path.glob(f"{file_name}*"))
             if len(files_paths) != 1:
-                raise RuntimeError(
-                    f"{len(files_paths)} files matching the name {file_name} were found in {dir_path}"
-                )
+                if name != "batches":
+                    # All collections except the "batches" one should have exactly one matching file
+                    raise RuntimeError(
+                        f"{len(files_paths)} files matching the name {file_name} were found in {dir_path}"
+                    )
+                if name == "batches" and len(files_paths) > 1:
+                    # Multiple files for the batches collection is not allowed (as for other collections)
+                    raise RuntimeError(
+                        f"{len(files_paths)} files matching the name {file_name} were found in {dir_path}"
+                    )
+                if name == "batches" and len(files_paths) == 0:
+                    # Case in which the batches collection did not exist yet
+                    continue
             if python:
                 pymongo_restore(collection=collection, input_file=files_paths[0])
             else:
