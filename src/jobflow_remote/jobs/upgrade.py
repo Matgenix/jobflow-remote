@@ -43,15 +43,21 @@ class UpgradeCondition:
 
     description: str
     collection: str
-    filter: dict
+    query: dict
+    one_doc_check: Callable | None = None
 
     def check(self, job_controller: JobController) -> dict | None:
         collection = getattr(job_controller, self.collection)
         if collection is None:
             return None
-        count = collection.count_documents(self.filter)
+        count = collection.count_documents(self.query)
         if count == 0:
             return None
+        if count == 1 and self.one_doc_check is not None:
+            doc = collection.find_one(self.query)
+            count = self.one_doc_check(doc)
+            if count == 0:
+                return None
         return {"condition": self, "count": count}
 
 
@@ -244,7 +250,7 @@ class DatabaseUpgrader:
             err = ["Some upgrade conditions were not satisfied:"]
             for vv, failed_cond in failed_conditions:
                 err.append(
-                    f" - {failed_cond['cond'].description} (for version {vv}), found {failed_cond['count']}"
+                    f" - {failed_cond['condition'].description} (for version {vv}), found {failed_cond['count']}"
                 )
             logger.error("\n".join(err))
             return False
@@ -314,38 +320,28 @@ def upgrade_to_0_1_5(
     return actions
 
 
+def count_batch_processes_old(doc):
+    if doc["batch_processes"] is None:
+        return 0
+    count = 0
+    for batch_processes_dict in doc["batch_processes"].values():
+        count += len(batch_processes_dict)
+    return count
+
+
 @DatabaseUpgrader.register_upgrade(
     "1.0",
     upgrade_conditions=[
         UpgradeCondition(
             description="There should not be any batch process in the auxiliary collection (old batch management)",
             collection="auxiliary",
-            filter={
-                "$or": [
-                    {"batch_processes": {"$exists": False}},
-                    {
-                        "$expr": {
-                            "$allElementsTrue": {
-                                "$map": {
-                                    "input": {"$objectToArray": "$batch_processes"},
-                                    "as": "worker",
-                                    "in": {
-                                        "$eq": [
-                                            {"$size": {"$objectToArray": "$$worker.v"}},
-                                            0,
-                                        ]
-                                    },
-                                }
-                            }
-                        }
-                    },
-                ]
-            },
+            query={"batch_processes": {"$exists": True}},
+            one_doc_check=count_batch_processes_old,
         ),
         UpgradeCondition(
             description="There should not be any SUBMITTED or RUNNING batch process in the batches collection",
             collection="batches",
-            filter={"batch_state": {"$in": ["SUBMITTED", "RUNNING"]}},
+            query={"batch_state": {"$in": ["SUBMITTED", "RUNNING"]}},
         ),
     ],
 )

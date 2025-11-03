@@ -210,10 +210,23 @@ def test_upgrade_to_1_0(
 ) -> None:
     from jobflow_remote.jobs.state import JobState
 
-    job_controller.backup_restore(upgrade_test_dir / "0.1.5", python=True)
+    job_controller.backup_restore(upgrade_test_dir / "1.0", python=True)
     assert job_controller.count_jobs() == 1
     assert job_controller.count_jobs(states=JobState.RUN_FINISHED) == 0
     assert job_controller.count_jobs(query={"state": "TERMINATED"}) == 1
+
+    assert str(job_controller.get_current_db_version()) == "0.1.8"
+
+    run_check_cli(
+        ["admin", "upgrade", "--target", "1.0"],
+        cli_input=random_project_name,
+        required_out=["The database has been upgraded"],
+    )
+
+    assert job_controller.count_jobs(states=JobState.RUN_FINISHED) == 1
+    assert job_controller.count_jobs(query={"state": "TERMINATED"}) == 0
+
+    assert str(job_controller.get_current_db_version()) == "1.0"
 
 
 def test_index_rebuild(job_controller, one_job, run_check_cli):
