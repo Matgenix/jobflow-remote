@@ -13,7 +13,6 @@ from jobflow_remote import SETTINGS, JobController, submit_flow
 from jobflow_remote.config.base import Project
 from jobflow_remote.jobs.state import JobState
 from jobflow_remote.testing import add_sleep
-from jobflow_remote.utils.db import pymongo_dump
 
 # Check that we use the right version
 version_to_backup = "0.1.8"
@@ -104,12 +103,6 @@ job_controller.set_job_state(state=JobState.TERMINATED, db_id=db_ids[0])
 db_dump_dir = "dump"
 coll_dump_dir = os.path.join(db_dump_dir, DB_NAME)
 dump_info = job_controller.backup_dump(db_dump_dir, compress=True, python=True)
-# Manually dumping the batches collection in this case as the backup dump of batches collection
-# is added in the new version (did not exist in version 0.1.8). This part can be removed next time
-# this template script is used.
-pymongo_dump(
-    job_controller.batches, output_path=os.path.join(db_dump_dir), compress=True
-)
 
 # Move files to this directory
 for fname in os.listdir(coll_dump_dir):
