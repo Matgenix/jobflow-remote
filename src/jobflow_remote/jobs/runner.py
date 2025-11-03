@@ -1156,9 +1156,10 @@ class Runner:
 
             # check that enough processes are submitted and submit the required
             # amount to reach max_jobs, if needed.
-            self.submit_batch_processes(
-                queue_manager, worker_name, worker, running_batch_processes
-            )
+            if running_batch_processes is not None:
+                self.submit_batch_processes(
+                    queue_manager, worker_name, worker, running_batch_processes
+                )
 
             # check for jobs that have terminated in the batch runner and
             # update the DB state accordingly
@@ -1289,7 +1290,7 @@ class Runner:
         worker_name: str,
         worker: WorkerBase,
         running_jobs: list[tuple[str, int, str]],
-    ) -> list[str]:
+    ) -> list[str] | None:
         """Update the status of the batch processes.
 
         This method
@@ -1309,8 +1310,9 @@ class Runner:
 
         Returns
         -------
-        list
-            List of running batch process ids (e.g. Slurm ids)
+        list or None
+            List of running batch process ids (e.g. Slurm ids) or None if the list of jobs could not be retrieved
+            from the worker.
 
         """
         logger.debug("update batch jobs: update status")
@@ -1323,7 +1325,6 @@ class Runner:
             return []
         processes = [batch_process.process_id for batch_process in batch_processes_data]
         if processes:
-            stopped_processes = set()
             try:
                 qjobs = queue_manager.get_jobs_list(
                     jobs=processes, user=worker.scheduler_username
@@ -1337,9 +1338,9 @@ class Runner:
                     f"error trying to get the list of batch processes for worker: {worker_name}",
                     exc_info=True,
                 )
-                # Without being able to get the actual list of batch processes from the worker, we assume
-                # that all the processes are still running (running or submitted)
-                running_processes = set(processes)
+                # If the actual list of batch processes cannot be retrieved from the worker, return None
+                # and deal with that in the update_batch_jobs method
+                return None
 
             for pid in running_processes:
                 if pid in self._cached_running_batch_pids.get(worker_name, set()):
