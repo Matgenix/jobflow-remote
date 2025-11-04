@@ -5251,7 +5251,7 @@ class JobController:
                     self.jobs_collection,
                     self.flows_collection,
                     self.auxiliary_collection,
-                    self.batches,
+                    self.batches_collection,
                 ],
             ):
                 doc_count[std_name] = mongodump_from_store(

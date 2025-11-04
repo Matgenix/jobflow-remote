@@ -667,7 +667,9 @@ def pymongo_restore(collection: Collection, input_file: str | Path) -> None:
     """
     try:
         with zopen(input_file, "rb") as f:
-            collection.insert_many(bson.decode_all(f.read()))
+            # This conditional is needed because insert_many cannot be used with an empty list
+            if docs := bson.decode_all(f.read()):
+                collection.insert_many(docs)
     except PyMongoError as e:
         raise RuntimeError(f"Error during PyMongo restore: {e!s}") from e
     except OSError as e:
