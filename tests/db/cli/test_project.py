@@ -285,6 +285,8 @@ def test_edit_replace(
             cli_input="y",
         )
 
+        assert (tmp_dir / "test_project_1.yaml.bak.1").exists()
+
         updated_project1 = loadfn(tmp_dir / "test_project_1.yaml")
         assert (
             "new_workdir"
@@ -312,12 +314,22 @@ def test_edit_replace(
             not in project1_check["workers"]["test_local_worker"]["resources"]
         )
 
-        # --force
+        # --force, no backup
         run_check_cli(
-            ["project", "edit", "replace", "old_resource", "new_resource", "--force"],
+            [
+                "project",
+                "edit",
+                "replace",
+                "old_resource",
+                "new_resource",
+                "--force",
+                "--no-backup",
+            ],
             required_out="✓ Modified: test_project_1",
             excluded_out="Apply these changes",
         )
+        assert (tmp_dir / "test_project_1.yaml.bak.1").exists()
+        assert not (tmp_dir / "test_project_1.yaml.bak.2").exists()
 
         updated_project1_force = loadfn(tmp_dir / "test_project_1.yaml")
         assert (
@@ -340,6 +352,9 @@ def test_edit_replace(
             ],
             cli_input="y\nn",
         )
+
+        assert (tmp_dir / "test_project_1.yaml.bak.1").exists()
+        assert (tmp_dir / "test_project_1.yaml.bak.2").exists()
 
         final_project1 = loadfn(tmp_dir / "test_project_1.yaml")
         final_project2 = loadfn(tmp_dir / "test_project_2.yaml")
@@ -409,11 +424,28 @@ def test_edit_replace(
         )
 
         run_check_cli(
-            ["project", "edit", "replace", "test", "TEST", "--all", "--force"],
+            [
+                "project",
+                "edit",
+                "replace",
+                "new_collection",
+                "old_collection",
+                "--all",
+                "--force",
+            ],
             required_out=[
                 "✓ Modified: test_project_1",
-                "✓ Modified: test_project_2",
-                "✓ Modified: test_project_3",
             ],
             excluded_out="invalid_project",
+        )
+
+        # Invalid modification
+        run_check_cli(
+            ["project", "edit", "replace", "workers", "wrong_field"],
+            required_out=[
+                "WARNING: The modification to the project file will result in an invalid file/project",
+                "wrong_field",
+                "No replacements were made in any files",
+            ],
+            cli_input="n",
         )

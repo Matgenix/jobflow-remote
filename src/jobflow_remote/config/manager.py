@@ -306,6 +306,28 @@ class ConfigManager:
 
         return project_names
 
+    def backup_project(self, project_name: str) -> None:
+        """
+        Create the backup of a project file using the naming convention
+        $FILENAME.bak.$N
+
+        Parameters
+        ----------
+        project_name
+            Name of the project to be removed.
+        """
+        project_data = self.get_project_data(project_name)
+        filepath = Path(project_data.filepath)
+        filename = filepath.name
+
+        i = 1
+        while True:
+            new_filepath = filepath.parent / f"{filename}.bak.{i}"
+            if not new_filepath.exists():
+                break
+            i += 1
+        shutil.copy2(filepath, new_filepath)
+
     def set_worker(
         self,
         name: str,
