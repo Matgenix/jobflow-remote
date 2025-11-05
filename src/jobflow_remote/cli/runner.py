@@ -17,6 +17,7 @@ from jobflow_remote.cli.types import (
     verbosity_opt,
 )
 from jobflow_remote.cli.utils import (
+    check_stopped_runner,
     exit_with_error_msg,
     exit_with_warning_msg,
     fmt_datetime,
@@ -468,7 +469,17 @@ def update_status(
         ),
     ] = False,
 ) -> None:
-    """ """
+    """
+    Update the state of jobs, flows and batches.
+
+    This is used to manually update the states without submitting, uploading,
+    downloading or performing actions other than updating the states.
+
+    Should be used with the runner stopped to avoid inconsistencies for the
+    runner.
+    """
+    check_stopped_runner(error=True)
+
     runner_id = os.getpid() if set_pid else None
     runner = Runner(
         log_level=log_level,
