@@ -20,6 +20,7 @@ from jobflow_remote.cli.types import (
 from jobflow_remote.cli.utils import (
     SerializeFileFormat,
     check_incompatible_opt,
+    check_stopped_runner,
     exit_with_error_msg,
     exit_with_warning_msg,
     get_config_manager,
@@ -28,7 +29,7 @@ from jobflow_remote.cli.utils import (
     out_console,
     print_success_msg,
 )
-from jobflow_remote.config import ConfigError, ConfigManager
+from jobflow_remote.config import ConfigError, ConfigManager, Project
 from jobflow_remote.config.helper import (
     check_jobstore,
     check_queue_store,
@@ -419,13 +420,27 @@ def replace(
         ),
     ] = False,
     force: force_opt = False,
+    no_backup: Annotated[
+        bool,
+        typer.Option(
+            "--no-backup",
+            "-nb",
+            help="Avoid creating a backup copy of the project file",
+        ),
+    ] = False,
 ) -> None:
     """
     Replace a string in one or more project files.
 
     This command performs a text replacement in the YAML project files,
     replacing all instances of old_string with new_string.
+    By default, creates a backup of the original file.
     """
+    import json
+
+    import tomlkit
+    from ruamel.yaml import YAML
+
     cm = get_config_manager()
 
     # Determine which projects to process
@@ -439,6 +454,8 @@ def replace(
     else:
         project_data = cm.get_project_data()
         projects_to_process = [project_data.project.name]
+
+        check_stopped_runner(error=True)
 
     modified_count = 0
 
@@ -481,8 +498,32 @@ def replace(
                         )
                     )
 
+                    try:
+                        if project_data.ext == "yaml":
+                            model = YAML().load(modified_content)
+                        elif project_data.ext == "json":
+                            model = json.loads(modified_content)
+                        elif project_data.ext == "toml":
+                            model = tomlkit.parse(modified_content)
+                        else:
+                            out_console.print(
+                                f"Unknown file format for project: {project_data.ext}"
+                            )
+                            continue
+                        Project.model_validate(model)
+                    except Exception as e:
+                        out_console.print(
+                            "[bold]WARNING: The modification to the project file will result in "
+                            f"an invalid file/project [/bold]: {getattr(e, 'message', str(e))}",
+                            style="red",
+                        )
+
                     if not Confirm.ask(f"Apply these changes to {project_name}?"):
                         continue
+
+                # create a backup of the project file before overwriting
+                if not no_backup:
+                    cm.backup_project(project_name)
 
                 # Write back the modified content
                 filepath.write_text(modified_content)
@@ -499,6 +540,9 @@ def replace(
             out_console.print(f"  ✗ Error processing {project_name}: {e}", style="red")
 
     if modified_count > 0:
-        print_success_msg(f"Successfully modified {modified_count} project file(s)")
+        print_success_msg(
+            f"Successfully modified {modified_count} project file(s). For the changes "
+            "to be registered the runner of all the modified projects needs to be restarted"
+        )
     if modified_count == 0:
         out_console.print("No replacements were made in any files", style="yellow")
