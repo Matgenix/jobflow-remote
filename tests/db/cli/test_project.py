@@ -219,3 +219,233 @@ def test_list_exec_config(job_controller, run_check_cli) -> None:
 def test_list_workers(job_controller, run_check_cli) -> None:
     output = ["Name", "type", "info", "test_local_worker", "test_local_worker_2"]
     run_check_cli(["project", "worker", "list", "-v"], required_out=output)
+
+
+def test_edit_replace(
+    job_controller, random_project_name, monkeypatch, tmp_dir, run_check_cli
+) -> None:
+    from monty.serialization import loadfn
+
+    from jobflow_remote import SETTINGS
+    from jobflow_remote.config.manager import ConfigManager
+
+    cm_orig = ConfigManager()
+    original_project = cm_orig.get_project()
+
+    with monkeypatch.context() as m:
+        m.setattr(SETTINGS, "projects_folder", str(tmp_dir))
+
+        # cases with empty projects folder
+        run_check_cli(
+            ["project", "edit", "replace", "old_text", "new_text"],
+            required_out=f"The selected project {random_project_name} does not exist or could not be parsed",
+            error=True,
+        )
+
+        run_check_cli(
+            ["project", "edit", "replace", "old_text", "new_text", "--all"],
+            required_out="No valid project files found",
+            error=True,
+        )
+
+        # create some projects
+        cm_patch = ConfigManager()
+        proj1 = original_project.copy()
+        proj1.name = "test_project_1"
+        proj1.workers["test_local_worker"].work_dir = "/path/to/old_workdir"
+        proj1.workers["test_local_worker"].resources = {"old_resource": "value"}
+        proj1.queue.store["collection_name"] = "old_collection"
+        cm_patch.create_project(proj1)
+
+        proj2 = original_project.copy()
+        proj2.name = "test_project_2"
+        proj2.workers["test_local_worker"].work_dir = "/different/old_workdir"
+        proj2.workers["test_local_worker"].resources = {"some_resource": "value"}
+        proj2.queue.store["collection_name"] = "old_collection"
+        cm_patch.create_project(proj2)
+
+        proj3 = original_project.copy()
+        proj3.name = "test_project_3"
+        proj3.workers["test_local_worker"].work_dir = "/different/old_workdir"
+        proj3.workers["test_local_worker"].resources = {
+            "different_key": "different_value"
+        }
+        proj3.queue.store["collection_name"] = "different_collection"
+        cm_patch.create_project(proj3)
+
+        m.setattr(SETTINGS, "project", "test_project_1")
+
+        # Replace in single project with confirmation
+        run_check_cli(
+            ["project", "edit", "replace", "old_workdir", "new_workdir"],
+            required_out=[
+                "Apply these changes to test_project_1?",
+                "✓ Modified: test_project_1",
+            ],
+            cli_input="y",
+        )
+
+        assert (tmp_dir / "test_project_1.yaml.bak.1").exists()
+
+        updated_project1 = loadfn(tmp_dir / "test_project_1.yaml")
+        assert (
+            "new_workdir"
+            in updated_project1["workers"]["test_local_worker"]["work_dir"]
+        )
+        assert (
+            "old_workdir"
+            not in updated_project1["workers"]["test_local_worker"]["work_dir"]
+        )
+
+        # Replace in single project with no confirmation
+        run_check_cli(
+            ["project", "edit", "replace", "old_resource", "new_resource"],
+            required_out=["Apply these changes to test_project_1?"],
+            cli_input="n",
+        )
+
+        project1_check = loadfn(tmp_dir / "test_project_1.yaml")
+        assert (
+            "old_resource"
+            in project1_check["workers"]["test_local_worker"]["resources"]
+        )
+        assert (
+            "new_resource"
+            not in project1_check["workers"]["test_local_worker"]["resources"]
+        )
+
+        # --force, no backup
+        run_check_cli(
+            [
+                "project",
+                "edit",
+                "replace",
+                "old_resource",
+                "new_resource",
+                "--force",
+                "--no-backup",
+            ],
+            required_out="✓ Modified: test_project_1",
+            excluded_out="Apply these changes",
+        )
+        assert (tmp_dir / "test_project_1.yaml.bak.1").exists()
+        assert not (tmp_dir / "test_project_1.yaml.bak.2").exists()
+
+        updated_project1_force = loadfn(tmp_dir / "test_project_1.yaml")
+        assert (
+            "new_resource"
+            in updated_project1_force["workers"]["test_local_worker"]["resources"]
+        )
+        assert (
+            "old_resource"
+            not in updated_project1_force["workers"]["test_local_worker"]["resources"]
+        )
+
+        # Replace with --all, mixed responses
+        run_check_cli(
+            ["project", "edit", "replace", "old_collection", "new_collection", "--all"],
+            required_out=[
+                "Apply these changes to test_project_1?",
+                "Apply these changes to test_project_2?",
+                "- No changes: test_project_3",
+                "✓ Modified: test_project_1",
+            ],
+            cli_input="y\nn",
+        )
+
+        assert (tmp_dir / "test_project_1.yaml.bak.1").exists()
+        assert (tmp_dir / "test_project_1.yaml.bak.2").exists()
+
+        final_project1 = loadfn(tmp_dir / "test_project_1.yaml")
+        final_project2 = loadfn(tmp_dir / "test_project_2.yaml")
+        final_project3 = loadfn(tmp_dir / "test_project_3.yaml")
+
+        assert "new_collection" in final_project1["queue"]["store"]["collection_name"]
+        assert (
+            "old_collection" in final_project2["queue"]["store"]["collection_name"]
+        )  # Should not change
+        assert (
+            "different_collection"
+            in final_project3["queue"]["store"]["collection_name"]
+        )  # Should not change
+
+        # --all --force
+        run_check_cli(
+            [
+                "project",
+                "edit",
+                "replace",
+                "localhost",
+                "127.0.0.1",
+                "--all",
+                "--force",
+            ],
+            required_out=[
+                "✓ Modified: test_project_1",
+                "✓ Modified: test_project_2",
+                "✓ Modified: test_project_3",
+                "Successfully modified 3 project file(s)",
+            ],
+            excluded_out="Apply these changes",
+        )
+
+        for proj_file in [
+            "test_project_1.yaml",
+            "test_project_2.yaml",
+            "test_project_3.yaml",
+        ]:
+            proj_data = loadfn(tmp_dir / proj_file)
+            assert "127.0.0.1" in proj_data["queue"]["store"]["host"]
+            assert "localhost" not in proj_data["queue"]["store"]["host"]
+
+        # Try to replace something that is not present in the files
+        run_check_cli(
+            [
+                "project",
+                "edit",
+                "replace",
+                "nonexistent_text",
+                "replacement_text",
+                "--all",
+                "--force",
+            ],
+            required_out=[
+                "- No changes: test_project_1",
+                "- No changes: test_project_2",
+                "- No changes: test_project_3",
+                "No replacements were made in any files",
+            ],
+        )
+
+        # Project with invalid YAML to test error handling
+        invalid_project_path = tmp_dir / "invalid_project.yaml"
+        invalid_project_path.write_text(
+            "name: invalid_project\nworkers:\n  - this is not valid yaml structure:\n      bad_indent"
+        )
+
+        run_check_cli(
+            [
+                "project",
+                "edit",
+                "replace",
+                "new_collection",
+                "old_collection",
+                "--all",
+                "--force",
+            ],
+            required_out=[
+                "✓ Modified: test_project_1",
+            ],
+            excluded_out="invalid_project",
+        )
+
+        # Invalid modification
+        run_check_cli(
+            ["project", "edit", "replace", "workers", "wrong_field"],
+            required_out=[
+                "WARNING: The modification to the project file will result in an invalid file/project",
+                "wrong_field",
+                "No replacements were made in any files",
+            ],
+            cli_input="n",
+        )
