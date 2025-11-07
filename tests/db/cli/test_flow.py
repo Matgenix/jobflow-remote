@@ -1,5 +1,6 @@
 import os.path
 import re
+import time
 
 import pytest
 
@@ -394,7 +395,8 @@ def test_clean(
     daemon_manager.start(raise_on_error=True)
     wait_daemon_started(daemon_manager)
 
-    for _ in range(10):
+    for _ in range(20):
+        time.sleep(0.1)
         job_slow_doc = job_controller.get_job_doc(job_id=slow_flow.jobs[0].uuid)
         if job_slow_doc.state in (JobState.SUBMITTED, JobState.RUNNING):
             break
