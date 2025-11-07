@@ -476,7 +476,7 @@ class Runner:
                 unfinished_batches = 0
             else:
                 unfinished_batches = len(
-                    self.job_controller.get_all_batches(
+                    self.job_controller.get_batches(
                         batch_state=[BatchState.SUBMITTED, BatchState.RUNNING]
                     )
                 )
@@ -1191,7 +1191,7 @@ class Runner:
             running directory.
         """
         logger.debug("update batch jobs: update running jobs")
-        batch_processes = self.job_controller.get_all_batches(
+        batch_processes = self.job_controller.get_batches(
             worker=worker_name,
             batch_state=[BatchState.SUBMITTED, BatchState.RUNNING],
             max_results=0,
@@ -1321,7 +1321,7 @@ class Runner:
 
         """
         logger.debug("update batch jobs: update status")
-        batch_processes_data = self.job_controller.get_all_batches(
+        batch_processes_data = self.job_controller.get_batches(
             worker=worker_name,
             batch_state=[BatchState.SUBMITTED, BatchState.RUNNING],
             max_results=0,

@@ -4761,7 +4761,7 @@ class JobController:
                 query["batch_state"] = {"$in": [bs.value for bs in batch_state]}
         return query
 
-    def get_all_batches(
+    def get_batches(
         self,
         worker: str | list[str] | None = None,
         batch_state: BatchState | list[BatchState] | None = None,
@@ -5326,19 +5326,18 @@ class JobController:
             command. WARNING: In this case metadata of the collections will not be restored.
         """
         dir_path = Path(dir_path)
-        collection_names = ["jobs", "flows", "jf_auxiliary", "batches"]
+        collection_names = ["jobs", "flows", "batches", "jf_auxiliary"]
         for name, db_name, collection in zip(
             collection_names,
             [
                 self.jobs_collection,
                 self.flows_collection,
-                self.auxiliary_collection,
                 self.batches_collection,
             ],
-            [self.jobs, self.flows, self.auxiliary, self.batches],
+            [self.jobs, self.flows, self.batches],
         ):
             count = collection.count_documents({})
-            if count > 0 and name != "jf_auxiliary":
+            if count > 0:
                 raise RuntimeError(
                     f"The collection named {db_name} for {name} contains {count} documents."
                     "Choose an empty collection."
@@ -5355,10 +5354,10 @@ class JobController:
             [
                 self.jobs_collection,
                 self.flows_collection,
-                self.auxiliary_collection,
                 self.batches_collection,
+                self.auxiliary_collection,
             ],
-            [self.jobs, self.flows, self.auxiliary, self.batches],
+            [self.jobs, self.flows, self.batches, self.auxiliary],
         ):
             file_name = f"{name}.bson"
             # compress may be set automatically in the restore functions, but if

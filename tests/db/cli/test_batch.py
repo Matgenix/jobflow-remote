@@ -48,7 +48,7 @@ def test_batch_worker(
         raise RuntimeError("Jobs did not complete")
 
     for _ in range(20):
-        if not job_controller.get_all_batches(
+        if not job_controller.get_batches(
             batch_state=[BatchState.RUNNING, BatchState.SUBMITTED]
         ):
             break
@@ -59,7 +59,7 @@ def test_batch_worker(
     daemon_manager.stop()
     wait_daemon_stopped(daemon_manager)
 
-    batches = job_controller.get_all_batches()
+    batches = job_controller.get_batches()
     assert len(batches) == 4
     # sorting on update time and process id as update time may be the same (ms precision in MongoDB)
     ordered_batches = sorted(batches, key=lambda x: (x.updated_on, x.process_id))

@@ -50,7 +50,7 @@ def test_run_batch_submission1(
     for _ in range(20):
         if (
             len(
-                job_controller.get_all_batches(
+                job_controller.get_batches(
                     batch_state=[BatchState.SUBMITTED, BatchState.RUNNING]
                 )
             )
@@ -67,7 +67,7 @@ def test_run_batch_submission1(
     runner.update_batch_jobs()
     assert (
         len(
-            job_controller.get_all_batches(
+            job_controller.get_batches(
                 batch_state=[BatchState.SUBMITTED, BatchState.RUNNING]
             )
         )
@@ -84,7 +84,7 @@ def test_run_batch_submission1(
 
     assert (
         len(
-            job_controller.get_all_batches(
+            job_controller.get_batches(
                 batch_state=[BatchState.SUBMITTED, BatchState.RUNNING]
             )
         )

@@ -208,7 +208,7 @@ You can customize the output using the following options:
 
 - ``--worker-name``: show only batches from a specific worker
 - ``--max-results``: limit the number of results shown (default: 20)
-- ``--batch-state``: filter by batch state (i.e. ``SUBMITTED``, ``RUNNING`` or ``FINISHED``)
+- ``--batch-state``: filter by batch state
 - ``--verbosity``: increase the verbosity level to include more details
 
 For example, to list all running batches from a specific worker:

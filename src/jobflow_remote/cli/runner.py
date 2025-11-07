@@ -470,13 +470,21 @@ def update_status(
     ] = False,
 ) -> None:
     """
-    Update the state of jobs, flows and batches.
+    Update the "submitted" and "running" states of jobs, flows and batches.
 
-    This is used to manually update the states without submitting, uploading,
-    downloading or performing actions other than updating the states.
+    This command updates the `"submitted"` and `"running"` states of jobs, flows, and batches.
+    It does **not** perform submissions, uploads, downloads, or any other side-effecting actions.
 
-    Should be used with the runner stopped to avoid inconsistencies for the
-    runner.
+    - Only jobs in a `SUBMITTED`, `BATCH_SUBMITTED`, `RUNNING`, or `BATCH_RUNNING` state are updated.
+    - Flows currently do not change state (though this may be extended in the future).
+    - Batch jobs in `SUBMITTED` or `RUNNING` states are updated.
+
+    This command is primarily intended for upgrade scenarios where:
+    - The runner must reflect the latest job statuses.
+    - No new jobs should be submitted.
+    - Actions such as uploads or database insertions are intentionally skipped.
+
+    Note that this command should be run **only when the runner is stopped** to avoid inconsistent states.
     """
     check_stopped_runner(error=True)
 

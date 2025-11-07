@@ -38,7 +38,7 @@ def processes_list(
     project = cm.get_project()
     workers = project.workers
 
-    batch_processes = jc.get_all_batches(
+    batch_processes = jc.get_batches(
         worker=worker_name,
         batch_state=batch_state,
         max_results=max_results,
