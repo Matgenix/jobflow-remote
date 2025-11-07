@@ -37,28 +37,48 @@ class UpgradeAction:
     required: bool = False
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UpgradeCondition:
-    """Details of an upgrade condition"""
+    """Generic upgrade condition"""
 
     description: str
-    collection: str
-    query: dict
-    one_doc_check: Callable | None = None
+    check_func: (
+        Callable[[JobController, UpgradeCondition | None], dict | None] | None
+    ) = None
 
     def check(self, job_controller: JobController) -> dict | None:
-        collection = getattr(job_controller, self.collection)
-        if collection is None:
-            return None
-        count = collection.count_documents(self.query)
-        if count == 0:
-            return None
-        if count == 1 and self.one_doc_check is not None:
-            doc = collection.find_one(self.query)
-            count = self.one_doc_check(doc)
+        if self.check_func is None:
+            raise NotImplementedError("check_func must be defined")
+        return self.check_func(job_controller, self)
+
+
+@dataclass(kw_only=True)
+class NoDocumentsIn(UpgradeCondition):
+    """Condition that checks that there is no document in a given collection matching the specified query."""
+
+    collection: str
+    query: dict | None = None
+    description: str | None = None
+
+    def __post_init__(self):
+        if self.description is None:
+            q_str = f" matching {self.query}" if self.query else ""
+            self.description = f"There should be no document in the '{self.collection}' collection{q_str}"
+
+        def _check(job_controller: JobController, _=None) -> dict | None:
+            coll = getattr(job_controller, self.collection, None)
+            if coll is None:
+                return None
+            count = coll.count_documents(self.query or {})
             if count == 0:
                 return None
-        return {"condition": self, "count": count}
+            return {
+                "condition": self,
+                "message": f"Found {count} document(s)",
+                "count": count,
+            }
+
+        self.check_func = _check
 
 
 class DatabaseUpgrader:
@@ -329,15 +349,39 @@ def count_batch_processes_old(doc):
     return count
 
 
+def check_batches_in_auxiliary_legacy(
+    job_controller: JobController, condition: UpgradeCondition
+) -> dict | None:
+    batches_docs = list(
+        job_controller.auxiliary.find({"batch_processes": {"$exists": True}}).limit(2)
+    )
+    if len(batches_docs) == 0:
+        return None
+    if len(batches_docs) > 1:
+        raise RuntimeError(
+            "More than one document with batch processes found in the auxiliary collection."
+        )
+    batch_doc = batches_docs[0]
+    if batch_doc["batch_processes"] is None:
+        return None
+    count = 0
+    for batch_processes_dict in batch_doc["batch_processes"].values():
+        count += len(batch_processes_dict)
+    if count == 0:
+        return None
+    return {
+        "condition": condition,
+        "message": f"Found {count} batche(s) in auxiliary collection (legacy batches management)",
+        "count": count,
+    }
+
+
 upgrade_conditions_for_1_0 = [
     UpgradeCondition(
         description="There should not be any batch process in the auxiliary collection (old batch management)",
-        collection="auxiliary",
-        query={"batch_processes": {"$exists": True}},
-        one_doc_check=count_batch_processes_old,
+        check_func=check_batches_in_auxiliary_legacy,
     ),
-    UpgradeCondition(
-        description="There should not be any SUBMITTED or RUNNING batch process in the batches collection",
+    NoDocumentsIn(
         collection="batches",
         query={"batch_state": {"$in": ["SUBMITTED", "RUNNING"]}},
     ),
