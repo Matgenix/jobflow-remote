@@ -1343,6 +1343,14 @@ def files_get(
 def files_delete(
     job_db_id: job_db_id_arg,
     job_index: job_index_opt = None,
+    all_states: Annotated[
+        bool,
+        typer.Option(
+            "--all-states",
+            "-as",
+            help="Delete files for a Job in any state",
+        ),
+    ] = False,
 ) -> None:
     """
     Delete files from the Job's execution folder.
@@ -1366,6 +1374,17 @@ def files_delete(
 
     if not remote_dir:
         exit_with_warning_msg("The remote folder has not been created yet")
+
+    cleanable_states = (
+        JobState.COMPLETED,
+        JobState.FAILED,
+        JobState.REMOTE_ERROR,
+    )
+    if not all_states and job_info.state not in cleanable_states:
+        exit_with_error_msg(
+            f"Job is in state {job_info.state.value}. To delete such "
+            "a Job run the command with the --all-states option"
+        )
 
     with loading_spinner(processing=False) as progress:
         progress.add_task(description="Deleting files...", total=None)

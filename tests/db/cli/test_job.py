@@ -485,6 +485,7 @@ def test_files_delete(job_controller, two_flows_four_jobs, run_check_cli) -> Non
     import os
 
     from jobflow_remote.jobs.runner import Runner
+    from jobflow_remote.jobs.state import JobState
 
     run_check_cli(
         ["job", "files", "get", "1", "queue.err"],
@@ -520,6 +521,29 @@ def test_files_delete(job_controller, two_flows_four_jobs, run_check_cli) -> Non
         ["job", "files", "delete", "3"],
         required_out=["The remote folder has not been created yet"],
     )
+
+    # assert job_controller.set_job_doc_properties(
+    #     {
+    #         "state": JobState.RUNNING.value,
+    #         "run_dir": "/SOME/not/EXISTING/fake/PaTh",
+    #     },
+    #     db_id="3",
+    # )
+    runner.run_one_job(db_id="3", target_state=JobState.RUNNING)
+    run_check_cli(
+        ["job", "files", "delete", "3"],
+        required_out=["run the command with the --all-states option"],
+        error=True,
+    )
+    job_info3 = job_controller.get_job_info(db_id="3")
+    assert os.path.exists(job_info3.run_dir)
+
+    run_check_cli(
+        ["job", "files", "delete", "3", "--all-states"],
+        excluded_out=["run the command with the --all-states option"],
+        required_out="Folder deleted",
+    )
+    assert not os.path.exists(job_info3.run_dir)
 
 
 def test_delete(job_controller, two_flows_four_jobs, run_check_cli) -> None:
