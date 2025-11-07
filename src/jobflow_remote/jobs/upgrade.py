@@ -37,7 +37,7 @@ class UpgradeAction:
     required: bool = False
 
 
-@dataclass(kw_only=True)
+@dataclass
 class UpgradeCondition:
     """Generic upgrade condition"""
 
@@ -52,15 +52,19 @@ class UpgradeCondition:
         return self.check_func(job_controller, self)
 
 
-@dataclass(kw_only=True)
+@dataclass
 class NoDocumentsIn(UpgradeCondition):
     """Condition that checks that there is no document in a given collection matching the specified query."""
 
-    collection: str
+    collection: str | None = None
     query: dict | None = None
     description: str | None = None
 
     def __post_init__(self):
+        # Here done this way as it does not work with python 3.9. When we drop python 3.9, we could
+        # use kw_only=True in the dataclass decorator.
+        if self.collection is None:
+            raise RuntimeError("The 'collection' argument is mandatory")
         if self.description is None:
             q_str = f" matching {self.query}" if self.query else ""
             self.description = f"There should be no document in the '{self.collection}' collection{q_str}"
