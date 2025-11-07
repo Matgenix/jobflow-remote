@@ -329,22 +329,22 @@ def count_batch_processes_old(doc):
     return count
 
 
-@DatabaseUpgrader.register_upgrade(
-    "1.0",
-    upgrade_conditions=[
-        UpgradeCondition(
-            description="There should not be any batch process in the auxiliary collection (old batch management)",
-            collection="auxiliary",
-            query={"batch_processes": {"$exists": True}},
-            one_doc_check=count_batch_processes_old,
-        ),
-        UpgradeCondition(
-            description="There should not be any SUBMITTED or RUNNING batch process in the batches collection",
-            collection="batches",
-            query={"batch_state": {"$in": ["SUBMITTED", "RUNNING"]}},
-        ),
-    ],
-)
+upgrade_conditions_for_1_0 = [
+    UpgradeCondition(
+        description="There should not be any batch process in the auxiliary collection (old batch management)",
+        collection="auxiliary",
+        query={"batch_processes": {"$exists": True}},
+        one_doc_check=count_batch_processes_old,
+    ),
+    UpgradeCondition(
+        description="There should not be any SUBMITTED or RUNNING batch process in the batches collection",
+        collection="batches",
+        query={"batch_state": {"$in": ["SUBMITTED", "RUNNING"]}},
+    ),
+]
+
+
+@DatabaseUpgrader.register_upgrade("1.0", upgrade_conditions=upgrade_conditions_for_1_0)
 def upgrade_to_1_0(
     job_controller: JobController,
     session: ClientSession | None = None,
