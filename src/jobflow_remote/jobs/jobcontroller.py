@@ -5371,14 +5371,16 @@ class JobController:
                     raise RuntimeError(
                         f"{len(files_paths)} files matching the name {file_name} were found in {dir_path}"
                     )
-                if name == "batches" and len(files_paths) > 1:
+                # Cases for the batches collection:
+                # - Multiple files for the batches collection is not allowed (as for other collections)
+                # - No file, for when the batches collection did not exist yet
+                if len(files_paths) > 1:
                     # Multiple files for the batches collection is not allowed (as for other collections)
                     raise RuntimeError(
                         f"{len(files_paths)} files matching the name {file_name} were found in {dir_path}"
                     )
-                if name == "batches" and len(files_paths) == 0:
-                    # Case in which the batches collection did not exist yet
-                    continue
+                # Case in which the batches collection did not exist yet
+                continue
             if python:
                 pymongo_restore(collection=collection, input_file=files_paths[0])
             else:
