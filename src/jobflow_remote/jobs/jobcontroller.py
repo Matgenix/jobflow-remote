@@ -2329,6 +2329,21 @@ class JobController:
         list
             List of db_ids of the updated Jobs.
         """
+        # if only priority is changed, any state is acceptable
+        if priority and not worker and not exec_config:
+            acceptable_states = None
+        else:
+            acceptable_states = [
+                JobState.READY,
+                JobState.WAITING,
+                JobState.COMPLETED,
+                JobState.FAILED,
+                JobState.PAUSED,
+                JobState.REMOTE_ERROR,
+                JobState.STOPPED,
+                JobState.USER_STOPPED,
+            ]
+
         set_dict: dict[str, Any] = {}
         if worker:
             if worker not in self.project.workers:
@@ -2376,17 +2391,6 @@ class JobController:
 
         if priority is not None:
             set_dict["priority"] = priority
-
-        acceptable_states = [
-            JobState.READY,
-            JobState.WAITING,
-            JobState.COMPLETED,
-            JobState.FAILED,
-            JobState.PAUSED,
-            JobState.REMOTE_ERROR,
-            JobState.STOPPED,
-            JobState.USER_STOPPED,
-        ]
 
         return self._many_jobs_action(
             method=self.set_job_doc_properties,
@@ -2564,7 +2568,7 @@ class JobController:
 
         # Only use the full aggregation if more job details are needed.
         # The single flow document is enough for basic information
-        if with_jobs_info:
+        if with_jobs_info is not False:
             if isinstance(with_jobs_info, bool):
                 projection_job = {f: 1 for f in projection_flow_info_jobs}
             else:
@@ -2659,7 +2663,10 @@ class JobController:
         delete_output: bool = False,
         delete_files: bool = False,
         cancel_processes: bool = True,
-    ) -> int:
+        raise_on_error: bool = False,
+        wait: int | None = None,
+        break_lock: bool = False,
+    ) -> list[str]:
         """
         Delete a list of Flows based on the flow uuids.
 
@@ -2677,11 +2684,21 @@ class JobController:
         cancel_processes
             If True will attempt to delete the processes for SUBMITTED and RUNNING jobs.
             Failure to cancel will not stop the deletion of the Flow.
-
+        raise_on_error
+            If True raise in case of error on one job error and stop the loop.
+            Otherwise, just log the error and proceed.
+        wait
+            In case the Flow that needs to be deleted is locked,
+            wait this time (in seconds) for the lock to be released.
+            Raise an error if lock is not released.
+        break_lock
+            Forcibly break the lock on locked documents. Use with care and
+            verify that the lock has been set by a process that is not running
+            anymore. Doing otherwise will likely lead to inconsistencies in the DB.
         Returns
         -------
-        int
-            Number of deleted Flows.
+        list
+            List of uuids of the deleted Flows.
         """
         if isinstance(flow_ids, str):
             flow_ids = [flow_ids]
@@ -2694,18 +2711,24 @@ class JobController:
                 f"Cannot delete {len(flow_ids)} Flows as they exceed the specified maximum "
                 f"limit ({max_limit}). Increase the limit to delete the Flows."
             )
-        deleted = 0
+        deleted = []
         # Open the SharedHosts so that hosts will be shared for all the Flows
         with SharedHosts(self.project):
             for fid in flow_ids:
-                # TODO should it catch errors?
-                if self.delete_flow(
-                    fid,
-                    delete_output=delete_output,
-                    delete_files=delete_files,
-                    cancel_processes=cancel_processes,
-                ):
-                    deleted += 1
+                try:
+                    if self.delete_flow(
+                        fid,
+                        delete_output=delete_output,
+                        delete_files=delete_files,
+                        cancel_processes=cancel_processes,
+                        wait=wait,
+                        break_lock=break_lock,
+                    ):
+                        deleted.append(fid)
+                except Exception:
+                    if raise_on_error:
+                        raise
+                    logger.exception(f"Error while deleting Flow with id {fid}")
 
         return deleted
 
@@ -2715,6 +2738,8 @@ class JobController:
         delete_output: bool = False,
         delete_files: bool = False,
         cancel_processes: bool = True,
+        wait: int | None = None,
+        break_lock: bool = False,
     ) -> bool:
         """
         Delete a single Flow based on the uuid.
@@ -2730,41 +2755,68 @@ class JobController:
         cancel_processes
             If True will attempt to delete the processes for SUBMITTED and RUNNING jobs.
             Failure to cancel will not stop the deletion of the Flow.
+        wait
+            In case the Flow that needs to be deleted is locked,
+            wait this time (in seconds) for the lock to be released.
+            Raise an error if lock is not released.
+        break_lock
+            Forcibly break the lock on locked documents. Use with care and
+            verify that the lock has been set by a process that is not running
+            anymore. Doing otherwise will likely lead to inconsistencies in the DB.
 
         Returns
         -------
         bool
             True if the flow has been deleted.
         """
-        # TODO should this lock anything (FW does not lock)?
-        flow = self.get_flow_info_by_flow_uuid(flow_id)
-        if not flow:
-            return False
-        job_ids = flow["jobs"]
-        if delete_output:
-            jobstore = self.jobstore
-            if jobstore_name := flow.get("jobstore"):
-                jobstore = self.optional_jobstores[jobstore_name]
-            jobstore.remove_docs({"uuid": {"$in": job_ids}})
-        if delete_files or cancel_processes:
-            jobs_info = self.get_jobs_info(flow_ids=[flow_id])
-            if cancel_processes:
-                for ji in jobs_info:
-                    if ji.state in [JobState.SUBMITTED, JobState.RUNNING]:
-                        # try cancelling the job submitted to the remote queue
-                        try:
-                            self._cancel_queue_process(ji.model_dump(mode="python"))
-                        except Exception:
-                            logger.warning(
-                                f"Failed cancelling the process for Job {ji.uuid} {ji.index} while deleting Flow {flow_id}",
-                                exc_info=True,
-                            )
-            # delete files after cancelling the queue job
-            if delete_files:
-                self.safe_delete_files(jobs_info)
+        sleep = None
+        if wait:
+            sleep = 10
+        # TODO locking the Flow prevents deleting it while one if its Jobs is
+        # completing, and thus avoids that Jobs are dynamically created while
+        # the Flow is being deleted.
+        # To avoid any sort of concurrent action it may be necessary to lock all the
+        # Jobs of the Flow. Consider doing this in the future.
+        with self.lock_flow(
+            filter={"uuid": flow_id},
+            sleep=sleep,
+            max_wait=wait,
+            get_locked_doc=True,
+            break_lock=break_lock,
+        ) as flow_lock:
+            if not flow_lock.locked_document:
+                if flow_lock.unavailable_document:
+                    raise FlowLockedError.from_flow_doc(flow_lock.unavailable_document)
+                return False
+            flow = flow_lock.locked_document
 
-        self.jobs.delete_many({"uuid": {"$in": job_ids}})
-        self.flows.delete_one({"uuid": flow_id})
+            job_ids = flow["jobs"]
+            if delete_output:
+                jobstore = self.jobstore
+                if jobstore_name := flow.get("jobstore"):
+                    jobstore = self.optional_jobstores[jobstore_name]
+                jobstore.remove_docs({"uuid": {"$in": job_ids}})
+            if delete_files or cancel_processes:
+                jobs_info = self.get_jobs_info(flow_ids=[flow_id])
+                if cancel_processes:
+                    for ji in jobs_info:
+                        if ji.state in [JobState.SUBMITTED, JobState.RUNNING]:
+                            # try cancelling the job submitted to the remote queue
+                            try:
+                                self._cancel_queue_process(ji.model_dump(mode="python"))
+                            except Exception:
+                                logger.warning(
+                                    f"Failed cancelling the process for Job {ji.uuid} {ji.index} while deleting Flow {flow_id}",
+                                    exc_info=True,
+                                )
+                # delete files after cancelling the queue job
+                if delete_files:
+                    self.safe_delete_files(jobs_info)
+
+            self.jobs.delete_many({"uuid": {"$in": job_ids}})
+
+            # Flow is deleted by the lock release
+            flow_lock.delete_on_release = True
         return True
 
     def unlock_jobs(

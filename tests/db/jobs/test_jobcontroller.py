@@ -158,9 +158,19 @@ def test_rerun_completed(job_controller, runner) -> None:
     assert j2_info.state == JobState.READY
     assert j3_info.state == JobState.WAITING
 
-    # try rerunning the second job. Wrong state
+    # try rerunning the second and third job. Wrong state
     with pytest.raises(ValueError, match="The Job is in the READY state"):
         job_controller.rerun_job(job_id=j2.uuid, job_index=j2.index)
+
+    with pytest.raises(ValueError, match="The Job is in the WAITING state"):
+        job_controller.rerun_job(job_id=j3.uuid, job_index=j3.index)
+
+    # check that the state did not change
+    j2_info = job_controller.get_job_info(job_id=j2.uuid, job_index=j2.index)
+    j3_info = job_controller.get_job_info(job_id=j3.uuid, job_index=j3.index)
+
+    assert j2_info.state == JobState.READY
+    assert j3_info.state == JobState.WAITING
 
     assert len(list(j1_path.iterdir())) > 0
 

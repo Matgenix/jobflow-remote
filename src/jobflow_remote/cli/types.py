@@ -266,6 +266,15 @@ force_opt = Annotated[
     ),
 ]
 
+yes_opt = Annotated[
+    bool,
+    typer.Option(
+        "--yes",
+        "-y",
+        help="Sets any confirmation values to 'yes' automatically",
+    ),
+]
+
 
 job_flow_id_flag_opt = Annotated[
     bool,
