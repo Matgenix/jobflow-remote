@@ -270,7 +270,7 @@ class DatabaseUpgrader:
             err = ["Some upgrade conditions were not satisfied:"]
             for vv, failed_cond in failed_conditions:
                 err.append(
-                    f" - {failed_cond['condition'].description} (for version {vv}), found {failed_cond['count']}"
+                    f" - {failed_cond['condition'].description} (for version {vv}): {failed_cond['message']}"
                 )
             logger.error("\n".join(err))
             return False
