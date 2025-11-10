@@ -75,6 +75,7 @@ jobs:
           - { python: "3.11", resolution: highest}
           - { python: "3.12", resolution: highest}
           - { python: "3.13", resolution: highest}
+          - { python: "3.14", resolution: highest}
 
     steps:
       - uses: actions/checkout@v5
