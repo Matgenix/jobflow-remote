@@ -1351,10 +1351,21 @@ def files_delete(
             help="Delete files for a Job in any state",
         ),
     ] = False,
+    force: Annotated[
+        bool,
+        typer.Option(
+            "--force",
+            "-f",
+            help="Do not check if runner is active",
+        ),
+    ] = False,
 ) -> None:
     """
     Delete files from the Job's execution folder.
     """
+    if all_states and not force:
+        check_stopped_runner(error=True)
+
     db_id, job_id = get_job_db_ids(job_db_id, job_index)
 
     jc = get_job_controller()

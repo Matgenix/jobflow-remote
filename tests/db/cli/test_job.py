@@ -481,7 +481,14 @@ def test_files_get(job_controller, one_job, tmp_dir, run_check_cli) -> None:
     )
 
 
-def test_files_delete(job_controller, two_flows_four_jobs, run_check_cli) -> None:
+def test_files_delete(
+    job_controller,
+    two_flows_four_jobs,
+    run_check_cli,
+    daemon_manager,
+    wait_daemon_started,
+    wait_daemon_shutdown,
+) -> None:
     import os
 
     from jobflow_remote.jobs.runner import Runner
@@ -522,13 +529,6 @@ def test_files_delete(job_controller, two_flows_four_jobs, run_check_cli) -> Non
         required_out=["The remote folder has not been created yet"],
     )
 
-    # assert job_controller.set_job_doc_properties(
-    #     {
-    #         "state": JobState.RUNNING.value,
-    #         "run_dir": "/SOME/not/EXISTING/fake/PaTh",
-    #     },
-    #     db_id="3",
-    # )
     runner.run_one_job(db_id="3", target_state=JobState.RUNNING)
     run_check_cli(
         ["job", "files", "delete", "3"],
@@ -538,12 +538,24 @@ def test_files_delete(job_controller, two_flows_four_jobs, run_check_cli) -> Non
     job_info3 = job_controller.get_job_info(db_id="3")
     assert os.path.exists(job_info3.run_dir)
 
+    daemon_manager.start()
+    wait_daemon_started(daemon_manager)
     run_check_cli(
         ["job", "files", "delete", "3", "--all-states"],
+        excluded_out="Folder deleted",
+        required_out="The daemon should not be running while performing this operation",
+        error=True,
+    )
+
+    run_check_cli(
+        ["job", "files", "delete", "3", "--all-states", "--force"],
         excluded_out=["run the command with the --all-states option"],
         required_out="Folder deleted",
     )
     assert not os.path.exists(job_info3.run_dir)
+
+    daemon_manager.shut_down()
+    wait_daemon_shutdown(daemon_manager)
 
 
 def test_delete(job_controller, two_flows_four_jobs, run_check_cli) -> None:

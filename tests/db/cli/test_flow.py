@@ -430,7 +430,6 @@ def test_clean(
         running_fids.append(flow.uuid)
         submit_flow(flow, worker="test_local_worker")
         for j in add_jobs:
-            # job_controller.set_job_state(state=JobState.RUNNING, job_id=j.uuid)
             assert job_controller.set_job_doc_properties(
                 {
                     "state": JobState.RUNNING.value,
