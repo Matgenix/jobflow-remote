@@ -22,13 +22,13 @@ from jobflow_remote.remote.data import get_job_path
 from jobflow_remote.utils.data import convert_utc_time
 
 if TYPE_CHECKING:
+    from packaging.version import Version
     from rich.console import ConsoleRenderable, RenderableType
 
     from jobflow_remote.config.base import ExecutionConfig, WorkerBase
     from jobflow_remote.jobs.data import FlowInfo, JobDoc, JobInfo
     from jobflow_remote.jobs.report import FlowsReport, JobsReport
     from jobflow_remote.jobs.upgrade import UpgradeAction
-
 
 colors_list = [
     "red",
@@ -583,6 +583,14 @@ def format_upgrade_actions(actions: list[UpgradeAction]):
     msg = ""
     for action in actions:
         msg += f"* {action.description}\n"
+
+    return Markdown(msg)
+
+
+def format_failed_conditions(failed_conditions: list[tuple[Version, dict]]):
+    msg = ""
+    for fc_version, fc_dict in failed_conditions:
+        msg += f"* {fc_dict['condition'].description}: {fc_dict['message']} (condition to upgrade to {fc_version!s})\n"
 
     return Markdown(msg)
 

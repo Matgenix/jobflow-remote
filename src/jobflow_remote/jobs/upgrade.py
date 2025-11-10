@@ -181,7 +181,7 @@ class DatabaseUpgrader:
 
     def dry_run(
         self, from_version: str | None = None, target_version: str | None = None
-    ) -> list[UpgradeAction]:
+    ) -> tuple[list[UpgradeAction], list[tuple[Version, dict]]]:
         """Simulate the upgrade process and return all actions that would be performed
 
         Parameters
@@ -207,9 +207,11 @@ class DatabaseUpgrader:
         )
 
         if db_version >= target_version:
-            return []
+            return [], []
 
         versions_needing_upgrade = self.collect_upgrades(db_version, target_version)
+
+        failed_conditions = self.check_upgrade_conditions(versions_needing_upgrade)
 
         all_actions = []
         for version in versions_needing_upgrade:
@@ -232,7 +234,7 @@ class DatabaseUpgrader:
             )
         )
 
-        return all_actions
+        return all_actions, failed_conditions
 
     def upgrade(
         self, from_version: str | None = None, target_version: str | None = None
