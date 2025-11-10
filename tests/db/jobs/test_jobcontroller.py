@@ -849,6 +849,7 @@ def test_backup(job_controller_drop, python, compress):
     jobs_name = "test_jobs"
     flows_name = "test_flows"
     aux_name = "test_auxiliary"
+    batches_name = "test_batches"
     job_controller_drop.jobs_collection = jobs_name
     job_controller_drop.jobs = job_controller_drop.db[jobs_name]
     job_controller_drop.queue_store.collection_name = jobs_name
@@ -857,6 +858,8 @@ def test_backup(job_controller_drop, python, compress):
     job_controller_drop.flows = job_controller_drop.db[flows_name]
     job_controller_drop.auxiliary_collection = aux_name
     job_controller_drop.auxiliary = job_controller_drop.db[aux_name]
+    job_controller_drop.batches_collection = batches_name
+    job_controller_drop.batches = job_controller_drop.db[batches_name]
 
     job_controller_drop.reset()
 
@@ -866,8 +869,17 @@ def test_backup(job_controller_drop, python, compress):
 
     # do not use submit_flow, otherwise the original collections will be used.
     job_controller_drop.add_flow(flow, worker="test_local_worker")
+    # Manually add a fake batch process
+    job_controller_drop.add_batch_process(
+        process_id="fake_bp_id",
+        batch_uid="fake_bp_uid",
+        worker="test_local_batch_worker",
+    )
 
     assert job_controller_drop.count_jobs() == 2
+    assert job_controller_drop.count_batches(worker="test_local_worker") == 0
+    assert job_controller_drop.count_batches(worker="test_local_batch_worker") == 1
+    assert job_controller_drop.count_batches() == 1
 
     db_name = job_controller_drop.queue_store.database
     with tempfile.TemporaryDirectory() as dir_name:
@@ -887,14 +899,15 @@ def test_backup(job_controller_drop, python, compress):
         assert "flows.bson" + ext in files
         assert "jf_auxiliary.bson" + ext in files
         assert "jobs.bson" + ext in files
+        assert "batches.bson" + ext in files
         if python:
-            assert len(files) == 3
+            assert len(files) == 4
         else:
             assert "flows.metadata.json" + ext in files
             assert "jf_auxiliary.metadata.json" + ext in files
             assert "jobs.metadata.json" + ext in files
 
-            assert len(files) == 6
+            assert len(files) == 8
 
         with pytest.raises(
             RuntimeError,
@@ -914,6 +927,16 @@ def test_backup(job_controller_drop, python, compress):
             )
 
         job_controller_drop.flows.delete_many({})
+
+        with pytest.raises(
+            RuntimeError,
+            match=f"The collection named {batches_name} for batches contains 1 documents.*",
+        ):
+            job_controller_drop.backup_restore(
+                dir_path=dir_path / db_name, compress=compress, python=python
+            )
+
+        job_controller_drop.batches.delete_many({})
         with pytest.raises(
             RuntimeError,
             match="next_id value is different from one in the auxiliary collection.*",

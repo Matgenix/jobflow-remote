@@ -118,6 +118,9 @@ class LocalHost(BaseHost):
     def copy(self, src, dst) -> None:
         shutil.copy(src, dst)
 
+    def move(self, src, dst) -> None:
+        shutil.move(src, dst)
+
     def listdir(self, path: str | Path) -> list[str]:
         try:
             return os.listdir(path)

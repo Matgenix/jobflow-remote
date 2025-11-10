@@ -301,7 +301,7 @@ back to its previous state, when the remote error occurred.
     retry --> UPLOADED
     retry --> SUBMITTED
     retry --> RUNNING
-    retry --> TERMINATED
+    retry --> RUN_FINISHED
     retry --> DOWNLOADED
     REMOTE_ERROR --> rerun{Rerun}
     FAILED --> rerun{Rerun}
@@ -315,7 +315,7 @@ back to its previous state, when the remote error occurred.
     classDef wait fill:#eae433
 
     class REMOTE_ERROR,FAILED error
-    class CHECKED_OUT,UPLOADED,SUBMITTED,RUNNING,TERMINATED,DOWNLOADED running
+    class CHECKED_OUT,UPLOADED,SUBMITTED,RUNNING,RUN_FINISHED,DOWNLOADED running
     class COMPLETED success
     class READY ready
     class WAITING wait

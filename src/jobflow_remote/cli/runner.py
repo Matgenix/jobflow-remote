@@ -17,6 +17,7 @@ from jobflow_remote.cli.types import (
     verbosity_opt,
 )
 from jobflow_remote.cli.utils import (
+    check_stopped_runner,
     exit_with_error_msg,
     exit_with_warning_msg,
     fmt_datetime,
@@ -446,3 +447,57 @@ def reset(
         dm.clean_files()
 
     out_console.print("The running runner document was reset")
+
+
+@app_runner.command()
+def update_status(
+    log_level: log_level_opt = LogLevel.INFO,
+    set_pid: Annotated[
+        bool,
+        typer.Option(
+            "--set-pid",
+            "-pid",
+            help="Set the runner id to the current process pid",
+        ),
+    ] = False,
+    connect_interactive: Annotated[
+        bool,
+        typer.Option(
+            "--connect-interactive",
+            "-i",
+            help="Activate the connection for interactive remote host",
+        ),
+    ] = False,
+) -> None:
+    """
+    Update the "submitted" and "running" states of jobs, flows and batches.
+
+    This command updates the `"submitted"` and `"running"` states of jobs, flows, and batches.
+    It does not perform submissions, uploads, downloads, or any other side-effecting actions.
+
+    - Only jobs in a `SUBMITTED`, `BATCH_SUBMITTED`, `RUNNING`, or `BATCH_RUNNING` state are updated.
+    - Flows currently do not change state (though this may be extended in the future).
+    - Batch jobs in `SUBMITTED` or `RUNNING` states are updated.
+
+    This command is primarily intended for upgrade scenarios where:
+    - The runner must reflect the latest job statuses.
+    - No new jobs should be submitted.
+    - Actions such as uploads or database insertions are intentionally skipped.
+
+    Note that this command should be run only when the runner is stopped to avoid inconsistent states.
+    """
+    check_stopped_runner(error=True)
+
+    runner_id = os.getpid() if set_pid else None
+    runner = Runner(
+        log_level=log_level,
+        runner_id=str(runner_id),
+        connect_interactive=connect_interactive,
+    )
+
+    try:
+        runner.check_run_status()
+        if runner.batch_workers:
+            runner.update_batch_jobs(submit=False)
+    finally:
+        runner.cleanup()

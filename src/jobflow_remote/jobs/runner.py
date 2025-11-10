@@ -315,7 +315,7 @@ class Runner:
         states = []
         if transfer:
             states.append(JobState.CHECKED_OUT.value)
-            states.append(JobState.TERMINATED.value)
+            states.append(JobState.RUN_FINISHED.value)
         if complete:
             states.append(JobState.DOWNLOADED.value)
         if queue:
@@ -350,7 +350,7 @@ class Runner:
                 self.check_run_status
             )
             # Limited workers will only affect the process interacting with the queue
-            # manager. When a job is submitted or terminated the count in the
+            # manager. When a job is submitted or finished to run, the count in the
             # limited_workers can be directly updated, since by construction only one
             # process will take care of the queue state.
             # The refresh can be run on a relatively high delay since it should only
@@ -413,7 +413,7 @@ class Runner:
         """
         states = [
             JobState.CHECKED_OUT.value,
-            JobState.TERMINATED.value,
+            JobState.RUN_FINISHED.value,
             JobState.DOWNLOADED.value,
             JobState.UPLOADED.value,
         ]
@@ -432,7 +432,7 @@ class Runner:
         )
 
         # Limited workers will only affect the process interacting with the queue
-        # manager. When a job is submitted or terminated the count in the
+        # manager. When a job is submitted or finished to run, the count in the
         # limited_workers can be directly updated, since by construction only one
         # process will take care of the queue state.
         # The refresh can be run on a relatively high delay since it should only
@@ -457,7 +457,7 @@ class Runner:
         running_states = [
             JobState.READY.value,
             JobState.CHECKED_OUT.value,
-            JobState.TERMINATED.value,
+            JobState.RUN_FINISHED.value,
             JobState.DOWNLOADED.value,
             JobState.UPLOADED.value,
             JobState.SUBMITTED.value,
@@ -476,7 +476,7 @@ class Runner:
                 unfinished_batches = 0
             else:
                 unfinished_batches = len(
-                    self.job_controller.get_all_batches(
+                    self.job_controller.get_batches(
                         batch_state=[BatchState.SUBMITTED, BatchState.RUNNING]
                     )
                 )
@@ -500,7 +500,7 @@ class Runner:
         """
         states = [
             JobState.CHECKED_OUT.value,
-            JobState.TERMINATED.value,
+            JobState.RUN_FINISHED.value,
             JobState.DOWNLOADED.value,
             JobState.UPLOADED.value,
         ]
@@ -540,7 +540,7 @@ class Runner:
         running_states = [
             JobState.READY.value,
             JobState.CHECKED_OUT.value,
-            JobState.TERMINATED.value,
+            JobState.RUN_FINISHED.value,
             JobState.DOWNLOADED.value,
             JobState.UPLOADED.value,
             JobState.SUBMITTED.value,
@@ -620,7 +620,7 @@ class Runner:
         states_methods = {
             JobState.CHECKED_OUT: self.upload,
             JobState.UPLOADED: self.submit,
-            JobState.TERMINATED: self.download,
+            JobState.RUN_FINISHED: self.download,
             JobState.DOWNLOADED: self.complete_job,
         }
 
@@ -860,7 +860,7 @@ class Runner:
 
     def download(self, lock) -> None:
         """
-        Download the final files for a locked Job in the TERMINATED state.
+        Download the final files for a locked Job in the RUN_FINISHED state.
         If successful set the state to DOWNLOADED.
 
         Parameters
@@ -977,9 +977,9 @@ class Runner:
         """
         Check the status of all the jobs submitted to a queue.
 
-        If Jobs started update their state from SUBMITTED to RUNNING.
-        If Jobs terminated set their state to TERMINATED if running on a remote
-        host. If on a local host set them directly to DOWNLOADED.
+        If Jobs started, update their state from SUBMITTED to RUNNING.
+        If Jobs finished to run, set their state to RUN_FINISHED if running on a remote
+        host. If on a local host, set them directly to DOWNLOADED.
         """
         logger.debug("check_run_status")
         # check for jobs that could have changed state
@@ -1049,13 +1049,13 @@ class Runner:
                     # if the worker is local go directly to DOWNLOADED, as files
                     # are not copied locally
                     if not worker.is_local:
-                        next_state = JobState.TERMINATED
+                        next_state = JobState.RUN_FINISHED
                     else:
                         next_state = JobState.DOWNLOADED
                     # the delay is applied if the job is finished on the worker
                     next_step_delay = worker.delay_download
                     logger.debug(
-                        f"terminated remote job with id {remote_doc['process_id']}"
+                        f"finished run for remote job with id {remote_doc['process_id']}"
                     )
                 elif not error and remote_doc["step_attempts"] > 0:
                     # reset the step attempts if succeeding in case there was
@@ -1095,7 +1095,7 @@ class Runner:
                             lock.update_on_release = set_output
                     # decrease the amount of jobs running if it is a limited worker
                     if (
-                        next_state in (JobState.TERMINATED, JobState.DOWNLOADED)
+                        next_state in (JobState.RUN_FINISHED, JobState.DOWNLOADED)
                         and worker_name in self.limited_workers
                     ):
                         self.limited_workers[doc["worker"]]["current"] -= 1
@@ -1129,13 +1129,18 @@ class Runner:
             }
             state["current"] = self.job_controller.count_jobs(query)
 
-    def update_batch_jobs(self) -> None:
+    def update_batch_jobs(self, submit: bool = True) -> None:
         """
         Update the status of batch jobs.
 
         Includes submitting to the remote queue, checking the status of
         running jobs in the queue and handle the files with the Jobs information
         about their status.
+
+        Parameters
+        ----------
+        submit
+            Whether to submit new batch processes.
         """
         logger.debug("update batch jobs")
         for worker_name, batch_manager in self.batch_workers.items():
@@ -1156,14 +1161,14 @@ class Runner:
 
             # check that enough processes are submitted and submit the required
             # amount to reach max_jobs, if needed.
-            if running_batch_processes is not None:
+            if submit and (running_batch_processes is not None):
                 self.submit_batch_processes(
                     queue_manager, worker_name, worker, running_batch_processes
                 )
 
-            # check for jobs that have terminated in the batch runner and
+            # check for jobs that have finished to run in the batch runner and
             # update the DB state accordingly
-            self.batch_update_terminated_jobs(batch_manager, worker_name, worker)
+            self.batch_update_run_finished_jobs(batch_manager, worker_name, worker)
 
     def batch_update_running_jobs(
         self, batch_manager: RemoteBatchManager, worker_name: str, worker
@@ -1186,7 +1191,7 @@ class Runner:
             running directory.
         """
         logger.debug("update batch jobs: update running jobs")
-        batch_processes = self.job_controller.get_all_batches(
+        batch_processes = self.job_controller.get_batches(
             worker=worker_name,
             batch_state=[BatchState.SUBMITTED, BatchState.RUNNING],
             max_results=0,
@@ -1316,7 +1321,7 @@ class Runner:
 
         """
         logger.debug("update batch jobs: update status")
-        batch_processes_data = self.job_controller.get_all_batches(
+        batch_processes_data = self.job_controller.get_batches(
             worker=worker_name,
             batch_state=[BatchState.SUBMITTED, BatchState.RUNNING],
             max_results=0,
@@ -1527,17 +1532,17 @@ class Runner:
             else:
                 logger.error(f"unhandled submission status {submit_result.status}")
 
-    def batch_update_terminated_jobs(self, batch_manager, worker_name, worker):
-        logger.debug("update batch jobs: update terminated jobs")
-        terminated_jobs = []
+    def batch_update_run_finished_jobs(self, batch_manager, worker_name, worker):
+        logger.debug("update batch jobs: update jobs which have finished to run")
+        run_finished_jobs = []
         try:
-            terminated_jobs = batch_manager.get_terminated()
+            run_finished_jobs = batch_manager.get_run_finished()
         except Exception:
             logger.warning(
-                f"error trying to get the list of terminated batch jobs for worker: {worker_name}",
+                f"error trying to get the list of batch jobs that have finished to run for worker: {worker_name}",
                 exc_info=True,
             )
-        for job_id, job_index, batch_uid in terminated_jobs:
+        for job_id, job_index, batch_uid in run_finished_jobs:
             lock_filter = {
                 "uuid": job_id,
                 "index": job_index,
@@ -1555,7 +1560,7 @@ class Runner:
             ) as lock:
                 if lock.locked_document:
                     if not worker.is_local:
-                        next_state = JobState.TERMINATED
+                        next_state = JobState.RUN_FINISHED
                     else:
                         next_state = JobState.DOWNLOADED
                     set_output = {
@@ -1574,10 +1579,10 @@ class Runner:
                         job_index=job_index,
                         batch_uid=batch_uid,
                         worker=worker_name,
-                        info={"state": JobState.TERMINATED.value},
+                        info={"state": JobState.RUN_FINISHED.value},
                     )
                     lock.update_on_release = set_output
-            batch_manager.delete_terminated([(job_id, job_index, batch_uid)])
+            batch_manager.delete_run_finished([(job_id, job_index, batch_uid)])
 
     def ping_running_runner(self):
         ping_result = self.job_controller.ping_running_runner()

@@ -1,11 +1,14 @@
-from typing import Annotated, Optional
+from typing import Annotated, Optional, cast
 
 import typer
 from packaging.version import parse as parse_version
 from rich.prompt import Confirm
 from rich.text import Text
 
-from jobflow_remote.cli.formatting import format_upgrade_actions
+from jobflow_remote.cli.formatting import (
+    format_failed_conditions,
+    format_upgrade_actions,
+)
 from jobflow_remote.cli.jf import app
 from jobflow_remote.cli.jfr_typer import JFRTyper
 from jobflow_remote.cli.types import (
@@ -119,7 +122,7 @@ def upgrade(
             out_console.print(text)
 
     if not no_dry_run:
-        actions = upgrader.dry_run(target_version=target)
+        actions, failed_conditions = upgrader.dry_run(target_version=target)
         if not actions:
             out_console.print(
                 f"No actions will be required for upgrading to version {target_version}"
@@ -130,6 +133,13 @@ def upgrade(
             )
             actions_formatted = format_upgrade_actions(actions)
             out_console.print(actions_formatted)
+            if failed_conditions:
+                out_console(
+                    "Note that the upgrade will fail due to the current status of the DB.\n"
+                    "List of conditions blocking the upgrade:"
+                )
+                failed_formatted = format_failed_conditions(failed_conditions)
+                out_console.print(failed_formatted)
 
     warn_text = Text.from_markup(
         "[bold red]Performing the upgrade will permanently modify data in the queue DB. "
@@ -369,6 +379,9 @@ def rebuild(
         out_console.print("Indexes rebuild started in background")
 
 
+DEFAULT_COLLECTION: DbCollection = cast(DbCollection, DbCollection.JOBS.value)
+
+
 @app_index.command()
 def create(
     key: index_key_arg,
@@ -381,7 +394,7 @@ def create(
             "-c",
             help="The collection where the index should be added",
         ),
-    ] = DbCollection.JOBS.value,  # type: ignore[assignment]
+    ] = DEFAULT_COLLECTION,
     unique: Annotated[
         bool,
         typer.Option(

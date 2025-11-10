@@ -115,7 +115,7 @@ class JobController:
         jobstore: JobStore,
         flows_collection: str = "flows",
         auxiliary_collection: str = "jf_auxiliary",
-        batches_collection: str | None = None,
+        batches_collection: str = "batches",
         project: Project | None = None,
         optional_jobstores: dict[str, JobStore] | None = None,
     ) -> None:
@@ -136,7 +136,6 @@ class JobController:
             Uses the DB defined in the queue_store.
         batches_collection
             The name of the collection used to store the batch processes.
-            This batches collection is optional.
         project
             The project where the Stores were defined.
         optional_jobstores
@@ -158,9 +157,7 @@ class JobController:
         self.jobs = self.queue_store._collection
         self.flows = self.db[self.flows_collection]
         self.auxiliary = self.db[self.auxiliary_collection]
-        self.batches = (
-            self.db[self.batches_collection] if self.batches_collection else None
-        )
+        self.batches = self.db[self.batches_collection]
         self.project = project
 
     @classmethod
@@ -4746,13 +4743,11 @@ class JobController:
                     f"stdout: {cancel_result.stdout}. stderr: {cancel_result.stderr}"
                 )
 
-    def get_all_batches(
-        self,
+    @staticmethod
+    def _build_query_batch(
         worker: str | list[str] | None = None,
         batch_state: BatchState | list[BatchState] | None = None,
-        max_results: int = 20,
-        sort: str | list | None = None,
-    ) -> list[BatchDoc] | None:
+    ) -> dict:
         query: dict = {}
         if worker:
             if not isinstance(worker, list):
@@ -4764,6 +4759,16 @@ class JobController:
                 query["batch_state"] = batch_state.value
             else:
                 query["batch_state"] = {"$in": [bs.value for bs in batch_state]}
+        return query
+
+    def get_batches(
+        self,
+        worker: str | list[str] | None = None,
+        batch_state: BatchState | list[BatchState] | None = None,
+        max_results: int = 20,
+        sort: str | list | None = None,
+    ) -> list[BatchDoc] | None:
+        query = self._build_query_batch(worker=worker, batch_state=batch_state)
         # Some batches may have updated at exactly the same time (up to ms precision of MongoDB)
         # To make sure we have always same order (in particular when limiting number of results),
         # we add a sort on process_id as well.
@@ -4776,6 +4781,14 @@ class JobController:
             BatchDoc.model_validate(bd_dict)
             for bd_dict in self.batches.find(query, sort=sort).limit(max_results)
         ]
+
+    def count_batches(
+        self,
+        worker: str | list[str] | None = None,
+        batch_state: BatchState | list[BatchState] | None = None,
+    ) -> list[BatchDoc] | None:
+        query = self._build_query_batch(worker=worker, batch_state=batch_state)
+        return self.batches.count_documents(query)
 
     def get_batch_process_id(self, batch_uid: str) -> tuple[str, str]:
         """Get the process id and worker of a batch process from its unique id.
@@ -5222,10 +5235,11 @@ class JobController:
         """
         dir_path = Path(dir_path)
         doc_count = {}
-        standard_collection_names = ["jobs", "flows", "jf_auxiliary"]
+        standard_collection_names = ["jobs", "flows", "jf_auxiliary", "batches"]
         if python:
             for std_name, collection in zip(
-                standard_collection_names, [self.jobs, self.flows, self.auxiliary]
+                standard_collection_names,
+                [self.jobs, self.flows, self.auxiliary, self.batches],
             ):
                 doc_count[std_name] = pymongo_dump(
                     collection=collection, output_path=dir_path, compress=compress
@@ -5237,6 +5251,7 @@ class JobController:
                     self.jobs_collection,
                     self.flows_collection,
                     self.auxiliary_collection,
+                    self.batches_collection,
                 ],
             ):
                 doc_count[std_name] = mongodump_from_store(
@@ -5250,7 +5265,12 @@ class JobController:
         # move the files produced to match the standard names
         for std_name, collection_name in zip(
             standard_collection_names,
-            [self.jobs_collection, self.flows_collection, self.auxiliary_collection],
+            [
+                self.jobs_collection,
+                self.flows_collection,
+                self.auxiliary_collection,
+                self.batches_collection,
+            ],
         ):
             if collection_name != std_name:
                 full_dir_path = dir_path / self.queue_store.database
@@ -5306,11 +5326,15 @@ class JobController:
             command. WARNING: In this case metadata of the collections will not be restored.
         """
         dir_path = Path(dir_path)
-        collection_names = ["jobs", "flows", "jf_auxiliary"]
+        collection_names = ["jobs", "flows", "batches", "jf_auxiliary"]
         for name, db_name, collection in zip(
             collection_names,
-            [self.jobs_collection, self.flows_collection],
-            [self.jobs, self.flows],
+            [
+                self.jobs_collection,
+                self.flows_collection,
+                self.batches_collection,
+            ],
+            [self.jobs, self.flows, self.batches],
         ):
             count = collection.count_documents({})
             if count > 0:
@@ -5327,8 +5351,13 @@ class JobController:
         self.auxiliary.delete_many({})
         for name, db_name, collection in zip(
             collection_names,
-            [self.jobs_collection, self.flows_collection, self.auxiliary_collection],
-            [self.jobs, self.flows, self.auxiliary],
+            [
+                self.jobs_collection,
+                self.flows_collection,
+                self.batches_collection,
+                self.auxiliary_collection,
+            ],
+            [self.jobs, self.flows, self.batches, self.auxiliary],
         ):
             file_name = f"{name}.bson"
             # compress may be set automatically in the restore functions, but if
@@ -5337,9 +5366,21 @@ class JobController:
                 file_name += ".gz"
             files_paths = list(dir_path.glob(f"{file_name}*"))
             if len(files_paths) != 1:
-                raise RuntimeError(
-                    f"{len(files_paths)} files matching the name {file_name} were found in {dir_path}"
-                )
+                if name != "batches":
+                    # All collections except the "batches" one should have exactly one matching file
+                    raise RuntimeError(
+                        f"{len(files_paths)} files matching the name {file_name} were found in {dir_path}"
+                    )
+                # Cases for the batches collection:
+                # - Multiple files for the batches collection is not allowed (as for other collections)
+                # - No file, for when the batches collection did not exist yet
+                if len(files_paths) > 1:
+                    # Multiple files for the batches collection is not allowed (as for other collections)
+                    raise RuntimeError(
+                        f"{len(files_paths)} files matching the name {file_name} were found in {dir_path}"
+                    )
+                # Case in which the batches collection did not exist yet
+                continue
             if python:
                 pymongo_restore(collection=collection, input_file=files_paths[0])
             else:

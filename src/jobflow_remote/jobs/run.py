@@ -291,7 +291,7 @@ def run_single_batch_jobs(
                         logger.warning(
                             f"Process for job with id {job_id} and index {index} finished with an error"
                         )
-                batch_manager.terminate_job(job_id, index)
+                batch_manager.set_job_finished(job_id, index)
             except Exception:
                 logger.exception(
                     "Error while running job with id {job_id} and index {index}"

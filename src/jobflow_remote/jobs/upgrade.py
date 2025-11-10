@@ -37,19 +37,68 @@ class UpgradeAction:
     required: bool = False
 
 
+@dataclass
+class UpgradeCondition:
+    """Generic upgrade condition"""
+
+    description: str
+    check_func: (
+        Callable[[JobController, UpgradeCondition | None], dict | None] | None
+    ) = None
+
+    def check(self, job_controller: JobController) -> dict | None:
+        if self.check_func is None:
+            raise NotImplementedError("check_func must be defined")
+        return self.check_func(job_controller, self)
+
+
+@dataclass
+class NoDocumentsIn(UpgradeCondition):
+    """Condition that checks that there is no document in a given collection matching the specified query."""
+
+    collection: str | None = None
+    query: dict | None = None
+    description: str | None = None
+
+    def __post_init__(self):
+        # Here done this way as it does not work with python 3.9. When we drop python 3.9, we could
+        # use kw_only=True in the dataclass decorator.
+        if self.collection is None:
+            raise RuntimeError("The 'collection' argument is mandatory")
+        if self.description is None:
+            q_str = f" matching {self.query}" if self.query else ""
+            self.description = f"There should be no document in the '{self.collection}' collection{q_str}"
+
+        def _check(job_controller: JobController, _=None) -> dict | None:
+            coll = getattr(job_controller, self.collection, None)
+            if coll is None:
+                return None
+            count = coll.count_documents(self.query or {})
+            if count == 0:
+                return None
+            return {
+                "condition": self,
+                "message": f"Found {count} document(s)",
+                "count": count,
+            }
+
+        self.check_func = _check
+
+
 class DatabaseUpgrader:
     """
     Object to handle the upgrade of the database between different versions
     """
 
     _upgrade_registry: ClassVar[dict[Version, Callable]] = {}
+    _upgrade_conditions_registry: ClassVar[dict[Version, list]] = {}
 
     def __init__(self, job_controller: JobController):
         self.job_controller = job_controller
         self.current_version = parse_version(jobflow_remote.__version__)
 
     @classmethod
-    def register_upgrade(cls, version: str):
+    def register_upgrade(cls, version: str, upgrade_conditions: list | None = None):
         """Decorator to register upgrade functions.
 
         This decorator should be used to register functions that implement the upgrades for each
@@ -59,6 +108,9 @@ class DatabaseUpgrader:
         ----------
         version
             The version to register the upgrade function for
+        upgrade_conditions
+            Conditions required to perform the upgrade (e.g. no jobs in a RUNNING state or no batch process
+            submitted or running, ...)
         """
 
         def decorator(func: Callable):
@@ -71,7 +123,10 @@ class DatabaseUpgrader:
                 logger.info(f"Completed upgrade to {version} in {duration:.2f}s")
                 return result
 
-            cls._upgrade_registry[parse_version(version)] = wrapper
+            vv = parse_version(version)
+            cls._upgrade_registry[vv] = wrapper
+            if upgrade_conditions:
+                cls._upgrade_conditions_registry[vv] = upgrade_conditions
             return wrapper
 
         return decorator
@@ -113,9 +168,20 @@ class DatabaseUpgrader:
             session=session,
         )
 
+    def check_upgrade_conditions(
+        self, versions: list[Version]
+    ) -> list[tuple[Version, dict]]:
+        failed_conditions = []
+        for version in versions:
+            upgrade_conditions = self._upgrade_conditions_registry.get(version, [])
+            for upgrade_condition in upgrade_conditions:
+                if (check := upgrade_condition.check(self.job_controller)) is not None:
+                    failed_conditions.append((version, check))  # noqa: PERF401
+        return failed_conditions
+
     def dry_run(
         self, from_version: str | None = None, target_version: str | None = None
-    ) -> list[UpgradeAction]:
+    ) -> tuple[list[UpgradeAction], list[tuple[Version, dict]]]:
         """Simulate the upgrade process and return all actions that would be performed
 
         Parameters
@@ -141,9 +207,11 @@ class DatabaseUpgrader:
         )
 
         if db_version >= target_version:
-            return []
+            return [], []
 
         versions_needing_upgrade = self.collect_upgrades(db_version, target_version)
+
+        failed_conditions = self.check_upgrade_conditions(versions_needing_upgrade)
 
         all_actions = []
         for version in versions_needing_upgrade:
@@ -166,7 +234,7 @@ class DatabaseUpgrader:
             )
         )
 
-        return all_actions
+        return all_actions, failed_conditions
 
     def upgrade(
         self, from_version: str | None = None, target_version: str | None = None
@@ -203,6 +271,15 @@ class DatabaseUpgrader:
             return False
 
         versions_needing_upgrade = self.collect_upgrades(db_version, target_version)
+
+        if failed_conditions := self.check_upgrade_conditions(versions_needing_upgrade):
+            err = ["Some upgrade conditions were not satisfied:"]
+            for vv, failed_cond in failed_conditions:
+                err.append(
+                    f" - {failed_cond['condition'].description} (for version {vv}): {failed_cond['message']}"
+                )
+            logger.error("\n".join(err))
+            return False
 
         logger.info(f"Starting upgrade from version {db_version} to {target_version}")
 
@@ -266,4 +343,98 @@ def upgrade_to_0_1_5(
         )
 
     actions.append(action)
+    return actions
+
+
+def check_batches_in_auxiliary_legacy(
+    job_controller: JobController, condition: UpgradeCondition
+) -> dict | None:
+    batches_docs = list(
+        job_controller.auxiliary.find({"batch_processes": {"$exists": True}}).limit(2)
+    )
+    if len(batches_docs) == 0:
+        return None
+    if len(batches_docs) > 1:
+        raise RuntimeError(
+            "More than one document with batch processes found in the auxiliary collection."
+        )
+    batch_doc = batches_docs[0]
+    if batch_doc["batch_processes"] is None:
+        return None
+    count = 0
+    for batch_processes_dict in batch_doc["batch_processes"].values():
+        count += len(batch_processes_dict)
+    if count == 0:
+        return None
+    return {
+        "condition": condition,
+        "message": f"Found {count} batche(s) in auxiliary collection (legacy batches management)",
+        "count": count,
+    }
+
+
+upgrade_conditions_for_1_0 = [
+    UpgradeCondition(
+        description="There should not be any batch process in the auxiliary collection (old batch management)",
+        check_func=check_batches_in_auxiliary_legacy,
+    ),
+    NoDocumentsIn(
+        collection="batches",
+        query={"batch_state": {"$in": ["SUBMITTED", "RUNNING"]}},
+    ),
+]
+
+
+@DatabaseUpgrader.register_upgrade("1.0", upgrade_conditions=upgrade_conditions_for_1_0)
+def upgrade_to_1_0(
+    job_controller: JobController,
+    session: ClientSession | None = None,
+    dry_run: bool = False,
+) -> list[UpgradeAction]:
+    actions = []
+    action = UpgradeAction(
+        description="Update all TERMINATED job states to RUN_FINISHED",
+        collection="jobs",
+        action_type="update",
+        details={
+            "filter": {"state": "TERMINATED"},
+            "update": {"$set": {"state": "RUN_FINISHED"}},
+            "upsert": False,
+            "required": True,
+        },
+    )
+
+    if not dry_run:
+        job_controller.jobs.update_many(
+            filter=action.details["filter"],
+            update=action.details["update"],
+            upsert=action.details["upsert"],
+            session=session,
+        )
+
+    actions.append(action)
+
+    action = UpgradeAction(
+        description="Move the 'terminated' directory to 'run_finished' on all batch workers",
+        collection="NO_COLLECTION",
+        action_type="Filesystems's move of directories on batch workers",
+        details={
+            "src": "'terminated' directories in the <JOBS_HANDLE_DIR> of each batch worker",
+            "dst": "'run_finished' directories in the <JOBS_HANDLE_DIR> of each batch worker",
+        },
+    )
+
+    if not dry_run:
+        for worker_config in job_controller.project.workers.values():
+            if worker_config.is_batch:
+                host = worker_config.get_host()
+                terminated_dir = worker_config.batch.jobs_handle_dir / "terminated"
+                if host.exists(terminated_dir):
+                    host.move(
+                        terminated_dir,
+                        worker_config.batch.jobs_handle_dir / "run_finished",
+                    )
+
+    actions.append(action)
+
     return actions

@@ -69,7 +69,7 @@ class JobsReport:
                 JobState.UPLOADED,
                 JobState.SUBMITTED,
                 JobState.RUNNING,
-                JobState.TERMINATED,
+                JobState.RUN_FINISHED,
                 JobState.DOWNLOADED,
                 JobState.BATCH_SUBMITTED,
                 JobState.BATCH_RUNNING,

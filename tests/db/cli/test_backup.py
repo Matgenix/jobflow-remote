@@ -9,6 +9,7 @@ def check_files(files: list[str], meta: bool, compress: bool):
     assert "flows.bson" + ext in files
     assert "jf_auxiliary.bson" + ext in files
     assert "jobs.bson" + ext in files
+    assert "batches.bson" + ext in files
 
     # recent versions of mongodump also produce a prelude.json file. Ignore it.
     if "prelude.json" + ext in files:
@@ -19,10 +20,11 @@ def check_files(files: list[str], meta: bool, compress: bool):
         assert "flows.metadata.json" + ext in files
         assert "jf_auxiliary.metadata.json" + ext in files
         assert "jobs.metadata.json" + ext in files
+        assert "batches.metadata.json" + ext in files
 
-        assert len(files) == 6
+        assert len(files) == 8
     else:
-        assert len(files) == 3
+        assert len(files) == 4
 
 
 @pytest.mark.parametrize(
@@ -56,6 +58,7 @@ def test_reset(
             "flows collection: 2 documents",
             "jf_auxiliary collection: 3 documents",
             "jobs collection: 4 documents",
+            "batches collection: 0 documents",
         ]
         cmd = ["backup", "create"]
         if compress:

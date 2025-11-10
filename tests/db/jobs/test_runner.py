@@ -77,7 +77,7 @@ def test_delay_download(job_controller, runner, monkeypatch, one_job):
     from jobflow_remote.jobs.state import JobState
 
     j = one_job.jobs[0]
-    # since this is a local worker the state after RUNNING is DOWNLOADED, not TERMINATED
+    # since this is a local worker the state after RUNNING is DOWNLOADED, not RUN_FINISHED
     with monkeypatch.context() as m:
         m.setattr(runner.workers["test_local_worker"], "delay_download", 5)
         assert runner.run_one_job(

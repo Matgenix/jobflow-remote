@@ -218,7 +218,7 @@ class WorkerBase(BaseModel):
     delay_download: Optional[int] = Field(
         default=None,
         description="Amount of seconds to wait to start the download after the Runner marked a Job "
-        "as TERMINATED. To account for delays in the writing of the file on the worker file system"
+        "as RUN_FINISHED. To account for delays in the writing of the file on the worker file system"
         " (e.g. NFS).",
     )
     model_config = ConfigDict(extra="forbid")
@@ -290,6 +290,10 @@ class WorkerBase(BaseModel):
     @property
     def is_local(self) -> bool:
         return self.type == "local"
+
+    @property
+    def is_batch(self) -> bool:
+        return self.batch is not None
 
 
 class LocalWorker(WorkerBase):

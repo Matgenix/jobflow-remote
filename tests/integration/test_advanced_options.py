@@ -188,7 +188,7 @@ def test_run_batch_multi_fail(
 
     # check that the two jobs were submitted only for the correct worker
     # (a bug submitted jobs for the wrong worker as well)
-    batch_processes = job_controller.get_all_batches()
+    batch_processes = job_controller.get_batches()
     assert len(batch_processes) == 1
     assert len(batch_processes[0].jobs) == 2
 
@@ -210,10 +210,10 @@ def test_run_batch_multi_fail(
     batch_uid = next(iter(batch_ids))
     assert check_valid_uuid(batch_uid)
 
-    assert len(job_controller.get_all_batches()) == 1
+    assert len(job_controller.get_batches()) == 1
 
-    assert len(job_controller.get_all_batches(batch_state=BatchState.FINISHED)) == 0
-    assert len(job_controller.get_all_batches(batch_state=[BatchState.RUNNING])) == 1
+    assert len(job_controller.get_batches(batch_state=BatchState.FINISHED)) == 0
+    assert len(job_controller.get_batches(batch_state=[BatchState.RUNNING])) == 1
 
     # now restart the runner and verify that the job is set to remote error
     # and running files are properly cleaned
@@ -238,11 +238,11 @@ def test_run_batch_multi_fail(
     )
 
     assert len(batch_manager.get_running()) == 0
-    assert len(batch_manager.get_terminated()) == 0
+    assert len(batch_manager.get_run_finished()) == 0
     assert len(batch_manager.get_submitted()) == 0
-    all_batches = job_controller.get_all_batches()
+    all_batches = job_controller.get_batches()
     assert len(all_batches) == 1
-    assert len(job_controller.get_all_batches(batch_state=BatchState.FINISHED)) == 1
+    assert len(job_controller.get_batches(batch_state=BatchState.FINISHED)) == 1
 
     # submit more jobs, will also be used to check that the files are cleaned during the reset
     job_ids = submit_jobs(4, 15)
@@ -295,11 +295,11 @@ def test_run_batch_multi_fail(
 
     # now reset the DB, the files should also be cleaned up
     job_controller.reset()
-    assert len(batch_manager.get_terminated()) == 0
+    assert len(batch_manager.get_run_finished()) == 0
     assert len(batch_manager.get_submitted()) == 0
     assert len(batch_manager.get_running()) == 0
 
-    assert len(job_controller.get_all_batches()) == 0
+    assert len(job_controller.get_batches()) == 0
 
 
 @pytest.mark.workers(["test_max_jobs_worker"])

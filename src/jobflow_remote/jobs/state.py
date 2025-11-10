@@ -3,6 +3,10 @@ from __future__ import annotations
 from enum import Enum
 
 
+class DeprecatedStateError(ValueError):
+    pass
+
+
 class JobState(Enum):
     """States of a Job."""
 
@@ -12,7 +16,7 @@ class JobState(Enum):
     UPLOADED = "UPLOADED"
     SUBMITTED = "SUBMITTED"
     RUNNING = "RUNNING"
-    TERMINATED = "TERMINATED"
+    RUN_FINISHED = "RUN_FINISHED"
     DOWNLOADED = "DOWNLOADED"
     REMOTE_ERROR = "REMOTE_ERROR"
     COMPLETED = "COMPLETED"
@@ -22,6 +26,14 @@ class JobState(Enum):
     USER_STOPPED = "USER_STOPPED"
     BATCH_SUBMITTED = "BATCH_SUBMITTED"
     BATCH_RUNNING = "BATCH_RUNNING"
+
+    @classmethod
+    def _missing_(cls, value):
+        if isinstance(value, str) and value.upper() == "TERMINATED":
+            raise DeprecatedStateError(
+                "The TERMINATED state has been replaced by RUN_FINISHED. If this is "
+                "present in the queue database run 'jf admin upgrade' to fix the issue"
+            )
 
     @property
     def short_value(self) -> str:
@@ -35,7 +47,7 @@ short_state_mapping = {
     JobState.UPLOADED: "U",
     JobState.SUBMITTED: "SU",
     JobState.RUNNING: "RU",
-    JobState.TERMINATED: "T",
+    JobState.RUN_FINISHED: "RF",
     JobState.DOWNLOADED: "D",
     JobState.REMOTE_ERROR: "RERR",
     JobState.COMPLETED: "C",
@@ -60,7 +72,7 @@ RUNNING_STATES = [
     JobState.UPLOADED,
     JobState.SUBMITTED,
     JobState.RUNNING,
-    JobState.TERMINATED,
+    JobState.RUN_FINISHED,
     JobState.DOWNLOADED,
 ]
 

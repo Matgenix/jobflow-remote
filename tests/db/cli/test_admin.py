@@ -127,9 +127,7 @@ def test_unlock_runner(job_controller, run_check_cli) -> None:
     )
 
 
-def test_upgrade(
-    job_controller, upgrade_test_dir, random_project_name, run_check_cli
-) -> None:
+def test_upgrade(job_controller, random_project_name, run_check_cli) -> None:
     # Test upgrading from development version. Explicitly pass such a target version
     # This is the case if the target version is not specified and the code installed
     # from source. No upgrade performed here.
@@ -205,6 +203,71 @@ def test_upgrade_to_0_1_5(
             "Current DB version: 0.1.5. No upgrade required for target version 0.1.5"
         ],
     )
+
+
+def test_upgrade_to_1_0(
+    job_controller, upgrade_test_dir, random_project_name, run_check_cli
+) -> None:
+    from pydantic_core import ValidationError
+
+    from jobflow_remote.jobs.state import JobState
+
+    job_controller.backup_restore(upgrade_test_dir / "1.0", python=True)
+    assert job_controller.count_jobs() == 1
+    assert job_controller.count_jobs(states=JobState.RUN_FINISHED) == 0
+    assert job_controller.count_jobs(query={"state": "TERMINATED"}) == 1
+
+    assert str(job_controller.get_current_db_version()) == "0.1.8"
+
+    # Create a fake terminated directory with some empty files in it
+    local_batch_worker = job_controller.project.workers["test_local_batch_worker"]
+    terminated_dir = local_batch_worker.batch.jobs_handle_dir / "terminated"
+    run_finished_dir = local_batch_worker.batch.jobs_handle_dir / "run_finished"
+    if not terminated_dir.exists():
+        terminated_dir.mkdir(parents=True)
+    (terminated_dir / "job_sentinel_ABC").touch()
+    (terminated_dir / "job_sentinel_123").touch()
+
+    assert not run_finished_dir.exists()
+
+    with pytest.raises(
+        ValidationError, match=r"The TERMINATED state has been replaced by RUN_FINISHED"
+    ):
+        job_controller.get_jobs_doc_query({})
+
+    with pytest.raises(
+        ValidationError, match=r"The TERMINATED state has been replaced by RUN_FINISHED"
+    ):
+        job_controller.get_jobs_info_query({})
+
+    run_check_cli(
+        ["job", "list"],
+        cli_input=random_project_name,
+        error=True,
+        required_out=[
+            "The TERMINATED state has been replaced by RUN_FINISHED",
+            "If this is present in the queue database run 'jf admin upgrade' to fix the issue",
+        ],
+    )
+
+    run_check_cli(
+        ["admin", "upgrade", "--target", "1.0"],
+        cli_input=random_project_name,
+        required_out=["The database has been upgraded"],
+    )
+
+    assert not terminated_dir.exists()
+
+    assert run_finished_dir.exists()
+    files = [f.name for f in run_finished_dir.iterdir()]
+    assert len(files) == 2
+    assert "job_sentinel_ABC" in files
+    assert "job_sentinel_123" in files
+
+    assert job_controller.count_jobs(states=JobState.RUN_FINISHED) == 1
+    assert job_controller.count_jobs(query={"state": "TERMINATED"}) == 0
+
+    assert str(job_controller.get_current_db_version()) == "1.0"
 
 
 def test_index_rebuild(job_controller, one_job, run_check_cli):
