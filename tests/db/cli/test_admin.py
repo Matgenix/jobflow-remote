@@ -208,6 +208,8 @@ def test_upgrade_to_0_1_5(
 def test_upgrade_to_1_0(
     job_controller, upgrade_test_dir, random_project_name, run_check_cli
 ) -> None:
+    from pydantic_core import ValidationError
+
     from jobflow_remote.jobs.state import JobState
 
     job_controller.backup_restore(upgrade_test_dir / "1.0", python=True)
@@ -227,6 +229,26 @@ def test_upgrade_to_1_0(
     (terminated_dir / "job_sentinel_123").touch()
 
     assert not run_finished_dir.exists()
+
+    with pytest.raises(
+        ValidationError, match=r"The TERMINATED state has been replaced by RUN_FINISHED"
+    ):
+        job_controller.get_jobs_doc_query({})
+
+    with pytest.raises(
+        ValidationError, match=r"The TERMINATED state has been replaced by RUN_FINISHED"
+    ):
+        job_controller.get_jobs_info_query({})
+
+    run_check_cli(
+        ["job", "list"],
+        cli_input=random_project_name,
+        error=True,
+        required_out=[
+            "The TERMINATED state has been replaced by RUN_FINISHED",
+            "If this is present in the queue database run 'jf admin upgrade' to fix the issue",
+        ],
+    )
 
     run_check_cli(
         ["admin", "upgrade", "--target", "1.0"],

@@ -3,6 +3,10 @@ from __future__ import annotations
 from enum import Enum
 
 
+class DeprecatedStateError(ValueError):
+    pass
+
+
 class JobState(Enum):
     """States of a Job."""
 
@@ -22,6 +26,14 @@ class JobState(Enum):
     USER_STOPPED = "USER_STOPPED"
     BATCH_SUBMITTED = "BATCH_SUBMITTED"
     BATCH_RUNNING = "BATCH_RUNNING"
+
+    @classmethod
+    def _missing_(cls, value):
+        if isinstance(value, str) and value.upper() == "TERMINATED":
+            raise DeprecatedStateError(
+                "The TERMINATED state has been replaced by RUN_FINISHED. If this is "
+                "present in the queue database run 'jf admin upgrade' to fix the issue"
+            )
 
     @property
     def short_value(self) -> str:

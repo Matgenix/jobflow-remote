@@ -2,15 +2,20 @@ from collections import defaultdict
 from datetime import datetime
 from enum import Enum
 from functools import cached_property
-from typing import Optional, Union
+from typing import Any, Optional, Union
 
 from jobflow import Flow, Job
 from monty.json import jsanitize
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from qtoolkit.core.data_objects import QResources, QState
 
 from jobflow_remote.config.base import ExecutionConfig
-from jobflow_remote.jobs.state import BatchState, FlowState, JobState
+from jobflow_remote.jobs.state import (
+    BatchState,
+    DeprecatedStateError,
+    FlowState,
+    JobState,
+)
 
 IN_FILENAME = "jfremote_in.json"
 OUT_FILENAME = "jfremote_out.json"
@@ -159,6 +164,21 @@ class RemoteInfo(BaseModel):
     queue_err: Optional[str] = None
 
 
+def _validate_job_state(value: Any) -> Any:
+    """
+    Shared validation logic for JobState field.
+
+    Raises DeprecatedStateError if applicable, otherwise lets Pydantic handle standard Enum validation.
+    """
+    try:
+        JobState(value)
+    except DeprecatedStateError:
+        raise
+    except Exception:
+        pass
+    return value
+
+
 class JobInfo(BaseModel):
     """
     Model with information extracted from a JobDoc.
@@ -240,6 +260,11 @@ class JobInfo(BaseModel):
         for k in ["name", "metadata", "hosts"]:
             d[k] = job[k]
         return cls.model_validate(d)
+
+    @field_validator("state", mode="before")
+    @classmethod
+    def state_validator(cls, value):
+        return _validate_job_state(value)
 
 
 def _projection_db_info() -> list[str]:
@@ -324,6 +349,11 @@ class JobDoc(BaseModel):
         if isinstance(self.resources, QResources):
             d["resources"] = self.resources.as_dict()
         return d
+
+    @field_validator("state", mode="before")
+    @classmethod
+    def state_validator(cls, value):
+        return _validate_job_state(value)
 
 
 class FlowDoc(BaseModel):
