@@ -158,9 +158,19 @@ def test_rerun_completed(job_controller, runner) -> None:
     assert j2_info.state == JobState.READY
     assert j3_info.state == JobState.WAITING
 
-    # try rerunning the second job. Wrong state
+    # try rerunning the second and third job. Wrong state
     with pytest.raises(ValueError, match="The Job is in the READY state"):
         job_controller.rerun_job(job_id=j2.uuid, job_index=j2.index)
+
+    with pytest.raises(ValueError, match="The Job is in the WAITING state"):
+        job_controller.rerun_job(job_id=j3.uuid, job_index=j3.index)
+
+    # check that the state did not change
+    j2_info = job_controller.get_job_info(job_id=j2.uuid, job_index=j2.index)
+    j3_info = job_controller.get_job_info(job_id=j3.uuid, job_index=j3.index)
+
+    assert j2_info.state == JobState.READY
+    assert j3_info.state == JobState.WAITING
 
     assert len(list(j1_path.iterdir())) > 0
 
@@ -1370,3 +1380,28 @@ def test_delete_flow(job_controller, runner, caplog):
 
     # Test deleting non-existent flow
     assert not job_controller.delete_flow("non-existent-uuid")
+
+
+def test_complete_onmissing_none(job_controller, runner):
+    from jobflow import Flow
+
+    from jobflow_remote import submit_flow
+    from jobflow_remote.jobs.state import JobState
+    from jobflow_remote.testing import always_fails, onmissing_none
+
+    j1 = always_fails()
+    j2 = onmissing_none(j1.output)
+    flow = Flow([j1, j2])
+
+    submit_flow(flow, worker="test_local_worker")
+
+    runner.run_one_job(max_seconds=20)
+
+    assert job_controller.get_job_info(job_id=j1.uuid).state == JobState.FAILED
+    assert job_controller.get_job_info(job_id=j2.uuid).state == JobState.READY
+
+    runner.run_one_job(max_seconds=20)
+
+    assert job_controller.get_job_info(job_id=j2.uuid).state == JobState.COMPLETED
+    # The job returns the input argument, so it should be None
+    assert job_controller.get_job_output(job_id=j2.uuid) is None

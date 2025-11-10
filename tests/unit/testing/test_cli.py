@@ -5,6 +5,7 @@ from typer.testing import Result
 def test_run_check_cli(run_check_cli):
     # Check multiple lines is found
     flow_excerpt = """├── flow: Commands for managing the flows
+│   ├── clean: Remove the files of the executed Jobs.
 │   ├── delete: Permanently delete Flows from the database
 │   ├── graph: Provide detailed information on a Flow.
 │   ├── info: Provide detailed information on a Flow.

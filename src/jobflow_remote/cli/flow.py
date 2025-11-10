@@ -17,6 +17,7 @@ from jobflow_remote.cli.formatting import (
 from jobflow_remote.cli.jf import app
 from jobflow_remote.cli.jfr_typer import JFRTyper
 from jobflow_remote.cli.types import (
+    break_lock_opt,
     cli_output_keys_opt,
     count_opt,
     days_opt,
@@ -41,12 +42,15 @@ from jobflow_remote.cli.types import (
     start_date_opt,
     stored_data_keys_opt,
     verbosity_opt,
+    wait_lock_opt,
+    yes_opt,
 )
 from jobflow_remote.cli.utils import (
     ReportInterval,
     SortOption,
     check_incompatible_opt,
     check_output_stored_data_keys,
+    check_stopped_runner,
     exit_with_error_msg,
     exit_with_warning_msg,
     get_job_controller,
@@ -57,6 +61,7 @@ from jobflow_remote.cli.utils import (
 )
 from jobflow_remote.jobs.graph import get_graph, plot_dash
 from jobflow_remote.jobs.report import FlowsReport
+from jobflow_remote.jobs.state import JobState
 
 app_flow = JFRTyper(
     name="flow", help="Commands for managing the flows", no_args_is_help=True
@@ -181,6 +186,8 @@ def delete(
             "the worker associated with the deleted Flows",
         ),
     ] = False,
+    wait: wait_lock_opt = None,
+    break_lock: break_lock_opt = False,
 ) -> None:
     """Permanently delete Flows from the database"""
     check_incompatible_opt({"start_date": start_date, "days": days, "hours": hours})
@@ -244,17 +251,25 @@ def delete(
         if progress:
             progress.add_task(description="Deleting flows...", total=None)
 
-        jc.delete_flows(
+        deleted = jc.delete_flows(
             flow_ids=to_delete,
             delete_output=delete_output,
             delete_files=delete_files,
             cancel_processes=not keep_processes,
             max_limit=max_limit,
+            wait=wait,
+            break_lock=break_lock,
         )
 
-    out_console.print(
-        f"Deleted Flow(s) with id: {', '.join(str(i) for i in to_delete)}"
-    )
+    if not_deleted := set(to_delete) - set(deleted):
+        out_console.print(
+            f"Some of the selected Flows were not deleted: {', '.join(i for i in not_deleted)}"
+        )
+
+    if deleted:
+        out_console.print(
+            f"Deleted Flow(s) with id: {', '.join(str(i) for i in deleted)}"
+        )
 
 
 @app_flow.command(name="info")
@@ -460,6 +475,144 @@ def resume(
         )
 
     out_console.print(f"{n_jobs} Job(s) resumed")
+
+
+@app_flow.command()
+def clean(
+    job_id: job_ids_opt = None,
+    db_id: db_ids_opt = None,
+    flow_id: flow_ids_opt = None,
+    state: flow_state_opt = None,
+    start_date: start_date_opt = None,
+    end_date: end_date_opt = None,
+    name: name_opt = None,
+    days: days_opt = None,
+    hours: hours_opt = None,
+    metadata: metadata_opt = None,
+    locked: locked_flow_opt = False,
+    verbosity: verbosity_opt = 0,
+    force: Annotated[
+        bool,
+        typer.Option(
+            "--force",
+            "-f",
+            help="Do not check if runner is active",
+        ),
+    ] = False,
+    yes: yes_opt = False,
+    all_states: Annotated[
+        bool,
+        typer.Option(
+            "--all-states",
+            "-as",
+            help="Delete files for Jobs in any state",
+        ),
+    ] = False,
+):
+    """
+    Remove the files of the executed Jobs.
+    """
+    check_incompatible_opt({"start_date": start_date, "days": days, "hours": hours})
+    check_incompatible_opt({"end_date": end_date, "days": days, "hours": hours})
+
+    if all_states and not force:
+        check_stopped_runner(error=True)
+
+    jc = get_job_controller()
+
+    start_date = get_start_date(start_date, days, hours)
+
+    with loading_spinner():
+        with_jobs_info = ["run_dir"]
+        flows_info = jc.get_flows_info(
+            job_ids=job_id,
+            db_ids=db_id,
+            flow_ids=flow_id,
+            states=state,
+            start_date=start_date,
+            end_date=end_date,
+            name=name,
+            metadata=metadata,
+            locked=locked,
+            with_jobs_info=with_jobs_info,
+        )
+
+    if not flows_info:
+        exit_with_warning_msg("No flows matching criteria")
+
+    if not yes:
+        if verbosity:
+            preamble = Text.from_markup(
+                f"[red]This operation will [bold]delete the files of the following {len(flows_info)} Flow(s)[/bold][/red]"
+            )
+            out_console.print(preamble)
+            table = get_flow_info_table(flows_info, verbosity=verbosity - 1)
+            out_console.print(table)
+            text = Text.from_markup("[red]Proceed anyway?[/red]")
+        else:
+            text = Text.from_markup(
+                f"[red]This operation will [bold]delete the files of {len(flows_info)} Flow(s)[/bold]. Proceed anyway?[/red]"
+            )
+
+        confirmed = Confirm.ask(text, default=False)
+        if not confirmed:
+            raise typer.Exit(0)
+
+    # if potentially interactive do not start the spinner.
+    spinner_cm: contextlib.AbstractContextManager
+    if jc.project.has_interactive_workers:
+        spinner_cm = contextlib.nullcontext()
+        out_console.print("Deleting files...")
+    else:
+        spinner_cm = loading_spinner(processing=False)
+
+    skipped_jobs = []
+    cleanable_states = (
+        JobState.COMPLETED,
+        JobState.FAILED,
+        JobState.REMOTE_ERROR,
+    )
+    with spinner_cm as progress:
+        if progress:
+            progress.add_task(description="Deleting files...", total=None)
+        jobs_info = {}
+        for fi in flows_info:
+            for ji in fi.jobs_info:
+                if ji.run_dir:
+                    if not all_states and ji.state not in cleanable_states:
+                        skipped_jobs.append(ji)
+                    else:
+                        jobs_info[ji.db_id] = ji
+
+        deleted = jc.safe_delete_files(list(jobs_info.values()))
+
+    deleted_dict = {ji.db_id: ji for ji in deleted}
+    not_deleted = set(jobs_info) - set(deleted_dict)
+    if not_deleted:
+        out_console.print("Folder was not deleted for the following jobs:")
+        for db_id in not_deleted:
+            out_console.print(f" - {db_id}: {jobs_info[db_id].run_dir}")
+    if skipped_jobs:
+        out_console.print(
+            f"{len(skipped_jobs)} were not cleaned-up due to their state:"
+        )
+        if len(skipped_jobs) < 10:
+            for ji in skipped_jobs:
+                out_console.print(f" - {ji.db_id} - {ji.state}")
+        else:
+            confirmed = False
+            if not yes:
+                text = (
+                    "The number of skipped jobs is too large to be printed, the list can be "
+                    "dumped to the `skipped_cleanup.dat` file. Do you want to create the file?"
+                )
+                confirmed = Confirm.ask(text, default=False)
+            if yes or confirmed:
+                with open("skipped_cleanup.dat", "w") as f:
+                    for ji in skipped_jobs:
+                        f.writelines(f" - {ji.db_id} - {ji.state}")
+
+    out_console.print(f"Deleted execution folders of {len(deleted)} Jobs")
 
 
 app_flow_set = JFRTyper(

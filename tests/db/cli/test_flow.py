@@ -1,5 +1,6 @@
 import os.path
 import re
+import time
 
 import pytest
 
@@ -69,9 +70,25 @@ def test_delete(job_controller, two_flows_four_jobs, run_check_cli) -> None:
 
     assert os.path.isdir(job_1_doc.run_dir)
 
+    # try deleting the Flow while locked. Should not succeed
+    with job_controller.lock_flow(filter={"uuid": two_flows_four_jobs[0].uuid}):
+        run_check_cli(
+            ["flow", "delete", "-fid", two_flows_four_jobs[0].uuid],
+            required_out=[
+                "FlowLockedError",
+                "Some of the selected Flows were not deleted",
+            ],
+            excluded_out="Deleted Flow",
+            cli_input="y",
+        )
+
+    assert job_controller.count_flows() == 2
+    assert job_controller.count_jobs() == 4
+
     run_check_cli(
         ["flow", "delete", "-fid", two_flows_four_jobs[0].uuid],
         required_out="Deleted Flow",
+        excluded_out="Some of the selected Flows were not deleted",
         cli_input="y",
     )
     assert job_controller.count_flows() == 1
@@ -285,3 +302,148 @@ def test_set_store(job_controller, runner, one_job, run_check_cli):
     )
 
     assert job_controller.get_flow_store(one_job.uuid) is None
+
+
+@pytest.mark.filterwarnings("ignore:Some jobs are not connected")
+def test_clean(
+    job_controller,
+    two_flows_four_jobs,
+    run_check_cli,
+    daemon_manager,
+    wait_daemon_started,
+    wait_daemon_shutdown,
+    tmp_dir,
+) -> None:
+    from jobflow import Flow
+
+    from jobflow_remote import submit_flow
+    from jobflow_remote.jobs.runner import Runner
+    from jobflow_remote.jobs.state import JobState
+    from jobflow_remote.testing import add, add_sleep
+
+    run_check_cli(
+        ["flow", "delete", "-fid", "wrong_uuid"],
+        required_out="No flows matching criteria",
+        cli_input="y",
+    )
+
+    # run one of the jobs to check that the output is not deleted
+    runner = Runner()
+    runner.run_all_jobs(max_seconds=30)
+    job_1_1_doc = job_controller.get_job_doc(job_id=two_flows_four_jobs[0].jobs[0].uuid)
+    job_1_2_doc = job_controller.get_job_doc(job_id=two_flows_four_jobs[0].jobs[1].uuid)
+    job_2_1_doc = job_controller.get_job_doc(job_id=two_flows_four_jobs[1].jobs[0].uuid)
+    job_2_2_doc = job_controller.get_job_doc(job_id=two_flows_four_jobs[1].jobs[1].uuid)
+
+    assert os.path.isdir(job_1_1_doc.run_dir)
+
+    required_out_1 = [
+        "This operation will delete the files of the following 1 Flow(s)",
+        two_flows_four_jobs[0].uuid,
+        "Deleted execution folders of 2 Jobs",
+    ]
+    run_check_cli(
+        ["flow", "clean", "-v", "-fid", two_flows_four_jobs[0].uuid],
+        required_out=required_out_1,
+        cli_input="y",
+    )
+    assert job_controller.count_flows() == 2
+
+    # check that the directory was deleted
+    assert not os.path.isdir(job_1_1_doc.run_dir)
+    assert not os.path.isdir(job_1_2_doc.run_dir)
+
+    assert os.path.isdir(job_2_1_doc.run_dir)
+    assert os.path.isdir(job_2_2_doc.run_dir)
+
+    # don't confirm and no verbose option
+    required_out_2 = [
+        "This operation will delete the files of 1 Flow(s)",
+    ]
+    run_check_cli(
+        ["flow", "clean", "-fid", two_flows_four_jobs[1].uuid],
+        required_out=required_out_2,
+        excluded_out=two_flows_four_jobs[1].uuid,
+        cli_input="n",
+    )
+    assert os.path.isdir(job_2_1_doc.run_dir)
+    assert os.path.isdir(job_2_2_doc.run_dir)
+
+    os.unlink(os.path.join(job_2_2_doc.run_dir, "jfremote_in.json"))
+
+    required_out_3 = [
+        "Deleted execution folders of 1 Jobs",
+        "Folder was not deleted for the following jobs:",
+        f"- {job_2_2_doc.db_id}",
+        "WARNING  Did not delete folder",
+        "jfremote_in.json is missing",
+    ]
+    excluded_out = ["Proceed anyway"]
+    run_check_cli(
+        ["flow", "clean", "-fid", two_flows_four_jobs[1].uuid, "--yes"],
+        required_out=required_out_3,
+        excluded_out=excluded_out,
+    )
+
+    assert not os.path.isdir(job_2_1_doc.run_dir)
+    assert os.path.isdir(job_2_2_doc.run_dir)
+
+    # add one more Flow with a slow sleep
+    slow_flow = Flow(add_sleep(2, 5))
+    submit_flow(slow_flow, worker="test_local_worker")
+
+    daemon_manager.start(raise_on_error=True)
+    wait_daemon_started(daemon_manager)
+
+    for _ in range(20):
+        time.sleep(0.1)
+        job_slow_doc = job_controller.get_job_doc(job_id=slow_flow.jobs[0].uuid)
+        if job_slow_doc.state in (JobState.SUBMITTED, JobState.RUNNING):
+            break
+    else:
+        raise RuntimeError(
+            f"The slow job did not become RUNNING within the expected time. Final state: {job_slow_doc.state}"
+        )
+    run_check_cli(
+        ["flow", "clean", "-fid", slow_flow.uuid, "--all-states"],
+        required_out="The daemon should not be running while performing this operation",
+        error=True,
+    )
+    assert os.path.isdir(job_slow_doc.run_dir)
+
+    run_check_cli(
+        ["flow", "clean", "-fid", slow_flow.uuid, "--all-states", "--force"],
+        excluded_out="The daemon should not be running while performing this operation",
+        required_out="Deleted execution folders of 1 Jobs",
+        cli_input="y",
+    )
+    assert not os.path.isdir(job_slow_doc.run_dir)
+
+    daemon_manager.shut_down(raise_on_error=True)
+    wait_daemon_shutdown(daemon_manager)
+
+    # add enough jobs to trigger
+    running_fids = []
+    for _ in range(3):
+        add_jobs = [add(1, 2) for _ in range(4)]
+        flow = Flow(add_jobs)
+        running_fids.append(flow.uuid)
+        submit_flow(flow, worker="test_local_worker")
+        for j in add_jobs:
+            assert job_controller.set_job_doc_properties(
+                {
+                    "state": JobState.RUNNING.value,
+                    "run_dir": "/SOME/not/EXISTING/fake/PaTh",
+                },
+                job_id=j.uuid,
+            )
+
+    run_check_cli(
+        sum((["-fid", fid] for fid in running_fids), start=["flow", "clean"]),
+        required_out=[
+            "The number of skipped jobs is too large to be printed",
+            "Deleted execution folders of 0 Jobs",
+        ],
+        cli_input="y\ny",
+    )
+    assert os.path.isfile("skipped_cleanup.dat")

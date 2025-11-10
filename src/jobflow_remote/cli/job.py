@@ -1337,3 +1337,71 @@ def files_get(
                 host.close()
             except Exception:
                 pass
+
+
+@app_job_files.command(name="delete")
+def files_delete(
+    job_db_id: job_db_id_arg,
+    job_index: job_index_opt = None,
+    all_states: Annotated[
+        bool,
+        typer.Option(
+            "--all-states",
+            "-as",
+            help="Delete files for a Job in any state",
+        ),
+    ] = False,
+    force: Annotated[
+        bool,
+        typer.Option(
+            "--force",
+            "-f",
+            help="Do not check if runner is active",
+        ),
+    ] = False,
+) -> None:
+    """
+    Delete files from the Job's execution folder.
+    """
+    if all_states and not force:
+        check_stopped_runner(error=True)
+
+    db_id, job_id = get_job_db_ids(job_db_id, job_index)
+
+    jc = get_job_controller()
+
+    with loading_spinner(processing=False) as progress:
+        progress.add_task(description="Retrieving info...", total=None)
+        job_info = jc.get_job_info(
+            job_id=job_id,
+            job_index=job_index,
+            db_id=db_id,
+        )
+
+    if not job_info:
+        exit_with_error_msg("No data matching the request")
+
+    remote_dir = job_info.run_dir
+
+    if not remote_dir:
+        exit_with_warning_msg("The remote folder has not been created yet")
+
+    cleanable_states = (
+        JobState.COMPLETED,
+        JobState.FAILED,
+        JobState.REMOTE_ERROR,
+    )
+    if not all_states and job_info.state not in cleanable_states:
+        exit_with_error_msg(
+            f"Job is in state {job_info.state.value}. To delete such "
+            "a Job run the command with the --all-states option"
+        )
+
+    with loading_spinner(processing=False) as progress:
+        progress.add_task(description="Deleting files...", total=None)
+        deleted = jc.safe_delete_files([job_info])
+
+    if not deleted:
+        exit_with_error_msg(f"The files were not deleted in folder: {job_info.run_dir}")
+
+    out_console.print(f"Folder deleted {job_info.run_dir}")
