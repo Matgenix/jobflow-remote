@@ -1,4 +1,4 @@
-from typing import Annotated, Optional
+from typing import Annotated, Optional, cast
 
 import typer
 from packaging.version import parse as parse_version
@@ -379,6 +379,9 @@ def rebuild(
         out_console.print("Indexes rebuild started in background")
 
 
+DEFAULT_COLLECTION: DbCollection = cast(DbCollection, DbCollection.JOBS.value)
+
+
 @app_index.command()
 def create(
     key: index_key_arg,
@@ -391,7 +394,7 @@ def create(
             "-c",
             help="The collection where the index should be added",
         ),
-    ] = DbCollection.JOBS.value,
+    ] = DEFAULT_COLLECTION,
     unique: Annotated[
         bool,
         typer.Option(
