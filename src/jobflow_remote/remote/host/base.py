@@ -94,6 +94,10 @@ class BaseHost(MSONable):
     def copy(self, src, dst):
         raise NotImplementedError
 
+    @abc.abstractmethod
+    def move(self, src, dst):
+        raise NotImplementedError
+
     def test(self) -> str | None:
         msg = None
         try:

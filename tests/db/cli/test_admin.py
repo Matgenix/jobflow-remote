@@ -217,11 +217,30 @@ def test_upgrade_to_1_0(
 
     assert str(job_controller.get_current_db_version()) == "0.1.8"
 
+    # Create a fake terminated directory with some empty files in it
+    local_batch_worker = job_controller.project.workers["test_local_batch_worker"]
+    terminated_dir = local_batch_worker.batch.jobs_handle_dir / "terminated"
+    run_finished_dir = local_batch_worker.batch.jobs_handle_dir / "run_finished"
+    if not terminated_dir.exists():
+        terminated_dir.mkdir(parents=True)
+    (terminated_dir / "job_sentinel_ABC").touch()
+    (terminated_dir / "job_sentinel_123").touch()
+
+    assert not run_finished_dir.exists()
+
     run_check_cli(
         ["admin", "upgrade", "--target", "1.0"],
         cli_input=random_project_name,
         required_out=["The database has been upgraded"],
     )
+
+    assert not terminated_dir.exists()
+
+    assert run_finished_dir.exists()
+    files = [f.name for f in run_finished_dir.iterdir()]
+    assert len(files) == 2
+    assert "job_sentinel_ABC" in files
+    assert "job_sentinel_123" in files
 
     assert job_controller.count_jobs(states=JobState.RUN_FINISHED) == 1
     assert job_controller.count_jobs(query={"state": "TERMINATED"}) == 0

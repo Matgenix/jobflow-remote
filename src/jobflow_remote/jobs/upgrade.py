@@ -421,9 +421,27 @@ def upgrade_to_1_0(
 
     actions.append(action)
 
-    # if not dry_run:
-    #     for worker_name, worker_config in job_controller.project.workers.items():
-    #         if worker_config.is_batch:
-    #             host = worker_config
+    action = UpgradeAction(
+        description="Move the 'terminated' directory to 'run_finished' on all batch workers",
+        collection="NO_COLLECTION",
+        action_type="Filesystems's move of directories on batch workers",
+        details={
+            "src": "'terminated' directories in the <JOBS_HANDLE_DIR> of each batch worker",
+            "dst": "'run_finished' directories in the <JOBS_HANDLE_DIR> of each batch worker",
+        },
+    )
+
+    if not dry_run:
+        for worker_config in job_controller.project.workers.values():
+            if worker_config.is_batch:
+                host = worker_config.get_host()
+                terminated_dir = worker_config.batch.jobs_handle_dir / "terminated"
+                if host.exists(terminated_dir):
+                    host.move(
+                        terminated_dir,
+                        worker_config.batch.jobs_handle_dir / "run_finished",
+                    )
+
+    actions.append(action)
 
     return actions

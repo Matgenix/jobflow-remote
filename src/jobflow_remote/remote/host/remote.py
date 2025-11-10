@@ -293,6 +293,10 @@ class RemoteHost(BaseHost):
         cmd = ["cp", str(src), str(dst)]
         self.execute(cmd)
 
+    def move(self, src, dst) -> None:
+        cmd = ["mv", str(src), str(dst)]
+        self.execute(cmd)
+
     def _execute_remote_func(
         self,
         remote_cmd: Callable,
