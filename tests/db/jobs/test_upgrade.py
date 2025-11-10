@@ -31,9 +31,6 @@ def test_upgrade_conditions(
             UpgradeCondition(
                 description="next_id",
                 check_func=fake_check,
-                # collection="auxiliary",
-                # query={"next_id": {"$exists": True}},
-                # one_doc_check=lambda doc: doc["next_id"],
             )
         ],
     )
