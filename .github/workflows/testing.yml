@@ -65,24 +65,26 @@ jobs:
           - 27017:27017
 
     needs: [build-test-bench]
-    runs-on: ubuntu-latest
+
     strategy:
       fail-fast: false
       matrix:
-        version:
-          - { python: "3.9", resolution: lowest-direct}
-          - { python: "3.10", resolution: highest}
-          - { python: "3.11", resolution: highest}
-          - { python: "3.12", resolution: highest}
-          - { python: "3.13", resolution: highest}
-          - { python: "3.14", resolution: highest}
+        config:
+          - { os: ubuntu-latest, python: "3.9", resolution: lowest-direct}
+          - { os: ubuntu-latest, python: "3.10", resolution: highest}
+          - { os: ubuntu-latest, python: "3.11", resolution: highest}
+          - { os: ubuntu-latest, python: "3.12", resolution: highest}
+          - { os: macos-latest, python: "3.13", resolution: lowest-direct}
+          - { os: ubuntu-latest, python: "3.14", resolution: highest}
+
+    runs-on: ${{ matrix.config.os }}
 
     steps:
       - uses: actions/checkout@v5
 
       - uses: actions/setup-python@v6
         with:
-          python-version: ${{ matrix.version.python }}
+          python-version: ${{ matrix.config.python }}
           cache: pip
           cache-dependency-path: pyproject.toml
 
@@ -114,7 +116,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install uv
-          uv pip install .[tests] --resolution=${{ matrix.version.resolution }}
+          uv pip install .[tests] --resolution=${{ matrix.config.resolution }}
 
       - name: Unit tests
         run: |
