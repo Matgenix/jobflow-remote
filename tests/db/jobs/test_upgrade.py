@@ -83,7 +83,6 @@ def test_upgrade_conditions(
     with caplog.at_level("ERROR"):
         assert db_upgrader.upgrade(from_version=None, target_version="99.0") is False
     assert job_controller.get_current_db_version() == package_version
-    print(caplog.text)
     assert "Some upgrade conditions were not satisfied:" in caplog.text
     assert " - next_id (for version 98.0): Found next_id = 5" in caplog.text
     assert " - no_jobs_ready (for version 99.0): Found 2 document(s)" in caplog.text

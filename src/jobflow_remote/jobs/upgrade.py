@@ -346,15 +346,6 @@ def upgrade_to_0_1_5(
     return actions
 
 
-def count_batch_processes_old(doc):
-    if doc["batch_processes"] is None:
-        return 0
-    count = 0
-    for batch_processes_dict in doc["batch_processes"].values():
-        count += len(batch_processes_dict)
-    return count
-
-
 def check_batches_in_auxiliary_legacy(
     job_controller: JobController, condition: UpgradeCondition
 ) -> dict | None:
