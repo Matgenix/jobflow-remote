@@ -33,7 +33,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install uv
-          uv pip install .[dev]
+          uv pip install --system .[dev]
 
       - name: Lint
         run: pre-commit run --all-files --show-diff-on-failure
@@ -169,7 +169,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install uv
-          uv pip install pyyaml
+          uv pip install --system pyyaml
 
       - name: Generate matrix from YAML
         id: set-matrix
@@ -200,7 +200,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install uv
-          uv pip install .[tests]
+          uv pip install --system .[tests]
 
       - name: Get files from artifact
         uses: actions/download-artifact@v6
@@ -235,10 +235,10 @@ jobs:
         run: |
           python -m pip install -U pip
           pip install uv
-          uv pip install -U setuptools wheel
+          uv pip install --system -U setuptools wheel
           # Required to generate rst files from markdown
           sudo apt install pandoc
-          uv pip install .[docs]
+          uv pip install --system .[docs]
 
       - name: Build Sphinx docs
         working-directory: doc
