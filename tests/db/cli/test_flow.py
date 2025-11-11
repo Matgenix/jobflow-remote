@@ -173,7 +173,7 @@ def test_delete(job_controller, two_flows_four_jobs, run_check_cli) -> None:
     )
 
 
-def test_flow_info(job_controller, two_flows_four_jobs, run_check_cli) -> None:
+def test_flow_info(job_controller, two_flows_four_jobs, run_check_cli, runner) -> None:
     columns = ["DB id", "Name", "State", "Job id", "(Index)", "Worker"]
     outputs = columns + [f"add{i}" for i in range(1, 3)] + ["READY", "WAITING"]
     excluded = [f"add{i}" for i in range(3, 5)] + ["{'f1_metadata': 'some_info'}"]
@@ -222,6 +222,33 @@ def test_flow_info(job_controller, two_flows_four_jobs, run_check_cli) -> None:
     assert table_flow_info_vvv == table_job_list_vvv
 
     run_check_cli(["flow", "info", "-j", "3", "-v"], required_out=["Metadata: {}"])
+
+    run_check_cli(
+        ["flow", "info", "-j", "1", "--report"],
+        required_out=[
+            "Flow Report: f1",
+            "Completed: 0 | Running: 0 | Queued: 0 | Pending: 2 | Failed: 0",
+            "READY",
+            "WAITING",
+            "Elapsed Time",
+        ],
+        excluded_out="COMPLETED",
+    )
+
+    runner.run_one_job(db_id="1")
+    runner.run_one_job(db_id="2")
+
+    run_check_cli(
+        ["flow", "info", "-j", "1", "--report"],
+        required_out=[
+            "Flow Report: f1",
+            "Progress: 2/2 (100.0%)",
+            "COMPLETED",
+            "Total Time",
+            "Total Job Run Time",
+        ],
+        excluded_out=["Elapsed Time", "READY"],
+    )
 
 
 def test_report(job_controller, run_check_cli) -> None:

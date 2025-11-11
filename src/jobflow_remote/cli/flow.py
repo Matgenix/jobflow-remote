@@ -12,6 +12,7 @@ from jobflow_remote.cli.formatting import (
     format_flow_info,
     get_flow_info_table,
     get_flow_report_components,
+    get_single_flow_report_components,
     header_name_data_getter_map,
 )
 from jobflow_remote.cli.jf import app
@@ -297,6 +298,14 @@ def flow_info(
             help="Reverse the sorting order of the jobs",
         ),
     ] = False,
+    print_report: Annotated[
+        bool,
+        typer.Option(
+            "--report",
+            "-rep",
+            help="Show a summary report of the Flow status",
+        ),
+    ] = False,
 ) -> None:
     """Provide detailed information on a Flow."""
 
@@ -320,6 +329,9 @@ def flow_info(
 
     with loading_spinner():
         jc = get_job_controller()
+        with_jobs_info: bool | list[str] = True
+        if report:
+            with_jobs_info = ["start_time", "end_time"]
 
         flows_info = jc.get_flows_info(
             job_ids=job_ids,
@@ -328,19 +340,22 @@ def flow_info(
             sort=db_sort,
             jobs_sort=db_jobs_sort,
             limit=1,
-            with_jobs_info=True,
+            with_jobs_info=with_jobs_info,
         )
     if not flows_info:
         exit_with_error_msg("No data matching the request")
 
-    out_console.print(
-        format_flow_info(
-            flows_info[0],
-            verbosity=verbosity,
-            output_keys=output_keys,
-            stored_data_keys=stored_data_keys,
+    if print_report:
+        out_console.print(*get_single_flow_report_components(flows_info[0]))
+    else:
+        out_console.print(
+            format_flow_info(
+                flows_info[0],
+                verbosity=verbosity,
+                output_keys=output_keys,
+                stored_data_keys=stored_data_keys,
+            )
         )
-    )
 
 
 @app_flow.command()
