@@ -579,6 +579,169 @@ def get_flow_report_components(report: FlowsReport) -> list[RenderableType]:
     return components
 
 
+def get_single_flow_report_components(flow_info: FlowInfo) -> list[RenderableType]:
+    """
+    Generate report rich components for a single Flow.
+
+    Parameters
+    ----------
+    flow_info
+        The FlowInfo object containing information about the Flow.
+
+    Returns
+    -------
+    list[RenderableType]
+        List of Rich components for display.
+    """
+    components = []
+
+    # Flow Header with basic information
+    header_table = Table(
+        title=f"Flow Report: {flow_info.name}",
+        title_style="bold green",
+        show_header=False,
+    )
+    header_table.add_column("", style="cyan", justify="right")
+    header_table.add_column("", style="white", justify="left")
+
+    header_table.add_row("Flow ID", flow_info.flow_id)
+    header_table.add_row("Flow State", flow_info.state.name)
+    header_table.add_row("Number of Jobs", str(len(flow_info.job_ids)))
+
+    # Calculate timing information
+    start_time = flow_info.created_on
+    header_table.add_row(
+        "Start Time",
+        convert_utc_time(start_time).strftime(fmt_datetime) + f" [{time.tzname[0]}]",
+    )
+
+    # If flow is completed, calculate total time
+    if flow_info.state == FlowState.COMPLETED:
+        end_time = flow_info.updated_on
+        header_table.add_row(
+            "Complete Time",
+            convert_utc_time(end_time).strftime(fmt_datetime) + f" [{time.tzname[0]}]",
+        )
+        total_time = (end_time - start_time).total_seconds()
+        hours, remainder = divmod(total_time, 3600)
+        minutes, seconds = divmod(remainder, 60)
+        header_table.add_row(
+            "Total Time", f"{int(hours):02d}:{int(minutes):02d}:{int(seconds):02d}"
+        )
+    else:
+        header_table.add_row(
+            "Last Updated",
+            convert_utc_time(flow_info.updated_on).strftime(fmt_datetime)
+            + f" [{time.tzname[0]}]",
+        )
+        # Show elapsed time for non-completed flows
+        elapsed_time = (datetime.datetime.utcnow() - start_time).total_seconds()
+        hours, remainder = divmod(elapsed_time, 3600)
+        minutes, seconds = divmod(remainder, 60)
+        header_table.add_row(
+            "Elapsed Time", f"{int(hours):02d}:{int(minutes):02d}:{int(seconds):02d}"
+        )
+
+    # Calculate sum of job execution times
+    if flow_info.jobs_info:
+        total_job_run_time = sum(job.run_time or 0 for job in flow_info.jobs_info)
+        if total_job_run_time > 0:
+            hours, remainder = divmod(total_job_run_time, 3600)
+            minutes, seconds = divmod(remainder, 60)
+            header_table.add_row(
+                "Total Job Run Time",
+                f"{int(hours):02d}:{int(minutes):02d}:{int(seconds):02d}",
+            )
+
+    components.append(header_table)
+
+    # Job States Distribution
+    if flow_info.jobs_info:
+        # Count job states
+        state_counts: dict[JobState, int] = {}
+        for job in flow_info.jobs_info:
+            state = job.state
+            state_counts[state] = state_counts.get(state, 0) + 1
+
+        # Create job states table
+        states_table = Table(title="Job States Distribution", title_style="bold green")
+        states_table.add_column("State", style="cyan", justify="left")
+        states_table.add_column("Count", style="white", justify="center")
+        states_table.add_column("Percentage", style="white", justify="right")
+
+        total_jobs = len(flow_info.jobs_info)
+
+        for state in JobState:
+            if state in state_counts:
+                count = state_counts[state]
+                percentage = (count / total_jobs) * 100
+
+                # Color code the state name based on state
+                if state in (JobState.FAILED, JobState.REMOTE_ERROR):
+                    state_str = f"[red]{state.name}[/red]"
+                elif state == JobState.COMPLETED:
+                    state_str = f"[green]{state.name}[/green]"
+                elif state == JobState.RUNNING:
+                    state_str = f"[cyan]{state.name}[/cyan]"
+                elif state in (
+                    JobState.PAUSED,
+                    JobState.STOPPED,
+                    JobState.USER_STOPPED,
+                ):
+                    state_str = f"[yellow]{state.name}[/yellow]"
+                else:
+                    state_str = state.name
+
+                states_table.add_row(
+                    Text.from_markup(state_str), str(count), f"{percentage:.1f}%"
+                )
+
+        components.append(states_table)
+
+        # Flow advancement
+        # Consider all the states after the Job has started as "running"
+        running_states = (
+            JobState.RUNNING,
+            JobState.BATCH_RUNNING,
+            JobState.RUN_FINISHED,
+            JobState.DOWNLOADED,
+        )
+        completed_count = sum(
+            1 for j in flow_info.jobs_info if j.state == JobState.COMPLETED
+        )
+        failed_count = sum(
+            1
+            for j in flow_info.jobs_info
+            if j.state in (JobState.FAILED, JobState.REMOTE_ERROR)
+        )
+        running_count = sum(1 for j in flow_info.jobs_info if j.state in running_states)
+        queued_count = sum(
+            1
+            for j in flow_info.jobs_info
+            if j.state in (JobState.SUBMITTED, JobState.BATCH_SUBMITTED)
+        )
+        pending_count = (
+            total_jobs - completed_count - failed_count - running_count - queued_count
+        )
+
+        progress_panel = Panel.fit(
+            Text.from_markup(
+                f"[green]Completed: {completed_count}[/green] | "
+                f"[cyan]Running: {running_count}[/cyan] | "
+                f"[blue]Queued: {queued_count}[/blue] | "
+                f"[yellow]Pending: {pending_count}[/yellow] | "
+                f"[red]Failed: {failed_count}[/red]\n"
+                f"Progress: {completed_count}/{total_jobs} ({(completed_count/total_jobs)*100:.1f}%)"
+            ),
+            title="Flow Progress",
+            title_align="left",
+            border_style="green",
+        )
+        components.append(progress_panel)
+
+    return components
+
+
 def format_upgrade_actions(actions: list[UpgradeAction]):
     msg = ""
     for action in actions:
