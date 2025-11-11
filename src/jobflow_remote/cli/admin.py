@@ -16,13 +16,14 @@ from jobflow_remote.cli.types import (
     end_date_opt,
     flow_ids_opt,
     flow_state_opt,
-    force_opt,
+    force_opt_deprecated,
     foreground_index_opt,
     index_direction_arg,
     index_key_arg,
     job_ids_indexes_opt,
     job_state_opt,
     start_date_opt,
+    yes_opt,
 )
 from jobflow_remote.cli.utils import (
     IndexDirection,
@@ -175,7 +176,8 @@ def reset(
             help="Also delete all the documents in the current store",
         ),
     ] = False,
-    force: force_opt = False,
+    yes_all: yes_opt = False,
+    force_deprecated: force_opt_deprecated = False,
 ) -> None:
     """
     Reset the jobflow database.
@@ -185,7 +187,7 @@ def reset(
 
     check_stopped_runner(error=True)
 
-    if not force:
+    if not yes_all:
         cm = get_config_manager()
         project_name = cm.get_project_data().project.name
         text = Text.from_markup(
@@ -216,7 +218,8 @@ def unlock(
     state: job_state_opt = None,
     start_date: start_date_opt = None,
     end_date: end_date_opt = None,
-    force: force_opt = False,
+    yes_all: yes_opt = False,
+    force_deprecated: force_opt_deprecated = False,
 ) -> None:
     """
     Forcibly removes the lock from the documents of the selected jobs.
@@ -227,7 +230,7 @@ def unlock(
 
     jc = get_job_controller()
 
-    if not force:
+    if not yes_all:
         with loading_spinner(processing=False) as progress:
             progress.add_task(
                 description="Checking the number of locked documents...", total=None
@@ -275,7 +278,8 @@ def unlock_flow(
     state: flow_state_opt = None,
     start_date: start_date_opt = None,
     end_date: end_date_opt = None,
-    force: force_opt = False,
+    yes_all: yes_opt = False,
+    force_deprecated: force_opt_deprecated = False,
 ) -> None:
     """
     Forcibly removes the lock from the documents of the selected jobs.
@@ -286,7 +290,7 @@ def unlock_flow(
 
     jc = get_job_controller()
 
-    if not force:
+    if not yes_all:
         with loading_spinner(processing=False) as progress:
             progress.add_task(
                 description="Checking the number of locked documents...", total=None
