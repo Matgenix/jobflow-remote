@@ -12,10 +12,11 @@ from jobflow_remote.cli.formatting import get_exec_config_table, get_worker_tabl
 from jobflow_remote.cli.jf import app
 from jobflow_remote.cli.jfr_typer import JFRTyper
 from jobflow_remote.cli.types import (
-    force_opt,
+    force_opt_deprecated,
     serialize_file_format_opt,
     tree_opt,
     verbosity_opt,
+    yes_opt,
 )
 from jobflow_remote.cli.utils import (
     SerializeFileFormat,
@@ -322,7 +323,8 @@ def remove(
             help="Project related folders are not deleted",
         ),
     ] = False,
-    force: force_opt = False,
+    yes_all: yes_opt = False,
+    force_deprecated: force_opt_deprecated = False,
 ) -> None:
     """Remove a project from the projects' folder, including the related folders."""
     cm = get_config_manager()
@@ -332,7 +334,7 @@ def remove(
 
     p = cm.get_project(name)
 
-    if not keep_folders and not force:
+    if not keep_folders and not yes_all:
         msg = f"This will delete also the folders:\n\t{p.base_dir}\n\t{p.log_dir}\n\t{p.tmp_dir}\n\t{p.daemon_dir}\nProceed anyway?"
         if not Confirm.ask(msg):
             raise typer.Exit(0)
@@ -419,7 +421,8 @@ def replace(
             help="Apply replacement to all project files",
         ),
     ] = False,
-    force: force_opt = False,
+    yes_all: yes_opt = False,
+    force_deprecated: force_opt_deprecated = False,
     no_backup: Annotated[
         bool,
         typer.Option(
@@ -471,7 +474,7 @@ def replace(
 
             if original_content != modified_content:
                 # Show diff and ask for confirmation if not forced
-                if not force:
+                if not yes_all:
                     out_console.print(
                         f"\n[bold]File: {filepath.name} (Project: {project_name})[/bold]"
                     )

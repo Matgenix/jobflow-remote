@@ -42,6 +42,19 @@ def test_reset(job_controller, one_job, run_check_cli) -> None:
     )
     assert job_controller.count_jobs() == 0
 
+    run_check_cli(
+        ["admin", "reset", "--yes"],
+        required_out="The database was reset",
+    )
+
+    # To test the deprecated --force option. Remove the test when the option is removed
+    run_check_cli(
+        ["admin", "reset", "--force"],
+        excluded_out="The database was reset",
+        required_out=["deprecated", "--yes"],
+        error=True,
+    )
+
 
 def test_unlock(job_controller, one_job, run_check_cli) -> None:
     j = one_job.jobs[0]

@@ -12,9 +12,10 @@ from jobflow_remote.cli.jf import app
 from jobflow_remote.cli.jfr_typer import JFRTyper
 from jobflow_remote.cli.types import (
     break_lock_opt,
-    force_opt,
+    force_opt_deprecated,
     log_level_opt,
     verbosity_opt,
+    yes_opt,
 )
 from jobflow_remote.cli.utils import (
     check_stopped_runner,
@@ -406,7 +407,8 @@ def foreground() -> None:
 
 @app_runner.command()
 def reset(
-    force: force_opt = False,
+    yes_all: yes_opt = False,
+    force_deprecated: force_opt_deprecated = False,
     break_lock: break_lock_opt = False,
 ) -> None:
     """
@@ -420,7 +422,7 @@ def reset(
     if running_runner in ("NO_DOCUMENT", None):
         exit_with_warning_msg("No running runner present in the database")
         raise typer.Exit(0)
-    if not force:
+    if not yes_all:
         text = Text.from_markup(
             "[red]This operation will remove the information about the current "
             "running runner from the database:[/red]\n"

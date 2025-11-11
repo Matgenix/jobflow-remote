@@ -314,7 +314,7 @@ def test_edit_replace(
             not in project1_check["workers"]["test_local_worker"]["resources"]
         )
 
-        # --force, no backup
+        # --yes, no backup
         run_check_cli(
             [
                 "project",
@@ -322,7 +322,7 @@ def test_edit_replace(
                 "replace",
                 "old_resource",
                 "new_resource",
-                "--force",
+                "--yes",
                 "--no-backup",
             ],
             required_out="✓ Modified: test_project_1",
@@ -369,7 +369,7 @@ def test_edit_replace(
             in final_project3["queue"]["store"]["collection_name"]
         )  # Should not change
 
-        # --all --force
+        # --all --yes
         run_check_cli(
             [
                 "project",
@@ -378,7 +378,7 @@ def test_edit_replace(
                 "localhost",
                 "127.0.0.1",
                 "--all",
-                "--force",
+                "--yes",
             ],
             required_out=[
                 "✓ Modified: test_project_1",
@@ -407,7 +407,7 @@ def test_edit_replace(
                 "nonexistent_text",
                 "replacement_text",
                 "--all",
-                "--force",
+                "--yes",
             ],
             required_out=[
                 "- No changes: test_project_1",
@@ -431,7 +431,7 @@ def test_edit_replace(
                 "new_collection",
                 "old_collection",
                 "--all",
-                "--force",
+                "--yes",
             ],
             required_out=[
                 "✓ Modified: test_project_1",
