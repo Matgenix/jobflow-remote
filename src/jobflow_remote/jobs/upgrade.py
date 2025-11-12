@@ -5,7 +5,7 @@ import functools
 import logging
 from dataclasses import dataclass
 from datetime import datetime
-from typing import TYPE_CHECKING, Callable, ClassVar
+from typing import TYPE_CHECKING, ClassVar
 
 from packaging.version import Version
 from packaging.version import parse as parse_version
@@ -13,6 +13,8 @@ from packaging.version import parse as parse_version
 import jobflow_remote
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from pymongo.client_session import ClientSession
 
     from jobflow_remote.jobs.jobcontroller import JobController

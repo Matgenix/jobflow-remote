@@ -1,4 +1,4 @@
-from typing import Annotated, Optional
+from typing import Annotated
 
 import typer
 
@@ -8,7 +8,7 @@ from jobflow_remote.cli.jf import app
 @app.command()
 def gui(
     port: Annotated[
-        Optional[int],
+        int | None,
         typer.Option(
             "--port",
             "-p",

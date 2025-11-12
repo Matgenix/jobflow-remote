@@ -13,7 +13,7 @@ from contextlib import ExitStack
 from datetime import datetime, timedelta, timezone
 from functools import cached_property
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import jobflow
 import pymongo
@@ -83,15 +83,14 @@ from jobflow_remote.utils.db import (
 from jobflow_remote.utils.remote import SharedHosts, safe_remove_job_files
 
 if TYPE_CHECKING:
-    from collections.abc import Generator, Sequence
+    from collections.abc import Callable, Generator, Sequence
     from enum import Enum
-    from typing import Union
 
     from maggma.stores import MongoStore
     from monty.json import MSONable
 
-    obj_type = Union[str, Enum, type[MSONable], list[Union[Enum, str, type[MSONable]]]]
-    load_type = Union[bool, dict[str, Union[bool, obj_type]]]
+    obj_type = str | Enum | type[MSONable] | list[Enum | str | type[MSONable]]
+    load_type = bool | dict[str, bool | obj_type]
 
 
 logger = logging.getLogger(__name__)
@@ -288,7 +287,7 @@ class JobController:
             A dictionary with the query to be applied to a collection
             containing JobDocs.
         """
-        if job_ids and not any(isinstance(ji, (list, tuple)) for ji in job_ids):
+        if job_ids and not any(isinstance(ji, list | tuple) for ji in job_ids):
             # without these cast mypy is confused about the type
             job_ids = cast(list[tuple[str, int]], [job_ids])
         db_ids = [db_ids] if isinstance(db_ids, str) else db_ids or []
@@ -403,11 +402,11 @@ class JobController:
             A dictionary with the query to be applied to a collection
             containing FlowDocs.
         """
-        if job_ids is not None and not isinstance(job_ids, (list, tuple)):
+        if job_ids is not None and not isinstance(job_ids, list | tuple):
             job_ids = [job_ids]
-        if db_ids is not None and not isinstance(db_ids, (list, tuple)):
+        if db_ids is not None and not isinstance(db_ids, list | tuple):
             db_ids = [db_ids]
-        if flow_ids is not None and not isinstance(flow_ids, (list, tuple)):
+        if flow_ids is not None and not isinstance(flow_ids, list | tuple):
             flow_ids = [flow_ids]
         if isinstance(states, FlowState):
             states = [states]
@@ -859,7 +858,7 @@ class JobController:
         for db_id in queried_dbs_ids:
             try:
                 job_updated_ids = method(db_id=db_id, **method_kwargs)
-                if not isinstance(job_updated_ids, (list, tuple)):
+                if not isinstance(job_updated_ids, list | tuple):
                     job_updated_ids = (
                         [] if job_updated_ids is None else [job_updated_ids]
                     )
@@ -3667,7 +3666,7 @@ class JobController:
         first_id = doc_next_id["next_id"]
         db_ids = []
         for (job, parents), db_id_int in zip(
-            jobs_list, range(first_id, first_id + n_jobs)
+            jobs_list, range(first_id, first_id + n_jobs), strict=False
         ):
             prefix = self.project.queue.db_id_prefix or ""
             db_id = f"{prefix}{db_id_int}"
@@ -3808,7 +3807,7 @@ class JobController:
         flow_updates["$set"] = {}
         ids_to_push = []
         for (job, parents), db_id_int in zip(
-            jobs_list, range(first_id, first_id + n_new_jobs)
+            jobs_list, range(first_id, first_id + n_new_jobs), strict=False
         ):
             prefix = self.project.queue.db_id_prefix or ""
             db_id = f"{prefix}{db_id_int}"
@@ -5303,6 +5302,7 @@ class JobController:
             for std_name, collection in zip(
                 standard_collection_names,
                 [self.jobs, self.flows, self.auxiliary, self.batches],
+                strict=False,
             ):
                 doc_count[std_name] = pymongo_dump(
                     collection=collection, output_path=dir_path, compress=compress
@@ -5316,6 +5316,7 @@ class JobController:
                     self.auxiliary_collection,
                     self.batches_collection,
                 ],
+                strict=False,
             ):
                 doc_count[std_name] = mongodump_from_store(
                     store=self.queue_store,
@@ -5334,6 +5335,7 @@ class JobController:
                 self.auxiliary_collection,
                 self.batches_collection,
             ],
+            strict=False,
         ):
             if collection_name != std_name:
                 full_dir_path = dir_path / self.queue_store.database
@@ -5398,6 +5400,7 @@ class JobController:
                 self.batches_collection,
             ],
             [self.jobs, self.flows, self.batches],
+            strict=False,
         ):
             count = collection.count_documents({})
             if count > 0:
@@ -5421,6 +5424,7 @@ class JobController:
                 self.auxiliary_collection,
             ],
             [self.jobs, self.flows, self.batches, self.auxiliary],
+            strict=False,
         ):
             file_name = f"{name}.bson"
             # compress may be set automatically in the restore functions, but if

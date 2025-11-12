@@ -1,5 +1,4 @@
 from pathlib import Path
-from typing import Optional
 
 from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -19,7 +18,7 @@ class JobflowRemoteSettings(BaseSettings):
     projects_folder: str = Field(
         DEFAULT_PROJECTS_FOLDER, description="Location of the projects files."
     )
-    project: Optional[str] = Field(None, description="The name of the project used.")
+    project: str | None = Field(None, description="The name of the project used.")
     cli_full_exc: bool = Field(
         default=False,
         description="If True prints the full stack trace of the exception when raised in the CLI.",
@@ -30,7 +29,7 @@ class JobflowRemoteSettings(BaseSettings):
     cli_log_level: LogLevel = Field(
         LogLevel.WARN, description="The level set for logging in the CLI"
     )
-    cli_job_list_columns: Optional[list[str]] = Field(
+    cli_job_list_columns: list[str] | None = Field(
         default=None,
         description="The list of columns to show in the `jf job list` command. For available "
         "options check the corresponding help: `jf job list -h`.",

@@ -1,4 +1,4 @@
-from typing import Annotated, Union
+from typing import Annotated
 
 import typer
 from rich.text import Text
@@ -26,7 +26,7 @@ app = JFRTyper(
 ADDITIONAL_LOGGERS = []
 
 
-def add_cli_logger_names(loggers: Union[str, list[str]]):
+def add_cli_logger_names(loggers: str | list[str]):
     # global ADDITIONAL_LOGGERS
 
     if isinstance(loggers, str):

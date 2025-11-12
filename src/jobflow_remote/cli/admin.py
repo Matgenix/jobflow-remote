@@ -1,4 +1,4 @@
-from typing import Annotated, Optional, cast
+from typing import Annotated, cast
 
 import typer
 from packaging.version import parse as parse_version
@@ -65,7 +65,7 @@ def upgrade(
         ),
     ] = False,
     target: Annotated[
-        Optional[str],
+        str | None,
         typer.Option(
             "--target",
             "-t",
@@ -158,7 +158,7 @@ def upgrade(
 @app_admin.command()
 def reset(
     validation: Annotated[
-        Optional[str],
+        str | None,
         typer.Argument(
             help=(
                 "If the number of flows in the DB exceed 25 it will be required to pass "
@@ -388,7 +388,7 @@ def create(
     direction: index_direction_arg = IndexDirection.ASC,
     foreground: foreground_index_opt = False,
     collection: Annotated[
-        Optional[DbCollection],
+        DbCollection | None,
         typer.Option(
             "--collection",
             "-c",

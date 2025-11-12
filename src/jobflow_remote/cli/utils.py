@@ -10,7 +10,7 @@ import uuid
 from contextlib import contextmanager
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Callable, NoReturn
+from typing import TYPE_CHECKING, Any, NoReturn
 
 import typer
 from click import ClickException
@@ -26,7 +26,7 @@ from jobflow_remote.config.base import ProjectUndefinedError
 from jobflow_remote.jobs.daemon import DaemonError, DaemonManager, DaemonStatus
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
+    from collections.abc import Callable, Mapping
     from cProfile import Profile
 
     from rich.console import ConsoleRenderable
@@ -484,7 +484,7 @@ def execute_multi_jobs_cmd(
                 modified_ids = single_cmd(
                     job_id=job_id, job_index=job_index, db_id=db_id, **kwargs
                 )
-                if not isinstance(modified_ids, (list, tuple)):
+                if not isinstance(modified_ids, list | tuple):
                     modified_ids = [] if modified_ids is None else [modified_ids]
                 if not modified_ids:
                     exit_with_error_msg("Could not perform the requested operation")
@@ -631,7 +631,7 @@ def get_command_tree(
         command_str = f"[bold green]{command_name}[/bold green]"
         if (
             show_docs
-            and isinstance(command, (TyperCommand, TyperGroup))
+            and isinstance(command, TyperCommand | TyperGroup)
             and command.help
         ):
             command_str += f": {command.help}"

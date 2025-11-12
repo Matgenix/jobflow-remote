@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Annotated, Optional
+from typing import Annotated
 
 import click
 import typer
@@ -26,7 +26,7 @@ tree_opt = Annotated[
 ]
 
 job_ids_indexes_opt = Annotated[
-    Optional[list[str]],
+    list[str] | None,
     typer.Option(
         "--job-id",
         "-jid",
@@ -38,7 +38,7 @@ job_ids_indexes_opt = Annotated[
 
 
 job_ids_opt = Annotated[
-    Optional[list[str]],
+    list[str] | None,
     typer.Option(
         "--job-id",
         "-jid",
@@ -49,7 +49,7 @@ job_ids_opt = Annotated[
 
 
 db_ids_opt = Annotated[
-    Optional[list[str]],
+    list[str] | None,
     typer.Option(
         "--db-id",
         "-did",
@@ -59,7 +59,7 @@ db_ids_opt = Annotated[
 
 
 flow_ids_opt = Annotated[
-    Optional[list[str]],
+    list[str] | None,
     typer.Option(
         "--flow-id",
         "-fid",
@@ -69,7 +69,7 @@ flow_ids_opt = Annotated[
 
 
 job_state_opt = Annotated[
-    Optional[list[JobState]],
+    list[JobState] | None,
     typer.Option(
         "--state",
         "-s",
@@ -79,7 +79,7 @@ job_state_opt = Annotated[
 
 
 flow_state_opt = Annotated[
-    Optional[list[FlowState]],
+    list[FlowState] | None,
     typer.Option(
         "--state",
         "-s",
@@ -89,7 +89,7 @@ flow_state_opt = Annotated[
 
 
 batch_state_opt = Annotated[
-    Optional[list[BatchState]],
+    list[BatchState] | None,
     typer.Option(
         "--state",
         "-s",
@@ -99,7 +99,7 @@ batch_state_opt = Annotated[
 
 
 name_opt = Annotated[
-    Optional[str],
+    str | None,
     typer.Option(
         "--name",
         "-n",
@@ -111,7 +111,7 @@ name_opt = Annotated[
 
 
 worker_name_opt = Annotated[
-    Optional[list[str]],
+    list[str] | None,
     typer.Option(
         "--worker",
         "-wk",
@@ -124,7 +124,7 @@ job_state_arg = Annotated[JobState, typer.Argument(help="One of the job states")
 
 
 start_date_opt = Annotated[
-    Optional[datetime],
+    datetime | None,
     typer.Option(
         "--start-date",
         "-sdate",
@@ -135,7 +135,7 @@ start_date_opt = Annotated[
 
 
 end_date_opt = Annotated[
-    Optional[datetime],
+    datetime | None,
     typer.Option(
         "--end-date",
         "-edate",
@@ -145,7 +145,7 @@ end_date_opt = Annotated[
 
 
 days_opt = Annotated[
-    Optional[int],
+    int | None,
     typer.Option(
         "--days",
         "-ds",
@@ -155,7 +155,7 @@ days_opt = Annotated[
 
 
 hours_opt = Annotated[
-    Optional[int],
+    int | None,
     typer.Option(
         "--hours",
         "-hs",
@@ -231,7 +231,7 @@ job_db_id_arg = Annotated[
     ),
 ]
 job_index_arg = Annotated[
-    Optional[int],
+    int | None,
     typer.Argument(
         help="The index of the job. If not defined the job with the largest index is selected",
         metavar="INDEX",
@@ -239,7 +239,7 @@ job_index_arg = Annotated[
 ]
 
 job_index_opt = Annotated[
-    Optional[int],
+    int | None,
     typer.Option(
         "--index",
         "-i",
@@ -401,7 +401,7 @@ index_key_arg = Annotated[
 ]
 
 index_direction_arg = Annotated[
-    Optional[IndexDirection],
+    IndexDirection | None,
     typer.Argument(
         help="The direction of the index",
         metavar="DIRECTION",
@@ -418,7 +418,7 @@ count_opt = Annotated[
 
 
 stored_data_keys_opt = Annotated[
-    Optional[list[str]],
+    list[str] | None,
     typer.Option(
         "--stored-data-key",
         "-sdk",
@@ -426,7 +426,7 @@ stored_data_keys_opt = Annotated[
     ),
 ]
 cli_output_keys_opt = Annotated[
-    Optional[str],
+    str | None,
     typer.Option(
         "--output",
         "-o",
@@ -446,8 +446,8 @@ class DictType(dict):
 # e.g., `str | None` vs `Optional[str]`
 # ruff enforces PEP 604
 # but will leave things in if they are explicit type aliases
-OptionalStr = Optional[str]
-OptionalDictType = Optional[DictType]
+OptionalStr = str | None
+OptionalDictType = DictType | None
 
 
 class DictTypeParser(click.ParamType):

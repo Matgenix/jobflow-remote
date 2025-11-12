@@ -8,7 +8,7 @@ import traceback
 import warnings
 from contextlib import ExitStack
 from pathlib import Path
-from typing import Callable
+from typing import TYPE_CHECKING, cast
 
 import fabric
 from fabric import Config
@@ -17,6 +17,9 @@ from paramiko.auth_strategy import AuthSource
 from paramiko.ssh_exception import SSHException
 
 from jobflow_remote.remote.host.base import BaseHost
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 logger = logging.getLogger(__name__)
 
@@ -176,7 +179,7 @@ class RemoteHost(BaseHost):
         """
         self._check_connected()
 
-        if isinstance(command, (list, tuple)):
+        if isinstance(command, list | tuple):
             command = " ".join(command)
 
         command = self.sanitize_command(command)
@@ -194,7 +197,7 @@ class RemoteHost(BaseHost):
             if self.login_shell:
                 shell_cmd += " -l "
             shell_cmd += " -c "
-            remote_command = shell_cmd + shlex.quote(command)
+            remote_command = shell_cmd + shlex.quote(cast(str, command))
         else:
             remote_command = command
 
