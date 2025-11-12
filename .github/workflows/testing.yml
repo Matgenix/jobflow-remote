@@ -65,7 +65,6 @@ jobs:
           - 27017:27017
 
     needs: [build-test-bench]
-    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
@@ -79,12 +78,13 @@ jobs:
           - { os: ubuntu-latest, python: "3.12", resolution: lowest-direct }
           - { os: ubuntu-latest, python: "3.12", resolution: highest }
 
+    runs-on: ${{ matrix.config.os }}
     steps:
       - uses: actions/checkout@v5
 
       - uses: actions/setup-python@v6
         with:
-          python-version: ${{ matrix.config.os }}
+          python-version: ${{ matrix.config.python }}
           cache: pip
           cache-dependency-path: pyproject.toml
 
