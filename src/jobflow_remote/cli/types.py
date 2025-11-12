@@ -15,6 +15,23 @@ from jobflow_remote.cli.utils import (
 from jobflow_remote.config.base import LogLevel
 from jobflow_remote.jobs.state import BatchState, FlowState, JobState
 
+
+def deprecated_option(old_name: str, new_name: str):
+    """Callback that warns about deprecated options and exits."""
+
+    def callback(value: Optional[str]):
+        from jobflow_remote.cli.utils import exit_with_error_msg
+
+        if value:
+            exit_with_error_msg(
+                f"Error: The '{old_name}' option is deprecated. "
+                f"Please use '{new_name}' instead.",
+            )
+        return value
+
+    return callback
+
+
 tree_opt = Annotated[
     bool,
     typer.Option(
@@ -256,7 +273,9 @@ flow_db_id_arg = Annotated[
     ),
 ]
 
-
+# This should not be used and has been replaced by yes_opt.
+# Do not remove for the time being as it may be still used by some other
+# package with plugins.
 force_opt = Annotated[
     bool,
     typer.Option(
@@ -265,6 +284,21 @@ force_opt = Annotated[
         help="No confirmation will be asked before proceeding",
     ),
 ]
+
+
+# Option to deprecate the usage of the --force option when used instead
+# of --yes. Can be removed in the future after a deprecation period.
+force_opt_deprecated = Annotated[
+    bool,
+    typer.Option(
+        "--force",
+        "-f",
+        help="No confirmation will be asked before proceeding",
+        callback=deprecated_option("--force", "--yes"),
+        hidden=True,
+    ),
+]
+
 
 yes_opt = Annotated[
     bool,

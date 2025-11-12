@@ -96,9 +96,19 @@ job_controller = JobController.from_project_name(project_name=project.name)
 job_controller.reset()
 
 j = add_sleep(1, 0.5)
-db_ids = submit_flow(j, worker="test_local_worker", project=project.name)
+db_ids_1 = submit_flow(j, worker="test_local_worker", project=project.name)
 
-job_controller.set_job_state(state=JobState.TERMINATED, db_id=db_ids[0])
+j = add_sleep(1, 0.5)
+db_ids_2 = submit_flow(j, worker="test_local_worker", project=project.name)
+
+# job_controller.set_job_state(state=JobState.TERMINATED, db_id=db_ids[0])
+job_controller.jobs.find_one_and_update(
+    {"db_id": db_ids_1[0]}, {"$set": {"state": "TERMINATED"}}
+)
+job_controller.jobs.find_one_and_update(
+    {"db_id": db_ids_2[0]},
+    {"$set": {"state": JobState.REMOTE_ERROR.value, "previous_state": "TERMINATED"}},
+)
 
 db_dump_dir = "dump"
 coll_dump_dir = os.path.join(db_dump_dir, DB_NAME)

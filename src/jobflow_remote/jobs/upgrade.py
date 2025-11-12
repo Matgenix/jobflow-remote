@@ -45,11 +45,17 @@ class UpgradeCondition:
     check_func: (
         Callable[[JobController, UpgradeCondition | None], dict | None] | None
     ) = None
+    skippable: bool = False
 
     def check(self, job_controller: JobController) -> dict | None:
         if self.check_func is None:
             raise NotImplementedError("check_func must be defined")
-        return self.check_func(job_controller, self)
+        result = self.check_func(job_controller, self)
+        if result and self.skippable:
+            result["message"] += (
+                " This condition can be avoided running jf admin upgrade with the `--force` option."
+            )
+        return result
 
 
 @dataclass
@@ -169,18 +175,23 @@ class DatabaseUpgrader:
         )
 
     def check_upgrade_conditions(
-        self, versions: list[Version]
+        self, versions: list[Version], force: bool = False
     ) -> list[tuple[Version, dict]]:
         failed_conditions = []
         for version in versions:
             upgrade_conditions = self._upgrade_conditions_registry.get(version, [])
             for upgrade_condition in upgrade_conditions:
+                if force and upgrade_condition.skippable:
+                    continue
                 if (check := upgrade_condition.check(self.job_controller)) is not None:
-                    failed_conditions.append((version, check))  # noqa: PERF401
+                    failed_conditions.append((version, check))
         return failed_conditions
 
     def dry_run(
-        self, from_version: str | None = None, target_version: str | None = None
+        self,
+        from_version: str | None = None,
+        target_version: str | None = None,
+        force: bool = False,
     ) -> tuple[list[UpgradeAction], list[tuple[Version, dict]]]:
         """Simulate the upgrade process and return all actions that would be performed
 
@@ -190,6 +201,8 @@ class DatabaseUpgrader:
             The version from which to start the upgrade. If ``None``, the current version in the database is used.
         target_version
             The target version of the upgrade. If ``None``, the current version of the package is used.
+        force
+            Perform the upgrade even if the conditions marked as 'skippable' are not satisfied.
 
         Returns
         -------
@@ -211,7 +224,9 @@ class DatabaseUpgrader:
 
         versions_needing_upgrade = self.collect_upgrades(db_version, target_version)
 
-        failed_conditions = self.check_upgrade_conditions(versions_needing_upgrade)
+        failed_conditions = self.check_upgrade_conditions(
+            versions_needing_upgrade, force=force
+        )
 
         all_actions = []
         for version in versions_needing_upgrade:
@@ -237,7 +252,10 @@ class DatabaseUpgrader:
         return all_actions, failed_conditions
 
     def upgrade(
-        self, from_version: str | None = None, target_version: str | None = None
+        self,
+        from_version: str | None = None,
+        target_version: str | None = None,
+        force: bool = False,
     ) -> bool:
         """Perform the database upgrade
 
@@ -252,6 +270,8 @@ class DatabaseUpgrader:
             The version from which to start the upgrade. If ``None``, the current version in the database is used.
         target_version
             The target version of the upgrade. If ``None``, the current version of the package is used.
+        force
+            Perform the upgrade even if the conditions marked as 'skippable' are not satisfied.
 
         Returns
         -------
@@ -272,7 +292,9 @@ class DatabaseUpgrader:
 
         versions_needing_upgrade = self.collect_upgrades(db_version, target_version)
 
-        if failed_conditions := self.check_upgrade_conditions(versions_needing_upgrade):
+        if failed_conditions := self.check_upgrade_conditions(
+            versions_needing_upgrade, force=force
+        ):
             err = ["Some upgrade conditions were not satisfied:"]
             for vv, failed_cond in failed_conditions:
                 err.append(
@@ -366,9 +388,15 @@ def check_batches_in_auxiliary_legacy(
         count += len(batch_processes_dict)
     if count == 0:
         return None
+    msg = (
+        f"Found {count} batche(s) in auxiliary collection (legacy batches management)."
+        " If there were batch jobs being executed at the time of the upgrade of version it"
+        " preferable to downgrade to the previous version of jobflow-remote and let those "
+        " jobs complete before upgrading again jobflw-remote and running `jf admin upgrade`"
+    )
     return {
         "condition": condition,
-        "message": f"Found {count} batche(s) in auxiliary collection (legacy batches management)",
+        "message": msg,
         "count": count,
     }
 
@@ -377,6 +405,7 @@ upgrade_conditions_for_1_0 = [
     UpgradeCondition(
         description="There should not be any batch process in the auxiliary collection (old batch management)",
         check_func=check_batches_in_auxiliary_legacy,
+        skippable=True,
     ),
     NoDocumentsIn(
         collection="batches",
@@ -409,6 +438,46 @@ def upgrade_to_1_0(
             filter=action.details["filter"],
             update=action.details["update"],
             upsert=action.details["upsert"],
+            session=session,
+        )
+
+    actions.append(action)
+
+    action = UpgradeAction(
+        description="Update all TERMINATED job previous states to RUN_FINISHED",
+        collection="jobs",
+        action_type="update",
+        details={
+            "filter": {"previous_state": "TERMINATED"},
+            "update": {"$set": {"previous_state": "RUN_FINISHED"}},
+            "upsert": False,
+            "required": True,
+        },
+    )
+
+    if not dry_run:
+        job_controller.jobs.update_many(
+            filter=action.details["filter"],
+            update=action.details["update"],
+            upsert=action.details["upsert"],
+            session=session,
+        )
+
+    actions.append(action)
+
+    action = UpgradeAction(
+        description="Remove the batches related document from the auxiliary collection",
+        collection="auxiliary",
+        action_type="delete",
+        details={
+            "filter": {"batch_processes": {"$exists": True}},
+            "required": True,
+        },
+    )
+
+    if not dry_run:
+        job_controller.auxiliary.delete_one(
+            filter=action.details["filter"],
             session=session,
         )
 

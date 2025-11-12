@@ -29,7 +29,7 @@ from jobflow_remote.cli.types import (
     flow_db_id_arg,
     flow_ids_opt,
     flow_state_opt,
-    force_opt,
+    force_opt_deprecated,
     hours_opt,
     job_flow_id_flag_opt,
     job_ids_opt,
@@ -153,7 +153,8 @@ def delete(
     name: name_opt = None,
     days: days_opt = None,
     hours: hours_opt = None,
-    force: force_opt = False,
+    yes_all: yes_opt = False,
+    force_deprecated: force_opt_deprecated = False,
     max_limit: Annotated[
         int,
         typer.Option(
@@ -220,7 +221,7 @@ def delete(
     if not flows_info:
         exit_with_warning_msg("No flows matching criteria")
 
-    if flows_info and not force:
+    if flows_info and not yes_all:
         if verbosity:
             preamble = Text.from_markup(
                 f"[red]This operation will [bold]delete the following {len(flows_info)} Flow(s)[/bold][/red]"
@@ -499,7 +500,7 @@ def clean(
             help="Do not check if runner is active",
         ),
     ] = False,
-    yes: yes_opt = False,
+    yes_all: yes_opt = False,
     all_states: Annotated[
         bool,
         typer.Option(
@@ -540,7 +541,7 @@ def clean(
     if not flows_info:
         exit_with_warning_msg("No flows matching criteria")
 
-    if not yes:
+    if not yes_all:
         if verbosity:
             preamble = Text.from_markup(
                 f"[red]This operation will [bold]delete the files of the following {len(flows_info)} Flow(s)[/bold][/red]"
@@ -601,13 +602,13 @@ def clean(
                 out_console.print(f" - {ji.db_id} - {ji.state}")
         else:
             confirmed = False
-            if not yes:
+            if not yes_all:
                 text = (
                     "The number of skipped jobs is too large to be printed, the list can be "
                     "dumped to the `skipped_cleanup.dat` file. Do you want to create the file?"
                 )
                 confirmed = Confirm.ask(text, default=False)
-            if yes or confirmed:
+            if yes_all or confirmed:
                 with open("skipped_cleanup.dat", "w") as f:
                     for ji in skipped_jobs:
                         f.writelines(f" - {ji.db_id} - {ji.state}")

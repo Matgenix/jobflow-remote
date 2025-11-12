@@ -16,13 +16,14 @@ from jobflow_remote.cli.types import (
     end_date_opt,
     flow_ids_opt,
     flow_state_opt,
-    force_opt,
+    force_opt_deprecated,
     foreground_index_opt,
     index_direction_arg,
     index_key_arg,
     job_ids_indexes_opt,
     job_state_opt,
     start_date_opt,
+    yes_opt,
 )
 from jobflow_remote.cli.utils import (
     IndexDirection,
@@ -73,6 +74,14 @@ def upgrade(
             " versions. Not for standard updates.",
         ),
     ] = None,
+    force: Annotated[
+        bool,
+        typer.Option(
+            "--force",
+            "-f",
+            help="Perform the upgrade even if the conditions marked as 'skippable' are not satisfied.",
+        ),
+    ] = False,
 ) -> None:
     """
     Upgrade the jobflow database.
@@ -122,7 +131,9 @@ def upgrade(
             out_console.print(text)
 
     if not no_dry_run:
-        actions, failed_conditions = upgrader.dry_run(target_version=target)
+        actions, failed_conditions = upgrader.dry_run(
+            target_version=target, force=force
+        )
         if not actions:
             out_console.print(
                 f"No actions will be required for upgrading to version {target_version}"
@@ -134,12 +145,13 @@ def upgrade(
             actions_formatted = format_upgrade_actions(actions)
             out_console.print(actions_formatted)
             if failed_conditions:
-                out_console(
-                    "Note that the upgrade will fail due to the current status of the DB.\n"
+                out_console.print(
+                    "[red]The upgrade will fail due to the current status of the DB.[/red]\n"
                     "List of conditions blocking the upgrade:"
                 )
                 failed_formatted = format_failed_conditions(failed_conditions)
                 out_console.print(failed_formatted)
+                exit_with_error_msg("Exiting upgrade procedure")
 
     warn_text = Text.from_markup(
         "[bold red]Performing the upgrade will permanently modify data in the queue DB. "
@@ -150,7 +162,7 @@ def upgrade(
     with loading_spinner(processing=False) as progress:
         progress.add_task(description="Upgrading the DB...", total=None)
 
-        done = upgrader.upgrade(target_version=target)
+        done = upgrader.upgrade(target_version=target, force=force)
     not_text = "" if done else "[bold]NOT [/bold]"
     out_console.print(f"The database has {not_text}been upgraded")
 
@@ -175,7 +187,8 @@ def reset(
             help="Also delete all the documents in the current store",
         ),
     ] = False,
-    force: force_opt = False,
+    yes_all: yes_opt = False,
+    force_deprecated: force_opt_deprecated = False,
 ) -> None:
     """
     Reset the jobflow database.
@@ -185,7 +198,7 @@ def reset(
 
     check_stopped_runner(error=True)
 
-    if not force:
+    if not yes_all:
         cm = get_config_manager()
         project_name = cm.get_project_data().project.name
         text = Text.from_markup(
@@ -216,7 +229,8 @@ def unlock(
     state: job_state_opt = None,
     start_date: start_date_opt = None,
     end_date: end_date_opt = None,
-    force: force_opt = False,
+    yes_all: yes_opt = False,
+    force_deprecated: force_opt_deprecated = False,
 ) -> None:
     """
     Forcibly removes the lock from the documents of the selected jobs.
@@ -227,7 +241,7 @@ def unlock(
 
     jc = get_job_controller()
 
-    if not force:
+    if not yes_all:
         with loading_spinner(processing=False) as progress:
             progress.add_task(
                 description="Checking the number of locked documents...", total=None
@@ -275,7 +289,8 @@ def unlock_flow(
     state: flow_state_opt = None,
     start_date: start_date_opt = None,
     end_date: end_date_opt = None,
-    force: force_opt = False,
+    yes_all: yes_opt = False,
+    force_deprecated: force_opt_deprecated = False,
 ) -> None:
     """
     Forcibly removes the lock from the documents of the selected jobs.
@@ -286,7 +301,7 @@ def unlock_flow(
 
     jc = get_job_controller()
 
-    if not force:
+    if not yes_all:
         with loading_spinner(processing=False) as progress:
             progress.add_task(
                 description="Checking the number of locked documents...", total=None
