@@ -32,8 +32,8 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements/requirements.txt
-          pip install .[dev]
+          pip install uv
+          uv pip install --system .[dev]
 
       - name: Lint
         run: pre-commit run --all-files --show-diff-on-failure
@@ -69,14 +69,22 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ['3.9', '3.10', '3.11', '3.12']
+        config:
+          - { os: ubuntu-latest, python: "3.9", resolution: lowest-direct }
+          - { os: ubuntu-latest, python: "3.9", resolution: highest }
+          - { os: ubuntu-latest, python: "3.10", resolution: lowest-direct }
+          - { os: ubuntu-latest, python: "3.10", resolution: highest }
+          - { os: ubuntu-latest, python: "3.11", resolution: lowest-direct }
+          - { os: ubuntu-latest, python: "3.11", resolution: highest }
+          - { os: ubuntu-latest, python: "3.12", resolution: lowest-direct }
+          - { os: ubuntu-latest, python: "3.12", resolution: highest }
 
     steps:
       - uses: actions/checkout@v5
 
       - uses: actions/setup-python@v6
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: ${{ matrix.config.os }}
           cache: pip
           cache-dependency-path: pyproject.toml
 
@@ -107,8 +115,8 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements/requirements.txt
-          pip install .[tests]
+          pip install uv
+          uv pip install .[tests] --system --resolution=${{ matrix.config.resolution }}
 
       - name: Unit tests
         run: |
@@ -160,7 +168,8 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pyyaml
+          pip install uv
+          uv pip install --system pyyaml
 
       - name: Generate matrix from YAML
         id: set-matrix
@@ -190,8 +199,8 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements/requirements.txt
-          pip install .[tests]
+          pip install uv
+          uv pip install --system .[tests]
 
       - name: Get files from artifact
         uses: actions/download-artifact@v6
@@ -225,11 +234,11 @@ jobs:
       - name: Install docs dependencies
         run: |
           python -m pip install -U pip
-          pip install -U setuptools wheel
+          pip install uv
+          uv pip install --system -U setuptools wheel
           # Required to generate rst files from markdown
           sudo apt install pandoc
-          pip install -r requirements/requirements.txt
-          pip install .[docs]
+          uv pip install --system .[docs]
 
       - name: Build Sphinx docs
         working-directory: doc
