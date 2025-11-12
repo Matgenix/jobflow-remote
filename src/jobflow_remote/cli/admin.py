@@ -74,6 +74,14 @@ def upgrade(
             " versions. Not for standard updates.",
         ),
     ] = None,
+    force: Annotated[
+        bool,
+        typer.Option(
+            "--force",
+            "-f",
+            help="Perform the upgrade even if the conditions marked as 'skippable' are not satisfied.",
+        ),
+    ] = False,
 ) -> None:
     """
     Upgrade the jobflow database.
@@ -123,7 +131,9 @@ def upgrade(
             out_console.print(text)
 
     if not no_dry_run:
-        actions, failed_conditions = upgrader.dry_run(target_version=target)
+        actions, failed_conditions = upgrader.dry_run(
+            target_version=target, force=force
+        )
         if not actions:
             out_console.print(
                 f"No actions will be required for upgrading to version {target_version}"
@@ -135,12 +145,13 @@ def upgrade(
             actions_formatted = format_upgrade_actions(actions)
             out_console.print(actions_formatted)
             if failed_conditions:
-                out_console(
-                    "Note that the upgrade will fail due to the current status of the DB.\n"
+                out_console.print(
+                    "[red]The upgrade will fail due to the current status of the DB.[/red]\n"
                     "List of conditions blocking the upgrade:"
                 )
                 failed_formatted = format_failed_conditions(failed_conditions)
                 out_console.print(failed_formatted)
+                exit_with_error_msg("Exiting upgrade procedure")
 
     warn_text = Text.from_markup(
         "[bold red]Performing the upgrade will permanently modify data in the queue DB. "
@@ -151,7 +162,7 @@ def upgrade(
     with loading_spinner(processing=False) as progress:
         progress.add_task(description="Upgrading the DB...", total=None)
 
-        done = upgrader.upgrade(target_version=target)
+        done = upgrader.upgrade(target_version=target, force=force)
     not_text = "" if done else "[bold]NOT [/bold]"
     out_console.print(f"The database has {not_text}been upgraded")
 

@@ -266,6 +266,11 @@ class JobInfo(BaseModel):
     def state_validator(cls, value):
         return _validate_job_state(value)
 
+    @field_validator("previous_state", mode="before")
+    @classmethod
+    def previous_state_validator(cls, value):
+        return _validate_job_state(value)
+
 
 def _projection_db_info() -> list[str]:
     """
@@ -353,6 +358,11 @@ class JobDoc(BaseModel):
     @field_validator("state", mode="before")
     @classmethod
     def state_validator(cls, value):
+        return _validate_job_state(value)
+
+    @field_validator("previous_state", mode="before")
+    @classmethod
+    def previous_state_validator(cls, value):
         return _validate_job_state(value)
 
 

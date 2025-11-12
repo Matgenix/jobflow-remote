@@ -42,19 +42,6 @@ def test_reset(job_controller, one_job, run_check_cli) -> None:
     )
     assert job_controller.count_jobs() == 0
 
-    run_check_cli(
-        ["admin", "reset", "--yes"],
-        required_out="The database was reset",
-    )
-
-    # To test the deprecated --force option. Remove the test when the option is removed
-    run_check_cli(
-        ["admin", "reset", "--force"],
-        excluded_out="The database was reset",
-        required_out=["deprecated", "--yes"],
-        error=True,
-    )
-
 
 def test_unlock(job_controller, one_job, run_check_cli) -> None:
     j = one_job.jobs[0]
@@ -218,17 +205,27 @@ def test_upgrade_to_0_1_5(
     )
 
 
+@pytest.mark.parametrize(
+    "batch_jobs",
+    [True, False],
+)
 def test_upgrade_to_1_0(
-    job_controller, upgrade_test_dir, random_project_name, run_check_cli
+    job_controller,
+    upgrade_test_dir,
+    random_project_name,
+    run_check_cli,
+    batch_jobs,
 ) -> None:
     from pydantic_core import ValidationError
 
     from jobflow_remote.jobs.state import JobState
 
     job_controller.backup_restore(upgrade_test_dir / "1.0", python=True)
-    assert job_controller.count_jobs() == 1
+    assert job_controller.count_jobs() == 2
     assert job_controller.count_jobs(states=JobState.RUN_FINISHED) == 0
     assert job_controller.count_jobs(query={"state": "TERMINATED"}) == 1
+    assert job_controller.count_jobs(query={"previous_state": "TERMINATED"}) == 1
+    assert job_controller.count_jobs(query={"previous_state": "RUN_FINISHED"}) == 0
 
     assert str(job_controller.get_current_db_version()) == "0.1.8"
 
@@ -246,12 +243,22 @@ def test_upgrade_to_1_0(
     with pytest.raises(
         ValidationError, match=r"The TERMINATED state has been replaced by RUN_FINISHED"
     ):
-        job_controller.get_jobs_doc_query({})
+        job_controller.get_jobs_doc_query({"db_id": "1"})
 
     with pytest.raises(
         ValidationError, match=r"The TERMINATED state has been replaced by RUN_FINISHED"
     ):
-        job_controller.get_jobs_info_query({})
+        job_controller.get_jobs_doc_query({"db_id": "2"})
+
+    with pytest.raises(
+        ValidationError, match=r"The TERMINATED state has been replaced by RUN_FINISHED"
+    ):
+        job_controller.get_jobs_info_query({"db_id": "1"})
+
+    with pytest.raises(
+        ValidationError, match=r"The TERMINATED state has been replaced by RUN_FINISHED"
+    ):
+        job_controller.get_jobs_info_query({"db_id": "2"})
 
     run_check_cli(
         ["job", "list"],
@@ -263,8 +270,35 @@ def test_upgrade_to_1_0(
         ],
     )
 
+    if batch_jobs:
+        set_batch_doc = {
+            "batch_processes.fake_batch_worker.12345": "ed262476-ad8f-493c-8b37-bc91f468119f"
+        }
+    else:
+        set_batch_doc = {"batch_processes.fake_batch_worker": {}}
+    job_controller.auxiliary.find_one_and_update(
+        {"batch_processes": {"$exists": True}},
+        {"$set": set_batch_doc},
+        upsert=True,
+    )
+
+    if batch_jobs:
+        run_check_cli(
+            ["admin", "upgrade", "--target", "1.0"],
+            excluded_out=["The database has been upgraded"],
+            required_out=[
+                "The upgrade will fail due to the current status of the DB",
+                "There should not be any batch process in the auxiliary collection",
+                "This condition can be avoided running jf admin upgrade with the --force option",
+            ],
+            error=True,
+        )
+
+    cmd_upgrade = ["admin", "upgrade", "--target", "1.0"]
+    if batch_jobs:
+        cmd_upgrade += ["--force"]
     run_check_cli(
-        ["admin", "upgrade", "--target", "1.0"],
+        cmd_upgrade,
         cli_input=random_project_name,
         required_out=["The database has been upgraded"],
     )
@@ -279,8 +313,12 @@ def test_upgrade_to_1_0(
 
     assert job_controller.count_jobs(states=JobState.RUN_FINISHED) == 1
     assert job_controller.count_jobs(query={"state": "TERMINATED"}) == 0
+    assert job_controller.count_jobs(query={"previous_state": "RUN_FINISHED"}) == 1
+    assert job_controller.count_jobs(query={"previous_state": "TERMINATED"}) == 0
 
     assert str(job_controller.get_current_db_version()) == "1.0"
+
+    assert not job_controller.auxiliary.find_one({"batch_processes": {"$exists": True}})
 
 
 def test_index_rebuild(job_controller, one_job, run_check_cli):
