@@ -35,7 +35,7 @@ dependencies = [
     "schedule ~= 1.2",
     "supervisor ~= 4.2",
     "tomlkit ~= 0.12",
-    "typer ~= 0.9",
+    "typer >= 0.16",
 ]
 
 [project.optional-dependencies]
