@@ -56,9 +56,22 @@ def test_upgrade_conditions(
     def upgrade_to_99(*_, **__):
         return []
 
+    @DatabaseUpgrader.register_upgrade(
+        version="100.0",
+        upgrade_conditions=[
+            NoDocumentsIn(
+                collection="flows",
+                skippable=True,
+            ),
+        ],
+    )
+    def upgrade_to_100(*_, **__):
+        return []
+
     db_upgrader = DatabaseUpgrader(job_controller)
     v98 = packaging.version.parse("98.0")
     v99 = packaging.version.parse("99.0")
+    v100 = packaging.version.parse("100.0")
     failed_conditions = db_upgrader.check_upgrade_conditions(versions=[v98, v99])
     assert len(failed_conditions) == 3
     version1, failed_condition1 = failed_conditions[0]
@@ -87,3 +100,11 @@ def test_upgrade_conditions(
         " - There should be no document in the 'flows' collection (for version 99.0): Found 2 document(s)"
         in caplog.text
     )
+
+    # Test skippable condition
+    failed_conditions = db_upgrader.check_upgrade_conditions(versions=[v100])
+    assert len(failed_conditions) == 1
+    failed_conditions = db_upgrader.check_upgrade_conditions(
+        versions=[v100], force=True
+    )
+    assert len(failed_conditions) == 0
