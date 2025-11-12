@@ -8,7 +8,7 @@ import traceback
 import warnings
 from contextlib import ExitStack
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 import fabric
 from fabric import Config
@@ -182,7 +182,7 @@ class RemoteHost(BaseHost):
         if isinstance(command, list | tuple):
             command = " ".join(command)
 
-        command = self.sanitize_command(command)
+        command_str: str = self.sanitize_command(command)
 
         # TODO: check if this works:
         if not workdir:
@@ -197,7 +197,7 @@ class RemoteHost(BaseHost):
             if self.login_shell:
                 shell_cmd += " -l "
             shell_cmd += " -c "
-            remote_command = shell_cmd + shlex.quote(cast(str, command))
+            remote_command = shell_cmd + shlex.quote(command_str)
         else:
             remote_command = command
 
