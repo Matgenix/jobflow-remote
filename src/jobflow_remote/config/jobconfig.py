@@ -1,10 +1,12 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING
 
 from jobflow_remote.config import ConfigManager
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from jobflow import Flow, Job, JobStore
     from qtoolkit.core.data_objects import QResources
 

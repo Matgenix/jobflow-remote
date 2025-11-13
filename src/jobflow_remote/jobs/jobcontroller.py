@@ -13,7 +13,7 @@ from contextlib import ExitStack
 from datetime import datetime, timedelta, timezone
 from functools import cached_property
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import jobflow
 import pymongo
@@ -83,15 +83,14 @@ from jobflow_remote.utils.db import (
 from jobflow_remote.utils.remote import SharedHosts, safe_remove_job_files
 
 if TYPE_CHECKING:
-    from collections.abc import Generator, Sequence
+    from collections.abc import Callable, Generator, Sequence
     from enum import Enum
-    from typing import Union
 
     from maggma.stores import MongoStore
     from monty.json import MSONable
 
-    obj_type = Union[str, Enum, type[MSONable], list[Union[Enum, str, type[MSONable]]]]
-    load_type = Union[bool, dict[str, Union[bool, obj_type]]]
+    obj_type = str | Enum | type[MSONable] | list[Enum | str | type[MSONable]]
+    load_type = bool | dict[str, bool | obj_type]
 
 
 logger = logging.getLogger(__name__)
@@ -288,7 +287,7 @@ class JobController:
             A dictionary with the query to be applied to a collection
             containing JobDocs.
         """
-        if job_ids and not any(isinstance(ji, (list, tuple)) for ji in job_ids):
+        if job_ids and not any(isinstance(ji, list | tuple) for ji in job_ids):
             # without these cast mypy is confused about the type
             job_ids = cast(list[tuple[str, int]], [job_ids])
         db_ids = [db_ids] if isinstance(db_ids, str) else db_ids or []
@@ -403,11 +402,11 @@ class JobController:
             A dictionary with the query to be applied to a collection
             containing FlowDocs.
         """
-        if job_ids is not None and not isinstance(job_ids, (list, tuple)):
+        if job_ids is not None and not isinstance(job_ids, list | tuple):
             job_ids = [job_ids]
-        if db_ids is not None and not isinstance(db_ids, (list, tuple)):
+        if db_ids is not None and not isinstance(db_ids, list | tuple):
             db_ids = [db_ids]
-        if flow_ids is not None and not isinstance(flow_ids, (list, tuple)):
+        if flow_ids is not None and not isinstance(flow_ids, list | tuple):
             flow_ids = [flow_ids]
         if isinstance(states, FlowState):
             states = [states]
@@ -859,7 +858,7 @@ class JobController:
         for db_id in queried_dbs_ids:
             try:
                 job_updated_ids = method(db_id=db_id, **method_kwargs)
-                if not isinstance(job_updated_ids, (list, tuple)):
+                if not isinstance(job_updated_ids, list | tuple):
                     job_updated_ids = (
                         [] if job_updated_ids is None else [job_updated_ids]
                     )
@@ -3667,7 +3666,7 @@ class JobController:
         first_id = doc_next_id["next_id"]
         db_ids = []
         for (job, parents), db_id_int in zip(
-            jobs_list, range(first_id, first_id + n_jobs)
+            jobs_list, range(first_id, first_id + n_jobs), strict=False
         ):
             prefix = self.project.queue.db_id_prefix or ""
             db_id = f"{prefix}{db_id_int}"
@@ -3808,7 +3807,7 @@ class JobController:
         flow_updates["$set"] = {}
         ids_to_push = []
         for (job, parents), db_id_int in zip(
-            jobs_list, range(first_id, first_id + n_new_jobs)
+            jobs_list, range(first_id, first_id + n_new_jobs), strict=False
         ):
             prefix = self.project.queue.db_id_prefix or ""
             db_id = f"{prefix}{db_id_int}"
@@ -3838,8 +3837,8 @@ class JobController:
                 {"$push": {"parents": {"$each": leaf_uuids}}},
             )
 
-        # flow_dict["updated_on"] = datetime.utcnow()
-        flow_updates["$set"]["updated_on"] = datetime.utcnow()
+        # flow_dict["updated_on"] = datetime.now(timezone.utc)
+        flow_updates["$set"]["updated_on"] = datetime.now(timezone.utc)
 
         # TODO, this could be replaced by the actual change, instead of the replace
         self.flows.update_one({"uuid": flow_dict["uuid"]}, flow_updates)
@@ -3890,7 +3889,7 @@ class JobController:
             {
                 "$set": {
                     "state": JobState.CHECKED_OUT.value,
-                    "updated_on": datetime.utcnow(),
+                    "updated_on": datetime.now(timezone.utc),
                 }
             },
             projection=["uuid", "index"],
@@ -3917,7 +3916,7 @@ class JobController:
         updated_cond = {
             "$cond": {
                 "if": {"$eq": ["$state", "READY"]},
-                "then": datetime.utcnow(),
+                "then": datetime.now(timezone.utc),
                 "else": "$updated_on",
             }
         }
@@ -4189,7 +4188,7 @@ class JobController:
                 {
                     "$set": {
                         "state": JobState.READY.value,
-                        "updated_on": datetime.utcnow(),
+                        "updated_on": datetime.now(timezone.utc),
                     }
                 },
             )
@@ -4362,7 +4361,7 @@ class JobController:
         """
         ping_result = self.auxiliary.find_one_and_update(
             {"running_runner.last_pinged": {"$exists": True}},
-            {"$set": {"running_runner.last_pinged": datetime.utcnow()}},
+            {"$set": {"running_runner.last_pinged": datetime.now(timezone.utc)}},
             upsert=False,
         )
 
@@ -4425,7 +4424,7 @@ class JobController:
             "$cond": {
                 "if": {"$eq": ["$state", flow_state.value]},
                 "then": "$updated_on",
-                "else": datetime.utcnow(),
+                "else": datetime.now(timezone.utc),
             }
         }
         self.flows.find_one_and_update(
@@ -4510,7 +4509,9 @@ class JobController:
             An instance of MongoLock.
         """
         db_filter = dict(query)
-        db_filter["remote.retry_time_limit"] = {"$not": {"$gt": datetime.utcnow()}}
+        db_filter["remote.retry_time_limit"] = {
+            "$not": {"$gt": datetime.now(timezone.utc)}
+        }
 
         if "sort" not in kwargs:
             kwargs["sort"] = [
@@ -4536,12 +4537,7 @@ class JobController:
                 error = f"Remote error: {e.msg}"
                 cause = e.__cause__
                 if cause:
-                    # this is required for support of python 3.9. In 3.10 the API
-                    # changed and format_exception(e) could be used instead.
-                    # Do that if/when support for 3.9 is dropped.
-                    trace = traceback.format_exception(
-                        type(cause), cause, cause.__traceback__
-                    )
+                    trace = traceback.format_exception(cause)
                     error += "\ncaused by:\n" + "".join(trace)
                 no_retry = e.no_retry
             except Exception:
@@ -4554,7 +4550,7 @@ class JobController:
                 if not error:
                     next_step_time_limit = None
                     if next_step_delay:
-                        next_step_time_limit = datetime.utcnow() + timedelta(
+                        next_step_time_limit = datetime.now(timezone.utc) + timedelta(
                             seconds=next_step_delay
                         )
                     # When succeeded don't set remote.queue_out/remote.queue_err to
@@ -4595,7 +4591,9 @@ class JobController:
                         step_attempts += 1
                         ind = min(step_attempts, len(delta_retry)) - 1
                         delta = delta_retry[ind]
-                        retry_time_limit = datetime.utcnow() + timedelta(seconds=delta)
+                        retry_time_limit = datetime.now(timezone.utc) + timedelta(
+                            seconds=delta
+                        )
                         update_on_release = {
                             "$set": {
                                 "remote.step_attempts": step_attempts,
@@ -4606,7 +4604,7 @@ class JobController:
                             }
                         }
                 if "$set" in update_on_release:
-                    update_on_release["$set"]["updated_on"] = datetime.utcnow()
+                    update_on_release["$set"]["updated_on"] = datetime.now(timezone.utc)
 
                 lock.update_on_release = update_on_release
 
@@ -4779,7 +4777,7 @@ class JobController:
             The uuid of the Flow to update.
         """
         self.flows.find_one_and_update(
-            {"nodes": uuid}, {"$set": {"updated_on": datetime.utcnow()}}
+            {"nodes": uuid}, {"$set": {"updated_on": datetime.now(timezone.utc)}}
         )
 
     def _cancel_queue_process(self, job_doc: dict) -> None:
@@ -5082,7 +5080,7 @@ class JobController:
                     "parents": flow_doc.parents,
                 }
             }
-            flow_update["$set"]["updated_on"] = datetime.utcnow()
+            flow_update["$set"]["updated_on"] = datetime.now(timezone.utc)
 
             # Set flow update to be applied on lock release
             flow_lock.update_on_release = flow_update
@@ -5303,6 +5301,7 @@ class JobController:
             for std_name, collection in zip(
                 standard_collection_names,
                 [self.jobs, self.flows, self.auxiliary, self.batches],
+                strict=False,
             ):
                 doc_count[std_name] = pymongo_dump(
                     collection=collection, output_path=dir_path, compress=compress
@@ -5316,6 +5315,7 @@ class JobController:
                     self.auxiliary_collection,
                     self.batches_collection,
                 ],
+                strict=False,
             ):
                 doc_count[std_name] = mongodump_from_store(
                     store=self.queue_store,
@@ -5334,6 +5334,7 @@ class JobController:
                 self.auxiliary_collection,
                 self.batches_collection,
             ],
+            strict=False,
         ):
             if collection_name != std_name:
                 full_dir_path = dir_path / self.queue_store.database
@@ -5398,6 +5399,7 @@ class JobController:
                 self.batches_collection,
             ],
             [self.jobs, self.flows, self.batches],
+            strict=False,
         ):
             count = collection.count_documents({})
             if count > 0:
@@ -5421,6 +5423,7 @@ class JobController:
                 self.auxiliary_collection,
             ],
             [self.jobs, self.flows, self.batches, self.auxiliary],
+            strict=False,
         ):
             file_name = f"{name}.bson"
             # compress may be set automatically in the restore functions, but if

@@ -11,7 +11,7 @@ import time
 import traceback
 import uuid
 from collections import OrderedDict, defaultdict
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -987,7 +987,7 @@ class Runner:
         db_filter = {
             "state": {"$in": [JobState.SUBMITTED.value, JobState.RUNNING.value]},
             "lock_id": None,
-            "remote.retry_time_limit": {"$not": {"$gt": datetime.utcnow()}},
+            "remote.retry_time_limit": {"$not": {"$gt": datetime.now(timezone.utc)}},
         }
         if filter:
             db_filter.update(filter)
@@ -1041,7 +1041,7 @@ class Runner:
                     and doc["state"] == JobState.SUBMITTED.value
                 ):
                     next_state = JobState.RUNNING
-                    start_time = datetime.utcnow()
+                    start_time = datetime.now(timezone.utc)
                     logger.debug(
                         f"remote job with id {remote_doc['process_id']} is running"
                     )
@@ -1231,7 +1231,7 @@ class Runner:
                     set_output = {
                         "$set": {
                             "state": JobState.BATCH_RUNNING.value,
-                            "start_time": datetime.utcnow(),
+                            "start_time": datetime.now(timezone.utc),
                             "remote.process_id": self.batch_get_process_id(
                                 batch_processes, batch_uid, worker_name, worker
                             ),

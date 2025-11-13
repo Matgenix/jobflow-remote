@@ -1,6 +1,6 @@
 import contextlib
 from datetime import datetime
-from typing import Annotated, Optional
+from typing import Annotated
 
 import typer
 from dateutil.tz import tzlocal
@@ -363,7 +363,7 @@ def graph(
     flow_db_id: flow_db_id_arg,
     job_id_flag: job_flow_id_flag_opt = False,
     label: Annotated[
-        Optional[str],
+        str | None,
         typer.Option(
             "--label",
             "-l",
@@ -371,7 +371,7 @@ def graph(
         ),
     ] = "name",
     file_path: Annotated[
-        Optional[str],
+        str | None,
         typer.Option(
             "--path",
             "-p",
@@ -444,7 +444,7 @@ def report(
         ),
     ] = ReportInterval.DAYS,
     num_intervals: Annotated[
-        Optional[int],
+        int | None,
         typer.Argument(
             help="The number of intervals to consider. Default depends on the interval type",
             metavar="NUM_INTERVALS",
@@ -641,7 +641,7 @@ app_flow.add_typer(app_flow_set)
 def store(
     flow_db_id: flow_db_id_arg,
     store: Annotated[
-        Optional[str],
+        str | None,
         typer.Argument(
             help="The name of the Store to be set. If empty will set the default JobStore",
             metavar="STORE",

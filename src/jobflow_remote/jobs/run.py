@@ -8,6 +8,7 @@ import subprocess
 import threading
 import time
 import traceback
+from datetime import timezone
 from multiprocessing import Manager, Process
 from typing import TYPE_CHECKING
 
@@ -54,7 +55,7 @@ def run_remote_job(run_dir: str | Path = ".") -> None:
     """Run the job."""
     initialize_remote_run_log()
 
-    start_time = datetime.datetime.utcnow()
+    start_time = datetime.datetime.now(timezone.utc)
     with cd(run_dir):
         error = None
         try:
@@ -107,7 +108,7 @@ def run_remote_job(run_dir: str | Path = ".") -> None:
                 "response": response,
                 "error": error,
                 "start_time": start_time,
-                "end_time": datetime.datetime.utcnow(),
+                "end_time": datetime.datetime.now(timezone.utc),
             }
             dumpfn(output, OUT_FILENAME)
         except Exception:
@@ -118,7 +119,7 @@ def run_remote_job(run_dir: str | Path = ".") -> None:
                 "response": None,
                 "error": error,
                 "start_time": start_time,
-                "end_time": datetime.datetime.utcnow(),
+                "end_time": datetime.datetime.now(timezone.utc),
             }
             dumpfn(output, OUT_FILENAME)
         finally:
@@ -128,7 +129,10 @@ def run_remote_job(run_dir: str | Path = ".") -> None:
 def ping(start_time, interval=600, filename=BATCH_INFO_FILENAME):
     while True:
         dumpfn(
-            {"start_time": start_time, "last_ping_time": datetime.datetime.utcnow()},
+            {
+                "start_time": start_time,
+                "last_ping_time": datetime.datetime.now(timezone.utc),
+            },
             fn=filename,
         )
         time.sleep(interval)
@@ -149,7 +153,7 @@ def run_batch_jobs(
     batch_info_fname: str | Path = BATCH_INFO_FILENAME,
 ) -> None:
     # Here we assume that we are in the batch work directory where a batch process is executed/submitted
-    start_time = datetime.datetime.utcnow()
+    start_time = datetime.datetime.now(timezone.utc)
     dumpfn({"start_time": start_time}, batch_info_fname)
 
     threading.Thread(
@@ -205,8 +209,8 @@ def run_batch_jobs(
     dumpfn(
         {
             "start_time": start_time,
-            "last_ping_time": datetime.datetime.utcnow(),
-            "end_time": datetime.datetime.utcnow(),
+            "last_ping_time": datetime.datetime.now(timezone.utc),
+            "end_time": datetime.datetime.now(timezone.utc),
         },
         batch_info_fname,
     )

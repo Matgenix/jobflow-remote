@@ -1,4 +1,4 @@
-from typing import Annotated, Optional
+from typing import Annotated
 
 import typer
 
@@ -18,7 +18,7 @@ app.add_typer(app_execution)
 @app_execution.command()
 def run(
     run_dir: Annotated[
-        Optional[str],
+        str | None,
         typer.Argument(
             help="The path to the folder where the files of the job to run will be executed",
         ),
@@ -49,7 +49,7 @@ def run_batch(
         ),
     ],
     max_time: Annotated[
-        Optional[float],
+        float | None,
         typer.Option(
             "--max-time",
             "-mt",
@@ -59,7 +59,7 @@ def run_batch(
         ),
     ] = None,
     max_wait: Annotated[
-        Optional[float],
+        float | None,
         typer.Option(
             "--max-wait",
             "-mw",
@@ -69,7 +69,7 @@ def run_batch(
         ),
     ] = 60,
     max_jobs: Annotated[
-        Optional[int],
+        int | None,
         typer.Option(
             "--max-jobs",
             "-mj",
@@ -77,7 +77,7 @@ def run_batch(
         ),
     ] = None,
     parallel_jobs: Annotated[
-        Optional[int],
+        int | None,
         typer.Option(
             "--parallel-jobs",
             "-pj",
@@ -85,7 +85,7 @@ def run_batch(
         ),
     ] = None,
     sleep_time: Annotated[
-        Optional[float],
+        float | None,
         typer.Option(
             "--sleep-time",
             "-st",

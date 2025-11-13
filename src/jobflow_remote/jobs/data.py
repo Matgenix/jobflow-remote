@@ -1,8 +1,8 @@
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from functools import cached_property
-from typing import Any, Optional, Union
+from typing import Any
 
 from jobflow import Flow, Job
 from monty.json import jsanitize
@@ -24,11 +24,11 @@ BATCH_INFO_FILENAME = "batch_info.json"
 
 def get_initial_job_doc_dict(
     job: Job,
-    parents: Optional[list[str]],
+    parents: list[str] | None,
     db_id: str,
     worker: str,
-    exec_config: Optional[ExecutionConfig],
-    resources: Optional[Union[dict, QResources]],
+    exec_config: ExecutionConfig | None,
+    resources: dict | QResources | None,
     priority: int,
 ) -> dict:
     """
@@ -85,7 +85,7 @@ def get_initial_job_doc_dict(
 
 
 def get_initial_flow_doc_dict(
-    flow: Flow, job_dicts: list[dict], jobstore: Optional[str] = None
+    flow: Flow, job_dicts: list[dict], jobstore: str | None = None
 ) -> dict:
     """
     Generate a serialized FlowDoc for initial insertion in the DB.
@@ -155,13 +155,13 @@ class RemoteInfo(BaseModel):
     """Model with data describing the remote state of a Job."""
 
     step_attempts: int = 0
-    queue_state: Optional[QState] = None
-    process_id: Optional[str] = None
-    retry_time_limit: Optional[datetime] = None
-    error: Optional[str] = None
+    queue_state: QState | None = None
+    process_id: str | None = None
+    retry_time_limit: datetime | None = None
+    error: str | None = None
     prerun_cleanup: bool = False
-    queue_out: Optional[str] = None
-    queue_err: Optional[str] = None
+    queue_out: str | None = None
+    queue_err: str | None = None
 
 
 def _validate_job_state(value: Any) -> Any:
@@ -173,6 +173,7 @@ def _validate_job_state(value: Any) -> Any:
     try:
         JobState(value)
     except DeprecatedStateError:
+        print("XXXX")
         raise
     except Exception:
         pass
@@ -194,25 +195,25 @@ class JobInfo(BaseModel):
     created_on: datetime
     updated_on: datetime
     remote: RemoteInfo = RemoteInfo()
-    parents: Optional[list[str]] = None
-    previous_state: Optional[JobState] = None
-    error: Optional[str] = None
-    lock_id: Optional[str] = None
-    lock_time: Optional[datetime] = None
-    run_dir: Optional[str] = None
-    start_time: Optional[datetime] = None
-    end_time: Optional[datetime] = None
+    parents: list[str] | None = None
+    previous_state: JobState | None = None
+    error: str | None = None
+    lock_id: str | None = None
+    lock_time: datetime | None = None
+    run_dir: str | None = None
+    start_time: datetime | None = None
+    end_time: datetime | None = None
     priority: int = 0
-    metadata: Optional[dict] = None
-    stored_data: Optional[dict] = None
-    hosts: Optional[list[str]] = None
+    metadata: dict | None = None
+    stored_data: dict | None = None
+    hosts: list[str] | None = None
 
     @property
     def is_locked(self) -> bool:
         return self.lock_id is not None
 
     @property
-    def run_time(self) -> Optional[float]:
+    def run_time(self) -> float | None:
         """
         Calculate the run time based on start and end time.
 
@@ -227,7 +228,7 @@ class JobInfo(BaseModel):
         return None
 
     @property
-    def estimated_run_time(self) -> Optional[float]:
+    def estimated_run_time(self) -> float | None:
         """
         Estimate the current run time based on the start time and the current time.
 
@@ -237,7 +238,9 @@ class JobInfo(BaseModel):
             The estimated run time in seconds.
         """
         if self.start_time:
-            return (datetime.utcnow() - self.start_time).total_seconds()
+            # needs to be timezone aware to compute the difference
+            start_time = self.start_time.replace(tzinfo=timezone.utc)
+            return (datetime.now(timezone.utc) - start_time).total_seconds()
 
         return None
 
@@ -311,23 +314,21 @@ class JobDoc(BaseModel):
     # among the parents, all the index will still be parents.
     # Note that for just the uuid this condition is not true: JobDocs with
     # the same uuid but different indexes may have different parents
-    parents: Optional[list[str]] = None
-    previous_state: Optional[JobState] = None
-    error: Optional[str] = None  # TODO is there a better way to serialize it?
-    lock_id: Optional[str] = None
-    lock_time: Optional[datetime] = None
-    run_dir: Optional[str] = None
-    start_time: Optional[datetime] = None
-    end_time: Optional[datetime] = None
-    created_on: datetime = Field(default_factory=datetime.utcnow)
-    updated_on: datetime = Field(default_factory=datetime.utcnow)
+    parents: list[str] | None = None
+    previous_state: JobState | None = None
+    error: str | None = None  # TODO is there a better way to serialize it?
+    lock_id: str | None = None
+    lock_time: datetime | None = None
+    run_dir: str | None = None
+    start_time: datetime | None = None
+    end_time: datetime | None = None
+    created_on: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_on: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     priority: int = 0
-    # store: Optional[JobStore] = None
-    exec_config: Optional[Union[ExecutionConfig, str]] = None
-    resources: Optional[Union[QResources, dict]] = None
+    exec_config: ExecutionConfig | str | None = None
+    resources: QResources | dict | None = None
 
-    stored_data: Optional[dict] = None
-    # history: Optional[list[str]] = None
+    stored_data: dict | None = None
 
     def as_db_dict(self) -> dict:
         """
@@ -373,10 +374,10 @@ class FlowDoc(BaseModel):
     jobs: list[str]
     state: FlowState
     name: str
-    lock_id: Optional[str] = None
-    lock_time: Optional[datetime] = None
-    created_on: datetime = Field(default_factory=datetime.utcnow)
-    updated_on: datetime = Field(default_factory=datetime.utcnow)
+    lock_id: str | None = None
+    lock_time: datetime | None = None
+    created_on: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_on: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     metadata: dict = Field(default_factory=dict)
     # parents need to include both the uuid and the index.
     # When dynamically replacing a Job with a Flow some new Jobs will
@@ -387,7 +388,7 @@ class FlowDoc(BaseModel):
     parents: dict[str, dict[str, list[str]]] = Field(default_factory=dict)
     # ids correspond to db_id, uuid, index for each JobDoc
     ids: list[tuple[str, str, int]] = Field(default_factory=list)
-    jobstore: Optional[str] = None
+    jobstore: str | None = None
 
     def as_db_dict(self) -> dict:
         """
@@ -455,11 +456,11 @@ class BatchDoc(BaseModel):
     batch_state: BatchState
     worker: str
     jobs: dict = Field(default_factory=dict)
-    created_on: datetime = Field(default_factory=datetime.utcnow)
-    updated_on: datetime = Field(default_factory=datetime.utcnow)
-    start_time: Optional[datetime] = None
-    end_time: Optional[datetime] = None
-    last_ping_time: Optional[datetime] = None
+    created_on: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_on: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    start_time: datetime | None = None
+    end_time: datetime | None = None
+    last_ping_time: datetime | None = None
 
     def as_db_dict(self) -> dict:
         """
@@ -521,7 +522,7 @@ class FlowInfo(BaseModel):
     parents: list[list[str]]
     hosts: list[list[str]]
     flow_metadata: dict
-    jobs_info: Optional[list[JobInfo]] = None
+    jobs_info: list[JobInfo] | None = None
 
     @classmethod
     def from_query_dict(cls, d) -> "FlowInfo":
@@ -554,7 +555,7 @@ class FlowInfo(BaseModel):
                 jobs_info.append(JobInfo.from_query_output(job_doc))
         else:
             db_ids, job_ids, job_indexes = list(  # type:ignore[assignment]
-                zip(*d["ids"])
+                zip(*d["ids"], strict=False)
             )
             # parents could be determined in this case as well from the Flow document.
             # However, to match the correct order it would require lopping over them.
@@ -584,7 +585,9 @@ class FlowInfo(BaseModel):
     def ids_mapping(self) -> dict[str, dict[int, str]]:
         d: dict = defaultdict(dict)
 
-        for db_id, job_id, index in zip(self.db_ids, self.job_ids, self.job_indexes):
+        for db_id, job_id, index in zip(
+            self.db_ids, self.job_ids, self.job_indexes, strict=False
+        ):
             d[job_id][int(index)] = db_id
 
         return dict(d)
@@ -637,7 +640,7 @@ def get_reset_job_base_dict() -> dict:
         "remote.queue_out": None,
         "remote.queue_err": None,
         "error": None,
-        "updated_on": datetime.utcnow(),
+        "updated_on": datetime.now(timezone.utc),
         "start_time": None,
         "end_time": None,
         "stored_data": None,

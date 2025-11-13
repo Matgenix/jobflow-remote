@@ -8,7 +8,7 @@ import subprocess
 import time
 import warnings
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from shutil import which
 from typing import TYPE_CHECKING, Any
@@ -254,7 +254,7 @@ class MongoLock:
     def acquire(self) -> None:
         """Acquire the lock."""
         # Set the lock expiration time
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         db_filter = copy.deepcopy(dict(self.filter))
 
         projection = self.projection
