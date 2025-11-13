@@ -304,10 +304,25 @@ def test_set_store(job_controller, runner, one_job, run_check_cli):
     assert job_controller.get_flow_store(one_job.uuid) is None
 
 
+@pytest.mark.parametrize(
+    "patch_project",
+    [
+        {
+            "_set": {
+                "runner->delay_update_batch": 0.1,
+                "runner->delay_advance_status": 0.1,
+                "runner->delay_check_run_status": 0.1,
+                "runner->delay_checkout": 0.1,
+            }
+        },
+    ],
+    indirect=True,
+)
 @pytest.mark.filterwarnings("ignore:Some jobs are not connected")
 def test_clean(
     job_controller,
     two_flows_four_jobs,
+    patch_project,
     run_check_cli,
     daemon_manager,
     wait_daemon_started,
