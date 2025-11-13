@@ -19,7 +19,7 @@ from jobflow_remote.jobs.state import BatchState, FlowState, JobState
 def deprecated_option(old_name: str, new_name: str):
     """Callback that warns about deprecated options and exits."""
 
-    def callback(value: Optional[str]):
+    def callback(value: str | None):
         from jobflow_remote.cli.utils import exit_with_error_msg
 
         if value:

@@ -109,7 +109,7 @@ class QueueManager:
         return ""
 
     def get_pre_run(self, pre_run: str | list[str] | None) -> str:
-        if isinstance(pre_run, (list, tuple)):
+        if isinstance(pre_run, list | tuple):
             return "\n".join(pre_run)
         return pre_run
 
@@ -135,7 +135,7 @@ class QueueManager:
         raise ValueError("commands should be a str or a list of str.")
 
     def get_post_run(self, post_run: str | list[str] | None) -> str:
-        if isinstance(post_run, (list, tuple)):
+        if isinstance(post_run, list | tuple):
             return "\n".join(post_run)
         return post_run
 

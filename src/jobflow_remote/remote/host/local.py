@@ -49,7 +49,7 @@ class LocalHost(BaseHost):
         exit_code : int
             Exit code of the command.
         """
-        if isinstance(command, (list, tuple)):
+        if isinstance(command, list | tuple):
             command = " ".join(command)
         command = self.sanitize_command(command)
         workdir = str(workdir) if workdir else Path.cwd()
