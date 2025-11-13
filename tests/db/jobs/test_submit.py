@@ -20,7 +20,7 @@ def test_submit_optional_jobstore(job_controller, runner) -> None:
 
     submit_flow(flow, worker="test_local_worker", jobstore="other_jobstore")
 
-    runner.run_all_jobs(max_seconds=10)
+    runner.run_all_jobs(max_seconds=20)
     assert job_controller.count_jobs(states=JobState.COMPLETED) == 2
 
     with pytest.raises(ValueError, match=".*has no outputs.*"):

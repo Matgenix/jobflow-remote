@@ -5,7 +5,7 @@ import functools
 import logging
 from dataclasses import dataclass
 from datetime import datetime
-from typing import TYPE_CHECKING, Callable, ClassVar
+from typing import TYPE_CHECKING, ClassVar
 
 from packaging.version import Version
 from packaging.version import parse as parse_version
@@ -13,6 +13,8 @@ from packaging.version import parse as parse_version
 import jobflow_remote
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from pymongo.client_session import ClientSession
 
     from jobflow_remote.jobs.jobcontroller import JobController
@@ -37,7 +39,7 @@ class UpgradeAction:
     required: bool = False
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UpgradeCondition:
     """Generic upgrade condition"""
 
@@ -58,19 +60,15 @@ class UpgradeCondition:
         return result
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NoDocumentsIn(UpgradeCondition):
     """Condition that checks that there is no document in a given collection matching the specified query."""
 
-    collection: str | None = None
+    collection: str | None
     query: dict | None = None
     description: str | None = None
 
     def __post_init__(self):
-        # Here done this way as it does not work with python 3.9. When we drop python 3.9, we could
-        # use kw_only=True in the dataclass decorator.
-        if self.collection is None:
-            raise RuntimeError("The 'collection' argument is mandatory")
         if self.description is None:
             q_str = f" matching {self.query}" if self.query else ""
             self.description = f"There should be no document in the '{self.collection}' collection{q_str}"

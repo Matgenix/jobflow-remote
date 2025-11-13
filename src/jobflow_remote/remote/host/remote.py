@@ -8,7 +8,7 @@ import traceback
 import warnings
 from contextlib import ExitStack
 from pathlib import Path
-from typing import Callable
+from typing import TYPE_CHECKING
 
 import fabric
 from fabric import Config
@@ -17,6 +17,9 @@ from paramiko.auth_strategy import AuthSource
 from paramiko.ssh_exception import SSHException
 
 from jobflow_remote.remote.host.base import BaseHost
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 logger = logging.getLogger(__name__)
 
@@ -176,10 +179,11 @@ class RemoteHost(BaseHost):
         """
         self._check_connected()
 
-        if isinstance(command, (list, tuple)):
+        if isinstance(command, list | tuple):
             command = " ".join(command)
 
-        command = self.sanitize_command(command)
+        # cast for mypy
+        command = str(self.sanitize_command(command))
 
         # TODO: check if this works:
         if not workdir:
@@ -356,10 +360,9 @@ class RemoteHost(BaseHost):
         # if the code gets here one of the errors that could be due to drop of the
         # connection occurred. Try to close and reopen the connection and retry
         # one more time
-        # Call to traceback.format_exception compatible with python 3.9
         logger.warning(
             f"Error while trying to execute a command on host {self.host}:\n"
-            f"{''.join(traceback.format_exception(type(error), error, error.__traceback__))}"
+            f"{''.join(traceback.format_exception(error))}"
             "Probably due to the connection dropping. "
             "Will reopen the connection and retry."
         )

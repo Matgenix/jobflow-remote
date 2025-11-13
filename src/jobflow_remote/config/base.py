@@ -1,9 +1,11 @@
+from __future__ import annotations
+
 import abc
 import logging
 import traceback
 from enum import Enum
 from pathlib import Path
-from typing import Annotated, Any, Literal, Optional, Union
+from typing import Annotated, Any, Literal
 
 from jobflow import JobStore
 from maggma.stores import MongoStore
@@ -54,7 +56,7 @@ class RunnerOptions(BaseModel):
         7200,
         description="Delay between subsequent pings to the running runner document.",
     )
-    lock_timeout: Optional[float] = Field(
+    lock_timeout: float | None = Field(
         86400,
         description="Time to consider the lock on a document expired and can be overridden (seconds)",
     )
@@ -134,21 +136,21 @@ class BatchConfig(BaseModel):
         description="Absolute path to a folder where the batch jobs will be executed. This refers to the jobs submitted"
         "to the queue. Jobflow's Job will still be executed in the standard folders."
     )
-    max_jobs_per_batch: Optional[int] = Field(
+    max_jobs_per_batch: int | None = Field(
         None, description="Maximum number of jobs executed in a single batch process"
     )
-    max_wait: Optional[float] = Field(
+    max_wait: float | None = Field(
         60,
         description="Maximum time to wait before stopping if no new jobs are available to run (seconds)",
     )
-    max_time: Optional[float] = Field(
+    max_time: float | None = Field(
         None,
         description="Maximum time after which a job will not start more jobs (seconds). To help avoid hitting the walltime",
     )
-    parallel_jobs: Optional[int] = Field(
+    parallel_jobs: int | None = Field(
         None, description="Number of jobs executed in parallel in the same process"
     )
-    sleep_time: Optional[float] = Field(
+    sleep_time: float | None = Field(
         None,
         description="Sleep time when no submitted job is available to run before checking again (seconds)",
     )
@@ -162,7 +164,7 @@ class WorkerBase(BaseModel):
         description="The discriminator field to determine the worker type"
     )
 
-    scheduler_type: Union[str, dict] = Field(
+    scheduler_type: str | dict = Field(
         description="Type of the scheduler. Either a string depending on the values supported by QToolKit "
         "or a serialized representation of a (subclass of) BaseSchedulerIO"
     )
@@ -170,20 +172,20 @@ class WorkerBase(BaseModel):
         description="Absolute path of the directory of the worker where subfolders for "
         "executing the calculation will be created"
     )
-    resources: Optional[dict] = Field(
+    resources: dict | None = Field(
         None,
         description="A dictionary defining the default resources requested to the "
         "scheduler. Used to fill in the QToolKit template",
     )
-    pre_run: Optional[str] = Field(
+    pre_run: str | None = Field(
         None,
         description="String with commands that will be executed before the execution of the Job",
     )
-    post_run: Optional[str] = Field(
+    post_run: str | None = Field(
         None,
         description="String with commands that will be executed after the execution of the Job",
     )
-    execution_cmd: Optional[str] = Field(
+    execution_cmd: str | None = Field(
         None,
         description="String with commands to execute the Job on the worker. By default will be "
         "set to `jf -fe execution run {}`. The `{}` part will be used to insert the path to "
@@ -195,16 +197,16 @@ class WorkerBase(BaseModel):
         description="Timeout for the execution of the commands in the worker "
         "(e.g. submitting a job)",
     )
-    max_jobs: Optional[int] = Field(
+    max_jobs: int | None = Field(
         None,
         description="The maximum number of jobs that can be submitted to the queue.",
         ge=0,
     )
-    batch: Optional[BatchConfig] = Field(
+    batch: BatchConfig | None = Field(
         None,
         description="Options for batch execution. If define the worker will be considered a batch worker",
     )
-    scheduler_username: Optional[str] = Field(
+    scheduler_username: str | None = Field(
         None,
         description="If defined, the list of jobs running on the worker will be fetched based on the"
         "username instead that from the list of job ids. May be necessary for some "
@@ -215,7 +217,7 @@ class WorkerBase(BaseModel):
         description="Sanitize the output of commands in case of failures due to spurious text produced"
         "by the worker shell.",
     )
-    delay_download: Optional[int] = Field(
+    delay_download: int | None = Field(
         default=None,
         description="Amount of seconds to wait to start the download after the Runner marked a Job "
         "as RUN_FINISHED. To account for delays in the writing of the file on the worker file system"
@@ -225,7 +227,7 @@ class WorkerBase(BaseModel):
 
     @field_validator("scheduler_type")
     @classmethod
-    def check_scheduler_type(cls, scheduler_type: Union[str, dict]) -> Union[str, dict]:
+    def check_scheduler_type(cls, scheduler_type: str | dict) -> str | dict:
         """Validator to set the default of scheduler_type."""
         if isinstance(scheduler_type, str) and scheduler_type not in scheduler_mapping:
             raise ValueError(f"Unknown scheduler type {scheduler_type}")
@@ -249,7 +251,7 @@ class WorkerBase(BaseModel):
 
     @field_validator("execution_cmd")
     @classmethod
-    def check_execution_cmd(cls, v) -> Optional[str]:
+    def check_execution_cmd(cls, v) -> str | None:
         if v is not None and "{}" not in v:
             raise ValueError(
                 "`execution_cmd` must contain a '{}' part to allow setting "
@@ -342,21 +344,21 @@ class ConnectionData(BaseModel):
     """
 
     host: str = Field(description="The host to which to connect")
-    user: Optional[str] = Field(None, description="Login username")
-    port: Optional[int] = Field(None, description="Port number")
-    password: Optional[str] = Field(None, description="Login password")
-    key_filename: Optional[Union[str, list[str]]] = Field(
+    user: str | None = Field(None, description="Login username")
+    port: int | None = Field(None, description="Port number")
+    password: str | None = Field(None, description="Login password")
+    key_filename: str | list[str] | None = Field(
         None,
         description="The filename, or list of filenames, of optional private key(s) "
         "and/or certs to try for authentication",
     )
-    passphrase: Optional[str] = Field(
+    passphrase: str | None = Field(
         None, description="Passphrase used for decrypting private keys"
     )
-    gateway: Optional[Union[str, "ConnectionData"]] = Field(
+    gateway: str | ConnectionData | None = Field(
         None, description="A shell command string to use as a proxy or gateway"
     )
-    connect_kwargs: Optional[dict] = Field(
+    connect_kwargs: dict | None = Field(
         None,
         description="Other keyword arguments passed to paramiko.client.SSHClient.connect",
     )
@@ -392,39 +394,39 @@ class RemoteWorker(WorkerBase):
         "remote", description="The discriminator field to determine the worker type"
     )
     host: str = Field(description="The host to which to connect")
-    user: Optional[str] = Field(None, description="Login username")
-    port: Optional[int] = Field(None, description="Port number")
-    password: Optional[str] = Field(None, description="Login password")
-    key_filename: Optional[Union[str, list[str]]] = Field(
+    user: str | None = Field(None, description="Login username")
+    port: int | None = Field(None, description="Port number")
+    password: str | None = Field(None, description="Login password")
+    key_filename: str | list[str] | None = Field(
         None,
         description="The filename, or list of filenames, of optional private key(s) "
         "and/or certs to try for authentication",
     )
-    passphrase: Optional[str] = Field(
+    passphrase: str | None = Field(
         None, description="Passphrase used for decrypting private keys"
     )
-    gateway: Optional[Union[str, ConnectionData]] = Field(
+    gateway: str | ConnectionData | None = Field(
         None, description="A shell command string to use as a proxy or gateway"
     )
-    forward_agent: Optional[bool] = Field(
+    forward_agent: bool | None = Field(
         None, description="Whether to enable SSH agent forwarding"
     )
-    connect_timeout: Optional[int] = Field(
+    connect_timeout: int | None = Field(
         None, description="Connection timeout, in seconds"
     )
-    connect_kwargs: Optional[dict] = Field(
+    connect_kwargs: dict | None = Field(
         None,
         description="Other keyword arguments passed to paramiko.client.SSHClient.connect",
     )
-    inline_ssh_env: Optional[bool] = Field(
+    inline_ssh_env: bool | None = Field(
         None,
         description="Whether to send environment variables 'inline' as prefixes in "
         "front of command strings",
     )
-    keepalive: Optional[int] = Field(
+    keepalive: int | None = Field(
         60, description="Keepalive value in seconds passed to paramiko's transport"
     )
-    shell_cmd: Optional[str] = Field(
+    shell_cmd: str | None = Field(
         "bash",
         description="The shell command used to execute the command remotely. If None "
         "the command is executed directly",
@@ -487,22 +489,20 @@ class RemoteWorker(WorkerBase):
         )
 
 
-WorkerConfig = Annotated[Union[LocalWorker, RemoteWorker], Field(discriminator="type")]
+WorkerConfig = Annotated[LocalWorker | RemoteWorker, Field(discriminator="type")]
 
 
 class ExecutionConfig(BaseModel):
     """Configuration to be set before and after the execution of a Job."""
 
-    modules: Optional[list[str]] = Field(
-        None, description="list of modules to be loaded"
-    )
-    export: Optional[dict[str, Any]] = Field(
+    modules: list[str] | None = Field(None, description="list of modules to be loaded")
+    export: dict[str, Any] | None = Field(
         None, description="dictionary with variable to be exported"
     )
-    pre_run: Optional[str] = Field(
+    pre_run: str | None = Field(
         None, description="Other commands to be executed before the execution of a job"
     )
-    post_run: Optional[str] = Field(
+    post_run: str | None = Field(
         None, description="Commands to be executed after the execution of a job"
     )
     model_config = ConfigDict(extra="forbid")
@@ -533,7 +533,7 @@ class QueueConfig(BaseModel):
         description="The name of the collection containing batches information. "
         "Taken from the same database as the one defined in the store",
     )
-    db_id_prefix: Optional[str] = Field(
+    db_id_prefix: str | None = Field(
         None,
         description="a string defining the prefix added to the integer ID associated "
         "to each Job in the database",
@@ -564,23 +564,23 @@ class Project(BaseModel):
     """The configurations of a Project."""
 
     name: str = Field(description="The name of the project")
-    base_dir: Optional[str] = Field(
+    base_dir: str | None = Field(
         None,
         description="The base directory containing the project related files. Default "
         "is a folder with the project name inside the projects folder",
         validate_default=True,
     )
-    tmp_dir: Optional[str] = Field(
+    tmp_dir: str | None = Field(
         None,
         description="Folder where remote files are copied. Default a 'tmp' folder in base_dir",
         validate_default=True,
     )
-    log_dir: Optional[str] = Field(
+    log_dir: str | None = Field(
         None,
         description="Folder containing all the logs. Default a 'log' folder in base_dir",
         validate_default=True,
     )
-    daemon_dir: Optional[str] = Field(
+    daemon_dir: str | None = Field(
         None,
         description="Folder containing daemon related files. Default to a 'daemon' "
         "folder in base_dir",
@@ -611,22 +611,22 @@ class Project(BaseModel):
         validate_default=True,
         validation_alias=AliasChoices("jobstore", "JOB_STORE"),
     )
-    remote_jobstore: Optional[dict] = Field(
+    remote_jobstore: dict | None = Field(
         None,
         description="The JobStore used for the data transfer between the Runner"
         "and the workers. Can be a string with the standard values",
     )
-    metadata: Optional[dict] = Field(
+    metadata: dict | None = Field(
         None, description="A dictionary with metadata associated to the project"
     )
-    optional_jobstores: Optional[dict[str, dict]] = Field(
+    optional_jobstores: dict[str, dict] | None = Field(
         default_factory=dict,
         description="A dictionary of optional JobStores that can be use to store "
         "outputs instead of the default jobstore. The key is the name used to "
         "refer to the JobStore.",
     )
 
-    def get_jobstore(self, name: Optional[str] = None) -> Optional[JobStore]:
+    def get_jobstore(self, name: str | None = None) -> JobStore | None:
         """
         Generate an instance of the JobStore based on the configuration.
 
