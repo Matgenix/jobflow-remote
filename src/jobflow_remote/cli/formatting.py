@@ -19,7 +19,7 @@ from rich.text import Text
 from jobflow_remote.cli.utils import ReprStr, fmt_datetime, render_scope_jfr
 from jobflow_remote.jobs.state import FlowState, JobState
 from jobflow_remote.remote.data import get_job_path
-from jobflow_remote.utils.data import convert_utc_time
+from jobflow_remote.utils.data import convert_utc_time, get_h_m_s
 
 if TYPE_CHECKING:
     from packaging.version import Version
@@ -88,6 +88,7 @@ def format_run_time(ji: JobInfo) -> str:
         return ""
     m, s = divmod(run_time, 60)
     h, m = divmod(m, 60)
+    h, m, s = get_h_m_s(run_time)
     return prefix + f"{h:g}:{m:02g}"
 
 
@@ -623,8 +624,7 @@ def get_single_flow_report_components(flow_info: FlowInfo) -> list[RenderableTyp
             convert_utc_time(end_time).strftime(fmt_datetime) + f" [{time.tzname[0]}]",
         )
         total_time = (end_time - start_time).total_seconds()
-        hours, remainder = divmod(total_time, 3600)
-        minutes, seconds = divmod(remainder, 60)
+        hours, minutes, seconds = get_h_m_s(total_time)
         header_table.add_row(
             "Total Time", f"{int(hours):02d}:{int(minutes):02d}:{int(seconds):02d}"
         )
@@ -636,8 +636,7 @@ def get_single_flow_report_components(flow_info: FlowInfo) -> list[RenderableTyp
         )
         # Show elapsed time for non-completed flows
         elapsed_time = (datetime.datetime.utcnow() - start_time).total_seconds()
-        hours, remainder = divmod(elapsed_time, 3600)
-        minutes, seconds = divmod(remainder, 60)
+        hours, minutes, seconds = get_h_m_s(elapsed_time)
         header_table.add_row(
             "Elapsed Time", f"{int(hours):02d}:{int(minutes):02d}:{int(seconds):02d}"
         )
@@ -646,8 +645,7 @@ def get_single_flow_report_components(flow_info: FlowInfo) -> list[RenderableTyp
     if flow_info.jobs_info:
         total_job_run_time = sum(job.run_time or 0 for job in flow_info.jobs_info)
         if total_job_run_time > 0:
-            hours, remainder = divmod(total_job_run_time, 3600)
-            minutes, seconds = divmod(remainder, 60)
+            hours, minutes, seconds = get_h_m_s(total_job_run_time)
             header_table.add_row(
                 "Total Job Run Time",
                 f"{int(hours):02d}:{int(minutes):02d}:{int(seconds):02d}",

@@ -219,10 +219,17 @@ def get_utc_offset(timezone: str):
     utc_offset = now.utcoffset()
 
     # Extract hours and minutes
-    hours, remainder = divmod(utc_offset.total_seconds(), 3600)
-    minutes = remainder // 60
+    hours, minutes, _ = get_h_m_s(utc_offset.total_seconds())
 
     return f"{int(hours):+03d}:{int(minutes):02d}"
+
+
+def get_h_m_s(
+    total_seconds: float,
+) -> tuple[float, float, float]:
+    hours, remainder = divmod(total_seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    return hours, minutes, seconds
 
 
 # TODO imported this from jobflow remote for backward compatibility.
