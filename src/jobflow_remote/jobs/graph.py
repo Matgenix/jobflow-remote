@@ -26,7 +26,7 @@ def get_graph(flow: FlowInfo, label: str = "name") -> DiGraph:
         graph.add_node(db_id, **job_prop)
 
     # Add edges based on parents
-    for child_node, parents in zip(flow.db_ids, flow.parents, strict=False):
+    for child_node, parents in zip(flow.db_ids, flow.parents, strict=True):
         for parent_uuid in parents:
             for parent_node in ids_mapping[parent_uuid].values():
                 graph.add_edge(parent_node, child_node)
@@ -47,7 +47,7 @@ def get_graph_elements(flow: FlowInfo):
     # edges based on parents
     edges = [
         (parent_node, child_node)
-        for child_node, parents in zip(flow.db_ids, flow.parents, strict=False)
+        for child_node, parents in zip(flow.db_ids, flow.parents, strict=True)
         for parent_uuid in parents
         for parent_node in ids_mapping[parent_uuid].values()
     ]

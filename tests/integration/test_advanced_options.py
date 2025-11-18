@@ -154,7 +154,7 @@ def test_run_batch_multi_fail(
         if (
             len(
                 job_controller.get_jobs_info(
-                    job_ids=list(zip(job_ids, [1] * len(job_ids), strict=False)),
+                    job_ids=list(zip(job_ids, [1] * len(job_ids), strict=True)),
                     states=JobState.BATCH_RUNNING,
                 )
             )
@@ -179,7 +179,7 @@ def test_run_batch_multi_fail(
     assert (
         len(
             job_controller.get_jobs_info(
-                job_ids=list(zip(job_ids, [1] * len(job_ids), strict=False)),
+                job_ids=list(zip(job_ids, [1] * len(job_ids), strict=True)),
                 states=JobState.BATCH_RUNNING,
             )
         )
@@ -223,7 +223,7 @@ def test_run_batch_multi_fail(
         if all(
             ji.state == JobState.REMOTE_ERROR
             for ji in job_controller.get_jobs_info(
-                job_ids=list(zip(job_ids, [1] * len(job_ids), strict=False))
+                job_ids=list(zip(job_ids, [1] * len(job_ids), strict=True))
             )
         ):
             break
@@ -251,7 +251,7 @@ def test_run_batch_multi_fail(
         if (
             len(
                 job_controller.get_jobs_info(
-                    job_ids=list(zip(job_ids, [1] * len(job_ids), strict=False)),
+                    job_ids=list(zip(job_ids, [1] * len(job_ids), strict=True)),
                     states=JobState.BATCH_RUNNING,
                 )
             )
@@ -275,7 +275,7 @@ def test_run_batch_multi_fail(
     assert (
         len(
             job_controller.get_jobs_info(
-                job_ids=list(zip(job_ids, [1] * len(job_ids), strict=False)),
+                job_ids=list(zip(job_ids, [1] * len(job_ids), strict=True)),
                 states=JobState.BATCH_RUNNING,
             )
         )
@@ -284,7 +284,7 @@ def test_run_batch_multi_fail(
     assert (
         len(
             job_controller.get_jobs_info(
-                job_ids=list(zip(job_ids, [1] * len(job_ids), strict=False)),
+                job_ids=list(zip(job_ids, [1] * len(job_ids), strict=True)),
                 states=JobState.BATCH_SUBMITTED,
             )
         )

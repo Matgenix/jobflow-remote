@@ -555,7 +555,7 @@ class FlowInfo(BaseModel):
                 jobs_info.append(JobInfo.from_query_output(job_doc))
         else:
             db_ids, job_ids, job_indexes = list(  # type:ignore[assignment]
-                zip(*d["ids"], strict=False)
+                zip(*d["ids"], strict=True)
             )
             # parents could be determined in this case as well from the Flow document.
             # However, to match the correct order it would require lopping over them.
@@ -586,7 +586,7 @@ class FlowInfo(BaseModel):
         d: dict = defaultdict(dict)
 
         for db_id, job_id, index in zip(
-            self.db_ids, self.job_ids, self.job_indexes, strict=False
+            self.db_ids, self.job_ids, self.job_indexes, strict=True
         ):
             d[job_id][int(index)] = db_id
 

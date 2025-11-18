@@ -3666,7 +3666,7 @@ class JobController:
         first_id = doc_next_id["next_id"]
         db_ids = []
         for (job, parents), db_id_int in zip(
-            jobs_list, range(first_id, first_id + n_jobs), strict=False
+            jobs_list, range(first_id, first_id + n_jobs), strict=True
         ):
             prefix = self.project.queue.db_id_prefix or ""
             db_id = f"{prefix}{db_id_int}"
@@ -3807,7 +3807,7 @@ class JobController:
         flow_updates["$set"] = {}
         ids_to_push = []
         for (job, parents), db_id_int in zip(
-            jobs_list, range(first_id, first_id + n_new_jobs), strict=False
+            jobs_list, range(first_id, first_id + n_new_jobs), strict=True
         ):
             prefix = self.project.queue.db_id_prefix or ""
             db_id = f"{prefix}{db_id_int}"
@@ -5301,7 +5301,7 @@ class JobController:
             for std_name, collection in zip(
                 standard_collection_names,
                 [self.jobs, self.flows, self.auxiliary, self.batches],
-                strict=False,
+                strict=True,
             ):
                 doc_count[std_name] = pymongo_dump(
                     collection=collection, output_path=dir_path, compress=compress
@@ -5315,7 +5315,7 @@ class JobController:
                     self.auxiliary_collection,
                     self.batches_collection,
                 ],
-                strict=False,
+                strict=True,
             ):
                 doc_count[std_name] = mongodump_from_store(
                     store=self.queue_store,
@@ -5334,7 +5334,7 @@ class JobController:
                 self.auxiliary_collection,
                 self.batches_collection,
             ],
-            strict=False,
+            strict=True,
         ):
             if collection_name != std_name:
                 full_dir_path = dir_path / self.queue_store.database
@@ -5423,7 +5423,7 @@ class JobController:
                 self.auxiliary_collection,
             ],
             [self.jobs, self.flows, self.batches, self.auxiliary],
-            strict=False,
+            strict=True,
         ):
             file_name = f"{name}.bson"
             # compress may be set automatically in the restore functions, but if
