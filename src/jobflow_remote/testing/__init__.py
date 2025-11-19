@@ -1,8 +1,9 @@
 """A series of toy workflows that can be used for testing."""
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
-from typing import Callable, NoReturn, Optional, Union
+from typing import NoReturn
 
 from jobflow import Job, JobConfig, Maker, OnMissing, Response, job
 from qtoolkit.io.shell import ShellIO
@@ -28,10 +29,10 @@ def write_file(n) -> None:
 
 @job
 def arithmetic(
-    a: Union[float, list[float]],
-    b: Union[float, list[float]],
-    op: Optional[Callable] = None,
-) -> Optional[float]:
+    a: float | list[float],
+    b: float | list[float],
+    op: Callable | None = None,
+) -> float | None:
     if op:
         return op(a, b)
 

@@ -1,10 +1,12 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING
 
 from jobflow_remote.config import ConfigManager
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from jobflow import Flow, Job, JobStore
     from qtoolkit.core.data_objects import QResources
 
@@ -20,6 +22,7 @@ def set_run_config(
     priority: int | None = None,
     worker: str | None = None,
     dynamic: bool = True,
+    overwrite: bool = False,
 ) -> Flow | Job:
     """
     Modify in place a Flow or a Job by setting the properties in the
@@ -60,6 +63,8 @@ def set_run_config(
     dynamic
         The updates will be propagated to Jobs/Flows dynamically generated at
         runtime.
+    overwrite
+        If True the whole JobConfig of the Job is replaced. Legacy behaviour.
 
     Returns
     -------
@@ -68,21 +73,37 @@ def set_run_config(
     """
     if not exec_config and not resources and not worker and priority is None:
         return flow_or_job
-    config: dict = {"manager_config": {}}
-    if exec_config is not None:
-        config["manager_config"]["exec_config"] = exec_config
-    if resources is not None:
-        config["manager_config"]["resources"] = resources
-    if worker is not None:
-        config["manager_config"]["worker"] = worker
-    if priority is not None:
-        config["manager_config"]["priority"] = priority
+
+    if overwrite:
+        dict_mod = False
+        config: dict = {"manager_config": {}}
+        if exec_config is not None:
+            config["manager_config"]["exec_config"] = exec_config
+        if resources is not None:
+            config["manager_config"]["resources"] = resources
+        if worker is not None:
+            config["manager_config"]["worker"] = worker
+        if priority is not None:
+            config["manager_config"]["priority"] = priority
+    else:
+        dict_mod = True
+        config_set: dict = {}
+        if exec_config is not None:
+            config_set["manager_config->exec_config"] = exec_config
+        if resources is not None:
+            config_set["manager_config->resources"] = resources
+        if worker is not None:
+            config_set["manager_config->worker"] = worker
+        if priority is not None:
+            config_set["manager_config->priority"] = priority
+        config = {"_set": config_set}
 
     flow_or_job.update_config(
         config=config,
         name_filter=name_filter,
         function_filter=function_filter,
         dynamic=dynamic,
+        dict_mod=dict_mod,
     )
 
     return flow_or_job

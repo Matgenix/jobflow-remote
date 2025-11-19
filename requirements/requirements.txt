@@ -1,4 +1,4 @@
-jobflow==0.1.19
+jobflow==0.2.1
 pydantic==2.12.4
 pymongo==4.10.1
 fabric==3.2.2

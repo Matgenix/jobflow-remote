@@ -413,7 +413,7 @@ class MinimalFileStore(Store):
                  a single field, or None if the Store's key
                  field is to be used
         """
-        if not isinstance(docs, (list, tuple)):
+        if not isinstance(docs, list | tuple):
             docs = [docs]
 
         self.data.extend(docs)

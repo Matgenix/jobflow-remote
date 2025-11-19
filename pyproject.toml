@@ -13,20 +13,19 @@ classifiers = [
     "Intended Audience :: System Administrators",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Topic :: Other/Nonlisted Topic",
     "Topic :: Scientific/Engineering",
 ]
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 dependencies = [
     "fabric ~= 3.2",
     "flufl.lock ~= 8.0",
-    "jobflow >= 0.1.19",
     "psutil >= 5.9,< 8.0; python_version < '3.12'",
     "psutil >= 6.0,< 8.0; python_version >= '3.12'",
+    "jobflow >= 0.2.1",
     "pydantic ~= 2.4",
     "pymongo >= 4.4, < 4.11",
     "python-dateutil>=2.8.2",
@@ -79,7 +78,7 @@ method = "git"
 default-tag = "0.0.1"
 
 [tool.ruff]
-target-version = "py39"
+target-version = "py310"
 
 [tool.ruff.lint]
 select = ["ALL"]

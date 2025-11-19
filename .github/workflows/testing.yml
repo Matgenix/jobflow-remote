@@ -69,8 +69,6 @@ jobs:
       fail-fast: false
       matrix:
         config:
-          - { os: ubuntu-latest, python: "3.9", resolution: lowest-direct }
-          - { os: ubuntu-latest, python: "3.9", resolution: highest }
           - { os: ubuntu-latest, python: "3.10", resolution: lowest-direct }
           - { os: ubuntu-latest, python: "3.10", resolution: highest }
           - { os: ubuntu-latest, python: "3.11", resolution: lowest-direct }

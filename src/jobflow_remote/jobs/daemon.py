@@ -12,7 +12,7 @@ import time
 from enum import Enum
 from pathlib import Path
 from string import Template
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING
 from xmlrpc.client import Fault
 
 import psutil
@@ -29,7 +29,7 @@ from jobflow_remote.jobs.jobcontroller import JobController
 from jobflow_remote.utils.db import MongoLock, RunnerLockedError
 
 if TYPE_CHECKING:
-    from collections.abc import Generator
+    from collections.abc import Callable, Generator
 
 logger = logging.getLogger(__name__)
 
