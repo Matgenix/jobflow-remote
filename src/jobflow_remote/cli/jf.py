@@ -76,6 +76,15 @@ def main(
             hidden=True,
         ),
     ] = False,
+    warn: Annotated[
+        bool,
+        typer.Option(
+            "--warn",
+            "-w",
+            help="Print warning messages regarding the parsing of the files in the projects folder.",
+            is_eager=True,
+        ),
+    ] = False,
     print_tree: tree_opt = False,  # If selected will print the tree of the CLI and exit
 ) -> None:
     """The controller CLI for jobflow-remote."""
@@ -97,7 +106,7 @@ def main(
 
     # initialize the ConfigManager only once, to avoid parsing the configuration
     # files multiple times when the command is executed.
-    initialize_config_manager()
+    initialize_config_manager(warn=warn)
     cm = get_config_manager()
     if project:
         SETTINGS.project = project
