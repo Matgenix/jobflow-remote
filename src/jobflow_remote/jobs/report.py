@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
+from datetime import timezone as timezone_mod
 from typing import TYPE_CHECKING
 
 from jobflow_remote.jobs.data import JobInfo, projection_job_info
@@ -103,7 +104,7 @@ class JobsReport:
         JobsReport
             A report of the job states.
         """
-        now = datetime.utcnow()
+        now = datetime.now(timezone_mod.utc)
 
         state_counts = job_controller.count_jobs_states(list(JobState))
 

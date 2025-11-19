@@ -20,7 +20,7 @@ def test_reset(job_controller, one_job, run_check_cli) -> None:
     for _ in range(26):
         f = Flow(add(1, 2))
         submit_flow(f, worker="test_local_worker")
-        time.sleep(0.001)
+        time.sleep(0.01)
 
     run_check_cli(
         ["admin", "reset"],

@@ -1,7 +1,7 @@
 import io
 from datetime import datetime
 from pathlib import Path
-from typing import Annotated, Optional
+from typing import Annotated
 
 import typer
 from dateutil.tz import tzlocal
@@ -799,7 +799,7 @@ def report(
         ),
     ] = ReportInterval.DAYS,
     num_intervals: Annotated[
-        Optional[int],
+        int | None,
         typer.Argument(
             help="The number of intervals to consider. Default depends on the interval type",
             metavar="NUM_INTERVALS",
@@ -827,7 +827,7 @@ def todir(
     job_db_id: job_db_id_arg = None,
     job_index: job_index_arg = None,
     shell: Annotated[
-        Optional[str],
+        str | None,
         typer.Option(
             "--shell",
             "-s",

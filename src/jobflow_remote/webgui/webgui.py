@@ -664,6 +664,7 @@ def trends(proj_name: str, what: str, interval: str = "days", ni: int = 7):
                 jfreport.trends.completed,
                 jfreport.trends.failed,
                 jfreport.trends.remote_error,
+                strict=True,
             )
         ],
         cls="trend-table",

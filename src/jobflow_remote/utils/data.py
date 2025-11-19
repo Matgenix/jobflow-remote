@@ -58,7 +58,7 @@ def deep_merge_dict(
 
 
 def remove_none(obj):
-    if isinstance(obj, (list, tuple, set)):
+    if isinstance(obj, list | tuple | set):
         return type(obj)(remove_none(x) for x in obj if x is not None)
     if isinstance(obj, dict):
         return type(obj)(
@@ -70,7 +70,7 @@ def remove_none(obj):
 
 
 def check_dict_keywords(obj: Any, keywords: list[str]) -> bool:
-    if isinstance(obj, (list, tuple, set)):
+    if isinstance(obj, list | tuple | set):
         return any(check_dict_keywords(x, keywords) for x in obj)
     if isinstance(obj, dict):
         for k, v in obj.items():

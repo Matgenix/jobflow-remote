@@ -1,4 +1,4 @@
-from typing import Annotated, Optional
+from typing import Annotated
 
 import typer
 
@@ -37,7 +37,7 @@ def create(
         ),
     ] = False,
     mongo_path: Annotated[
-        Optional[str],
+        str | None,
         typer.Option(
             "--mongo-path",
             "-m",
@@ -89,7 +89,7 @@ def restore(
         ),
     ] = ".",
     mongo_path: Annotated[
-        Optional[str],
+        str | None,
         typer.Option(
             "--mongo-path",
             "-m",
