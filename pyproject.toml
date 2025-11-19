@@ -26,6 +26,7 @@ dependencies = [
     "psutil >= 5.9,< 8.0; python_version < '3.12'",
     "psutil >= 6.0,< 8.0; python_version >= '3.12'",
     "jobflow >= 0.2.1",
+    "monty >= 2024.7.12",
     "pydantic ~= 2.4",
     "pymongo >= 4.4, < 4.11",
     "python-dateutil>=2.8.2",
