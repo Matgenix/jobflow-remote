@@ -1,4 +1,6 @@
 name: testing
+env:
+  PYTHON_VERSION: "3.13"
 
 on:
   push:
@@ -25,7 +27,7 @@ jobs:
 
       - uses: actions/setup-python@v6
         with:
-          python-version: '3.10'
+          python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
           cache-dependency-path: pyproject.toml
 
@@ -69,12 +71,16 @@ jobs:
       fail-fast: false
       matrix:
         config:
+          - { os: macos-latest, python: "3.10", resolution: lowest-direct }
           - { os: ubuntu-latest, python: "3.10", resolution: lowest-direct }
           - { os: ubuntu-latest, python: "3.10", resolution: highest }
-          - { os: ubuntu-latest, python: "3.11", resolution: lowest-direct }
           - { os: ubuntu-latest, python: "3.11", resolution: highest }
-          - { os: ubuntu-latest, python: "3.12", resolution: lowest-direct }
           - { os: ubuntu-latest, python: "3.12", resolution: highest }
+          - { os: ubuntu-latest, python: "3.13", resolution: lowest-direct }
+          - { os: ubuntu-latest, python: "3.13", resolution: highest }
+          - { os: ubuntu-latest, python: "3.14", resolution: lowest-direct }
+          - { os: macos-latest, python: "3.14", resolution: highest }
+          - { os: ubuntu-latest, python: "3.14", resolution: highest }
 
     runs-on: ${{ matrix.config.os }}
     steps:
@@ -87,17 +93,21 @@ jobs:
           cache-dependency-path: pyproject.toml
 
       - name: Install mongo-tools
+        if: matrix.config.os == 'ubuntu-latest'
         run: |
           wget https://fastdl.mongodb.org/tools/db/mongodb-database-tools-ubuntu2204-x86_64-100.10.0.deb
           sudo apt install ./mongodb-database-tools-*-100.10.0.deb
 
       - name: Set up Docker Buildx
+        if: matrix.config.os == 'ubuntu-latest'
         uses: docker/setup-buildx-action@v3
 
       - name: List images
+        if: matrix.config.os == 'ubuntu-latest'
         run: docker images
 
       - name: Load test bench containers
+        if: matrix.config.os == 'ubuntu-latest'
         uses: docker/bake-action@v6
         with:
           load: true
@@ -108,6 +118,7 @@ jobs:
             *.cache-from=type=gha,scope=global
 
       - name: List images
+        if: matrix.config.os == 'ubuntu-latest'
         run: docker images
 
       - name: Install dependencies
@@ -124,6 +135,7 @@ jobs:
             --cov=jobflow_remote --cov-report= --cov-config=pyproject.toml
 
       - name: Database tests
+        if: matrix.config.os == 'ubuntu-latest'
         run: |
           COVERAGE_FILE=.coverage-db \
           pytest -m db \
@@ -131,6 +143,7 @@ jobs:
             --cov=jobflow_remote --cov-report= --cov-config=pyproject.toml
 
       - name: Full integration tests
+        if: matrix.config.os == 'ubuntu-latest'
         run: |
           COVERAGE_FILE=.coverage-integration \
           pytest -m integration \
@@ -162,7 +175,7 @@ jobs:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
         with:
-          python-version: '3.12'
+          python-version: '3.13'
 
       - name: Install dependencies
         run: |
@@ -192,7 +205,7 @@ jobs:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
         with:
-          python-version: '3.12'
+          python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
           cache-dependency-path: pyproject.toml
       - name: Install dependencies
@@ -204,7 +217,7 @@ jobs:
       - name: Get files from artifact
         uses: actions/download-artifact@v6
         with:
-          name: coverage-files-artifact-3.12
+          name: coverage-files-artifact-${{ env.PYTHON_VERSION }}
 
       - name: Codecov upload
         uses: ./.github/actions/codecov-upload-action
@@ -225,10 +238,10 @@ jobs:
           submodules: true
           fetch-depth: 0
 
-      - name: Set up Python 3.11
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
         uses: actions/setup-python@v6
         with:
-          python-version: '3.11'
+          python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Install docs dependencies
         run: |
