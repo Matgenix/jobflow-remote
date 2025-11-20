@@ -60,12 +60,6 @@ jobs:
             *.cache-from=type=gha,scope=global
 
   test:
-    services:
-      local_mongodb:
-        image: mongo:5.0
-        ports:
-          - 27017:27017
-
     needs: [build-test-bench]
     strategy:
       fail-fast: false
@@ -81,6 +75,12 @@ jobs:
           - { os: ubuntu-latest, python: "3.14", resolution: lowest-direct }
           - { os: macos-latest, python: "3.14", resolution: highest }
           - { os: ubuntu-latest, python: "3.14", resolution: highest }
+
+    services:
+      local_mongodb:
+        image: ${{ matrix.config.os == 'ubuntu-latest' && 'mongo:5.0' || '' }}
+        ports:
+          - 27017:27017
 
     runs-on: ${{ matrix.config.os }}
     steps:
