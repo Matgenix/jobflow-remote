@@ -70,7 +70,6 @@ jobs:
           - { os: ubuntu-latest, python: "3.10", resolution: highest }
           - { os: ubuntu-latest, python: "3.11", resolution: highest }
           - { os: ubuntu-latest, python: "3.12", resolution: highest }
-          - { os: ubuntu-latest, python: "3.13", resolution: lowest-direct }
           - { os: ubuntu-latest, python: "3.13", resolution: highest }
           - { os: ubuntu-latest, python: "3.14", resolution: lowest-direct }
           - { os: macos-latest, python: "3.14", resolution: highest }
@@ -78,6 +77,7 @@ jobs:
 
     services:
       local_mongodb:
+        # Only use the mongodb service for ubuntu
         image: ${{ matrix.config.os == 'ubuntu-latest' && 'mongo:5.0' || '' }}
         ports:
           - 27017:27017
