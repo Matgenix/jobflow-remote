@@ -189,6 +189,7 @@ def one_job(random_project_name):
     from jobflow_remote.testing import add
 
     j = add(1, 5)
+    j.name = "add_job"
     flow = Flow([j])
     submit_flow(flow, worker="test_local_worker")
 
@@ -204,24 +205,24 @@ def two_flows_four_jobs(random_project_name):
     from jobflow_remote.testing import add
 
     add_first = add(1, 5)
-    add_first.name = "add1"
+    add_first.name = "add_job1"
     add_second = add(add_first.output, 5)
-    add_second.name = "add2"
+    add_second.name = "add_job2"
 
     add_first.update_metadata({"test_meta": 1})
 
     flow = Flow([add_first, add_second])
-    flow.name = "f1"
+    flow.name = "flow_1"
     flow.metadata["f1_metadata"] = "some_info"
     submit_flow(flow, worker="test_local_worker")
 
     add_third = add(1, 5)
-    add_third.name = "add3"
+    add_third.name = "add_job3"
     add_fourth = add(add_third.output, 5)
-    add_fourth.name = "add4"
+    add_fourth.name = "add_job4"
 
     flow2 = Flow([add_third, add_fourth])
-    flow2.name = "f2"
+    flow2.name = "flow_2"
     submit_flow(flow2, worker="test_local_worker")
 
     return [flow, flow2]

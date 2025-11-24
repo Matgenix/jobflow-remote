@@ -12,7 +12,7 @@ def test_flows_list(job_controller, two_flows_four_jobs, run_check_cli) -> None:
     from jobflow_remote.testing import add
 
     columns = ["DB id", "Name", "State", "Flow id", "Num Jobs", "Last updated"]
-    outputs = columns + [f"f{i}" for i in range(1, 3)] + ["READY"]
+    outputs = columns + [f"flow_{i}" for i in range(1, 3)] + ["READY"]
 
     run_check_cli(["flow", "list"], required_out=outputs)
     run_check_cli(["flow", "list", "--count"], required_out="Number of Flows: 2")
@@ -175,8 +175,8 @@ def test_delete(job_controller, two_flows_four_jobs, run_check_cli) -> None:
 
 def test_flow_info(job_controller, two_flows_four_jobs, run_check_cli, runner) -> None:
     columns = ["DB id", "Name", "State", "Job id", "(Index)", "Worker"]
-    outputs = columns + [f"add{i}" for i in range(1, 3)] + ["READY", "WAITING"]
-    excluded = [f"add{i}" for i in range(3, 5)] + ["{'f1_metadata': 'some_info'}"]
+    outputs = columns + [f"add_job{i}" for i in range(1, 3)] + ["READY", "WAITING"]
+    excluded = [f"add_job{i}" for i in range(3, 5)] + ["{'f1_metadata': 'some_info'}"]
     res_flow_info = run_check_cli(
         ["flow", "info", "-j", "1", "--jobs-sort", "db_id"],
         required_out=outputs,
@@ -226,7 +226,7 @@ def test_flow_info(job_controller, two_flows_four_jobs, run_check_cli, runner) -
     run_check_cli(
         ["flow", "info", "-j", "1", "--report"],
         required_out=[
-            "Flow Report: f1",
+            "Flow Report: flow_1",
             "Completed: 0 | Running: 0 | Queued: 0 | Pending: 2 | Failed: 0",
             "READY",
             "WAITING",
@@ -241,7 +241,7 @@ def test_flow_info(job_controller, two_flows_four_jobs, run_check_cli, runner) -
     run_check_cli(
         ["flow", "info", "-j", "1", "--report"],
         required_out=[
-            "Flow Report: f1",
+            "Flow Report: flow_1",
             "Progress: 2/2 (100.0%)",
             "COMPLETED",
             "Total Time",
