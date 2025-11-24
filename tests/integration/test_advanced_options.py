@@ -304,7 +304,11 @@ def test_run_batch_multi_fail(
 
 @pytest.mark.workers(["test_max_jobs_worker"])
 def test_max_jobs_worker(
-    job_controller, daemon_manager, wait_daemon_started, wait_daemon_shutdown
+    job_controller,
+    daemon_manager,
+    patch_project,
+    wait_daemon_started,
+    wait_daemon_shutdown,
 ) -> None:
     import time
 
@@ -313,6 +317,17 @@ def test_max_jobs_worker(
     from jobflow_remote import submit_flow
     from jobflow_remote.jobs.state import JobState
     from jobflow_remote.testing import add_sleep
+
+    patch_project(
+        {
+            "_set": {
+                "runner->delay_checkout": 0.1,
+                "runner->delay_check_run_status": 0.1,
+                "runner->delay_advance_status": 0.1,
+                "runner->delay_refresh_limited": 0.5,
+            }
+        }
+    )
 
     # run the daemon in background to check what happens to the
     # jobs during the execution

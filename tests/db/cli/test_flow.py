@@ -331,10 +331,25 @@ def test_set_store(job_controller, runner, one_job, run_check_cli):
     assert job_controller.get_flow_store(one_job.uuid) is None
 
 
+@pytest.mark.parametrize(
+    "patch_project",
+    [
+        {
+            "_set": {
+                "runner->delay_update_batch": 0.2,
+                "runner->delay_advance_status": 0.2,
+                "runner->delay_check_run_status": 0.2,
+                "runner->delay_checkout": 0.2,
+            }
+        },
+    ],
+    indirect=True,
+)
 @pytest.mark.filterwarnings("ignore:Some jobs are not connected")
 def test_clean(
     job_controller,
     two_flows_four_jobs,
+    patch_project,
     run_check_cli,
     daemon_manager,
     wait_daemon_started,
@@ -422,8 +437,8 @@ def test_clean(
     daemon_manager.start(raise_on_error=True)
     wait_daemon_started(daemon_manager)
 
-    for _ in range(20):
-        time.sleep(0.1)
+    for _ in range(60):
+        time.sleep(0.5)
         job_slow_doc = job_controller.get_job_doc(job_id=slow_flow.jobs[0].uuid)
         if job_slow_doc.state in (JobState.SUBMITTED, JobState.RUNNING):
             break
