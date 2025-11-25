@@ -6,7 +6,7 @@ def test_jobs_list(job_controller, two_flows_four_jobs, run_check_cli) -> None:
 
     # split "job id" from "index", because it can be sent to a new line
     columns = ["DB id", "Name", "State", "Job id", "(Index)", "Worker", "Last updated"]
-    outputs = columns + [f"add{i}" for i in range(1, 5)] + ["READY", "WAITING"]
+    outputs = columns + [f"add_job{i}" for i in range(1, 5)] + ["READY", "WAITING"]
 
     run_check_cli(["job", "list"], required_out=outputs)
     run_check_cli(["job", "list", "--count"], required_out="Number of jobs: 4")
@@ -22,15 +22,15 @@ def test_jobs_list(job_controller, two_flows_four_jobs, run_check_cli) -> None:
         ["job", "list", "--color"],
         required_out=outputs,
         required_out_colored=[
-            "[green]add1[/green]",
-            "[green]add2[/green]",
-            "[red]add3[/red]",
-            "[red]add4[/red]",
+            "[green]add_job1[/green]",
+            "[green]add_job2[/green]",
+            "[red]add_job3[/red]",
+            "[red]add_job4[/red]",
         ],
     )
 
-    outputs = ["add1", "READY"]
-    excluded = [f"add{i}" for i in range(2, 5)]
+    outputs = ["add_job1", "READY"]
+    excluded = [f"add_job{i}" for i in range(2, 5)]
     run_check_cli(
         ["job", "list", "-did", "1"], required_out=outputs, excluded_out=excluded
     )
@@ -80,7 +80,7 @@ def test_jobs_list(job_controller, two_flows_four_jobs, run_check_cli) -> None:
     )
 
     outputs = ["WAITING", "READY", "State", "DB id", "whatever"]
-    excluded = ["add1", "add2", "Name", "Job id"]
+    excluded = ["add_job1", "add_job2", "Name", "Job id"]
     run_check_cli(
         ["job", "list", "-o", "state,db_id", "-sdk", "whatever"],
         required_out=outputs,
@@ -156,7 +156,7 @@ def test_jobs_list_settings(
         m.setattr(SETTINGS, "cli_job_list_columns", ["state", "db_id"])
 
         outputs = ["WAITING", "READY", "State", "DB id"]
-        excluded = ["add1", "add2", "Name", "Job id"]
+        excluded = ["add_job1", "add_job2", "Name", "Job id"]
         run_check_cli(
             ["job", "list"],
             required_out=outputs,
@@ -165,7 +165,7 @@ def test_jobs_list_settings(
 
         # using -v will lead to a very large table which isn't fully displayed
         columns = ["DB", "id", "Name", "Sta", "Job", "id", "Wor", "Last", "Loc"]
-        outputs = columns + [f"add{i}" for i in range(1, 5)] + ["REA", "WAI"]
+        outputs = columns + [f"add_job{i}" for i in range(1, 5)] + ["REA", "WAI"]
         run_check_cli(
             ["job", "list", "-v"],
             required_out=outputs,
@@ -178,7 +178,7 @@ def test_job_info(job_controller, two_flows_four_jobs, run_check_cli) -> None:
     from jobflow_remote import submit_flow
     from jobflow_remote.testing import add
 
-    outputs = ["name = 'add1'", "state = 'READY'"]
+    outputs = ["name = 'add_job1'", "state = 'READY'"]
     excluded_n = ["run_dir = None", "start_time = None"]
     excluded = [*excluded_n, "job = {"]
     run_check_cli(["job", "info", "1"], required_out=outputs, excluded_out=excluded)
@@ -224,7 +224,7 @@ def test_job_info_by_pid(job_controller, two_flows_four_jobs, run_check_cli):
     )
 
     # Test successful retrieval of job info by process ID
-    outputs = ["name = 'add1'", "state = 'READY'", f"'process_id': '{test_pid}'"]
+    outputs = ["name = 'add_job1'", "state = 'READY'", f"'process_id': '{test_pid}'"]
     run_check_cli(["job", "info", "--pid", str(test_pid)], required_out=outputs)
 
     # Test with invalid process ID
@@ -374,7 +374,9 @@ def test_queue_out(job_controller, one_job, run_check_cli) -> None:
     runner = Runner()
     runner.run_one_job(db_id="1")
 
-    run_check_cli(["job", "queue-out", "1"], required_out=["Queue output from", "add"])
+    run_check_cli(
+        ["job", "queue-out", "1"], required_out=["Queue output from", "add_job"]
+    )
 
     run_check_cli(
         ["job", "queue-out", "10"],
@@ -647,11 +649,11 @@ def test_queries(job_controller, two_flows_four_jobs, run_check_cli) -> None:
         required_out="Operation completed: 0 jobs modified",
     )
     run_check_cli(
-        ["job", "pause", "--name", "add1"],
+        ["job", "pause", "--name", "add_job1"],
         required_out="Operation completed: 1 jobs modified",
     )
     run_check_cli(
-        ["job", "resume", "--name", "add*"],
+        ["job", "resume", "--name", "add_job*"],
         required_out="Operation completed: 1 jobs modified",
     )
 

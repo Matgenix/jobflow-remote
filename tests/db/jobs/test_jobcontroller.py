@@ -49,23 +49,23 @@ def test_queries(job_controller, runner) -> None:
     from jobflow_remote.testing import add
 
     add_first = add(1, 5)
-    add_first.name = "add1"
+    add_first.name = "add_job1"
     add_second = add(add_first.output, 5)
-    add_second.name = "add2"
+    add_second.name = "add_job2"
 
     add_first.update_metadata({"test_meta": 1})
 
     flow = Flow([add_first, add_second])
-    flow.name = "f1"
+    flow.name = "flow_1"
     submit_flow(flow, worker="test_local_worker")
 
     add_third = add(1, 5)
-    add_third.name = "add3"
+    add_third.name = "add_job3"
     add_fourth = add(add_third.output, 5)
-    add_fourth.name = "add4"
+    add_fourth.name = "add_job4"
 
     flow2 = Flow([add_third, add_fourth])
-    flow2.name = "f2"
+    flow2.name = "flow_2"
     submit_flow(flow2, worker="test_local_worker")
 
     date_create = datetime.datetime.now()
@@ -85,9 +85,9 @@ def test_queries(job_controller, runner) -> None:
 
     assert job_controller.count_jobs(metadata={"test_meta": 1}) == 1
 
-    assert job_controller.count_jobs(name="add") == 0
-    assert job_controller.count_jobs(name="add1") == 1
-    assert job_controller.count_jobs(name="add*") == 4
+    assert job_controller.count_jobs(name="add_job") == 0
+    assert job_controller.count_jobs(name="add_job1") == 1
+    assert job_controller.count_jobs(name="add_job*") == 4
 
     assert job_controller.count_jobs(flow_ids=flow.uuid) == 2
 
@@ -116,8 +116,8 @@ def test_queries(job_controller, runner) -> None:
     assert job_controller.count_flows(flow_ids=flow.uuid) == 1
     assert job_controller.count_flows(start_date=date_create) == 1
     assert job_controller.count_flows(end_date=date_create) == 1
-    assert job_controller.count_flows(name="f1") == 1
-    assert job_controller.count_flows(name="f*") == 2
+    assert job_controller.count_flows(name="flow_1") == 1
+    assert job_controller.count_flows(name="flow_*") == 2
     assert (
         job_controller.count_flows(query={"uuid": {"$in": (flow.uuid, flow2.uuid)}})
         == 2
