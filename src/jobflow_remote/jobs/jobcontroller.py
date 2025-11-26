@@ -1953,7 +1953,12 @@ class JobController:
             job_lock_kwargs=job_lock_kwargs,
             flow_lock_kwargs=flow_lock_kwargs,
         ) as (job_lock, flow_lock):
-            # lock_job_flow already checks that the locked document is not none, both for job and flow
+            # lock_job_flow already checks that the locked document is not none, both for job and flow.
+            # Check required to let mypy know
+            if job_lock.locked_document is None:
+                raise RuntimeError("No job document found in lock")
+            if flow_lock.locked_document is None:
+                raise RuntimeError("No job document found in lock")
             job_doc = job_lock.locked_document
 
             job_state = JobState(job_doc["state"])
@@ -2024,6 +2029,11 @@ class JobController:
             flow_lock_kwargs=flow_lock_kwargs,
         ) as (job_lock, flow_lock):
             # lock_job_flow already checks that the locked document is not none, both for job and flow
+            # Check required to let mypy know
+            if job_lock.locked_document is None:
+                raise RuntimeError("No job document found in lock")
+            if flow_lock.locked_document is None:
+                raise RuntimeError("No job document found in lock")
             job_doc = job_lock.locked_document
             job_id = job_doc["uuid"]
             job_index = job_doc["index"]
@@ -2173,6 +2183,11 @@ class JobController:
             flow_lock_kwargs=flow_lock_kwargs,
         ) as (job_lock, flow_lock):
             # lock_job_flow already checks that the locked document is not none, both for job and flow
+            # Check required to let mypy know
+            if job_lock.locked_document is None:
+                raise RuntimeError("No job document found in lock")
+            if flow_lock.locked_document is None:
+                raise RuntimeError("No job document found in lock")
             job_doc = job_lock.locked_document
             job_id = job_doc["uuid"]
             job_index = job_doc["index"]
@@ -5105,6 +5120,11 @@ class JobController:
             job_lock_kwargs=job_lock_kwargs,
         ) as (job_lock, flow_lock):
             # lock_job_flow already checks that the locked document is not none, both for job and flow
+            # Check required to let mypy know
+            if job_lock.locked_document is None:
+                raise RuntimeError("No job document found in lock")
+            if flow_lock.locked_document is None:
+                raise RuntimeError("No job document found in lock")
             job_doc = job_lock.locked_document
 
             # Update FlowDoc
