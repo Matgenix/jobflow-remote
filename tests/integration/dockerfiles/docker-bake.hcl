@@ -82,5 +82,6 @@ target "frontend" {
     tags = [
         "${IMAGE_BASE}-frontend:${IMAGE_TAG}",
     ]
+    output = ["type=docker"]
     platforms = ["linux/amd64"]
 }

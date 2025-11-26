@@ -345,6 +345,10 @@ services:
       - "{db_port}:27017"
     restart: always
     container_name: mongo_container
+    networks:
+      multifrontend_net:
+        aliases:
+          - mongo_server
     healthcheck:
       test: ["CMD", "mongosh", "--eval", "db.runCommand('ping').ok"]
       interval: 1s
@@ -362,6 +366,10 @@ services:
       - "{slurm_ssh_port}:22"
     stdin_open: true
     tty: true
+    networks:
+      multifrontend_net:
+        aliases:
+          - slurm_cluster
     healthcheck:
       test: ["CMD", "bash", "-c", "</dev/tcp/localhost/22"]
       interval: 1s
@@ -380,6 +388,10 @@ services:
       - "{sge_ssh_port}:22"
     stdin_open: true
     tty: true
+    networks:
+      multifrontend_net:
+        aliases:
+          - sge_cluster
     healthcheck:
       test: ["CMD", "bash", "-c", "</dev/tcp/localhost/22"]
       interval: 1s
@@ -398,6 +410,10 @@ services:
       - "{pbs_ssh_port}:22"
     stdin_open: true
     tty: true
+    networks:
+      multifrontend_net:
+        aliases:
+          - pbs_cluster
     healthcheck:
       test: ["CMD", "bash", "-c", "</dev/tcp/localhost/22"]
       interval: 1s
@@ -410,7 +426,7 @@ services:
   jobflow_remote_testing_frontend1:
     image: ghcr.io/matgenix/jobflow-remote-testing-frontend:latest
     container_name: jobflow_testing_frontend1
-    hostname: frontend
+    hostname: frontend1
     ports:
       - "{frontend1_port}:22"
     stdin_open: true
@@ -433,7 +449,7 @@ services:
   jobflow_remote_testing_frontend2:
     image: ghcr.io/matgenix/jobflow-remote-testing-frontend:latest
     container_name: jobflow_testing_frontend2
-    hostname: frontend
+    hostname: frontend2
     ports:
       - "{frontend2_port}:22"
     stdin_open: true
@@ -631,7 +647,7 @@ def frontend1_host(frontend1_port):
         host="localhost",
         port=frontend1_port,
         user="jobflow",
-        connect_kwargs={"password": "jobflow"},
+        connect_kwargs={"password": "jobflow", "look_for_keys": False},
     )
 
 
@@ -641,7 +657,7 @@ def frontend2_host(frontend2_port):
         host="localhost",
         port=frontend2_port,
         user="jobflow",
-        connect_kwargs={"password": "jobflow"},
+        connect_kwargs={"password": "jobflow", "look_for_keys": False},
     )
 
 
