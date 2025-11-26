@@ -15,6 +15,8 @@ from monty.os import cd
 from python_on_whales import DockerClient
 from python_on_whales import docker as docker_pow
 
+from jobflow_remote.remote.host import RemoteHost
+
 # Note that the workers are identified based on the scheduler_type, assuming that
 # "shell" workers are executed locally and not in any container. If this changes
 # the options will need to be modified. The fixtures will need to be updated accordingly.
@@ -293,6 +295,18 @@ def db_port():
     return _get_free_port()
 
 
+@pytest.fixture(scope="session")
+def frontend1_port():
+    """The exposed local port for SSH connections to the queue container."""
+    return _get_free_port()
+
+
+@pytest.fixture(scope="session")
+def frontend2_port():
+    """The exposed local port for SSH connections to the queue container."""
+    return _get_free_port()
+
+
 @pytest.fixture(scope="session", autouse=True)
 def bake_containers(worker_types):
     # targets here should be a list containing "slurm", "sge", "pbs"
@@ -300,6 +314,7 @@ def bake_containers(worker_types):
     # don't bake anything if only "shell" is needed.
     if not targets:
         return
+    targets.append("frontend")
     hcl_path = Path(__file__).parent.resolve() / "dockerfiles/docker-bake.hcl"
     docker_pow.buildx.bake(
         targets=targets,
@@ -314,6 +329,8 @@ def compose_containers(
     sge_ssh_port,
     pbs_ssh_port,
     db_port,
+    frontend1_port,
+    frontend2_port,
     bake_containers,
     coverage_file,
     pytestconfig,
@@ -388,6 +405,61 @@ services:
       retries: 30
       start_period: 2s
 """
+
+    compose_yaml += f"""
+  jobflow_remote_testing_frontend1:
+    image: ghcr.io/matgenix/jobflow-remote-testing-frontend:latest
+    container_name: jobflow_testing_frontend1
+    hostname: frontend
+    ports:
+      - "{frontend1_port}:22"
+    stdin_open: true
+    tty: true
+    volumes:
+      - jobflow_shared:/home/jobflow
+    networks:
+      multifrontend_net:
+        aliases:
+          - frontend1
+    healthcheck:
+      test: ["CMD", "bash", "-c", "</dev/tcp/localhost/22"]
+      interval: 1s
+      timeout: 1s
+      retries: 30
+      start_period: 2s
+"""
+
+    compose_yaml += f"""
+  jobflow_remote_testing_frontend2:
+    image: ghcr.io/matgenix/jobflow-remote-testing-frontend:latest
+    container_name: jobflow_testing_frontend2
+    hostname: frontend
+    ports:
+      - "{frontend2_port}:22"
+    stdin_open: true
+    tty: true
+    volumes:
+      - jobflow_shared:/home/jobflow
+    networks:
+      multifrontend_net:
+        aliases:
+          - frontend2
+    healthcheck:
+      test: ["CMD", "bash", "-c", "</dev/tcp/localhost/22"]
+      interval: 1s
+      timeout: 1s
+      retries: 30
+      start_period: 2s
+"""
+    # Shared volume definition for frontend1 and frontend2
+    compose_yaml += """
+volumes:
+  jobflow_shared:
+networks:
+  multifrontend_net:
+    driver: bridge
+"""
+
     with tempfile.NamedTemporaryFile("wt", suffix="compose.yaml", delete=False) as f:
         f.write(compose_yaml)
         f.flush()
@@ -551,6 +623,26 @@ services:
 @pytest.fixture(scope="session")
 def store_database_name():
     return _get_random_name()
+
+
+@pytest.fixture(scope="session")
+def frontend1_host(frontend1_port):
+    return RemoteHost(
+        host="localhost",
+        port=frontend1_port,
+        user="jobflow",
+        connect_kwargs={"password": "jobflow"},
+    )
+
+
+@pytest.fixture(scope="session")
+def frontend2_host(frontend2_port):
+    return RemoteHost(
+        host="localhost",
+        port=frontend2_port,
+        user="jobflow",
+        connect_kwargs={"password": "jobflow"},
+    )
 
 
 @pytest.fixture(scope="session", autouse=True)

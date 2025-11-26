@@ -15,7 +15,8 @@ group "default" {
     targets = [
         "slurm",
         "sge",
-        "pbs"
+        "pbs",
+        "frontend"
     ]
 }
 
@@ -67,6 +68,19 @@ target "pbs" {
     cache-to = CI ? ["type=gha,mode=max"] : ["type=registry,ref=${IMAGE_BASE}-pbs:cache,mode=max"]
     tags = [
         "${IMAGE_BASE}-pbs:${IMAGE_TAG}",
+    ]
+    platforms = ["linux/amd64"]
+}
+
+target "frontend" {
+    dockerfile = "./tests/integration/dockerfiles/Dockerfile"
+    args = {
+        QUEUE_SYSTEM = "frontend"
+    }
+    cache-from = []
+    cache-to = []
+    tags = [
+        "${IMAGE_BASE}-frontend:${IMAGE_TAG}",
     ]
     platforms = ["linux/amd64"]
 }
