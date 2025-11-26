@@ -76,11 +76,11 @@ def main(
             hidden=True,
         ),
     ] = False,
-    warn: Annotated[
+    warn_project: Annotated[
         bool,
         typer.Option(
-            "--warn",
-            "-w",
+            "--warn-project",
+            "-wp",
             help="Print warning messages regarding the parsing of the files in the projects folder.",
             is_eager=True,
         ),
@@ -106,7 +106,7 @@ def main(
 
     # initialize the ConfigManager only once, to avoid parsing the configuration
     # files multiple times when the command is executed.
-    initialize_config_manager(warn=warn)
+    initialize_config_manager(warn=warn_project)
     cm = get_config_manager()
     if project:
         SETTINGS.project = project
