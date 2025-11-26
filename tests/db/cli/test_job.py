@@ -247,13 +247,50 @@ def test_set_state(job_controller, two_flows_four_jobs, run_check_cli) -> None:
     from jobflow_remote.jobs.state import JobState
 
     run_check_cli(
-        ["job", "set-state", "UPLOADED", "1"], required_out="operation completed"
+        ["job", "set-state", "UPLOADED", two_flows_four_jobs[0][0].uuid],
+        required_out="Operation completed: 1 jobs modified",
     )
-    assert job_controller.set_job_state(JobState.UPLOADED, db_id="1")
+    assert (
+        job_controller.get_job_info(job_id=two_flows_four_jobs[0][0].uuid).state
+        == JobState.UPLOADED
+    )
+    assert (
+        job_controller.get_job_info(job_id=two_flows_four_jobs[0][1].uuid).state
+        == JobState.WAITING
+    )
+    assert (
+        job_controller.get_job_info(job_id=two_flows_four_jobs[1][0].uuid).state
+        == JobState.READY
+    )
+    assert (
+        job_controller.get_job_info(job_id=two_flows_four_jobs[1][1].uuid).state
+        == JobState.WAITING
+    )
     run_check_cli(
         ["job", "set-state", "UPLOADED", "10"],
-        required_out="Could not change the job state",
-        error=True,
+        required_out="No Job matching criteria",
+    )
+
+    run_check_cli(
+        ["job", "set-state", "COMPLETED", "--state", "WAITING"],
+        required_out="Operation completed: 2 jobs modified",
+    )
+
+    assert (
+        job_controller.get_job_info(job_id=two_flows_four_jobs[0][0].uuid).state
+        == JobState.UPLOADED
+    )
+    assert (
+        job_controller.get_job_info(job_id=two_flows_four_jobs[0][1].uuid).state
+        == JobState.COMPLETED
+    )
+    assert (
+        job_controller.get_job_info(job_id=two_flows_four_jobs[1][0].uuid).state
+        == JobState.READY
+    )
+    assert (
+        job_controller.get_job_info(job_id=two_flows_four_jobs[1][1].uuid).state
+        == JobState.COMPLETED
     )
 
 
