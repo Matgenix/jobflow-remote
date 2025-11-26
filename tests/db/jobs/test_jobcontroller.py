@@ -630,6 +630,7 @@ def test_set_job_run_properties(job_controller, one_job) -> None:
 
 def test_set_job_doc_properties(job_controller, one_job) -> None:
     from jobflow_remote.jobs.state import JobState
+    from jobflow_remote.utils.db import JobLockedError
 
     # error missing input
     with pytest.raises(
@@ -647,6 +648,25 @@ def test_set_job_doc_properties(job_controller, one_job) -> None:
             values={"job.metadata.x": "y"},
             job_id=one_job[0].uuid,
             acceptable_states=[JobState.COMPLETED],
+        )
+
+    # error missing job
+    with pytest.raises(ValueError, match="No Job matching criteria"):
+        job_controller.set_job_doc_properties(
+            values={"job.metadata.x": "y"},
+            job_id="wrong_uuid",
+        )
+    # error locked job
+    with (
+        pytest.raises(JobLockedError, match="The Job matching criteria.*is locked"),
+        job_controller.lock_job(
+            filter={"uuid": one_job[0].uuid, "index": one_job[0].index}
+        ),
+    ):
+        job_controller.set_job_doc_properties(
+            values={"job.metadata.x": "y"},
+            job_id=one_job[0].uuid,
+            job_index=one_job[0].index,
         )
 
     job_controller.set_job_doc_properties(

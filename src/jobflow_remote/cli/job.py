@@ -68,7 +68,6 @@ from jobflow_remote.cli.utils import (
     hide_progress,
     loading_spinner,
     out_console,
-    print_success_msg,
     str_to_dict,
 )
 from jobflow_remote.jobs.report import JobsReport
@@ -287,30 +286,55 @@ def job_info(
 
 @app_job.command()
 def set_state(
-    state: job_state_arg,
-    job_db_id: job_db_id_arg,
+    new_state: job_state_arg,
+    job_db_id: job_db_id_arg = None,
     job_index: job_index_arg = None,
+    job_id: job_ids_indexes_opt = None,
+    db_id: db_ids_opt = None,
+    flow_id: flow_ids_opt = None,
+    state: job_state_opt = None,
+    start_date: start_date_opt = None,
+    end_date: end_date_opt = None,
+    name: name_opt = None,
+    metadata: metadata_opt = None,
+    days: days_opt = None,
+    hours: hours_opt = None,
+    worker_name: worker_name_opt = None,
+    custom_query: query_opt = None,
+    verbosity: verbosity_opt = 0,
+    wait: wait_lock_opt = None,
+    break_lock: break_lock_opt = False,
 ) -> None:
     """
-    Sets the state of a Job to an arbitrary value.
+    Sets the state of one or more Jobs to an arbitrary value.
     WARNING: No checks. This can lead to inconsistencies in the DB. Use with care.
     """
-    db_id, job_id = get_job_db_ids(job_db_id, job_index)
 
-    with loading_spinner():
-        jc = get_job_controller()
+    jc = get_job_controller()
 
-        succeeded = jc.set_job_state(
-            state=state,
-            job_id=job_id,
-            job_index=job_index,
-            db_id=db_id,
-        )
-
-    if not succeeded:
-        exit_with_error_msg("Could not change the job state")
-
-    print_success_msg()
+    execute_multi_jobs_cmd(
+        state=new_state,
+        single_cmd=jc.set_job_state,
+        multi_cmd=jc.set_jobs_state,
+        job_db_id=job_db_id,
+        job_index=job_index,
+        job_ids=job_id,
+        db_ids=db_id,
+        flow_ids=flow_id,
+        states=state,
+        start_date=start_date,
+        end_date=end_date,
+        name=name,
+        metadata=metadata,
+        workers=worker_name,
+        custom_query=custom_query,
+        days=days,
+        hours=hours,
+        verbosity=verbosity,
+        wait=wait,
+        break_lock=break_lock,
+        interactive=True,
+    )
 
 
 @app_job.command()

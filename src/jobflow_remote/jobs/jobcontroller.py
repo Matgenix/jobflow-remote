@@ -1396,7 +1396,7 @@ class JobController:
         Returns
         -------
         str
-            The db_id of the updated Job. None if the Job was not updated.
+            The db_id of the updated Job.
         """
         sleep = None
         if wait:
@@ -1410,24 +1410,115 @@ class JobController:
             sleep=sleep,
             max_wait=wait,
             projection=projection,
+            get_locked_doc=True,
         ) as lock:
             doc = lock.locked_document
-            if doc:
-                if (
-                    acceptable_states
-                    and JobState(doc["state"]) not in acceptable_states
-                ):
-                    raise ValueError(
-                        f"Job in state {doc['state']}. The action cannot be performed"
+            if not doc:
+                if lock.unavailable_document:
+                    raise JobLockedError(
+                        f"The Job matching criteria {lock_filter} is locked."
                     )
-                values = dict(values)
-                # values["updated_on"] = datetime.utcnow()
-                lock.update_on_release = (
-                    [{"$set": values}] if use_pipeline else {"$set": values}
+                raise ValueError(f"No Job matching criteria {lock_filter}")
+            if acceptable_states and JobState(doc["state"]) not in acceptable_states:
+                raise ValueError(
+                    f"Job in state {doc['state']}. The action cannot be performed"
                 )
-                return doc["db_id"]
+            values = dict(values)
+            # values["updated_on"] = datetime.utcnow()
+            lock.update_on_release = (
+                [{"$set": values}] if use_pipeline else {"$set": values}
+            )
+            return doc["db_id"]
 
-        return None
+    def set_jobs_state(
+        self,
+        state: JobState,
+        job_ids: tuple[str, int] | list[tuple[str, int]] | None = None,
+        db_ids: str | list[str] | None = None,
+        flow_ids: str | list[str] | None = None,
+        states: JobState | list[JobState] | None = None,
+        start_date: datetime | None = None,
+        end_date: datetime | None = None,
+        name: str | None = None,
+        metadata: dict | None = None,
+        workers: str | list[str] | None = None,
+        custom_query: dict | None = None,
+        raise_on_error: bool = True,
+        wait: int | None = None,
+        break_lock: bool = False,
+    ) -> list[str]:
+        """
+        Set the state of multiple Jobs to an arbitrary JobState.
+
+        No check is performed! Any job can be set to any state.
+        Only for advanced users or for debugging purposes.
+
+        Parameters
+        ----------
+        state
+            The new state of the Jobs.
+        job_ids
+            One or more tuples, each containing the (uuid, index) pair of the
+            Jobs to retrieve.
+        db_ids
+            One or more db_ids of the Jobs to retrieve.
+        flow_ids
+            One or more Flow uuids to which the Jobs to retrieve belong. Can contain db_ids and uuids.
+        states
+            One or more states of the Jobs.
+        start_date
+            Filter Jobs that were updated_on after this date.
+            Should be in the machine local time zone. It will be converted to UTC.
+        end_date
+            Filter Jobs that were updated_on before this date.
+            Should be in the machine local time zone. It will be converted to UTC.
+        name
+            Pattern matching the name of Job. Default is an exact match, but all
+            conventions from python fnmatch can be used (e.g. *test*)
+        metadata
+            A dictionary of the values of the metadata to match. Should be an
+            exact match for all the values provided.
+        workers
+            One or more worker names.
+        custom_query
+            A generic query. Keys must not overlap with other specified query options.
+        raise_on_error
+            If True raise in case of error on one job error and stop the loop.
+            Otherwise, just log the error and proceed.
+        force
+            Bypass the limitation that only failed Jobs can be rerun.
+        wait
+            In case the Flow or Jobs that need to be updated are locked,
+            wait this time (in seconds) for the lock to be released.
+            Raise an error if lock is not released.
+        break_lock
+            Forcibly break the lock on locked documents. Use with care and
+            verify that the lock has been set by a process that is not running
+            anymore. Doing otherwise will likely lead to inconsistencies in the DB.
+
+        Returns
+        -------
+        list
+            List of db_ids of the updated Jobs.
+        """
+        return self._many_jobs_action(
+            method=self.set_job_state,
+            action_description="setting state",
+            state=state,
+            job_ids=job_ids,
+            db_ids=db_ids,
+            flow_ids=flow_ids,
+            states=states,
+            start_date=start_date,
+            end_date=end_date,
+            name=name,
+            metadata=metadata,
+            workers=workers,
+            custom_query=custom_query,
+            raise_on_error=raise_on_error,
+            wait=wait,
+            break_lock=break_lock,
+        )
 
     def set_job_state(
         self,
@@ -1448,6 +1539,8 @@ class JobController:
 
         Parameters
         ----------
+        state
+            The new state of the Job.
         db_id
             The db_id of the Job.
         job_id
@@ -1465,7 +1558,7 @@ class JobController:
         Returns
         -------
         str
-            The db_id of the updated Job. None if the Job was not updated.
+            The db_id of the updated Job.
         """
         values = {
             "state": state.value,
@@ -1860,9 +1953,8 @@ class JobController:
             job_lock_kwargs=job_lock_kwargs,
             flow_lock_kwargs=flow_lock_kwargs,
         ) as (job_lock, flow_lock):
+            # lock_job_flow already checks that the locked document is not none, both for job and flow
             job_doc = job_lock.locked_document
-            if job_doc is None:
-                raise RuntimeError("No job document found in lock")
 
             job_state = JobState(job_doc["state"])
             if job_state in [JobState.SUBMITTED.value, JobState.RUNNING.value]:
@@ -1877,8 +1969,6 @@ class JobController:
             job_id = job_doc["uuid"]
             job_index = job_doc["index"]
             updated_states = {job_id: {job_index: JobState.USER_STOPPED}}
-            if flow_lock.locked_document is None:
-                raise RuntimeError("No document found in flow lock")
             self.update_flow_state(
                 flow_uuid=flow_lock.locked_document["uuid"],
                 updated_states=updated_states,
@@ -1887,8 +1977,6 @@ class JobController:
                 "$set": {"state": JobState.USER_STOPPED.value}
             }
             return_doc = job_lock.locked_document
-            if return_doc is None:
-                raise RuntimeError("No document found in final job lock")
 
             return return_doc["db_id"]
 
@@ -1935,23 +2023,18 @@ class JobController:
             job_lock_kwargs=job_lock_kwargs,
             flow_lock_kwargs=flow_lock_kwargs,
         ) as (job_lock, flow_lock):
+            # lock_job_flow already checks that the locked document is not none, both for job and flow
             job_doc = job_lock.locked_document
-            if job_doc is None:
-                raise RuntimeError("No job document found in lock")
             job_id = job_doc["uuid"]
             job_index = job_doc["index"]
             updated_states = {job_id: {job_index: JobState.PAUSED}}
             flow_doc = flow_lock.locked_document
-            if flow_doc is None:
-                raise RuntimeError("No flow document found in lock")
             self.update_flow_state(
                 flow_uuid=flow_doc["uuid"],
                 updated_states=updated_states,
             )
             job_lock.update_on_release = {"$set": {"state": JobState.PAUSED.value}}
             return_doc = job_lock.locked_document
-            if return_doc is None:
-                raise RuntimeError("No document found in final job lock")
 
             return return_doc["db_id"]
 
@@ -2089,9 +2172,8 @@ class JobController:
             job_lock_kwargs=job_lock_kwargs,
             flow_lock_kwargs=flow_lock_kwargs,
         ) as (job_lock, flow_lock):
+            # lock_job_flow already checks that the locked document is not none, both for job and flow
             job_doc = job_lock.locked_document
-            if job_doc is None:
-                raise RuntimeError("No job document found in lock")
             job_id = job_doc["uuid"]
             job_index = job_doc["index"]
             final_state = self._resume_job_locked(job_doc)
@@ -5022,11 +5104,8 @@ class JobController:
             break_lock=break_lock,
             job_lock_kwargs=job_lock_kwargs,
         ) as (job_lock, flow_lock):
+            # lock_job_flow already checks that the locked document is not none, both for job and flow
             job_doc = job_lock.locked_document
-            if job_doc is None:
-                raise RuntimeError("No job document found in lock")
-            if flow_lock.locked_document is None:
-                raise RuntimeError("No document found in flow lock")
 
             # Update FlowDoc
             flow_doc = FlowDoc.model_validate(flow_lock.locked_document)
