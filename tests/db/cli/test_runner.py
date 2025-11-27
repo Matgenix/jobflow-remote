@@ -61,7 +61,7 @@ def test_std_operations(
     assert rr_after["start_time"] > rr_before["start_time"]
 
     run_check_cli(
-        ["runner", "stop"],
+        ["runner", "stop-processes"],
         required_out="The stop signal has been sent to the Runner",
     )
 
@@ -75,6 +75,19 @@ def test_std_operations(
 
     run_check_cli(
         ["runner", "shutdown"],
+    )
+
+    wait_daemon_shutdown(daemon_manager)
+
+    run_check_cli(
+        ["runner", "start"],
+    )
+
+    wait_daemon_started(daemon_manager)
+
+    # "stop" means "shutdown", test this as well
+    run_check_cli(
+        ["runner", "stop"],
     )
 
     wait_daemon_shutdown(daemon_manager)
@@ -113,7 +126,7 @@ def test_reset(wait_daemon_started, daemon_manager, job_controller, run_check_cl
     run_check_cli(
         ["runner", "start"],
         required_out=[
-            "A daemon runner process may be running on a different machine",
+            "A daemon runner process associated to this database may be already running",
             "YYYYYYY",
             "jf runner reset",
         ],
