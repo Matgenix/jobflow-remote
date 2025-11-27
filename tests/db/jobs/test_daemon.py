@@ -83,6 +83,11 @@ def test_start_stop(
     wait_daemon_shutdown(daemon_manager)
     assert daemon_manager.check_status() == DaemonStatus.SHUT_DOWN
 
+    assert daemon_manager.start(raise_on_error=True, single=single)
+    wait_daemon_started(daemon_manager)
+    assert daemon_manager.shut_down(raise_on_error=True, wait=True)
+    assert daemon_manager.check_status() == DaemonStatus.SHUT_DOWN
+
     processes_info = daemon_manager.get_processes_info()
     assert processes_info is None
 
@@ -205,7 +210,7 @@ def test_runner_different_machine(
     assert daemon_manager.pid_filepath.exists()
     with pytest.raises(
         RunningDaemonError,
-        match=r"A daemon runner process may be running on a different machine",
+        match=r"A daemon runner process associated to this database may be already running",
     ):
         daemon_manager.start(raise_on_error=True, single=False)
     assert daemon_manager.pid_filepath.exists()
@@ -219,7 +224,7 @@ def test_runner_different_machine(
 
     with pytest.raises(
         RunningDaemonError,
-        match=r"A daemon runner process may be running on a different machine",
+        match=r"A daemon runner process associated to this database may be already running",
     ):
         daemon_manager.kill(raise_on_error=True)
     assert daemon_manager.pid_filepath.exists()
@@ -233,7 +238,7 @@ def test_runner_different_machine(
 
     with pytest.raises(
         RunningDaemonError,
-        match=r"A daemon runner process may be running on a different machine",
+        match=r"A daemon runner process associated to this database may be already running",
     ):
         daemon_manager.stop(raise_on_error=True)
     assert daemon_manager.pid_filepath.exists()
@@ -247,7 +252,7 @@ def test_runner_different_machine(
 
     with pytest.raises(
         RunningDaemonError,
-        match=r"A daemon runner process may be running on a different machine",
+        match=r"A daemon runner process associated to this database may be already running",
     ):
         daemon_manager.shut_down(raise_on_error=True)
     assert daemon_manager.pid_filepath.exists()

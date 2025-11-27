@@ -133,6 +133,7 @@ class DaemonStatus(Enum):
     """
 
     SHUT_DOWN = "SHUT_DOWN"
+    SHUTTING_DOWN = "SHUTTING_DOWN"
     STOPPED = "STOPPED"
     STOPPING = "STOPPING"
     PARTIALLY_RUNNING = "PARTIALLY_RUNNING"
@@ -343,7 +344,7 @@ class DaemonManager:
 
         return running
 
-    def check_status(self) -> DaemonStatus:
+    def check_status(self, raise_on_shutdown: bool = True) -> DaemonStatus:
         """
         Get the current status of the daemon based on the state of the supervisord
         process and the running processes.
@@ -384,9 +385,11 @@ class DaemonManager:
                 return DaemonStatus.SHUT_DOWN
 
             if exc.faultString == "SHUTDOWN_STATE":
-                raise DaemonError(
-                    "The daemon is likely shutting down and the actual state cannot be determined"
-                ) from exc
+                if raise_on_shutdown:
+                    raise DaemonError(
+                        "The daemon is likely shutting down and the actual state cannot be determined"
+                    ) from exc
+                return DaemonStatus.SHUTTING_DOWN
             raise
         if not proc_info:
             raise DaemonError(
@@ -824,7 +827,7 @@ class DaemonManager:
 
         raise DaemonError(f"Daemon status {status} could not be handled")
 
-    def shut_down(self, raise_on_error: bool = False) -> bool:
+    def shut_down(self, raise_on_error: bool = False, wait: bool = False) -> bool:
         """
         Shut down the supervisord process and all the processes of the daemon.
 
@@ -832,7 +835,8 @@ class DaemonManager:
         ----------
         raise_on_error
             If True, raise an exception if an error occurs.
-
+        wait
+            If True wait until the daemon has stopped.
         Returns
         -------
         bool
@@ -861,6 +865,19 @@ class DaemonManager:
                 if raise_on_error:
                     raise
                 return False
+            if wait:
+                while True:
+                    time.sleep(1)
+                    try:
+                        current_status = self.check_status(raise_on_shutdown=False)
+                    except Exception as exc:
+                        if raise_on_error:
+                            raise DaemonError(
+                                "Error while waiting for the daemon to shut down"
+                            ) from exc
+                        return False
+                    if current_status == DaemonStatus.SHUT_DOWN:
+                        break
             lock.update_on_release = {"$set": {"running_runner": None}}
             return True
 
@@ -1134,25 +1151,31 @@ class DaemonManager:
             "user",
             "daemon_dir",
         ]
-        for data in data_to_check:
-            if local_data[data] != db_data[data]:
-                break
-        else:
+        diffs = [d for d in data_to_check if local_data[d] != db_data[d]]
+
+        if not diffs:
             logger.info(
                 "The DB reports that there is a running runner and it corresponds to this machine"
             )
             return None
 
-        error = (
-            "A daemon runner process may be running on a different machine.\n"
-            "Here is the information retrieved from the database:\n"
-            f"- hostname: {db_data['hostname']}\n"
-            f"- project_name: {db_data['project_name']}\n"
-            f"- start_time: {db_data['start_time']}\n"
-            f"- last_pinged: {db_data['last_pinged']}\n"
-            f"- daemon_dir: {db_data['daemon_dir']}\n"
-            f"- user: {db_data['user']}"
+        error = "A daemon runner process associated to this database may be already running.\n"
+        helper_sentences = {
+            "hostname": "active on another machine",
+            "project_name": "associated to another Project",
+            "user": "associated to another user",
+            "daemon_dir": "using a different project folder",
+        }
+        for d in diffs:
+            error += (
+                f"- It seems to be {helper_sentences[d]}: {db_data[d]}"
+                f" (current {local_data[d]})\n"
+            )
+        error += (
+            f"- It was started at: {db_data['start_time']}\n"
+            f"- The last time it pinged the database was: {db_data['last_pinged']}\n"
         )
+
         if raise_on_error:
             raise RunningDaemonError(error)
         return error

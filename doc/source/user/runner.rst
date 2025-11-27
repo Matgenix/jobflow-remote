@@ -78,38 +78,36 @@ the steps 3 and 4.
     the project configuration is changed the ``Runner`` needed the runner needs
     to be restarted.
 
-.. _runner stop:
+.. _runner stop_shutdown:
 
-Stop
-----
+Stop - Shutdown
+---------------
 
 Executing the stop command::
 
     jf runner stop
 
+or the command::
+
+    jf runner shutdown
+
 relies on Supervisor to send a ``SIGTERM`` signal (a termination signal that allows
-the process to exit cleanly) to all the ``Runner`` processes.
-In this case the supervisor process will remain active. Unless the ``--wait`` option
-is specified, the completion of the command will not imply that all the ``Runner``
-processes have been terminated.
+the process to exit cleanly) to all the ``Runner`` processes. After this also the
+Supervisor process will be stopped. The two commands are equivalent and will result in
+a Runner in the ``shut_down`` state.
+
+Unless the ``--wait`` option is specified, the completion of the command will not imply
+that all the ``Runner`` processes have been terminated.
 
 .. warning::
     The ``Runner`` is designed to recognize the signal and **wait for the completion of
     the action being performed**, before actually exiting.
 
 .. note::
-    Since the supervisor process remains active, when starting the runner again after
-    a stop it is not possible to switch from a single process to a split configuration
-    or the other way round. It is necessary to shut down the whole daemon in that case.
-
-Shutdown
---------
-Shutting down the runner with the command::
-
-    jf runner shutdown
-
-is equivalent to the :ref:`runner stop`, except that also the Supervisor process will
-be stopped.
+    In older versions of jobflow-remote the ``jf runner stop`` command used to stop
+    only the ``Runner`` processes, but leaving the Supervisor process active. Since version
+    1.0 this has been removed from the CLI to simply the handling of the runner.
+    If needed, the option is still available through the python API.
 
 Kill
 ----

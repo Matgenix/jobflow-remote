@@ -44,7 +44,10 @@ app.add_typer(app_runner)
 
 
 _running_daemon_error_msg = (
-    "\nIf no runner is active on that machine clean the DB with `jf runner reset`"
+    "\nRun `jf runner info` to get more details about the active runner reported in the database.\n"
+    "If you are [bold]absolutely sure that no other runner is active on another machine "
+    "or for another project[/bold], clean the DB with `jf runner reset`.\n"
+    "[bold]If you are unsure about the meaning of this message check the documentation:[/bold] [link=https://matgenix.github.io/jobflow-remote/user/runner.html#running-daemon-check]https://matgenix.github.io/jobflow-remote/user/runner.html#running-daemon-check[/link]"
 )
 
 
@@ -177,7 +180,7 @@ def start(
             )
         except RunningDaemonError as e:
             exit_with_error_msg(
-                f"Error while starting the daemon: {getattr(e, 'message', e)}{_running_daemon_error_msg}"
+                f"Error while starting the daemon:\n{getattr(e, 'message', e)}{_running_daemon_error_msg}"
             )
         except DaemonError as e:
             exit_with_error_msg(
@@ -195,8 +198,8 @@ def start(
         dm.foreground_processes(print_function=out_console.print)
 
 
-@app_runner.command()
-def stop(
+@app_runner.command(hidden=True)
+def stop_processes(
     wait: Annotated[
         bool,
         typer.Option(
@@ -222,7 +225,7 @@ def stop(
             stop_sent = dm.stop(wait=wait, raise_on_error=True)
         except RunningDaemonError as e:
             exit_with_error_msg(
-                f"Error while stopping the daemon: {getattr(e, 'message', e)}{_running_daemon_error_msg}"
+                f"Error while stopping the daemon:\n{getattr(e, 'message', e)}{_running_daemon_error_msg}"
             )
         except DaemonError as e:
             exit_with_error_msg(
@@ -235,6 +238,26 @@ def stop(
             "The stop signal has been sent to the Runner. Run 'jf runner status' to verify if it stopped",
             style="yellow",
         )
+
+
+@app_runner.command()
+def stop(
+    wait: Annotated[
+        bool,
+        typer.Option(
+            "--wait",
+            "-w",
+            help=(
+                "Wait until the daemon has stopped. NOTE: this may take a while if a large file is being transferred!"
+            ),
+        ),
+    ] = False,
+) -> None:
+    """
+    Shuts down the supervisord process.
+    Note that the supervisord process will stop after all the runner processes have finished.
+    """
+    shutdown(wait=wait)
 
 
 @app_runner.command()
@@ -251,7 +274,7 @@ def kill() -> None:
             dm.kill(raise_on_error=True)
         except RunningDaemonError as e:
             exit_with_error_msg(
-                f"Error while killing the daemon: {getattr(e, 'message', e)}{_running_daemon_error_msg}"
+                f"Error while killing the daemon:\n{getattr(e, 'message', e)}{_running_daemon_error_msg}"
             )
         except DaemonError as e:
             exit_with_error_msg(
@@ -260,20 +283,31 @@ def kill() -> None:
 
 
 @app_runner.command()
-def shutdown() -> None:
+def shutdown(
+    wait: Annotated[
+        bool,
+        typer.Option(
+            "--wait",
+            "-w",
+            help=(
+                "Wait until the daemon has shut down. NOTE: this may take a while if a large file is being transferred!"
+            ),
+        ),
+    ] = False,
+) -> None:
     """
     Shuts down the supervisord process.
-    Note that if the daemon is running it will wait for the daemon to stop.
+    Note that the supervisord process will stop after all the runner processes have finished
     """
     cm = get_config_manager()
     dm = DaemonManager.from_project(cm.get_project())
     with loading_spinner(processing=False) as progress:
         progress.add_task(description="Shutting down supervisor...", total=None)
         try:
-            dm.shut_down(raise_on_error=True)
+            dm.shut_down(raise_on_error=True, wait=wait)
         except RunningDaemonError as e:
             exit_with_error_msg(
-                f"Error while shutting down supervisor: {getattr(e, 'message', e)}{_running_daemon_error_msg}"
+                f"Error while shutting down supervisor:\n{getattr(e, 'message', e)}{_running_daemon_error_msg}"
             )
         except DaemonError as e:
             exit_with_error_msg(
@@ -295,7 +329,7 @@ def restart() -> None:
             dm.restart(raise_on_error=True)
         except RunningDaemonError as e:
             exit_with_error_msg(
-                f"Error while restarting the daemon: {getattr(e, 'message', e)}{_running_daemon_error_msg}"
+                f"Error while restarting the daemon:\n{getattr(e, 'message', e)}{_running_daemon_error_msg}"
             )
         except DaemonError as e:
             exit_with_error_msg(
