@@ -6,9 +6,9 @@ import importlib.metadata
 import logging
 import shutil
 import traceback
-import typing
 import warnings
 from collections import defaultdict
+from collections.abc import MutableMapping
 from contextlib import ExitStack
 from datetime import datetime, timedelta, timezone
 from functools import cached_property
@@ -1954,11 +1954,6 @@ class JobController:
             flow_lock_kwargs=flow_lock_kwargs,
         ) as (job_lock, flow_lock):
             # lock_job_flow already checks that the locked document is not none, both for job and flow.
-            # Check required to let mypy know
-            if job_lock.locked_document is None:
-                raise RuntimeError("No job document found in lock")
-            if flow_lock.locked_document is None:
-                raise RuntimeError("No job document found in lock")
             job_doc = job_lock.locked_document
 
             job_state = JobState(job_doc["state"])
@@ -2029,11 +2024,6 @@ class JobController:
             flow_lock_kwargs=flow_lock_kwargs,
         ) as (job_lock, flow_lock):
             # lock_job_flow already checks that the locked document is not none, both for job and flow
-            # Check required to let mypy know
-            if job_lock.locked_document is None:
-                raise RuntimeError("No job document found in lock")
-            if flow_lock.locked_document is None:
-                raise RuntimeError("No job document found in lock")
             job_doc = job_lock.locked_document
             job_id = job_doc["uuid"]
             job_index = job_doc["index"]
@@ -2183,11 +2173,6 @@ class JobController:
             flow_lock_kwargs=flow_lock_kwargs,
         ) as (job_lock, flow_lock):
             # lock_job_flow already checks that the locked document is not none, both for job and flow
-            # Check required to let mypy know
-            if job_lock.locked_document is None:
-                raise RuntimeError("No job document found in lock")
-            if flow_lock.locked_document is None:
-                raise RuntimeError("No job document found in lock")
             job_doc = job_lock.locked_document
             job_id = job_doc["uuid"]
             job_index = job_doc["index"]
@@ -4643,6 +4628,7 @@ class JobController:
 
             set_output = lock.update_on_release
 
+            update_on_release: list | dict
             if lock.locked_document:
                 if not error:
                     next_step_time_limit = None
@@ -4660,9 +4646,12 @@ class JobController:
                             "remote.error": None,
                         }
                     }
-                    update_on_release = deep_merge_dict(
-                        succeeded_update, set_output or {}
-                    )
+                    if isinstance(set_output, list):
+                        update_on_release = [*set_output, succeeded_update]
+                    else:
+                        update_on_release = deep_merge_dict(
+                            succeeded_update, set_output or {}
+                        )
                 else:
                     step_attempts = doc["remote"]["step_attempts"]
                     no_retry = no_retry or step_attempts >= max_step_attempts
@@ -4700,7 +4689,10 @@ class JobController:
                                 "remote.queue_err": queue_err,
                             }
                         }
-                if "$set" in update_on_release:
+                if (
+                    isinstance(update_on_release, MutableMapping)
+                    and "$set" in update_on_release
+                ):
                     update_on_release["$set"]["updated_on"] = datetime.now(timezone.utc)
 
                 lock.update_on_release = update_on_release
@@ -4998,7 +4990,7 @@ class JobController:
         return self.batches.insert_one(batch_doc_dict)
 
     def update_job_in_batch(
-        self, job_id: str, job_index: int, batch_uid: str, worker: str, info: typing.Any
+        self, job_id: str, job_index: int, batch_uid: str, worker: str, info: Any
     ):
         self.batches.update_one(
             {"batch_uid": batch_uid},
@@ -5120,11 +5112,6 @@ class JobController:
             job_lock_kwargs=job_lock_kwargs,
         ) as (job_lock, flow_lock):
             # lock_job_flow already checks that the locked document is not none, both for job and flow
-            # Check required to let mypy know
-            if job_lock.locked_document is None:
-                raise RuntimeError("No job document found in lock")
-            if flow_lock.locked_document is None:
-                raise RuntimeError("No job document found in lock")
             job_doc = job_lock.locked_document
 
             # Update FlowDoc

@@ -6,7 +6,7 @@ import uuid
 from collections.abc import Mapping, MutableMapping
 from copy import deepcopy
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, TypeVar
 from uuid import UUID
 
 import maggma.stores  # required to enable subclass searching
@@ -15,14 +15,16 @@ from dateutil.tz import gettz
 from maggma.core.store import Store
 from monty.json import MontyDecoder
 
+M = TypeVar("M", bound=MutableMapping)
+
 
 def deep_merge_dict(
-    d1: MutableMapping,
+    d1: M,
     d2: Mapping,
     path: list[str] | None = None,
     raise_on_conflicts: bool = True,
     inplace: bool = True,
-) -> MutableMapping:
+) -> M:
     """
     Merge a dictionary d2 into a dictionary d1 recursively.
 
