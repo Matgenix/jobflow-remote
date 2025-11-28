@@ -153,8 +153,8 @@ class MongoLock:
         self.filter = filter or {}
         self.update = update
         self.break_lock = break_lock
-        self.locked_document = None
-        self.unavailable_document = None
+        self.locked_document: dict | None = None
+        self.unavailable_document: dict | None = None
         self.lock_id = lock_id or suuid()
         self.kwargs = kwargs
         self._update_on_release: dict | list = {}
@@ -335,7 +335,8 @@ class MongoLock:
             return
 
         # Release the lock by removing the unique identifier and lock expiration time
-        update: list | dict = {"$set": {self.LOCK_KEY: None, self.LOCK_TIME_KEY: None}}
+        base_update: dict = {"$set": {self.LOCK_KEY: None, self.LOCK_TIME_KEY: None}}
+        update: list | dict = base_update
         # TODO maybe set on release only if no exception was raised?
         if self.update_on_release:
             # if an exception raised inside the context manager do not update the document
@@ -345,9 +346,9 @@ class MongoLock:
                     f"The update_on_release {self.update_on_release} will not be applied."
                 )
             elif isinstance(self.update_on_release, list):
-                update = [update, *self.update_on_release]
+                update = [base_update, *self.update_on_release]
             else:
-                update = deep_merge_dict(update, self.update_on_release)
+                update = deep_merge_dict(base_update, self.update_on_release)
         logger.debug(f"release lock with update: {update}")
 
         # if an exception raised inside the context manager do not delete the document
