@@ -238,7 +238,7 @@ def test_edit_replace(
         # cases with empty projects folder
         run_check_cli(
             ["project", "edit", "replace", "old_text", "new_text"],
-            required_out=f"The selected project {random_project_name} does not exist or could not be parsed",
+            required_out="The active projects config file could not be parsed. Please check the formatting of your YAML. You can use the command 'jf project list -w' to get the parsing errors.",
             error=True,
         )
 
