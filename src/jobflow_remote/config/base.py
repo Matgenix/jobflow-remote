@@ -754,3 +754,7 @@ class ConfigError(Exception):
 
 class ProjectUndefinedError(ConfigError):
     """Exception raised if the Project has not been defined or could not be determined."""
+
+
+class ProjectParsingError(ConfigError):
+    """Exception raised if the Project does not exist or could not be parsed."""

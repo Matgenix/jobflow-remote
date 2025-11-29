@@ -17,6 +17,7 @@ from jobflow_remote.config.base import (
     ConfigError,
     ExecutionConfig,
     Project,
+    ProjectParsingError,
     ProjectUndefinedError,
     WorkerBase,
 )
@@ -165,7 +166,7 @@ class ConfigManager:
         project_name = self.select_project_name(project_name)
 
         if project_name not in self.projects_data:
-            raise ConfigError(
+            raise ProjectParsingError(
                 f"The selected project {project_name} does not exist "
                 "or could not be parsed correctly"
             )
@@ -274,20 +275,28 @@ class ConfigManager:
         self.dump_project(project_data)
         self.projects_data[project_data.project.name] = project_data
 
-    def project_names_from_files(self) -> list[str]:
+    def project_names_from_files(
+        self, *, suppress_warnings: bool = False
+    ) -> tuple[list[str], list[str]]:
         """
-        Parses all the prasable files and only checks for the "name" attribute to
+        Parses all the parsable files and only checks for the "name" attribute to
         return a list of potential project file names.
 
         Useful in case some projects cannot be properly parsed, but the full list
         needs to be returned.
 
+        Parameters
+        ----------
+        suppress_warnings
+            If set to True, suppress warnings related to the parsing of the files in the projects folder.
+
         Returns
         -------
-        list
-            List of project names.
+        tuple
+            List of project names + List of erroneous files
         """
         project_names = []
+        erroneous_files = []
         for ext in self.projects_ext:
             for filepath in glob.glob(str(self.projects_folder / f"*.{ext}")):
                 try:
@@ -299,12 +308,15 @@ class ConfigManager:
                     if "name" in d:
                         project_names.append(d["name"])
                 except Exception:
-                    logger.warning(
-                        f"File {filepath} could not be parsed as a Project. Error: {traceback.format_exc()}"
-                    )
-                    continue
+                    erroneous_files.append(
+                        Path(filepath).stem
+                    )  # assume that this is the name of the project
+                    if not suppress_warnings:
+                        logger.warning(
+                            f"File {filepath} could not be parsed as a Project. Error: {traceback.format_exc()}"
+                        )
 
-        return project_names
+        return project_names, erroneous_files
 
     def backup_project(self, project_name: str) -> None:
         """
