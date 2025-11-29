@@ -22,7 +22,7 @@ from rich.tree import Tree
 from typer.core import TyperCommand, TyperGroup
 
 from jobflow_remote import ConfigManager, JobController
-from jobflow_remote.config.base import ProjectUndefinedError
+from jobflow_remote.config.base import ProjectParsingError, ProjectUndefinedError
 from jobflow_remote.jobs.daemon import DaemonError, DaemonManager, DaemonStatus
 
 if TYPE_CHECKING:
@@ -314,6 +314,11 @@ def cli_error_handler(func):
             exit_with_error_msg(
                 "The active project could not be determined and it is required to execute this command. Please "
                 "check the formatting of your YAML."
+            )
+        except ProjectParsingError:
+            exit_with_error_msg(
+                "The active projects config file could not be parsed. Please check the formatting of your YAML. "
+                "You can use the command 'jf project list -w' to get the parsing errors."
             )
         except Exception as e:
             from jobflow_remote import SETTINGS

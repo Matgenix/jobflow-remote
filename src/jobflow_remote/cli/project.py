@@ -70,7 +70,9 @@ def list_projects(
     except ConfigError:
         pass
 
-    full_project_list = cm.project_names_from_files()
+    full_project_list, erroneous_files = cm.project_names_from_files(
+        suppress_warnings=True
+    )
 
     if not full_project_list:
         exit_with_warning_msg(f"No project available in {cm.projects_folder}")
@@ -79,7 +81,9 @@ def list_projects(
     for pn in sorted(full_project_list):
         out_console.print(f" - {pn}", style="green" if pn == project_name else None)
 
-    not_parsed_projects = set(full_project_list).difference(cm.projects_data)
+    not_parsed_projects = set(full_project_list).difference(cm.projects_data) | set(
+        erroneous_files
+    )
     if not_parsed_projects:
         out_console.print(
             "The following project names exist in files in the project folder, "
@@ -89,7 +93,7 @@ def list_projects(
         )
         from jobflow_remote import SETTINGS
 
-        if SETTINGS.cli_suggestions:
+        if SETTINGS.cli_suggestions and not warn:
             out_console.print(
                 "Run the command with -w option to see the parsing errors",
                 style="yellow",
