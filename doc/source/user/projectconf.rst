@@ -18,6 +18,7 @@ configured through environment variables or an additional configuration file.
     not attempt to refresh them during the execution. Whenever any configuration is changed
     the ``Runner`` should be restarted.
 
+.. _projectconf options:
 
 Project options
 ===============
@@ -258,7 +259,7 @@ other collections within the same database to  manage and track different aspect
 
 - **Flows collection**: keeps track of the state of Flows and their relationship to Jobs.
 - **Auxiliary collection**: stores additional internal metadata required by jobflow-remote.
-- **Batches collection**: stores information about *batch processes* (see :ref:`Batch submission`),
+- **Batches collection**: stores information about *batch processes* (see :ref:`advancedoptions batch`),
   including their state, associated worker, start and end times, and the list of Jobs
   executed within each batch. This collection allows for monitoring both active and
   past batch executions.

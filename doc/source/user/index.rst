@@ -23,6 +23,7 @@ details are found in :ref:`reference`.
    backup
    cli
    gui
+   troubleshooting
 
 .. toctree::
    :hidden:

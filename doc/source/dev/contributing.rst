@@ -5,11 +5,11 @@ Contributing to jobflow-remote
 We love your input! We want to make contributing to as easy and
 transparent as possible, whether it’s:
 
--  Reporting a bug
--  Discussing the current state of the code
--  Submitting a fix
--  Proposing or implementing new features
--  Becoming a maintainer
+- Reporting a bug
+- Discussing the current state of the code
+- Submitting a fix
+- Proposing or implementing new features
+- Becoming a maintainer
 
 Reporting bugs, getting help, and discussion
 --------------------------------------------
@@ -23,12 +23,12 @@ If you are making a bug report, incorporate as many elements of the
 following as possible to ensure a timely response and avoid the need for
 followups:
 
--  A quick summary and/or background.
--  Steps to reproduce - be specific! **Provide sample code.**
--  What you expected would happen, compared to what actually happens.
--  The full stack trace of any errors you encounter.
--  Notes (possibly including why you think this might be happening, or
-   steps you tried that didn’t work).
+- A quick summary and/or background.
+- Steps to reproduce - be specific! **Provide sample code.**
+- What you expected would happen, compared to what actually happens.
+- The full stack trace of any errors you encounter.
+- Notes (possibly including why you think this might be happening, or
+  steps you tried that didn’t work).
 
 We love thorough bug reports as this means the development team can make
 quick and meaningful fixes. When we confirm your bug report, we’ll move
@@ -48,11 +48,11 @@ for more information on this procedure.
 
 The basic procedure for making a PR is:
 
--  Fork the repo and create your branch from main.
--  Commit your improvements to your branch and push to your Github fork
-   (repo).
--  When you’re finished, go to your fork and make a Pull Request. It
-   will automatically update if you need to make further changes.
+- Fork the repo and create your branch from main.
+- Commit your improvements to your branch and push to your Github fork
+  (repo).
+- When you’re finished, go to your fork and make a Pull Request. It will
+  automatically update if you need to make further changes.
 
 How to Make a Great Pull Request
 --------------------------------
@@ -60,22 +60,22 @@ How to Make a Great Pull Request
 We have a few tips for writing good PRs that are accepted into the main
 repo:
 
--  Use the Numpy Code style for all of your code. Find an example
-   `here <https://sphinxcontrib-napoleon.readthedocs.io/en/latest/example_numpy.html#example-numpy>`__.
--  Your code should have (4) spaces instead of tabs.
--  If needed, update the documentation.
--  **Write tests** for new features! Good tests are 100%, absolutely
-   necessary for good code. We use the python ``pytest`` framework – see
-   some of the other tests in this repo for examples, or review the
-   `Hitchhiker’s guide to
-   python <https://docs.python-guide.org/writing/tests>`__ for some good
-   resources on writing good tests.
--  Understand your contributions will fall under the same license as
-   this repo.
--  This project uses ``pre-commit`` for uniform linting across many
-   developers. You can install it through the extra dev dependencies
-   with ``pip install -e .[dev]`` and then run ``pre-commit install`` to
-   activate it for you local repository.
+- Use the Numpy Code style for all of your code. Find an example
+  `here <https://sphinxcontrib-napoleon.readthedocs.io/en/latest/example_numpy.html#example-numpy>`__.
+- Your code should have (4) spaces instead of tabs.
+- If needed, update the documentation.
+- **Write tests** for new features! Good tests are 100%, absolutely
+  necessary for good code. We use the python ``pytest`` framework – see
+  some of the other tests in this repo for examples, or review the
+  `Hitchhiker’s guide to
+  python <https://docs.python-guide.org/writing/tests>`__ for some good
+  resources on writing good tests.
+- Understand your contributions will fall under the same license as this
+  repo.
+- This project uses ``pre-commit`` for uniform linting across many
+  developers. You can install it through the extra dev dependencies with
+  ``pip install -e .[dev]`` and then run ``pre-commit install`` to
+  activate it for you local repository.
 
 When you submit your PR, our CI service will automatically run your
 tests. We welcome good discussion on the best ways to write your code,
