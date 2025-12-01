@@ -47,7 +47,7 @@ _running_daemon_error_msg = (
     "\nRun `jf runner info` to get more details about the active runner reported in the database.\n"
     "If you are [bold]absolutely sure that no other runner is active on another machine "
     "or for another project[/bold], clean the DB with `jf runner reset`.\n"
-    "[bold]If you are unsure about the meaning of this message check the documentation:[/bold] [link=https://matgenix.github.io/jobflow-remote/user/runner.html#running-daemon-check]https://matgenix.github.io/jobflow-remote/user/runner.html#running-daemon-check[/link]"
+    "[bold]If you are unsure about the meaning of this message check the documentation:[/bold] [link=https://matgenix.github.io/jobflow-remote/user/troubleshooting.html]https://matgenix.github.io/jobflow-remote/user/troubleshooting.html[/link]"
 )
 
 

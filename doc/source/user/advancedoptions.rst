@@ -80,6 +80,8 @@ Given the strict connection requirements, this approach comes with some limitati
 * The Runner can only run with a single process, not in the split mode.
 
 
+.. _advancedoptions batch:
+
 Batch submission
 ================
 

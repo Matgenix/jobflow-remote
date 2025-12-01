@@ -92,8 +92,8 @@ or the command::
     jf runner shutdown
 
 relies on Supervisor to send a ``SIGTERM`` signal (a termination signal that allows
-the process to exit cleanly) to all the ``Runner`` processes. After this also the
-Supervisor process will be stopped. The two commands are equivalent and will result in
+the process to exit cleanly) to all the ``Runner`` processes. After this the
+Supervisor process will also be stopped. The two commands are equivalent and will result in
 a Runner in the ``shut_down`` state.
 
 Unless the ``--wait`` option is specified, the completion of the command will not imply
@@ -106,7 +106,7 @@ that all the ``Runner`` processes have been terminated.
 .. note::
     In older versions of jobflow-remote the ``jf runner stop`` command used to stop
     only the ``Runner`` processes, but leaving the Supervisor process active. Since version
-    1.0 this has been removed from the CLI to simply the handling of the runner.
+    1.0 this has been removed from the CLI to simplify the handling of the runner.
     If needed, the option is still available through the python API.
 
 Kill
