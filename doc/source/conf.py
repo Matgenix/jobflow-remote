@@ -31,7 +31,7 @@ from jobflow_remote.config.settings import JobflowRemoteSettings
 # -- Project information -----------------------------------------------------
 
 project = "Jobflow Remote"
-copyright = "2023, Matgenix SRL"  # noqa: A001
+copyright = "2025, Matgenix SRL"  # noqa: A001
 author = "Guido Petretto, Matthew Evans, David Waroquiers"
 
 
@@ -116,11 +116,11 @@ html_theme_options = {
         "image_dark": "_static/img/jfr_logo.svg",
     },
     "collapse_navigation": True,
-    "announcement": (
-        "<p>"
-        "Jobflow Remote is still in beta phase. The API may change at any time."
-        "</p>"
-    ),
+    # "announcement": (
+    #     "<p>"
+    #     "Jobflow Remote is still in beta phase. The API may change at any time."
+    #     "</p>"
+    # ),
     # "announcement": "<p>This is still in development</p>",
     # "navbar_end": ["theme-switcher", "navbar-icon-links"],
     # "navbar_end": ["theme-switcher", "version-switcher", "navbar-icon-links"],
