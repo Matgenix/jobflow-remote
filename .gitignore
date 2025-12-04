@@ -73,7 +73,6 @@ instance/
 doc/_build/
 doc/source/api/*.rst
 
-doc/source/dev/index.rst
 doc/source/changelog.rst
 
 # PyBuilder
