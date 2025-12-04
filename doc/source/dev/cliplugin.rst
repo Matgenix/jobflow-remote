@@ -58,12 +58,12 @@ Create a module (e.g., ``my_package/jf_plugin.py``) with a ``setup_jf_plugin`` f
         This function should import typer apps and register commands.
         """
         from jobflow_remote.cli.job import app_job
-        import typer
+        from jobflow_remote.cli.utils import out_console
 
         @app_job.command()
         def my_command():
             """My custom command added to 'jf job' group."""
-            typer.echo("Hello from my plugin!")
+            out_console.print("Hello from my plugin!")
 
 This example adds a ``my-command`` to the ``jf job`` command group, accessible as:
 
@@ -81,7 +81,7 @@ You can also create entirely new command groups:
     def setup_jf_plugin():
         from jobflow_remote.cli.jf import app
         from jobflow_remote.cli.jfr_typer import JFRTyper
-        import typer
+        from jobflow_remote.cli.utils import out_console
 
         # Create a new command group
         app_backup = JFRTyper(
@@ -93,12 +93,12 @@ You can also create entirely new command groups:
         @app_backup.command()
         def create():
             """Create a backup."""
-            typer.echo("Creating backup...")
+            out_console.print("Creating backup...")
 
         @app_backup.command()
         def restore():
             """Restore from backup."""
-            typer.echo("Restoring backup...")
+            out_console.print("Restoring backup...")
 
         # Register the new command group
         app.add_typer(app_backup)
