@@ -308,9 +308,7 @@ class ConfigManager:
                     if "name" in d:
                         project_names.append(d["name"])
                 except Exception:
-                    erroneous_files.append(
-                        Path(filepath).stem
-                    )  # assume that this is the name of the project
+                    erroneous_files.append(Path(filepath).name)
                     if not suppress_warnings:
                         logger.warning(
                             f"File {filepath} could not be parsed as a Project. Error: {traceback.format_exc()}"

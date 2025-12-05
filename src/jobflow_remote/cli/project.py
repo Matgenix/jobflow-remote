@@ -81,9 +81,7 @@ def list_projects(
     for pn in sorted(full_project_list):
         out_console.print(f" - {pn}", style="green" if pn == project_name else None)
 
-    not_parsed_projects = set(full_project_list).difference(cm.projects_data) | set(
-        erroneous_files
-    )
+    not_parsed_projects = set(full_project_list).difference(cm.projects_data)
     if not_parsed_projects:
         out_console.print(
             "The following project names exist in files in the project folder, "
@@ -91,9 +89,17 @@ def list_projects(
             f"{', '.join(not_parsed_projects)}.",
             style="yellow",
         )
+    if erroneous_files:
+        out_console.print(
+            "The following files exist in the project folder, "
+            "but could not properly parsed as projects: "
+            f"{', '.join(erroneous_files)}.",
+            style="yellow",
+        )
+    if (not_parsed_projects or erroneous_files) and not warn:
         from jobflow_remote import SETTINGS
 
-        if SETTINGS.cli_suggestions and not warn:
+        if SETTINGS.cli_suggestions:
             out_console.print(
                 "Run the command with -w option to see the parsing errors",
                 style="yellow",
