@@ -24,7 +24,7 @@ classifiers = [
 requires-python = ">=3.10"
 dependencies = [
     "fabric ~= 3.2",
-    "flufl.lock ~= 8.0",
+    "flufl.lock >= 8,< 10",
     "psutil >= 5.9,< 8.0; python_version < '3.12'",
     "psutil >= 6.0,< 8.0; python_version >= '3.12'",
     "jobflow >= 0.2.1",
