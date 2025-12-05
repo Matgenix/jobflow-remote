@@ -315,11 +315,12 @@ def cli_error_handler(func):
                 "The active project could not be determined and it is required to execute this command. Please "
                 "check the formatting of your YAML."
             )
-        except ProjectParsingError:
-            exit_with_error_msg(
-                "The active projects config file could not be parsed. Please check the formatting of your YAML. "
-                "You can use the command 'jf project list -w' to get the parsing errors."
+        except ProjectParsingError as exc:
+            msg = (
+                f"{getattr(exc, 'message', str(exc))}. "
+                f"You can use the command 'jf project list -w' to get the parsing errors."
             )
+            exit_with_error_msg(msg)
         except Exception as e:
             from jobflow_remote import SETTINGS
 
