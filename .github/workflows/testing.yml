@@ -71,9 +71,9 @@ jobs:
           - { os: ubuntu-latest, python: "3.11", resolution: highest }
           - { os: ubuntu-latest, python: "3.12", resolution: highest }
           - { os: ubuntu-latest, python: "3.13", resolution: highest }
-          - { os: ubuntu-latest, python: "3.14", resolution: lowest-direct }
-          - { os: macos-latest, python: "3.14", resolution: highest }
-          - { os: ubuntu-latest, python: "3.14", resolution: highest }
+          - { os: ubuntu-latest, python: "3.14.x", resolution: lowest-direct }
+          - { os: macos-latest, python: "3.14.x", resolution: highest }
+          - { os: ubuntu-latest, python: "3.14.x", resolution: highest }
 
     services:
       local_mongodb:
