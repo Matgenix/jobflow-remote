@@ -21,7 +21,8 @@ classifiers = [
     "Topic :: Other/Nonlisted Topic",
     "Topic :: Scientific/Engineering",
 ]
-requires-python = ">=3.10"
+# 3.14.1 breaks networkx, which is a dependency through jobflow. Should be fixed for 3.14.2
+requires-python = ">=3.10, !=3.14.1"
 dependencies = [
     "fabric ~= 3.2",
     "flufl.lock >= 8,< 10",
