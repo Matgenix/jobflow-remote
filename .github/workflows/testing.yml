@@ -91,6 +91,7 @@ jobs:
           python-version: ${{ matrix.config.python }}
           cache: pip
           cache-dependency-path: pyproject.toml
+          check-latest: true
 
       - name: Install mongo-tools
         if: matrix.config.os == 'ubuntu-latest'
