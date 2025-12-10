@@ -90,3 +90,57 @@ def test_batch_worker(
             ordered_batches[-2].batch_uid,
         ],
     )
+
+    # test "batch info"
+    run_check_cli(
+        ["batch", "info", batches[0].batch_uid],
+        required_out=[
+            "process_id",
+            "batch_uid",
+            "FINISHED",
+            batches[0].batch_uid,
+            batches[0].process_id,
+        ],
+    )
+    run_check_cli(
+        ["batch", "info", batches[0].process_id],
+        required_out=[
+            "process_id",
+            "batch_uid",
+            "FINISHED",
+            batches[0].batch_uid,
+            batches[0].process_id,
+        ],
+    )
+
+    # test "batch delete"
+    run_check_cli(
+        ["batch", "delete", "-pid", batches[0].process_id],
+        required_out=["This operation will delete 1 batch"],
+        excluded_out=["1 batch processes deleted"],
+        cli_input="n",
+    )
+    assert job_controller.count_batches() == 4
+
+    run_check_cli(
+        ["batch", "delete", "-pid", batches[0].process_id, "-y"],
+        excluded_out=["This operation will delete 1 batch"],
+        required_out=["1 batch processes deleted"],
+    )
+    assert job_controller.count_batches() == 3
+
+    run_check_cli(
+        ["batch", "delete", "--state", "RUNNING"],
+        required_out=["This could lead to inconsistencies or data loss"],
+        excluded_out=["batch processes deleted"],
+        cli_input="n",
+    )
+    assert job_controller.count_batches() == 3
+
+    run_check_cli(
+        ["batch", "delete"],
+        excluded_out=["This could lead to inconsistencies or data loss"],
+        required_out=["This operation will delete", "batch processes deleted"],
+        cli_input="y",
+    )
+    assert job_controller.count_batches() == 0

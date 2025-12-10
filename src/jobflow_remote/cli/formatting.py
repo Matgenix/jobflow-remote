@@ -26,7 +26,7 @@ if TYPE_CHECKING:
     from rich.console import ConsoleRenderable, RenderableType
 
     from jobflow_remote.config.base import ExecutionConfig, WorkerBase
-    from jobflow_remote.jobs.data import FlowInfo, JobDoc, JobInfo
+    from jobflow_remote.jobs.data import BatchDoc, FlowInfo, JobDoc, JobInfo
     from jobflow_remote.jobs.report import FlowsReport, JobsReport
     from jobflow_remote.jobs.upgrade import UpgradeAction
 
@@ -774,6 +774,7 @@ def get_batch_processes_table(
         table.add_column("Status")
     if verbosity > 0:
         table.add_column(job_ids_column_name)
+        table.add_column(header_name_data_getter_map["last_updated"][0])
 
     for ibatch, batch_data in enumerate(batch_processes):
         worker = workers[batch_data.worker]
@@ -788,6 +789,7 @@ def get_batch_processes_table(
 
         if verbosity > 0:
             row.append("\n".join([f"{jb[0]} ({jb[1]})" for jb in batches_jobs[ibatch]]))
+            row.append(header_name_data_getter_map["last_updated"][1](batch_data))
 
         table.add_row(*row)
 
@@ -817,3 +819,39 @@ def get_runner_pings_table(runner_pings: list[dict]) -> Table:
         table.add_row(*[f(rp.get(k)) for k, f in ping_keys.items()])
 
     return table
+
+
+BATCH_INFO_ORDER = [
+    "process_id",
+    "batch_uid",
+    "batch_state",
+    "worker",
+    "process_folder",
+    "updated_on",
+    "last_ping_time",
+    "created_on",
+    "start_time",
+    "end_time",
+    "jobs",
+]
+
+
+def format_batch_info(batch_doc: BatchDoc, worker):
+    d = batch_doc.dict()
+
+    # convert dates at the first level and for the remote error
+    for k, v in d.items():
+        if isinstance(v, datetime.datetime):
+            d[k] = convert_utc_time(v).strftime(fmt_datetime)
+
+    d = jsanitize(d, allow_bson=True, enum_values=True, strict=True)
+
+    d["process_folder"] = get_job_path(batch_doc.batch_uid, None, worker.batch.work_dir)
+
+    # reorder the keys
+    sorted_d = {}
+    for k in BATCH_INFO_ORDER:
+        if k in d:
+            sorted_d[k] = d[k]
+
+    return render_scope_jfr(sorted_d, sort_keys=False, overflow="fold")
