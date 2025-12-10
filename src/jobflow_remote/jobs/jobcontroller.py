@@ -3139,6 +3139,7 @@ class JobController:
         self.auxiliary.drop()
         self.auxiliary.insert_one({"next_id": 1})
         self.auxiliary.insert_one({"running_runner": None})
+        self.auxiliary.insert_one({"runner_pings": []})
         self.batches.drop()
         self.update_version_information()
         self.build_indexes(drop=True)
@@ -4432,22 +4433,65 @@ class JobController:
                 )
             lock.update_on_release = {"$set": {"running_runner": None}}
 
-    def ping_running_runner(self) -> bool:
+    def ping_running_runner(self, data: dict | None = None) -> tuple[bool, list]:
         """
         Ping the running_runner document, if exists and has been activated as a daemon.
+        Also add a ping in the runner_pings_doc auxiliary document
+
+        Parameters
+        ----------
+        data
+            A dictionary of data to be added to the ping information
 
         Returns
         -------
-        bool
-            True if the ping was successful.
+        dict
+            The content of the running_runner document, if present.
         """
+        ping_time = datetime.now(timezone.utc)
         ping_result = self.auxiliary.find_one_and_update(
             {"running_runner.last_pinged": {"$exists": True}},
-            {"$set": {"running_runner.last_pinged": datetime.now(timezone.utc)}},
+            {"$set": {"running_runner.last_pinged": ping_time}},
             upsert=False,
         )
 
-        return ping_result is not None
+        data = dict(data or {})
+        data["time"] = ping_time
+        runner_pings_doc = self.auxiliary.find_one_and_update(
+            {"runner_pings": {"$exists": True}},
+            {"$push": {"runner_pings": {"$each": [data], "$slice": -50}}},
+            return_document=pymongo.ReturnDocument.AFTER,
+            upsert=True,
+        )
+
+        return ping_result is not None, runner_pings_doc.get("runner_pings", [])
+
+    def get_runner_pings(self) -> list:
+        """
+        Fetch the last pings from the DB.
+        The content of the "runner_pings" document in the auxiliary collection.
+
+        Returns
+        -------
+        list
+            The list of the latests pings. Last element of the list is the last ping.
+        """
+        runner_pings_doc = self.auxiliary.find_one({"runner_pings": {"$exists": True}})
+        # Check if not None for compatibility with potentially not upgraded DBs and
+        # avoiding hard failures. Can probably be removed in the future.
+        if runner_pings_doc:
+            return runner_pings_doc.get("runner_pings", [])
+        return []
+
+    def clean_runner_pings(self) -> None:
+        """
+        Remove all the pings from the "runner_pings" document in the auxiliary collection.
+        """
+        self.auxiliary.find_one_and_update(
+            {"runner_pings": {"$exists": True}},
+            {"$set": {"runner_pings": []}},
+            upsert=True,
+        )
 
     def update_flow_state(
         self,

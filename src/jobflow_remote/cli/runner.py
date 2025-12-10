@@ -8,6 +8,7 @@ from rich.scope import render_scope
 from rich.table import Table
 from rich.text import Text
 
+from jobflow_remote.cli.formatting import get_runner_pings_table
 from jobflow_remote.cli.jf import app
 from jobflow_remote.cli.jfr_typer import JFRTyper
 from jobflow_remote.cli.types import (
@@ -102,6 +103,14 @@ def run(
             help="Activate the connection for interactive remote host",
         ),
     ] = False,
+    daemonized: Annotated[
+        bool,
+        typer.Option(
+            "--daemonized",
+            "-d",
+            help="If selected, indicates that the daemon is started inside a daemon. The parent PID will be added.",
+        ),
+    ] = False,
 ) -> None:
     """
     Execute the Runner in the foreground.
@@ -109,10 +118,14 @@ def run(
     Should be used by the daemon or for testing purposes.
     """
     runner_id = os.getpid() if set_pid else None
+    daemon_id = None
+    if daemonized:
+        daemon_id = os.getppid()
     runner = Runner(
         log_level=log_level,
         runner_id=str(runner_id),
         connect_interactive=connect_interactive,
+        daemon_id=str(daemon_id),
     )
     if not (transfer or complete or queue or checkout):
         transfer = complete = queue = checkout = True
@@ -374,7 +387,17 @@ def status() -> None:
 
 
 @app_runner.command()
-def info(verbosity: verbosity_opt = 0) -> None:
+def info(
+    verbosity: verbosity_opt = 0,
+    pings: Annotated[
+        bool,
+        typer.Option(
+            "--pings",
+            "-p",
+            help=("Also show all the ping entries"),
+        ),
+    ] = False,
+) -> None:
     """
     Fetch the information about the process of the daemon.
     Contain the supervisord process and the processes running the Runner.
@@ -419,6 +442,58 @@ def info(verbosity: verbosity_opt = 0) -> None:
         out_console.print(render_scope(running_runner_doc))
     else:
         out_console.print("No running runner defined in the DB")
+
+    # in any case fetch the data from the pings and warn if the last ping
+    # is not from the active runner.
+    pings_data = jc.get_runner_pings()
+
+    if pings:
+        out_console.print("")
+        pings_table = get_runner_pings_table(pings_data)
+        out_console.print(pings_table)
+
+    if pings_data:
+        last_ping = pings_data[-1]
+        diffs = []
+        if running_runner_doc:
+            data_to_check = [
+                "hostname",
+                "project_name",
+                "user",
+                "daemon_dir",
+            ]
+            diffs = [d for d in data_to_check if running_runner_doc[d] != last_ping[d]]
+        if (
+            procs_info_dict
+            and procs_info_dict.get("supervisord", {}).get("pid")
+            != last_ping["daemon_id"]
+        ):
+            diffs.append("daemon_id")
+
+        if diffs:
+            warn_msg = (
+                "There is an inconsistency between the actual runner information "
+                "and the last ping in the database.\n"
+                "This suggests that another runner process associated to this database "
+                "may be already running\n"
+            )
+            helper_sentences = {
+                "daemon_id": "running under another supervisor process",
+                "hostname": "active on another machine",
+                "project_name": "associated to another Project",
+                "user": "associated to another user",
+                "daemon_dir": "using a different project folder",
+            }
+            for d in diffs:
+                warn_msg += f"- It seems to be {helper_sentences[d]}: {last_ping[d]}\n"
+            warn_msg += f"- The last time it pinged the database was: {last_ping['time']} (UTC)\n"
+
+            warn_msg += (
+                "Run the command with the --pings option to get a list of all the last pings "
+                "from the runners in the database and consult the documentation "
+                "[link=https://matgenix.github.io/jobflow-remote/user/troubleshooting.html]https://matgenix.github.io/jobflow-remote/user/troubleshooting.html[/link]"
+            )
+            out_console.print(warn_msg, style="gold1")
 
 
 @app_runner.command()

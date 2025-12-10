@@ -45,8 +45,8 @@ When trying to start/stop the Runner, the system prompts an error stating that::
 
     A daemon runner process associated to this database may be already running
 
-or, alternatively, more than one set of daemon processes is mistakenly already
-running simultaneously.
+or, alternatively, more than one set of daemon processes is already
+running simultaneously (which should not happen).
 
 Key concepts about the Runner in these context are:
 
@@ -93,8 +93,17 @@ daemon record from the database by running::
 Lost daemon processes
 ---------------------
 
-If you discover that multiple daemons are actively running on different systems
-you will need to **manually terminate the lost processes**. This is because
+One way to discover if there are multiple Runners active associated to a database
+is to run the command::
+
+    jf runner info --pings
+
+that will list all the last pings from Runners. If you expect that the daemon
+is shut down but you keep seeing pings from some processes there might be an
+active Runner somewhere (note that the runner pings the database once every hour).
+
+If you discover that multiple daemons are actively running you will
+need to **manually terminate the lost processes**. This is because
 jobflow-remote may have lost control over them.
 
 Connect to the different machines and look for processes containing "runner"
