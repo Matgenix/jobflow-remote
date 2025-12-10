@@ -160,6 +160,8 @@ def test_info(
     job_controller,
     run_check_cli,
 ):
+    import time
+
     # start the daemon and test the correct behaviour
     daemon_manager.start(single=True)
     wait_daemon_started(daemon_manager)
@@ -169,6 +171,7 @@ def test_info(
 
     # wait for the runner to have pinged the DB before proceeding
     for _ in range(30):
+        time.sleep(1)
         if len(job_controller.get_runner_pings()) > 0:
             break
     else:
