@@ -4951,17 +4951,49 @@ class JobController:
 
     @staticmethod
     def _build_query_batch(
+        process_id: str | list[str] | None = None,
+        batch_uid: str | list[str] | None = None,
         worker: str | list[str] | None = None,
         batch_state: BatchState | list[BatchState] | None = None,
     ) -> dict:
+        """
+        Build a query to search for batch processes, based on standard parameters.
+        The BatchDoc will need to satisfy all the defined conditions.
+
+        Parameters
+        ----------
+        process_id
+            One or more process ids of the batch processes to retrieve.
+        batch_uid
+            One or more batch uids of the batch processes to retrieve.
+        worker
+            One or more worker names.
+        batch_state
+            One or more BatchStates.
+
+        Returns
+        -------
+            A dictionary with the query to be applied to a collection
+            containing BatchDocs.
+        """
         query: dict = {}
+        if process_id:
+            if isinstance(process_id, str):
+                query["process_id"] = process_id
+            else:
+                query["process_id"] = {"$in": process_id}
+        if batch_uid:
+            if isinstance(batch_uid, str):
+                query["batch_uid"] = batch_uid
+            else:
+                query["batch_uid"] = {"$in": batch_uid}
         if worker:
-            if not isinstance(worker, list):
+            if isinstance(worker, str):
                 query["worker"] = worker
             else:
                 query["worker"] = {"$in": worker}
         if batch_state:
-            if not isinstance(batch_state, list):
+            if isinstance(batch_state, BatchState):
                 query["batch_state"] = batch_state.value
             else:
                 query["batch_state"] = {"$in": [bs.value for bs in batch_state]}
@@ -4969,12 +5001,43 @@ class JobController:
 
     def get_batches(
         self,
+        process_id: str | list[str] | None = None,
+        batch_uid: str | list[str] | None = None,
         worker: str | list[str] | None = None,
         batch_state: BatchState | list[BatchState] | None = None,
-        max_results: int = 20,
+        limit: int = 20,
         sort: str | list | None = None,
-    ) -> list[BatchDoc] | None:
-        query = self._build_query_batch(worker=worker, batch_state=batch_state)
+    ) -> list[BatchDoc]:
+        """
+        Get a list of documents for batch processes.
+
+        Parameters
+        ----------
+        process_id
+            One or more process ids of the batch processes to retrieve.
+        batch_uid
+            One or more batch uids of the batch processes to retrieve.
+        worker
+            One or more worker names.
+        batch_state
+            One or more BatchStates.
+        limit
+            Maximum number of entries to retrieve. 0 means no limit.
+        sort
+            A list of (key, direction) pairs specifying the sort order for this
+            query. Follows pymongo conventions.
+
+        Returns
+        -------
+        list
+            A list of BatchDoc object satisfying the criteria.
+        """
+        query = self._build_query_batch(
+            process_id=process_id,
+            batch_uid=batch_uid,
+            worker=worker,
+            batch_state=batch_state,
+        )
         # Some batches may have updated at exactly the same time (up to ms precision of MongoDB)
         # To make sure we have always same order (in particular when limiting number of results),
         # we add a sort on process_id as well.
@@ -4985,16 +5048,80 @@ class JobController:
 
         return [
             BatchDoc.model_validate(bd_dict)
-            for bd_dict in self.batches.find(query, sort=sort).limit(max_results)
+            for bd_dict in self.batches.find(query, sort=sort).limit(limit)
         ]
 
     def count_batches(
         self,
+        process_id: str | list[str] | None = None,
+        batch_uid: str | list[str] | None = None,
         worker: str | list[str] | None = None,
         batch_state: BatchState | list[BatchState] | None = None,
-    ) -> list[BatchDoc] | None:
-        query = self._build_query_batch(worker=worker, batch_state=batch_state)
+    ) -> int:
+        """
+        Count the batch processes documents.
+
+        Parameters
+        ----------
+        process_id
+            One or more process ids of the batch processes to retrieve.
+        batch_uid
+            One or more batch uids of the batch processes to retrieve.
+        worker
+            One or more worker names.
+        batch_state
+            One or more BatchStates.
+
+        Returns
+        -------
+        int
+            The number of batch processes satisfying the criteria.
+        """
+        query = self._build_query_batch(
+            process_id=process_id,
+            batch_uid=batch_uid,
+            worker=worker,
+            batch_state=batch_state,
+        )
         return self.batches.count_documents(query)
+
+    def delete_batches(
+        self,
+        process_id: str | list[str] | None = None,
+        batch_uid: str | list[str] | None = None,
+        worker: str | list[str] | None = None,
+        batch_state: BatchState | list[BatchState] | None = None,
+    ) -> int:
+        """
+        Delete batch processes entried from the database.
+        No attempt to cancel the running processes on the worker if they
+        are still running.
+
+        Parameters
+        ----------
+        process_id
+            One or more process ids of the batch processes to retrieve.
+        batch_uid
+            One or more batch uids of the batch processes to retrieve.
+        worker
+            One or more worker names.
+        batch_state
+            One or more BatchStates.
+
+        Returns
+        -------
+        int
+            The number of deleted entries.
+        """
+        query = self._build_query_batch(
+            process_id=process_id,
+            batch_uid=batch_uid,
+            worker=worker,
+            batch_state=batch_state,
+        )
+        delete_result = self.batches.delete_many(query)
+
+        return delete_result.deleted_count
 
     def get_batch_process_id(self, batch_uid: str) -> tuple[str, str]:
         """Get the process id and worker of a batch process from its unique id.
@@ -5046,14 +5173,14 @@ class JobController:
         return self.batches.insert_one(batch_doc_dict)
 
     def update_job_in_batch(
-        self, job_id: str, job_index: int, batch_uid: str, worker: str, info: Any
+        self, job_id: str, job_index: int, batch_uid: str, info: Any
     ):
         self.batches.update_one(
             {"batch_uid": batch_uid},
             {
                 "$set": {
                     f"jobs.{job_id}.{job_index}": info,
-                    "updated_on": datetime.now(),
+                    "updated_on": datetime.now(timezone.utc),
                 }
             },
         )
@@ -5081,8 +5208,8 @@ class JobController:
             {
                 "$set": {
                     "batch_state": BatchState.RUNNING.value,
-                    "updated_on": datetime.now(),
-                    "start_time": start_time or datetime.now(),
+                    "updated_on": datetime.now(timezone.utc),
+                    "start_time": start_time or datetime.now(timezone.utc),
                 }
             },
         )
@@ -5110,8 +5237,8 @@ class JobController:
             {
                 "$set": {
                     "batch_state": BatchState.FINISHED.value,
-                    "updated_on": datetime.now(),
-                    "end_time": end_time or datetime.now(),
+                    "updated_on": datetime.now(timezone.utc),
+                    "end_time": end_time or datetime.now(timezone.utc),
                 }
             },
         )

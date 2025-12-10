@@ -1212,7 +1212,7 @@ class Runner:
         batch_processes = self.job_controller.get_batches(
             worker=worker_name,
             batch_state=[BatchState.SUBMITTED, BatchState.RUNNING],
-            max_results=0,
+            limit=0,
         )
         running_jobs = []
         try:
@@ -1243,7 +1243,6 @@ class Runner:
                         job_id=job_id,
                         job_index=job_index,
                         batch_uid=batch_uid,
-                        worker=worker_name,
                         info={"state": JobState.BATCH_RUNNING.value},
                     )
                     set_output = {
@@ -1342,7 +1341,7 @@ class Runner:
         batch_processes_data = self.job_controller.get_batches(
             worker=worker_name,
             batch_state=[BatchState.SUBMITTED, BatchState.RUNNING],
-            max_results=0,
+            limit=0,
         )
         if not batch_processes_data:
             return []
@@ -1596,7 +1595,6 @@ class Runner:
                         job_id=job_id,
                         job_index=job_index,
                         batch_uid=batch_uid,
-                        worker=worker_name,
                         info={"state": JobState.RUN_FINISHED.value},
                     )
                     lock.update_on_release = set_output

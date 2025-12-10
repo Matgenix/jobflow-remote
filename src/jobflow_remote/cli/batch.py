@@ -1,4 +1,10 @@
-from jobflow_remote.cli.formatting import get_batch_processes_table
+from typing import Annotated
+
+import typer
+from rich.prompt import Confirm
+from rich.text import Text
+
+from jobflow_remote.cli.formatting import format_batch_info, get_batch_processes_table
 from jobflow_remote.cli.jf import app
 from jobflow_remote.cli.jfr_typer import JFRTyper
 from jobflow_remote.cli.types import (
@@ -6,13 +12,18 @@ from jobflow_remote.cli.types import (
     max_results_opt,
     verbosity_opt,
     worker_name_opt,
+    yes_opt,
 )
 from jobflow_remote.cli.utils import (
+    check_valid_uuid,
     exit_with_warning_msg,
     get_config_manager,
     get_job_controller,
+    loading_spinner,
     out_console,
+    print_success_msg,
 )
+from jobflow_remote.jobs.state import BatchState
 
 app_batch = JFRTyper(
     name="batch", help="Helper utils handling batch jobs", no_args_is_help=True
@@ -29,7 +40,6 @@ def processes_list(
 ) -> None:
     """
     Show the list of processes being executed on the batch workers.
-    Increasing verbosity will require connecting to the host.
     """
 
     jc = get_job_controller()
@@ -38,11 +48,12 @@ def processes_list(
     project = cm.get_project()
     workers = project.workers
 
-    batch_processes = jc.get_batches(
-        worker=worker_name,
-        batch_state=batch_state,
-        max_results=max_results,
-    )
+    with loading_spinner():
+        batch_processes = jc.get_batches(
+            worker=worker_name,
+            batch_state=batch_state,
+            limit=max_results,
+        )
     if not batch_processes:
         exit_with_warning_msg("No batch processes")
 
@@ -67,3 +78,110 @@ def processes_list(
     )
 
     out_console.print(table)
+
+
+@app_batch.command(name="info")
+def process_info(
+    selected_id: Annotated[
+        str,
+        typer.Argument(
+            help="The ID of the batch process. Can be the Process id (i.e. the one coming from the worker) or batch UID",
+            metavar="ID",
+        ),
+    ],
+):
+    """Detailed information on a specific batch process."""
+
+    process_id = batch_uid = None
+    if check_valid_uuid(selected_id, raise_on_error=False):
+        batch_uid = selected_id
+    else:
+        process_id = selected_id
+
+    jc = get_job_controller()
+
+    cm = get_config_manager()
+    project = cm.get_project()
+    workers = project.workers
+
+    with loading_spinner():
+        batch_processes = jc.get_batches(
+            process_id=process_id,
+            batch_uid=batch_uid,
+            limit=1,
+        )
+
+    if not batch_processes:
+        exit_with_warning_msg("No batch process matching the request")
+
+    worker = workers[batch_processes[0].worker]
+    out_console.print(
+        format_batch_info(batch_processes[0], worker=worker), overflow="crop"
+    )
+
+
+@app_batch.command()
+def delete(
+    process_id: Annotated[
+        str | None,
+        typer.Option(
+            "--process-id",
+            "-pid",
+            help="One or more process ids",
+        ),
+    ] = None,
+    batch_uid: Annotated[
+        str | None,
+        typer.Option(
+            "--batch-uid",
+            "-uid",
+            help="One or more process ids",
+        ),
+    ] = None,
+    worker_name: worker_name_opt = None,
+    batch_state: batch_state_opt = (BatchState.FINISHED.value,),
+    yes_all: yes_opt = False,
+):
+    """Remove one or more batch processes from the database. No effect on the processes running on the worker."""
+
+    if len(set(batch_state).difference([BatchState.FINISHED])) > 0 and not yes_all:
+        text = Text.from_markup(
+            "[red]This operation may remove batch processes in states other than 'FINISHED'. "
+            "This could lead to [bold]inconsistencies or data loss[/bold]. Proceed anyway?[/red]"
+        )
+
+        confirmed = Confirm.ask(text, default=False)
+        if not confirmed:
+            raise typer.Exit(0)
+
+    jc = get_job_controller()
+
+    with loading_spinner():
+        n_batch_processes = jc.count_batches(
+            process_id=process_id,
+            batch_uid=batch_uid,
+            worker=worker_name,
+            batch_state=batch_state,
+        )
+
+    if not n_batch_processes:
+        exit_with_warning_msg("No batch process matching the request")
+
+    if not yes_all:
+        text = Text.from_markup(
+            f"[red]This operation will [bold]delete {n_batch_processes} batch processes[/bold]. Proceed anyway?[/red]"
+        )
+
+        confirmed = Confirm.ask(text, default=False)
+        if not confirmed:
+            raise typer.Exit(0)
+
+    with loading_spinner():
+        n_deleted = jc.delete_batches(
+            process_id=process_id,
+            batch_uid=batch_uid,
+            worker=worker_name,
+            batch_state=batch_state,
+        )
+
+    print_success_msg(f"Operation completed. {n_deleted} batch processes deleted")

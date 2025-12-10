@@ -173,7 +173,6 @@ def _validate_job_state(value: Any) -> Any:
     try:
         JobState(value)
     except DeprecatedStateError:
-        print("XXXX")
         raise
     except Exception:
         pass

@@ -312,8 +312,9 @@ def cli_error_handler(func):
             raise  # Do not capture click or typer exceptions
         except ProjectUndefinedError:
             exit_with_error_msg(
-                "The active project could not be determined and it is required to execute this command. Please "
-                "check the formatting of your YAML."
+                "The active project could not be determined and it is required to execute this command. "
+                "Explicitly define one or check if there is an error in project configuration file "
+                "(usually in the YAML format). The 'jf project list -w' command prints the parsing errors, if any."
             )
         except ProjectParsingError as exc:
             msg = (
