@@ -71,9 +71,9 @@ jobs:
           - { os: ubuntu-latest, python: "3.11", resolution: highest }
           - { os: ubuntu-latest, python: "3.12", resolution: highest }
           - { os: ubuntu-latest, python: "3.13", resolution: highest }
-          - { os: ubuntu-latest, python: "3.14.x", resolution: lowest-direct }
-          - { os: macos-latest, python: "3.14.x", resolution: highest }
-          - { os: ubuntu-latest, python: "3.14.x", resolution: highest }
+          - { os: ubuntu-latest, python: "3.14.x", resolution: lowest-direct, display: "3.14" }
+          - { os: macos-latest, python: "3.14.x", resolution: highest, display: "3.14" }
+          - { os: ubuntu-latest, python: "3.14.x", resolution: highest, display: "3.14" }
 
     services:
       local_mongodb:
@@ -83,7 +83,7 @@ jobs:
           - 27017:27017
 
     runs-on: ${{ matrix.config.os }}
-    name: test (${{ matrix.config.os }}, ${{ replace(matrix.config.python, '.x', '') }}, ${{ matrix.config.resolution }})
+    name: test (${{ matrix.config.os }}, ${{ matrix.config.display || matrix.config.python }}, ${{ matrix.config.resolution }})
     steps:
       - uses: actions/checkout@v6
 
