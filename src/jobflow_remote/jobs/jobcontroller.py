@@ -96,6 +96,9 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+_MAX_ARCHIVED_RUNNER_PINGS = 50
+
+
 class JobController:
     """
     Main entry point for all the interactions with the Stores.
@@ -4436,7 +4439,8 @@ class JobController:
     def ping_running_runner(self, data: dict | None = None) -> tuple[bool, list]:
         """
         Ping the running_runner document, if exists and has been activated as a daemon.
-        Also add a ping in the runner_pings_doc auxiliary document
+        Also add a ping in the runner_pings auxiliary document. The length of the
+        runner_pings list is limited in size.
 
         Parameters
         ----------
@@ -4445,8 +4449,9 @@ class JobController:
 
         Returns
         -------
-        dict
-            The content of the running_runner document, if present.
+        tuple
+            a bool with True if the ping was successful and the list of pings
+            in the runner_pings document.
         """
         ping_time = datetime.now(timezone.utc)
         ping_result = self.auxiliary.find_one_and_update(
@@ -4459,7 +4464,14 @@ class JobController:
         data["time"] = ping_time
         runner_pings_doc = self.auxiliary.find_one_and_update(
             {"runner_pings": {"$exists": True}},
-            {"$push": {"runner_pings": {"$each": [data], "$slice": -50}}},
+            {
+                "$push": {
+                    "runner_pings": {
+                        "$each": [data],
+                        "$slice": -_MAX_ARCHIVED_RUNNER_PINGS,
+                    }
+                }
+            },
             return_document=pymongo.ReturnDocument.AFTER,
             upsert=True,
         )
