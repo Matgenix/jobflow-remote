@@ -94,10 +94,14 @@ def test_delay_download(job_controller, runner, monkeypatch, one_job):
 def test_ping_runner_runner(job_controller, runner, monkeypatch, caplog):
     from datetime import datetime
 
-    assert not job_controller.ping_running_runner()
+    pinged_succeed, runner_pings = job_controller.ping_running_runner()
+    assert not pinged_succeed
     runner.ping_running_runner()
     # check that the ping does not create the document
     assert job_controller.get_running_runner() is None
+    # the runner pings are created (only one, because the runner
+    # will not ping the first time runner.ping_running_runner() is called)
+    assert len(runner_pings) == 1
 
     # create a fake running runner document
     t0 = datetime.now()

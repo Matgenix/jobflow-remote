@@ -462,12 +462,14 @@ def info(
                 "user",
                 "daemon_dir",
             ]
-            diffs = [d for d in data_to_check if running_runner_doc[d] != last_ping[d]]
-        if (
-            procs_info_dict
-            and procs_info_dict.get("supervisord", {}).get("pid")
-            != last_ping["daemon_id"]
-        ):
+            diffs = [
+                d
+                for d in data_to_check
+                if running_runner_doc.get(d) != last_ping.get(d)
+            ]
+        if procs_info_dict and str(
+            procs_info_dict.get("supervisord", {}).get("pid")
+        ) != str(last_ping["daemon_id"]):
             diffs.append("daemon_id")
 
         if diffs:
