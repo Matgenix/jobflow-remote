@@ -83,6 +83,7 @@ jobs:
           - 27017:27017
 
     runs-on: ${{ matrix.config.os }}
+    name: test (${{ matrix.config.os }}, ${{ replace(matrix.config.python, '.x', '') }}, ${{ matrix.config.resolution }})
     steps:
       - uses: actions/checkout@v6
 
