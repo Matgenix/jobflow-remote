@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import getpass
 import json
 import logging
 import math
 import shutil
 import signal
+import socket
 import time
 import traceback
 import uuid
@@ -89,6 +91,7 @@ class Runner:
         log_level: LogLevel | None = None,
         runner_id: str | None = None,
         connect_interactive: bool = False,
+        daemon_id: str | None = None,
     ) -> None:
         """
         Parameters
@@ -102,15 +105,18 @@ class Runner:
             A unique identifier for the Runner process. Used to identify the
             runner process in logging and in the DB locks.
             If None a uuid will be generated.
-        connect_interactive:
+        connect_interactive
             If True during initialization will open connections to the hosts
             marked as interactive.
+        daemon_id
+            A unique identifier for the daemon process that manages this Runner process.
         """
         self.stop_signal = False
         self.runner_id: str = runner_id or str(uuid.uuid4())
+        self.daemon_id = daemon_id
         self.config_manager: ConfigManager = ConfigManager()
-        self.project_name = project_name
         self.project: Project = self.config_manager.get_project(project_name)
+        self.project_name = self.project.name
         self.job_controller: JobController = JobController.from_project(self.project)
         self.workers: dict[str, WorkerBase] = self.project.workers
         # Build the dictionary of hosts. The reference is the worker name.
@@ -171,6 +177,8 @@ class Runner:
                     )
                 ):
                     host.connect()
+        self.runner_host = socket.gethostname()
+        self.pinged_db = False
 
     @property
     def runner_options(self) -> RunnerOptions:
@@ -384,8 +392,18 @@ class Runner:
 
         # all the processes will ping the running_runner document to signal
         # that at least one is still active.
+        run_options = dict(
+            transfer=transfer,
+            complete=complete,
+            queue=queue,
+            checkout=checkout,
+        )
+        try:
+            self.ping_running_runner(run_options=run_options)
+        except Exception:
+            logger.exception("Error during initial ping running runner")
         scheduler.every(self.project.runner.delay_ping_db).seconds.do(
-            self.ping_running_runner
+            self.ping_running_runner, run_options=run_options
         )
 
         ticks_remaining: int | bool = True
@@ -1584,10 +1602,35 @@ class Runner:
                     lock.update_on_release = set_output
             batch_manager.delete_run_finished([(job_id, job_index, batch_uid)])
 
-    def ping_running_runner(self):
-        ping_result = self.job_controller.ping_running_runner()
+    def ping_running_runner(self, run_options: dict | None = None):
+        ping_data = {
+            "daemon_id": self.daemon_id,
+            "runner_id": self.runner_id,
+            "project_name": self.project_name,
+            "hostname": self.runner_host,
+            "run_options": run_options,
+            "user": getpass.getuser(),
+            "daemon_dir": self.project.daemon_dir,
+        }
+        ping_result, runner_pings = self.job_controller.ping_running_runner(
+            data=ping_data
+        )
         if not ping_result:
             logger.info("Could not ping the running_runner document")
+
+        # The returned value include the latest ping from this process,
+        # Skip it for the first ping, as older pings may be in the DB.
+        if self.pinged_db and runner_pings and len(runner_pings) > 1:
+            prev_ping = runner_pings[-2]
+            daemon_id = prev_ping.get("daemon_id")
+            # note that here the remote daemon_id could be None, if it was not
+            # set. This would happen for example in case of runner started without
+            # a daemon. Warn anyway, since it can still lead to inconsistencies.
+            if daemon_id != self.daemon_id:
+                msg = f"A ping from a different set of Runner processes was found in the database: {prev_ping}"
+                logger.warning(msg)
+        if runner_pings:
+            self.pinged_db = True
 
     def cleanup(self) -> None:
         """Close all the connections after stopping the Runner."""

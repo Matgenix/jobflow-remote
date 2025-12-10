@@ -792,3 +792,28 @@ def get_batch_processes_table(
         table.add_row(*row)
 
     return table
+
+
+def get_runner_pings_table(runner_pings: list[dict]) -> Table:
+    ping_keys = {
+        "daemon_id": lambda x: str(x),
+        "runner_id": lambda x: str(x),
+        "time": lambda x: convert_utc_time(x).strftime(fmt_datetime),
+        "hostname": lambda x: str(x),
+        "run_options": lambda x: str(x),
+        "project_name": lambda x: str(x),
+        "user": lambda x: str(x),
+    }
+    table = Table(title="Runner pings")
+    table.add_column("Daemon ID")
+    table.add_column("Runner ID")
+    table.add_column(f"Ping time{time_zone_str}")
+    table.add_column("Hostname")
+    table.add_column("Run options")
+    table.add_column("Project")
+    table.add_column("User")
+
+    for rp in reversed(runner_pings):
+        table.add_row(*[f(rp.get(k)) for k, f in ping_keys.items()])
+
+    return table

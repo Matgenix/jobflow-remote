@@ -1112,6 +1112,15 @@ def test_running_runner(job_controller, daemon_manager, wait_daemon_started):
     assert job_controller.get_running_runner() == "NO_DOCUMENT"
 
 
+def test_runner_pings(job_controller):
+    data = {"test": "XX"}
+    job_controller.ping_running_runner(data=data)
+    job_controller.ping_running_runner(data=data)
+    assert len(job_controller.get_runner_pings()) == 2
+    job_controller.clean_runner_pings()
+    assert len(job_controller.get_runner_pings()) == 0
+
+
 def test_stop_jobflow_resume(job_controller, runner) -> None:
     from jobflow import Flow
 

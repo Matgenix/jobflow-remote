@@ -151,3 +151,97 @@ def test_reset(wait_daemon_started, daemon_manager, job_controller, run_check_cl
 
     wait_daemon_started(daemon_manager)
     assert daemon_manager.check_status().value == "RUNNING"
+
+
+def test_info(
+    wait_daemon_started,
+    wait_daemon_shutdown,
+    daemon_manager,
+    job_controller,
+    run_check_cli,
+):
+    # start the daemon and test the correct behaviour
+    daemon_manager.start(single=True)
+    wait_daemon_started(daemon_manager)
+
+    running_runner = job_controller.get_running_runner()
+    runner_info = daemon_manager._get_runner_info()
+    ping_data = {
+        "daemon_id": runner_info["processes_info"]["supervisord"]["pid"],
+        "runner_id": runner_info["processes_info"]["runner_daemon:run_jobflow0"]["pid"],
+        "project_name": running_runner["project_name"],
+        "hostname": running_runner["hostname"],
+        "run_options": {},
+        "user": running_runner["user"],
+        "daemon_dir": running_runner["daemon_dir"],
+    }
+
+    run_check_cli(
+        ["runner", "info"],
+        required_out=[
+            "supervisord",
+            "runner_daemon",
+            "hostname",
+            running_runner["hostname"],
+        ],
+        excluded_out=[
+            "Daemon is not running",
+            "No running runner defined in the DB",
+            "Runner pings",
+            f"│ {ping_data['hostname']}",
+            "inconsistency",
+        ],
+    )
+
+    run_check_cli(
+        ["runner", "info", "--pings"],
+        required_out=[
+            "supervisord",
+            "runner_daemon",
+            "hostname",
+            running_runner["hostname"],
+            "Runner pings",
+            f"│ {ping_data['hostname']}",
+        ],
+        excluded_out=[
+            "Daemon is not running",
+            "No running runner defined in the DB",
+            "inconsistency",
+        ],
+    )
+
+    # now stop and restart the runner to trigger issues
+    daemon_manager.shut_down()
+    wait_daemon_shutdown(daemon_manager)
+
+    daemon_manager.start(single=True)
+    wait_daemon_started(daemon_manager)
+    job_controller.ping_running_runner(data=ping_data)
+
+    req_out = [
+        "supervisord",
+        "runner_daemon",
+        "hostname",
+        running_runner["hostname"],
+        "inconsistency between the actual runner information and the last ping in the database",
+        f"running under another supervisor process: {ping_data['daemon_id']}",
+    ]
+    excl_out = [
+        "Daemon is not running",
+        "No running runner defined in the DB",
+        "Runner pings",
+        f"│ {ping_data['hostname']}",
+    ]
+    run_check_cli(
+        ["runner", "info"],
+        required_out=req_out,
+        excluded_out=[*excl_out, "active on another machine"],
+    )
+
+    ping_data["hostname"] = "XXXX"
+    job_controller.ping_running_runner(data=ping_data)
+    run_check_cli(
+        ["runner", "info"],
+        required_out=[*req_out, "active on another machine"],
+        excluded_out=excl_out,
+    )

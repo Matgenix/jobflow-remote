@@ -4,7 +4,6 @@ import contextlib
 import datetime
 import getpass
 import logging
-import os
 import re
 import socket
 import subprocess
@@ -54,7 +53,7 @@ serverurl=unix://$sock_file
 
 [program:runner_daemon]
 priority=100
-command=jf -p $project runner run -pid -log $loglevel $connect_interactive
+command=jf -p $project runner run -pid -d -log $loglevel $connect_interactive
 autostart=true
 autorestart=false
 numprocs=1
@@ -83,7 +82,7 @@ serverurl=unix://$sock_file
 
 [program:runner_daemon_checkout]
 priority=100
-command=jf -p $project runner run -pid --checkout -log $loglevel $connect_interactive
+command=jf -p $project runner run -pid --checkout -d -log $loglevel $connect_interactive
 autostart=true
 autorestart=false
 numprocs=1
@@ -92,7 +91,7 @@ stopwaitsecs=86400
 
 [program:runner_daemon_transfer]
 priority=100
-command=jf -p $project runner run -pid --transfer -log $loglevel $connect_interactive
+command=jf -p $project runner run -pid --transfer -d -log $loglevel $connect_interactive
 autostart=true
 autorestart=false
 numprocs=$num_procs_transfer
@@ -101,7 +100,7 @@ stopwaitsecs=86400
 
 [program:runner_daemon_queue]
 priority=100
-command=jf -p $project runner run -pid --queue -log $loglevel $connect_interactive
+command=jf -p $project runner run -pid --queue -d -log $loglevel $connect_interactive
 autostart=true
 autorestart=false
 numprocs=1
@@ -110,7 +109,7 @@ stopwaitsecs=86400
 
 [program:runner_daemon_complete]
 priority=100
-command=jf -p $project runner run -pid --complete -log $loglevel $connect_interactive
+command=jf -p $project runner run -pid --complete -d -log $loglevel $connect_interactive
 autostart=true
 autorestart=false
 numprocs=$num_procs_complete
@@ -1042,10 +1041,7 @@ class DaemonManager:
         Generate a dictionary with the information about the runner and
         the system where it is being executed.
         """
-        try:
-            user = os.getlogin()
-        except OSError:
-            user = os.environ.get("USER", None)
+        user = getpass.getuser()
         # Note that this approach may give a different MAC address for the
         # same machine, if more than one network device is present (this
         # may also include local virtual machines). Consider replacing this
@@ -1071,8 +1067,8 @@ class DaemonManager:
             "user": user,
             "daemon_dir": self.project.daemon_dir,
             "project_name": self.project.name,
-            "start_time": datetime.datetime.now(),
-            "last_pinged": datetime.datetime.now(),
+            "start_time": datetime.datetime.now(datetime.timezone.utc),
+            "last_pinged": datetime.datetime.now(datetime.timezone.utc),
             "runner_options": self.project.runner.model_dump(mode="json"),
         }
 

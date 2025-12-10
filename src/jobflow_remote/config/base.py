@@ -53,7 +53,7 @@ class RunnerOptions(BaseModel):
         "and running jobs (seconds). Only used if a batch worker is present",
     )
     delay_ping_db: float = Field(
-        7200,
+        3600,
         description="Delay between subsequent pings to the running runner document.",
     )
     lock_timeout: float | None = Field(
