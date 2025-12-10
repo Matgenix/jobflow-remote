@@ -1112,13 +1112,20 @@ def test_running_runner(job_controller, daemon_manager, wait_daemon_started):
     assert job_controller.get_running_runner() == "NO_DOCUMENT"
 
 
-def test_runner_pings(job_controller):
+def test_runner_pings(job_controller, monkeypatch):
     data = {"test": "XX"}
-    job_controller.ping_running_runner(data=data)
-    job_controller.ping_running_runner(data=data)
-    assert len(job_controller.get_runner_pings()) == 2
-    job_controller.clean_runner_pings()
-    assert len(job_controller.get_runner_pings()) == 0
+    import jobflow_remote.jobs.jobcontroller
+
+    with monkeypatch.context() as m:
+        m.setattr(jobflow_remote.jobs.jobcontroller, "_MAX_ARCHIVED_RUNNER_PINGS", 3)
+        job_controller.ping_running_runner(data=data)
+        job_controller.ping_running_runner(data=data)
+        assert len(job_controller.get_runner_pings()) == 2
+        for _ in range(3):
+            job_controller.ping_running_runner(data=data)
+        assert len(job_controller.get_runner_pings()) == 3
+        job_controller.clean_runner_pings()
+        assert len(job_controller.get_runner_pings()) == 0
 
 
 def test_stop_jobflow_resume(job_controller, runner) -> None:
