@@ -166,6 +166,14 @@ def test_info(
 
     running_runner = job_controller.get_running_runner()
     runner_info = daemon_manager._get_runner_info()
+
+    # wait for the runner to have pinged the DB before proceeding
+    for _ in range(30):
+        if len(job_controller.get_runner_pings()) > 0:
+            break
+    else:
+        raise RuntimeError("The runner did not ping the DB within the allocated time")
+
     ping_data = {
         "daemon_id": runner_info["processes_info"]["supervisord"]["pid"],
         "runner_id": runner_info["processes_info"]["runner_daemon:run_jobflow0"]["pid"],
