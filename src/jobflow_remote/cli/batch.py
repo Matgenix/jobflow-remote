@@ -122,6 +122,17 @@ def process_info(
 
 @app_batch.command()
 def delete(
+    # batch_state defined like this to avoid typing issues
+    batch_state: Annotated[
+        list[BatchState] | None,
+        typer.Option(
+            "--state",
+            "-s",
+            help="One or more of the batch states",
+            default_factory=lambda: [BatchState.FINISHED.value],
+            show_default=f"{BatchState.FINISHED.value}",
+        ),
+    ],
     process_id: Annotated[
         str | None,
         typer.Option(
@@ -139,11 +150,11 @@ def delete(
         ),
     ] = None,
     worker_name: worker_name_opt = None,
-    batch_state: batch_state_opt = (BatchState.FINISHED.value,),
     yes_all: yes_opt = False,
 ):
     """Remove one or more batch processes from the database. No effect on the processes running on the worker."""
 
+    print(batch_state)
     if len(set(batch_state).difference([BatchState.FINISHED])) > 0 and not yes_all:
         text = Text.from_markup(
             "[red]This operation may remove batch processes in states other than 'FINISHED'. "
