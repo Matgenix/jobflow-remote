@@ -1056,6 +1056,15 @@ class JobController:
                 doc_update = self._reset_remote(job_doc_dict, delete_files=delete_files)
                 modified_jobs = []
             elif (
+                job_state in [JobState.BATCH_SUBMITTED, JobState.BATCH_RUNNING]
+                and not force
+            ):
+                raise ValueError(
+                    "Rerunning a BATCH_SUBMITTED or BATCH_RUNNING can lead to multiple execution of the "
+                    "same job if the job has already started. If this is not the case or the job is not "
+                    "running anymore, use the 'force' option to bypass the check."
+                )
+            elif (
                 job_state not in [JobState.FAILED, JobState.REMOTE_ERROR] and not force
             ):
                 raise ValueError(
@@ -1969,6 +1978,12 @@ class JobController:
                         f"Failed cancelling the process for Job {job_doc['uuid']} {job_doc['index']}",
                         exc_info=True,
                     )
+            elif job_state in [JobState.BATCH_SUBMITTED, JobState.BATCH_RUNNING]:
+                logger.warning(
+                    f"The job {job_doc['uuid']} {job_doc['index']} will be set to the STOPPED state, "
+                    f"but it was in the {job_state.value} state so it cannot be cancelled from "
+                    "execution on the worker."
+                )
             job_id = job_doc["uuid"]
             job_index = job_doc["index"]
             updated_states = {job_id: {job_index: JobState.USER_STOPPED}}
@@ -4955,6 +4970,8 @@ class JobController:
         batch_uid: str | list[str] | None = None,
         worker: str | list[str] | None = None,
         batch_state: BatchState | list[BatchState] | None = None,
+        job_ids: tuple[str, int] | list[tuple[str, int]] | None = None,
+        db_ids: str | list[str] | None = None,
     ) -> dict:
         """
         Build a query to search for batch processes, based on standard parameters.
@@ -4970,12 +4987,18 @@ class JobController:
             One or more worker names.
         batch_state
             One or more BatchStates.
+        job_ids
+            list of job uuids and job index pairs.
+        db_ids
+            list of job db_ids.
 
         Returns
         -------
             A dictionary with the query to be applied to a collection
             containing BatchDocs.
         """
+        if job_ids and db_ids:
+            raise ValueError("job_ids and db_ids cannot be specified simultaneously")
         query: dict = {}
         if process_id:
             if isinstance(process_id, str):
@@ -4997,6 +5020,21 @@ class JobController:
                 query["batch_state"] = batch_state.value
             else:
                 query["batch_state"] = {"$in": [bs.value for bs in batch_state]}
+        if job_ids:
+            if isinstance(job_ids[0], str):
+                query["jobs"] = {"$elemMatch": {"1": job_ids[0], "2": job_ids[1]}}
+            else:
+                query["$or"] = [
+                    {"jobs": {"$elemMatch": {"1": ji[0], "2": ji[1]}}}  # type: ignore
+                    for ji in job_ids
+                ]
+        if db_ids:
+            if isinstance(db_ids, str):
+                query["jobs"] = {"$elemMatch": {"0": db_ids[0]}}
+            else:
+                query["$or"] = [
+                    {"jobs": {"$elemMatch": {"0": did[0]}}} for did in db_ids
+                ]
         return query
 
     def get_batches(
@@ -5005,6 +5043,8 @@ class JobController:
         batch_uid: str | list[str] | None = None,
         worker: str | list[str] | None = None,
         batch_state: BatchState | list[BatchState] | None = None,
+        job_ids: tuple[str, int] | list[tuple[str, int]] | None = None,
+        db_ids: str | list[str] | None = None,
         limit: int = 20,
         sort: str | list | None = None,
     ) -> list[BatchDoc]:
@@ -5021,6 +5061,10 @@ class JobController:
             One or more worker names.
         batch_state
             One or more BatchStates.
+        job_ids
+            list of job uuids and job index pairs.
+        db_ids
+            list of job db_ids.
         limit
             Maximum number of entries to retrieve. 0 means no limit.
         sort
@@ -5037,6 +5081,8 @@ class JobController:
             batch_uid=batch_uid,
             worker=worker,
             batch_state=batch_state,
+            job_ids=job_ids,
+            db_ids=db_ids,
         )
         # Some batches may have updated at exactly the same time (up to ms precision of MongoDB)
         # To make sure we have always same order (in particular when limiting number of results),
@@ -5057,6 +5103,8 @@ class JobController:
         batch_uid: str | list[str] | None = None,
         worker: str | list[str] | None = None,
         batch_state: BatchState | list[BatchState] | None = None,
+        job_ids: tuple[str, int] | list[tuple[str, int]] | None = None,
+        db_ids: str | list[str] | None = None,
     ) -> int:
         """
         Count the batch processes documents.
@@ -5071,6 +5119,10 @@ class JobController:
             One or more worker names.
         batch_state
             One or more BatchStates.
+        job_ids
+            list of job uuids and job index pairs.
+        db_ids
+            list of job db_ids.
 
         Returns
         -------
@@ -5082,6 +5134,8 @@ class JobController:
             batch_uid=batch_uid,
             worker=worker,
             batch_state=batch_state,
+            job_ids=job_ids,
+            db_ids=db_ids,
         )
         return self.batches.count_documents(query)
 
@@ -5093,16 +5147,16 @@ class JobController:
         batch_state: BatchState | list[BatchState] | None = None,
     ) -> int:
         """
-        Delete batch processes entried from the database.
+        Delete batch processes from the database.
         No attempt to cancel the running processes on the worker if they
         are still running.
 
         Parameters
         ----------
         process_id
-            One or more process ids of the batch processes to retrieve.
+            One or more process ids of the batch processes to delete.
         batch_uid
-            One or more batch uids of the batch processes to retrieve.
+            One or more batch uids of the batch processes to delete.
         worker
             One or more worker names.
         batch_state
@@ -5173,15 +5227,15 @@ class JobController:
         return self.batches.insert_one(batch_doc_dict)
 
     def update_job_in_batch(
-        self, job_id: str, job_index: int, batch_uid: str, info: Any
+        self, job_id: str, job_index: int, batch_uid: str, db_id: str
     ):
         self.batches.update_one(
             {"batch_uid": batch_uid},
             {
-                "$set": {
-                    f"jobs.{job_id}.{job_index}": info,
-                    "updated_on": datetime.now(timezone.utc),
-                }
+                "$addToSet": {
+                    "jobs": [db_id, job_id, job_index],
+                },
+                "$set": {"updated_on": datetime.now(timezone.utc)},
             },
         )
 
@@ -5242,6 +5296,24 @@ class JobController:
                 }
             },
         )
+
+    def fix_batch_doc_jobs(self) -> int:
+        return self.batches.update_many(
+            {},
+            [
+                {
+                    "$set": {
+                        "jobs": {
+                            "$cond": {
+                                "if": {"$eq": [{"$type": "$jobs"}, "object"]},
+                                "then": [],
+                                "else": "$jobs",
+                            }
+                        }
+                    }
+                }
+            ],
+        ).modified_count
 
     def delete_job(
         self,

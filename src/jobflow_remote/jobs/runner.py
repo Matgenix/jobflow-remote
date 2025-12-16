@@ -1243,7 +1243,7 @@ class Runner:
                         job_id=job_id,
                         job_index=job_index,
                         batch_uid=batch_uid,
-                        info={"state": JobState.BATCH_RUNNING.value},
+                        db_id=lock.locked_document.get("db_id"),
                     )
                     set_output = {
                         "$set": {
@@ -1595,7 +1595,7 @@ class Runner:
                         job_id=job_id,
                         job_index=job_index,
                         batch_uid=batch_uid,
-                        info={"state": JobState.RUN_FINISHED.value},
+                        db_id=lock.locked_document.get("db_id"),
                     )
                     lock.update_on_release = set_output
             batch_manager.delete_run_finished([(job_id, job_index, batch_uid)])
