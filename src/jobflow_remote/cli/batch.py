@@ -1,6 +1,7 @@
 from typing import Annotated
 
 import typer
+from pydantic import ValidationError
 from rich.prompt import Confirm
 from rich.text import Text
 
@@ -9,6 +10,8 @@ from jobflow_remote.cli.jf import app
 from jobflow_remote.cli.jfr_typer import JFRTyper
 from jobflow_remote.cli.types import (
     batch_state_opt,
+    db_ids_opt,
+    job_ids_indexes_opt,
     max_results_opt,
     verbosity_opt,
     worker_name_opt,
@@ -16,9 +19,11 @@ from jobflow_remote.cli.types import (
 )
 from jobflow_remote.cli.utils import (
     check_valid_uuid,
+    exit_with_error_msg,
     exit_with_warning_msg,
     get_config_manager,
     get_job_controller,
+    get_job_ids_indexes,
     loading_spinner,
     out_console,
     print_success_msg,
@@ -31,11 +36,43 @@ app_batch = JFRTyper(
 app.add_typer(app_batch)
 
 
+def _check_exception_dev_version(exc: ValidationError):
+    """
+    Helper function to handle the change in the "jobs" type in the BatchDoc object.
+
+    Initially defined as dict was switched to a list. Users may have this in their DB
+    if using development version.
+
+    Parameters
+    ----------
+    exc
+        The pydantic ValidationError exception to be verified.
+    """
+    try:
+        # capture all possible to avoid that if some keys are not present it
+        # fails with a confusing message.
+        val_errors = exc.errors()
+        if (
+            exc.error_count() == 1
+            and val_errors[0]["loc"] == ("jobs",)
+            and isinstance(val_errors[0]["input"], dict)
+        ):
+            exit_with_error_msg(
+                "It seems that you have used a development version of jobflow-remote. The internal format"
+                "of the batch jobs have changed before the release. Please run 'jf batch fix-batch-doc-jobs-dict'"
+                " to upgrade the database content."
+            )
+    except Exception:
+        pass
+
+
 @app_batch.command(name="list")
 def processes_list(
     worker_name: worker_name_opt = None,
     max_results: max_results_opt = 20,
     batch_state: batch_state_opt = None,
+    job_id: job_ids_indexes_opt = None,
+    db_id: db_ids_opt = None,
     verbosity: verbosity_opt = 0,
 ) -> None:
     """
@@ -48,33 +85,30 @@ def processes_list(
     project = cm.get_project()
     workers = project.workers
 
-    with loading_spinner():
-        batch_processes = jc.get_batches(
-            worker=worker_name,
-            batch_state=batch_state,
-            limit=max_results,
-        )
+    job_ids_indexes = get_job_ids_indexes(job_id)
+
+    try:
+        with loading_spinner():
+            batch_processes = jc.get_batches(
+                worker=worker_name,
+                batch_state=batch_state,
+                job_ids=job_ids_indexes,
+                db_ids=db_id,
+                limit=max_results,
+            )
+    except ValidationError as exc:
+        _check_exception_dev_version(exc=exc)
+        raise
+
     if not batch_processes:
         exit_with_warning_msg("No batch processes")
-
-    batches_jobs = []
-    if verbosity > 0:
-        for batch in batch_processes:
-            batch_jobs = [
-                (jid, str(jidx))
-                for jid, jid_dict in batch.jobs.items()
-                for jidx in jid_dict
-            ]
-            batches_jobs.append(batch_jobs)
 
     table = get_batch_processes_table(
         batch_processes=batch_processes,
         workers=workers,
-        batches_jobs=batches_jobs,
         verbosity=verbosity,
         status=True,
         title="Batches info",
-        job_ids_column_name="Job ids (Index)",
     )
 
     out_console.print(table)
@@ -108,11 +142,17 @@ def process_info(
         batch_processes = jc.get_batches(
             process_id=process_id,
             batch_uid=batch_uid,
-            limit=1,
+            limit=2,
         )
 
     if not batch_processes:
         exit_with_warning_msg("No batch process matching the request")
+
+    if len(batch_processes) > 1:
+        exit_with_error_msg(
+            "More than one document matches the selection criteria. User 'jf batch list' to identify a"
+            "unique criteria for the batch process that you want to visualize"
+        )
 
     worker = workers[batch_processes[0].worker]
     out_console.print(
@@ -124,7 +164,7 @@ def process_info(
 def delete(
     # batch_state defined like this to avoid typing issues
     batch_state: Annotated[
-        list[BatchState] | None,
+        list[BatchState],
         typer.Option(
             "--state",
             "-s",
@@ -145,8 +185,8 @@ def delete(
         str | None,
         typer.Option(
             "--batch-uid",
-            "-uid",
-            help="One or more process ids",
+            "-bid",
+            help="One or more batch unique ids",
         ),
     ] = None,
     worker_name: worker_name_opt = None,
@@ -154,34 +194,36 @@ def delete(
 ):
     """Remove one or more batch processes from the database. No effect on the processes running on the worker."""
 
-    print(batch_state)
-    if len(set(batch_state).difference([BatchState.FINISHED])) > 0 and not yes_all:
-        text = Text.from_markup(
-            "[red]This operation may remove batch processes in states other than 'FINISHED'. "
-            "This could lead to [bold]inconsistencies or data loss[/bold]. Proceed anyway?[/red]"
-        )
-
-        confirmed = Confirm.ask(text, default=False)
-        if not confirmed:
-            raise typer.Exit(0)
-
     jc = get_job_controller()
 
-    with loading_spinner():
-        n_batch_processes = jc.count_batches(
-            process_id=process_id,
-            batch_uid=batch_uid,
-            worker=worker_name,
-            batch_state=batch_state,
-        )
+    try:
+        with loading_spinner():
+            to_delete = jc.get_batches(
+                process_id=process_id,
+                batch_uid=batch_uid,
+                worker=worker_name,
+                batch_state=batch_state,
+            )
+    except ValidationError as exc:
+        _check_exception_dev_version(exc)
+        raise
 
-    if not n_batch_processes:
+    if not to_delete:
         exit_with_warning_msg("No batch process matching the request")
 
     if not yes_all:
-        text = Text.from_markup(
-            f"[red]This operation will [bold]delete {n_batch_processes} batch processes[/bold]. Proceed anyway?[/red]"
-        )
+        if len(set(batch_state).difference([BatchState.FINISHED])) > 0 and any(
+            b.batch_state != BatchState.FINISHED for b in to_delete
+        ):
+            text = Text.from_markup(
+                "[red]This operation may remove batch processes in states other than 'FINISHED'. "
+                "This could lead to [bold]inconsistencies or data loss[/bold]. "
+                "Overall it will [bold]delete {len(to_delete)} batch processes[/bold]. Proceed anyway?[/red]"
+            )
+        else:
+            text = Text.from_markup(
+                f"[red]This operation will [bold]delete {len(to_delete)} batch processes[/bold]. Proceed anyway?[/red]"
+            )
 
         confirmed = Confirm.ask(text, default=False)
         if not confirmed:
@@ -196,3 +238,12 @@ def delete(
         )
 
     print_success_msg(f"Operation completed. {n_deleted} batch processes deleted")
+
+
+@app_batch.command(hidden=True)
+def fix_batch_doc_jobs_dict():
+    jc = get_job_controller()
+
+    n_fixed = jc.fix_batch_doc_jobs()
+
+    out_console.print(f"{n_fixed} batch documents modified")

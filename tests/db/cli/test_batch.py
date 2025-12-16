@@ -30,9 +30,12 @@ def test_batch_worker(
     from jobflow_remote.jobs.state import BatchState, JobState
     from jobflow_remote.testing import add_sleep
 
+    job_ids_db_ids = []
     for _ in range(8):
         add_j = add_sleep(2, 1)
-        submit_flow(add_j, worker="test_local_batch_worker")
+        job_ids_db_ids.append(
+            (add_j.uuid, submit_flow(add_j, worker="test_local_batch_worker")[0])
+        )
 
     assert job_controller.count_flows() == 8
     assert job_controller.count_jobs() == 8
@@ -91,6 +94,32 @@ def test_batch_worker(
         ],
     )
 
+    job_info = job_controller.get_job_info(job_id=job_ids_db_ids[0][0])
+    missing_proc_ids = [
+        ob.process_id
+        for ob in ordered_batches
+        if ob.process_id != job_info.remote.process_id
+    ]
+    run_check_cli(
+        ["batch", "list", "-jid", f"{job_ids_db_ids[0][0]}:1"],
+        required_out=[
+            "Batches info",
+            "FINISHED",
+            job_info.remote.process_id,
+        ],
+        excluded_out=["Running batches info", "RUNNING", *missing_proc_ids],
+    )
+
+    run_check_cli(
+        ["batch", "list", "-did", job_ids_db_ids[0][1]],
+        required_out=[
+            "Batches info",
+            "FINISHED",
+            job_info.remote.process_id,
+        ],
+        excluded_out=["Running batches info", "RUNNING", *missing_proc_ids],
+    )
+
     # test "batch info"
     run_check_cli(
         ["batch", "info", batches[0].batch_uid],
@@ -113,6 +142,11 @@ def test_batch_worker(
         ],
     )
 
+    run_check_cli(
+        ["batch", "info", "FAKE_PROCESS_ID"],
+        required_out="No batch process matching the request",
+    )
+
     # test "batch delete"
     run_check_cli(
         ["batch", "delete", "-pid", batches[0].process_id],
@@ -129,6 +163,12 @@ def test_batch_worker(
     )
     assert job_controller.count_batches() == 3
 
+    # manually set one of the batch jobs to RUNNING
+    job_controller.batches.find_one_and_update(
+        {"process_id": ordered_batches[1].process_id},
+        {"$set": {"batch_state": BatchState.RUNNING.value}},
+    )
+
     run_check_cli(
         ["batch", "delete", "--state", "RUNNING"],
         required_out=["This could lead to inconsistencies or data loss"],
@@ -143,4 +183,69 @@ def test_batch_worker(
         required_out=["This operation will delete", "batch processes deleted"],
         cli_input="y",
     )
-    assert job_controller.count_batches() == 0
+    assert job_controller.count_batches() == 1
+
+    # add a second job with the same process id to trigger an error in "batch info"
+    job_controller.add_batch_process(
+        process_id=ordered_batches[1].process_id,
+        batch_uid="fake_uid",
+        worker="fake_worker",
+    )
+
+    run_check_cli(
+        ["batch", "info", ordered_batches[1].process_id],
+        required_out="More than one document matches the selection criteria",
+        error=True,
+    )
+
+
+def test_fix_batch_doc_dict(job_controller, run_check_cli):
+    from jobflow_remote.utils.data import suuid
+
+    uuid1 = suuid()
+    uuid2 = suuid()
+    job_controller.add_batch_process(
+        process_id="1234", batch_uid=uuid1, worker="test_local_batch_worker"
+    )
+    job_controller.add_batch_process(
+        process_id="5678", batch_uid=uuid2, worker="test_local_batch_worker"
+    )
+    job_controller.update_job_in_batch(
+        batch_uid=uuid1, job_id="jobuuid1", job_index=1, db_id="1"
+    )
+    job_controller.batches.find_one_and_update(
+        {"process_id": "5678"},
+        {"$set": {"jobs": {"jobuuid2": {"1": {"status": "BATCH_SUBMITTED"}}}}},
+    )
+
+    run_check_cli(
+        ["batch", "list"],
+        required_out="It seems that you have used a development version of jobflow-remote",
+        error=True,
+    )
+
+    run_check_cli(
+        ["batch", "delete", "-y", "-s", "SUBMITTED"],
+        required_out="It seems that you have used a development version of jobflow-remote",
+        error=True,
+    )
+
+    assert isinstance(job_controller.get_batches(process_id="1234")[0].jobs, list)
+    assert isinstance(
+        job_controller.batches.find_one({"process_id": "5678"})["jobs"], dict
+    )
+
+    run_check_cli(
+        ["batch", "fix-batch-doc-jobs-dict"],
+        required_out="1 batch documents modified",
+    )
+    # check that the existing list is not modified and the dict is converted to a list
+    assert job_controller.get_batches(process_id="1234")[0].jobs == [
+        ["1", "jobuuid1", 1]
+    ]
+    assert job_controller.get_batches(process_id="5678")[0].jobs == []
+
+    run_check_cli(
+        ["batch", "list"],
+        required_out=["1234", "5678"],
+    )

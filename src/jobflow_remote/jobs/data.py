@@ -454,7 +454,7 @@ class BatchDoc(BaseModel):
     process_id: str
     batch_state: BatchState
     worker: str
-    jobs: dict = Field(default_factory=dict)
+    jobs: list = Field(default_factory=list)
     created_on: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_on: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     start_time: datetime | None = None

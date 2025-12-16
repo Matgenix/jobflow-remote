@@ -457,6 +457,40 @@ def test_rerun_remote_error(job_controller, monkeypatch, runner) -> None:
     assert j1_info.remote.prerun_cleanup
 
 
+def test_rerun_generic(job_controller):
+    from jobflow import Flow
+
+    from jobflow_remote import submit_flow
+    from jobflow_remote.jobs.state import JobState
+    from jobflow_remote.testing import add
+
+    j1 = add(1, 2)
+    j2 = add(j1.output, 2)
+    flow = Flow([j1, j2])
+
+    submit_flow(flow, worker="test_local_worker")
+
+    # test that a job in batch execution cannot be rerun without force
+    job_controller.set_job_state(
+        JobState.BATCH_SUBMITTED, job_id=j1.uuid, job_index=j1.index
+    )
+    with pytest.raises(
+        ValueError, match="Rerunning a BATCH_SUBMITTED or BATCH_RUNNING can lead"
+    ):
+        job_controller.rerun_job(job_id=j1.uuid, job_index=j1.index)
+
+    assert (
+        job_controller.get_job_info(job_id=j1.uuid, job_index=j1.index).state
+        == JobState.BATCH_SUBMITTED
+    )
+
+    assert job_controller.rerun_job(job_id=j1.uuid, job_index=j1.index, force=True)
+    assert (
+        job_controller.get_job_info(job_id=j1.uuid, job_index=j1.index).state
+        == JobState.READY
+    )
+
+
 def test_retry(job_controller, monkeypatch, runner) -> None:
     from jobflow import Flow
 
@@ -530,13 +564,18 @@ def test_pause_play(job_controller) -> None:
     assert job_controller.get_flows_info(job_ids=j.uuid)[0].state == FlowState.READY
 
 
-def test_stop(job_controller, one_job) -> None:
+def test_stop(job_controller, one_job, caplog) -> None:
     from jobflow_remote.jobs.state import FlowState, JobState
 
     j = one_job.jobs[0]
     assert job_controller.stop_jobs(job_ids=(j.uuid, 1)) == ["1"]
     assert job_controller.get_job_info(job_id=j.uuid).state == JobState.USER_STOPPED
     assert job_controller.get_flows_info(job_ids=j.uuid)[0].state == FlowState.STOPPED
+
+    job_controller.set_job_state(JobState.BATCH_SUBMITTED, job_id=j.uuid, job_index=1)
+    assert job_controller.stop_jobs(job_ids=(j.uuid, 1)) == ["1"]
+    assert job_controller.get_job_info(job_id=j.uuid).state == JobState.USER_STOPPED
+    assert "cannot be cancelled from execution on the worker" in caplog.text
 
 
 def test_unlock_jobs(job_controller, one_job) -> None:
@@ -1442,3 +1481,38 @@ def test_complete_onmissing_none(job_controller, runner):
     assert job_controller.get_job_info(job_id=j2.uuid).state == JobState.COMPLETED
     # The job returns the input argument, so it should be None
     assert job_controller.get_job_output(job_id=j2.uuid) is None
+
+
+def test_batches(job_controller):
+    assert job_controller.add_batch_process(
+        process_id="1234", batch_uid="uuid1", worker="test_local_batch_worker"
+    )
+    assert job_controller.add_batch_process(
+        process_id="1235", batch_uid="uuid2", worker="test_local_batch_worker"
+    )
+
+    assert job_controller.count_batches() == 2
+
+    job_controller.update_job_in_batch(
+        job_id="job_uuid1", job_index=1, db_id="1", batch_uid="uuid1"
+    )
+    job_controller.update_job_in_batch(
+        job_id="job_uuid2", job_index=1, db_id="2", batch_uid="uuid1"
+    )
+    # the same job updated twice should not be inserted more than once:
+    job_controller.update_job_in_batch(
+        job_id="job_uuid1", job_index=1, db_id="1", batch_uid="uuid1"
+    )
+    job_controller.update_job_in_batch(
+        job_id="job_uuid3", job_index=1, db_id="3", batch_uid="uuid2"
+    )
+    batches = job_controller.get_batches(batch_uid="uuid1")
+    assert len(batches) == 1
+    assert len(batches[0].jobs) == 2
+
+    assert job_controller.count_batches(job_ids=("job_uuid1", 1)) == 1
+    assert (
+        job_controller.count_batches(job_ids=[("job_uuid1", 1), ("job_uuid3", 1)]) == 2
+    )
+    assert job_controller.count_batches(db_ids="1") == 1
+    assert job_controller.count_batches(db_ids=["1", "3"]) == 2

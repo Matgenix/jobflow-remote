@@ -759,11 +759,9 @@ def format_failed_conditions(failed_conditions: list[tuple[Version, dict]]):
 def get_batch_processes_table(
     batch_processes: list,
     workers: dict[str, WorkerBase],
-    batches_jobs: list[list[tuple[str, str]]],
     verbosity: int = 0,
     title: str = "Running batches info",
     status: bool = False,
-    job_ids_column_name: str = "Running Job ids (Index)",
 ):
     table = Table(title=title)
     table.add_column("Process ID")
@@ -773,10 +771,10 @@ def get_batch_processes_table(
     if status:
         table.add_column("Status")
     if verbosity > 0:
-        table.add_column(job_ids_column_name)
+        table.add_column("DB id - Running Job ids (Index)")
         table.add_column(header_name_data_getter_map["last_updated"][0])
 
-    for ibatch, batch_data in enumerate(batch_processes):
+    for batch_data in batch_processes:
         worker = workers[batch_data.worker]
         row = [
             batch_data.process_id,
@@ -788,7 +786,9 @@ def get_batch_processes_table(
             row.append(batch_data.batch_state.value)
 
         if verbosity > 0:
-            row.append("\n".join([f"{jb[0]} ({jb[1]})" for jb in batches_jobs[ibatch]]))
+            row.append(
+                "\n".join([f"{jb[0]} {jb[1]} ({jb[2]})" for jb in batch_data.jobs])
+            )
             row.append(header_name_data_getter_map["last_updated"][1](batch_data))
 
         table.add_row(*row)
