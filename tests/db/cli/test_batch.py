@@ -95,8 +95,8 @@ def test_batch_worker(
     )
 
     job_info = job_controller.get_job_info(job_id=job_ids_db_ids[0][0])
-    missing_proc_ids = [
-        ob.process_id
+    missing_batch_uids = [
+        ob.batch_uid
         for ob in ordered_batches
         if ob.process_id != job_info.remote.process_id
     ]
@@ -107,7 +107,7 @@ def test_batch_worker(
             "FINISHED",
             job_info.remote.process_id,
         ],
-        excluded_out=["Running batches info", "RUNNING", *missing_proc_ids],
+        excluded_out=["Running batches info", "RUNNING", *missing_batch_uids],
     )
 
     run_check_cli(
@@ -117,7 +117,7 @@ def test_batch_worker(
             "FINISHED",
             job_info.remote.process_id,
         ],
-        excluded_out=["Running batches info", "RUNNING", *missing_proc_ids],
+        excluded_out=["Running batches info", "RUNNING", *missing_batch_uids],
     )
 
     # test "batch info"
@@ -213,6 +213,9 @@ def test_fix_batch_doc_dict(job_controller, run_check_cli):
     job_controller.update_job_in_batch(
         batch_uid=uuid1, job_id="jobuuid1", job_index=1, db_id="1"
     )
+    # setting the "jobs" to a dict (instead of a list) to test that the error
+    # is handled correctly and prints the proper error message (this is due to
+    # a change in the type during development)
     job_controller.batches.find_one_and_update(
         {"process_id": "5678"},
         {"$set": {"jobs": {"jobuuid2": {"1": {"status": "BATCH_SUBMITTED"}}}}},
