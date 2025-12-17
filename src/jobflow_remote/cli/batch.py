@@ -48,6 +48,7 @@ def _check_exception_dev_version(exc: ValidationError):
     exc
         The pydantic ValidationError exception to be verified.
     """
+    # TODO consider removing this function in the future
     try:
         # capture all possible to avoid that if some keys are not present it
         # fails with a confusing message.
@@ -60,7 +61,8 @@ def _check_exception_dev_version(exc: ValidationError):
             exit_with_error_msg(
                 "It seems that you have used a development version of jobflow-remote. The internal format"
                 "of the batch jobs have changed before the release. Please run 'jf batch fix-batch-doc-jobs-dict'"
-                " to upgrade the database content."
+                " to upgrade the database content (note that this command is hidden from the help as it is "
+                "only needed for this error)."
             )
     except Exception:
         pass
@@ -231,10 +233,7 @@ def delete(
 
     with loading_spinner():
         n_deleted = jc.delete_batches(
-            process_id=process_id,
-            batch_uid=batch_uid,
-            worker=worker_name,
-            batch_state=batch_state,
+            process_id=[td.process_id for td in to_delete],
         )
 
     print_success_msg(f"Operation completed. {n_deleted} batch processes deleted")
