@@ -1436,7 +1436,7 @@ class JobController:
                     f"Job in state {doc['state']}. The action cannot be performed"
                 )
             values = dict(values)
-            # values["updated_on"] = datetime.utcnow()
+            # values["updated_on"] = datetime.now(timezone.utc)
             lock.update_on_release = (
                 [{"$set": values}] if use_pipeline else {"$set": values}
             )

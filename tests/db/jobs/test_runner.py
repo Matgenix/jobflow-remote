@@ -72,7 +72,7 @@ def test_upload_cleanup_error(job_controller, runner, monkeypatch):
 
 
 def test_delay_download(job_controller, runner, monkeypatch, one_job):
-    from datetime import datetime
+    from datetime import datetime, timezone
 
     from jobflow_remote.jobs.state import JobState
 
@@ -85,7 +85,9 @@ def test_delay_download(job_controller, runner, monkeypatch, one_job):
         )
     j_info = job_controller.get_job_info(job_id=j.uuid, job_index=j.index)
     assert j_info.remote.retry_time_limit is not None
-    assert j_info.remote.retry_time_limit > datetime.utcnow()
+    assert j_info.remote.retry_time_limit.replace(tzinfo=timezone.utc) > datetime.now(
+        timezone.utc
+    )
 
     # verify that it can properly complete after waiting
     assert runner.run_one_job(max_seconds=20, job_id=[j.uuid, j.index])

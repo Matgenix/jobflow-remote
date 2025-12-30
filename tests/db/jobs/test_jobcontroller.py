@@ -1074,7 +1074,7 @@ def test_count_states(job_controller):
 
 
 def test_get_trends(job_controller, one_job):
-    from datetime import datetime
+    from datetime import datetime, timezone
 
     import dateutil
 
@@ -1083,7 +1083,7 @@ def test_get_trends(job_controller, one_job):
     tzname = datetime.now(dateutil.tz.tzlocal()).tzname()
 
     now = datetime.now()
-    utcnow = datetime.utcnow()
+    utcnow = datetime.now(timezone.utc)
     job_trends = job_controller.get_trends(
         list(JobState), interval="days", interval_timezone=tzname
     )
@@ -1104,9 +1104,11 @@ def test_get_trends(job_controller, one_job):
         list(JobState), interval="weeks", interval_timezone="UTC"
     )
     assert len(job_trends) == 4
-    assert utcnow.strftime("%Y-%V") in job_trends
-    assert job_trends[utcnow.strftime("%Y-%V")][JobState.READY] == 1
-    assert job_trends[utcnow.strftime("%Y-%V")][JobState.COMPLETED] == 0
+    iso_year, iso_week, _ = utcnow.isocalendar()
+    iso_id = f"{iso_year}-{iso_week:02d}"
+    assert iso_id in job_trends
+    assert job_trends[iso_id][JobState.READY] == 1
+    assert job_trends[iso_id][JobState.COMPLETED] == 0
 
     job_trends = job_controller.get_trends(
         list(JobState), interval="years", num_intervals=2, interval_timezone=tzname
