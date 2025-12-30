@@ -635,7 +635,10 @@ def get_single_flow_report_components(flow_info: FlowInfo) -> list[RenderableTyp
             + f" [{time.tzname[0]}]",
         )
         # Show elapsed time for non-completed flows
-        elapsed_time = (datetime.datetime.utcnow() - start_time).total_seconds()
+        elapsed_time = (
+            datetime.datetime.now(datetime.timezone.utc)
+            - start_time.replace(tzinfo=datetime.timezone.utc)
+        ).total_seconds()
         hours, minutes, seconds = get_h_m_s(elapsed_time)
         header_table.add_row(
             "Elapsed Time", f"{int(hours):02d}:{int(minutes):02d}:{int(seconds):02d}"

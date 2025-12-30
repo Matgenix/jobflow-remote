@@ -14,8 +14,8 @@ def test_get_job_info_table():
         worker="test_worker",
         name="job1",
         state=JobState.READY,
-        created_on=datetime.datetime.utcnow(),
-        updated_on=datetime.datetime.utcnow(),
+        created_on=datetime.datetime.now(datetime.timezone.utc),
+        updated_on=datetime.datetime.now(datetime.timezone.utc),
         hosts=["5e337e69-b153-45e0-82f2-4a7af8b45e44"],
     )
 
@@ -26,8 +26,8 @@ def test_get_job_info_table():
         worker="another_worker",
         name="job2",
         state=JobState.COMPLETED,
-        created_on=datetime.datetime.utcnow(),
-        updated_on=datetime.datetime.utcnow(),
+        created_on=datetime.datetime.now(datetime.timezone.utc),
+        updated_on=datetime.datetime.now(datetime.timezone.utc),
         hosts=["5e337e69-b153-45e0-82f2-4a7af8b45e44"],
     )
 
@@ -38,8 +38,8 @@ def test_get_job_info_table():
         worker="another_worker",
         name="job3",
         state=JobState.COMPLETED,
-        created_on=datetime.datetime.utcnow(),
-        updated_on=datetime.datetime.utcnow(),
+        created_on=datetime.datetime.now(datetime.timezone.utc),
+        updated_on=datetime.datetime.now(datetime.timezone.utc),
         hosts=["d490d691-8c96-4e93-93c0-8bb2a45e6746"],
     )
 

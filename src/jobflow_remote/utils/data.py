@@ -177,7 +177,7 @@ def get_past_time_rounded(
         past relative to the given reference datetime.
     """
     if not reference:
-        reference = datetime.utcnow()
+        reference = datetime.now(timezone.utc)
     past = reference - relativedelta(**{interval: num_intervals - 1})  # type: ignore[arg-type]
 
     # Define starting point modifications based on quantity type
