@@ -3,7 +3,7 @@ pydantic==2.12.5
 pymongo==4.10.1
 fabric==3.2.2
 tomlkit==0.13.3
-qtoolkit==0.1.6
+qtoolkit==0.1.7
 typer==0.21.1
 rich==14.2.0
 psutil==7.2.1
