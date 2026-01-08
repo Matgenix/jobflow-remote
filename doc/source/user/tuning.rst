@@ -116,10 +116,22 @@ a suitable submission script.
 
 .. note::
 
-    There are `SLURM <https://matgenix.github.io/qtoolkit/api/qtoolkit.io.slurm.html>`_
-    and `PBS <https://matgenix.github.io/qtoolkit/api/qtoolkit.io.pbs.html>`_
-    specific keywords that can be passed to ``submit_flow`` to use the
-    respective queueing system commands.
+    If relying on the specific queueing system keywords, the values that can be
+    passed are those present in the `templates defined in qtoolkit <https://matgenix.github.io/qtoolkit/user/resources.html#scheduler-templates>`_
+    Given the large number of options usually available for each scheduler, the
+    templates for each scheduler only contains a subset of the available options.
+    However, in each of the templates it is possible to pass a ``qverbatim`` option
+    that will be added to the header as is, allowing to pass any scheduler-specific option.
+    For example, in the case of a Slurm scheduler:
+
+    .. code-block:: python
+
+        options = {
+            "partition": "standard",
+            "qverbatim": "#SBATCH --tmp=10G\n#SBATCH --nice=100",
+        }
+        script = slurm_io.get_submission_script(commands="echo 'Hello'", options=options)
+
 
 How to tune
 ===========
