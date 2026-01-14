@@ -74,6 +74,7 @@ doc/_build/
 doc/source/api/*.rst
 
 doc/source/changelog.rst
+doc/source/dev/contributing.rst
 
 # PyBuilder
 .pybuilder/
