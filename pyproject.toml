@@ -3,7 +3,7 @@ name = "jobflow-remote"
 description = "Jobflow Remote is a Python package to run jobflow workflows on remote resources"
 readme = "README.md"
 keywords = []
-license = { text = "modified BSD" }
+license = "BSD-3-Clause"
 authors = [{ name = "Guido Petretto", email = "guido.petretto@matgenix.com" }]
 dynamic = ["version"]
 classifiers = [
