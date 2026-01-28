@@ -256,3 +256,73 @@ def test_info(
         required_out=[*req_out, "active on another machine"],
         excluded_out=excl_out,
     )
+
+
+def test_stop_all_runners(
+    job_controller,
+    wait_daemon_started,
+    run_check_cli,
+    crete_tmp_project,
+    daemon_manager,
+    tmp_dir,
+    random_project_name,
+):
+    from monty.serialization import loadfn
+
+    from jobflow_remote.jobs.daemon import DaemonManager, DaemonStatus
+
+    jc1, pn1 = crete_tmp_project(suffix="_1")
+    jc2, pn2 = crete_tmp_project(suffix="_2")
+    dm1 = DaemonManager.from_project_name(pn1)
+    dm2 = DaemonManager.from_project_name(pn2)
+
+    daemon_manager.start()
+    dm1.start()
+    wait_daemon_started(daemon_manager)
+    wait_daemon_started(dm1)
+
+    assert dm2.check_status() == DaemonStatus.SHUT_DOWN
+
+    run_check_cli(
+        [
+            "runner",
+            "shutdown",
+            "--all",
+            "--wait",
+            "--json",
+            tmp_dir / "shutdown_proj.json",
+        ],
+        required_out=[random_project_name, f"{random_project_name}_1"],
+        excluded_out=f"{random_project_name}_2",
+    )
+
+    assert daemon_manager.check_status() == DaemonStatus.SHUT_DOWN
+    assert dm1.check_status() == DaemonStatus.SHUT_DOWN
+    assert dm2.check_status() == DaemonStatus.SHUT_DOWN
+    shutdown_set = set(loadfn(tmp_dir / "shutdown_proj.json"))
+    assert shutdown_set == {random_project_name, f"{random_project_name}_1"}
+
+    daemon_manager.start()
+    dm2.start()
+
+    wait_daemon_started(daemon_manager)
+    wait_daemon_started(dm2)
+
+    run_check_cli(
+        [
+            "runner",
+            "stop-processes",
+            "--all",
+            "--wait",
+            "--json",
+            tmp_dir / "stopped_proj.json",
+        ],
+        required_out=[random_project_name, f"{random_project_name}_2"],
+        excluded_out=f"{random_project_name}_1",
+    )
+
+    assert daemon_manager.check_status() == DaemonStatus.STOPPED
+    assert dm1.check_status() == DaemonStatus.SHUT_DOWN
+    assert dm2.check_status() == DaemonStatus.STOPPED
+    stopped_set = set(loadfn(tmp_dir / "stopped_proj.json"))
+    assert stopped_set == {random_project_name, f"{random_project_name}_2"}

@@ -1,8 +1,11 @@
 import datetime
+import logging
 import os
+import time
 from typing import Annotated
 
 import typer
+from monty.serialization import dumpfn
 from rich.prompt import Confirm
 from rich.scope import render_scope
 from rich.table import Table
@@ -37,6 +40,9 @@ from jobflow_remote.jobs.daemon import (
 )
 from jobflow_remote.jobs.runner import Runner
 from jobflow_remote.utils.data import convert_utc_time
+
+logger = logging.getLogger(__name__)
+
 
 app_runner = JFRTyper(
     name="runner", help="Commands for handling the Runner", no_args_is_help=True
@@ -223,34 +229,118 @@ def stop_processes(
             ),
         ),
     ] = False,
+    all_projects: Annotated[
+        bool,
+        typer.Option(
+            "--all",
+            "-a",
+            help=("Stop the runner for all the projects"),
+        ),
+    ] = False,
+    json_out: Annotated[
+        str | None,
+        typer.Option(
+            "--json",
+            "-j",
+            help=(
+                "if --all dump the list of stopped runners in json format to a file at this path"
+            ),
+        ),
+    ] = None,
 ) -> None:
     """
     Send a stop signal to the Runner processes.
     Each of the Runner processes will stop when finished the task being executed.
     By default, return immediately.
     """
-    cm = get_config_manager()
-    dm = DaemonManager.from_project(cm.get_project())
-    stop_sent = False
-    with loading_spinner(processing=False) as progress:
-        progress.add_task(description="Stopping the daemon...", total=None)
-        try:
-            stop_sent = dm.stop(wait=wait, raise_on_error=True)
-        except RunningDaemonError as e:
-            exit_with_error_msg(
-                f"Error while stopping the daemon:\n{getattr(e, 'message', e)}{_running_daemon_error_msg}"
-            )
-        except DaemonError as e:
-            exit_with_error_msg(
-                f"Error while stopping the daemon: {getattr(e, 'message', e)}"
-            )
-    from jobflow_remote import SETTINGS
+    if all_projects:
+        cm = get_config_manager()
+        stop_projects = []
+        daemon_managers = {}
+        with loading_spinner(processing=False) as progress:
+            progress.add_task(description="Stopping all runners...", total=None)
+            for project_name in cm.projects_data:
+                try:
+                    dm = DaemonManager.from_project_name(project_name=project_name)
+                    daemon_managers[project_name] = dm
+                    current_status = dm.check_status(raise_on_shutdown=False)
+                    if current_status not in (
+                        DaemonStatus.SHUT_DOWN,
+                        DaemonStatus.SHUTTING_DOWN,
+                        DaemonStatus,
+                        DaemonStatus.STOPPED,
+                    ):
+                        dm.stop(raise_on_error=True, wait=False)
+                        stop_projects.append(project_name)
+                except Exception:
+                    logger.warning(
+                        f"Error while checking or stopping runner for project {project_name}",
+                        exc_info=True,
+                    )
 
-    if stop_sent and not wait and SETTINGS.cli_suggestions:
-        out_console.print(
-            "The stop signal has been sent to the Runner. Run 'jf runner status' to verify if it stopped",
-            style="yellow",
+            if wait:
+                stopped_missing = set(stop_projects)
+                max_wait = 120
+                t0 = time.time()
+                while stopped_missing:
+                    for project_name in list(stopped_missing):
+                        try:
+                            current_status = daemon_managers[project_name].check_status(
+                                raise_on_shutdown=False
+                            )
+                            if current_status == DaemonStatus.STOPPED:
+                                stopped_missing.remove(project_name)
+                        except Exception:
+                            logger.warning(
+                                f"Error while checking runner for project {project_name}",
+                                exc_info=True,
+                            )
+                    if time.time() - t0 > max_wait:
+                        break
+                    time.sleep(2)
+
+                if stopped_missing:
+                    exit_with_error_msg(
+                        "Not all the runners stopped within the allocated time. "
+                        f"Not stopped: {stopped_missing}. "
+                        f"Stopped: {set(stop_projects).difference(stopped_missing)}"
+                    )
+
+        if json_out:
+            dumpfn(stop_projects, json_out, fmt="json")
+
+        if not stop_projects:
+            exit_with_warning_msg("No active runner found for any (parsable) project")
+
+        msg = Text.from_markup(
+            "The runners for the following projects have been stopped:\n"
+            + "\n".join(f"- {pn}" for pn in stop_projects)
         )
+        out_console.print(msg)
+
+    else:
+        cm = get_config_manager()
+        dm = DaemonManager.from_project(cm.get_project())
+        stop_sent = False
+        with loading_spinner(processing=False) as progress:
+            progress.add_task(description="Stopping the daemon...", total=None)
+            try:
+                stop_sent = dm.stop(wait=wait, raise_on_error=True)
+            except RunningDaemonError as e:
+                exit_with_error_msg(
+                    f"Error while stopping the daemon:\n{getattr(e, 'message', e)}{_running_daemon_error_msg}"
+                )
+            except DaemonError as e:
+                exit_with_error_msg(
+                    f"Error while stopping the daemon: {getattr(e, 'message', e)}"
+                )
+        from jobflow_remote import SETTINGS
+
+        if stop_sent and not wait and SETTINGS.cli_suggestions:
+            out_console.print(
+                "The stop signal has been sent to the Runner. Run 'jf runner status' to verify if it stopped",
+                style="yellow",
+            )
 
 
 @app_runner.command()
@@ -261,16 +351,34 @@ def stop(
             "--wait",
             "-w",
             help=(
-                "Wait until the daemon has stopped. NOTE: this may take a while if a large file is being transferred!"
+                "Wait until the daemon has shut down. NOTE: this may take a while if a large file is being transferred!"
             ),
         ),
     ] = False,
+    all_projects: Annotated[
+        bool,
+        typer.Option(
+            "--all",
+            "-a",
+            help=("Shutdown the runner for all the projects"),
+        ),
+    ] = False,
+    json_out: Annotated[
+        str | None,
+        typer.Option(
+            "--json",
+            "-j",
+            help=(
+                "if --all dump the list of shutdown runners in json format to a file at this path"
+            ),
+        ),
+    ] = None,
 ) -> None:
     """
     Shuts down the supervisord process.
     Note that the supervisord process will stop after all the runner processes have finished.
     """
-    shutdown(wait=wait)
+    shutdown(wait=wait, all_projects=all_projects, json_out=json_out)
 
 
 @app_runner.command()
@@ -307,25 +415,108 @@ def shutdown(
             ),
         ),
     ] = False,
+    all_projects: Annotated[
+        bool,
+        typer.Option(
+            "--all",
+            "-a",
+            help=("Shutdown the runner for all the projects"),
+        ),
+    ] = False,
+    json_out: Annotated[
+        str | None,
+        typer.Option(
+            "--json",
+            "-j",
+            help=(
+                "if --all dump the list of shutdown runners in json format to a file at this path"
+            ),
+        ),
+    ] = None,
 ) -> None:
     """
     Shuts down the supervisord process.
     Note that the supervisord process will stop after all the runner processes have finished
     """
-    cm = get_config_manager()
-    dm = DaemonManager.from_project(cm.get_project())
-    with loading_spinner(processing=False) as progress:
-        progress.add_task(description="Shutting down supervisor...", total=None)
-        try:
-            dm.shut_down(raise_on_error=True, wait=wait)
-        except RunningDaemonError as e:
-            exit_with_error_msg(
-                f"Error while shutting down supervisor:\n{getattr(e, 'message', e)}{_running_daemon_error_msg}"
-            )
-        except DaemonError as e:
-            exit_with_error_msg(
-                f"Error while shutting down supervisor: {getattr(e, 'message', e)}"
-            )
+    if all_projects:
+        cm = get_config_manager()
+        shutdown_projects = []
+        daemon_managers = {}
+        with loading_spinner(processing=False) as progress:
+            progress.add_task(description="Shutting down all runners...", total=None)
+            for project_name in cm.projects_data:
+                try:
+                    dm = DaemonManager.from_project_name(project_name=project_name)
+                    daemon_managers[project_name] = dm
+                    current_status = dm.check_status(raise_on_shutdown=False)
+                    if current_status not in (
+                        DaemonStatus.SHUT_DOWN,
+                        DaemonStatus.SHUTTING_DOWN,
+                    ):
+                        dm.shut_down(raise_on_error=True, wait=False)
+                    if current_status != DaemonStatus.SHUT_DOWN:
+                        shutdown_projects.append(project_name)
+                except Exception:
+                    logger.warning(
+                        f"Error while checking or shutting down runner for project {project_name}",
+                        exc_info=True,
+                    )
+
+            if wait:
+                shutdown_missing = set(shutdown_projects)
+                max_wait = 120
+                t0 = time.time()
+                while shutdown_missing:
+                    for project_name in list(shutdown_missing):
+                        try:
+                            current_status = daemon_managers[project_name].check_status(
+                                raise_on_shutdown=False
+                            )
+                            if current_status == DaemonStatus.SHUT_DOWN:
+                                shutdown_missing.remove(project_name)
+                        except Exception:
+                            logger.warning(
+                                f"Error while checking runner for project {project_name}",
+                                exc_info=True,
+                            )
+                    if time.time() - t0 > max_wait:
+                        break
+                    time.sleep(2)
+
+                if shutdown_missing:
+                    exit_with_error_msg(
+                        "Not all the runners stopped within the allocated time. "
+                        f"Not shut-down: {shutdown_missing}. "
+                        f"Shut-down: {set(shutdown_projects).difference(shutdown_missing)}"
+                    )
+
+        if json_out:
+            dumpfn(shutdown_projects, json_out, fmt="json")
+
+        if not shutdown_projects:
+            exit_with_warning_msg("No active runner found for any (parsable) project")
+
+        msg = Text.from_markup(
+            "The runners for the following projects have been shut-down:\n"
+            + "\n".join(f"- {pn}" for pn in shutdown_projects)
+        )
+        out_console.print(msg)
+
+    else:
+        cm = get_config_manager()
+        dm = DaemonManager.from_project(cm.get_project())
+        with loading_spinner(processing=False) as progress:
+            progress.add_task(description="Shutting down supervisor...", total=None)
+            try:
+                dm.shut_down(raise_on_error=True, wait=wait)
+            except RunningDaemonError as e:
+                exit_with_error_msg(
+                    f"Error while shutting down supervisor:\n{getattr(e, 'message', e)}{_running_daemon_error_msg}"
+                )
+            except DaemonError as e:
+                exit_with_error_msg(
+                    f"Error while shutting down supervisor: {getattr(e, 'message', e)}"
+                )
 
 
 @app_runner.command()
