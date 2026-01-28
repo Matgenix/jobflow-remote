@@ -80,14 +80,28 @@ def write_tmp_settings(
     os.environ["JFREMOTE_CONFIG_FILE"] = _get_random_name(length=10) + ".json"
     # This import must come after setting the env vars as jobflow loads the default
     # config on import
+    write_project_conf(
+        mongoclient, random_project_name, store_database_name, tmp_proj_dir, workdir
+    )
+
+    # In some cases it seems that the SETTINGS have already been imported
+    # and thus not taking the new configurations into account.
+    # Regenerate the JobflowRemoteSettings after setting paths and project
+    import jobflow_remote
+    from jobflow_remote.config.settings import JobflowRemoteSettings
+
+    jobflow_remote.SETTINGS = JobflowRemoteSettings()
+
+
+def write_project_conf(mongoclient, project_name, database_name, tmp_proj_dir, workdir):
     from jobflow_remote.config import Project
 
     project = Project(
-        name=random_project_name,
+        name=project_name,
         jobstore={
             "docs_store": {
                 "type": "MongoStore",
-                "database": store_database_name,
+                "database": database_name,
                 "host": mongoclient.HOST,
                 "port": mongoclient.PORT,
                 "collection_name": "docs",
@@ -95,7 +109,7 @@ def write_tmp_settings(
             "additional_stores": {
                 "big_data": {
                     "type": "GridFSStore",
-                    "database": store_database_name,
+                    "database": database_name,
                     "host": mongoclient.HOST,
                     "port": mongoclient.PORT,
                     "collection_name": "data",
@@ -105,7 +119,7 @@ def write_tmp_settings(
         queue={
             "store": {
                 "type": "MongoStore",
-                "database": store_database_name,
+                "database": database_name,
                 "host": mongoclient.HOST,
                 "port": mongoclient.PORT,
                 "collection_name": "jobs",
@@ -138,7 +152,7 @@ def write_tmp_settings(
                 max_jobs=4,
             ),
         },
-        exec_config={"test": {"export": {"TESTING_ENV_VAR": random_project_name}}},
+        exec_config={"test": {"export": {"TESTING_ENV_VAR": project_name}}},
         runner=dict(
             delay_checkout=1,
             delay_check_run_status=1,
@@ -150,7 +164,7 @@ def write_tmp_settings(
             "other_jobstore": {
                 "docs_store": {
                     "type": "MongoStore",
-                    "database": store_database_name,
+                    "database": database_name,
                     "host": mongoclient.HOST,
                     "port": mongoclient.PORT,
                     "collection_name": "other_docs",
@@ -158,7 +172,7 @@ def write_tmp_settings(
                 "additional_stores": {
                     "big_data": {
                         "type": "GridFSStore",
-                        "database": store_database_name,
+                        "database": database_name,
                         "host": mongoclient.HOST,
                         "port": mongoclient.PORT,
                         "collection_name": "other_data",
@@ -168,16 +182,60 @@ def write_tmp_settings(
         },
     )
     project_json = project.model_dump_json(indent=2)
-    with open(tmp_proj_dir / f"{random_project_name}.json", "w") as f:
+    with open(tmp_proj_dir / f"{project_name}.json", "w") as f:
         f.write(project_json)
 
-    # In some cases it seems that the SETTINGS have already been imported
-    # and thus not taking the new configurations into account.
-    # Regenerate the JobflowRemoteSettings after setting paths and project
-    import jobflow_remote
-    from jobflow_remote.config.settings import JobflowRemoteSettings
 
-    jobflow_remote.SETTINGS = JobflowRemoteSettings()
+@pytest.fixture()
+def crete_tmp_project(
+    random_project_name,
+    store_database_name,
+    mongoclient,
+    tmp_proj_work_dirs,
+    wait_daemon_shutdown,
+):
+    from jobflow_remote import JobController
+    from jobflow_remote.jobs.daemon import DaemonManager
+
+    project_names = []
+    database_names = []
+    tmp_proj_dir, workdir = tmp_proj_work_dirs
+
+    def create_with_suffix(suffix):
+        project_name = random_project_name + suffix
+        database_name = store_database_name + suffix
+        project_names.append(project_name)
+        database_names.append(database_name)
+        write_project_conf(
+            mongoclient=mongoclient,
+            project_name=project_name,
+            database_name=database_name,
+            tmp_proj_dir=tmp_proj_dir,
+            workdir=workdir,
+        )
+        jc = JobController.from_project_name(project_name)
+        jc.reset()
+        return jc, project_name
+
+    try:
+        yield create_with_suffix
+    finally:
+        for pn in project_names:
+            try:
+                dm = DaemonManager.from_project_name(pn)
+                dm.shut_down()
+                wait_daemon_shutdown(dm)
+            except Exception:
+                pass
+            try:
+                (tmp_proj_dir / f"{pn}.json").unlink(missing_ok=True)
+            except Exception:
+                pass
+        for dn in database_names:
+            try:
+                mongoclient.drop_database(dn)
+            except Exception:
+                pass
 
 
 @pytest.fixture()
