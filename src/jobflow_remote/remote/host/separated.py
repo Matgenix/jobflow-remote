@@ -20,9 +20,11 @@ logger = logging.getLogger(__name__)
 
 
 class SeparatedTransferHost(BaseHost):
-    """Host that delegates commands and file transfers to separate connections.
+    """
+    Host that delegates commands and file transfers to separate connections.
 
     This enables HPC systems where:
+
     - Login node: SSH/scheduler commands work, but SFTP is disabled
     - Transfer node: SFTP works, but scheduler commands don't work
 
@@ -65,11 +67,38 @@ class SeparatedTransferHost(BaseHost):
         workdir: str | Path | None = None,
         timeout: int | None = None,
     ) -> tuple[str, str, int]:
-        """Execute the given command on the command host."""
+        """Execute the given command on the command host.
+
+        Parameters
+        ----------
+        command : str or list of str
+            Command to execute, as a str or list of str.
+        workdir : str or Path or None
+            Path where the command will be executed.
+        timeout : int or None
+            Timeout for the execution of the command.
+
+        Returns
+        -------
+        stdout : str
+            Standard output of the command.
+        stderr : str
+            Standard error of the command.
+        exit_code : int
+            Exit code of the command.
+        """
         return self.command_host.execute(command, workdir, timeout)
 
     def shell(self, pre_cmd: str | None = None, shell: str = "bash"):
-        """Open a shell on the command host."""
+        """Open a shell on the command host.
+
+        Parameters
+        ----------
+        pre_cmd : str or None
+            Any command to be executed before starting the shell.
+        shell : str
+            The name of the shell to start.
+        """
         return self.command_host.shell(pre_cmd, shell)
 
     # -------------------------------------------------------------------------
@@ -79,47 +108,155 @@ class SeparatedTransferHost(BaseHost):
     def mkdir(
         self, directory: str | Path, recursive: bool = True, exist_ok: bool = True
     ) -> bool:
-        """Create directory via transfer host."""
+        """Create directory on the transfer host.
+
+        Parameters
+        ----------
+        directory : str or Path
+            Path of the directory to create.
+        recursive : bool
+            If True, create parent directories as needed.
+        exist_ok : bool
+            If True, do not raise an error if directory exists.
+
+        Returns
+        -------
+        bool
+            True if the directory was created successfully.
+        """
         return self.transfer_host.mkdir(directory, recursive, exist_ok)
 
     def write_text_file(self, filepath: str | Path, content: str) -> None:
-        """Write content to a file via transfer host."""
+        """Write content to a file on the transfer host.
+
+        Parameters
+        ----------
+        filepath : str or Path
+            Path to the file to write.
+        content : str
+            Content to write to the file.
+        """
         return self.transfer_host.write_text_file(filepath, content)
 
     def read_text_file(self, filepath: str | Path) -> str:
-        """Read content from a file via transfer host."""
+        """Read content from a file on the transfer host.
+
+        Parameters
+        ----------
+        filepath : str or Path
+            Path to the file to read.
+
+        Returns
+        -------
+        str
+            Content of the file.
+        """
         return self.transfer_host.read_text_file(filepath)
 
     def put(self, src, dst) -> None:
-        """Upload file via transfer host."""
+        """Upload a file to the transfer host.
+
+        Parameters
+        ----------
+        src : str or Path or file-like
+            Local source path or file-like object.
+        dst : str or Path
+            Remote destination path.
+        """
         return self.transfer_host.put(src, dst)
 
     def get(self, src, dst) -> None:
-        """Download file via transfer host."""
+        """Download a file from the transfer host.
+
+        Parameters
+        ----------
+        src : str or Path
+            Remote source path.
+        dst : str or Path or file-like
+            Local destination path or file-like object.
+        """
         return self.transfer_host.get(src, dst)
 
     def copy(self, src, dst) -> None:
-        """Copy file on transfer host."""
+        """Copy a file on the transfer host.
+
+        Parameters
+        ----------
+        src : str or Path
+            Source path on remote host.
+        dst : str or Path
+            Destination path on remote host.
+        """
         return self.transfer_host.copy(src, dst)
 
     def move(self, src, dst) -> None:
-        """Move file on transfer host."""
+        """Move a file on the transfer host.
+
+        Parameters
+        ----------
+        src : str or Path
+            Source path on remote host.
+        dst : str or Path
+            Destination path on remote host.
+        """
         return self.transfer_host.move(src, dst)
 
     def listdir(self, path: str | Path) -> list[str]:
-        """List directory via transfer host."""
+        """List directory contents on the transfer host.
+
+        Parameters
+        ----------
+        path : str or Path
+            Path to the directory to list.
+
+        Returns
+        -------
+        list of str
+            List of filenames in the directory.
+        """
         return self.transfer_host.listdir(path)
 
     def remove(self, path: str | Path) -> None:
-        """Remove file via transfer host."""
+        """Remove a file on the transfer host.
+
+        Parameters
+        ----------
+        path : str or Path
+            Path to the file to remove.
+        """
         return self.transfer_host.remove(path)
 
     def rmtree(self, path: str | Path, raise_on_error: bool = False) -> bool:
-        """Recursively delete directory tree via transfer host."""
+        """Recursively delete a directory tree on the transfer host.
+
+        Parameters
+        ----------
+        path : str or Path
+            Path to the directory tree to be removed.
+        raise_on_error : bool
+            If False (default), errors will be ignored. Otherwise, errors
+            will raise an exception.
+
+        Returns
+        -------
+        bool
+            True if the directory tree was successfully removed.
+        """
         return self.transfer_host.rmtree(path, raise_on_error)
 
     def exists(self, path: str | Path) -> bool:
-        """Check if path exists via transfer host."""
+        """Check if a path exists on the transfer host.
+
+        Parameters
+        ----------
+        path : str or Path
+            The path to check.
+
+        Returns
+        -------
+        bool
+            True if the path exists.
+        """
         return self.transfer_host.exists(path)
 
     # -------------------------------------------------------------------------
@@ -127,24 +264,42 @@ class SeparatedTransferHost(BaseHost):
     # -------------------------------------------------------------------------
 
     def connect(self) -> None:
-        """Open both connections."""
+        """Open connections to both the command and transfer hosts."""
         self.command_host.connect()
         self.transfer_host.connect()
 
     def close(self) -> bool:
-        """Close both connections."""
+        """Close connections to both hosts.
+
+        Returns
+        -------
+        bool
+            True if both connections were closed successfully.
+        """
         cmd_closed = self.command_host.close()
         transfer_closed = self.transfer_host.close()
         return cmd_closed and transfer_closed
 
     @property
     def is_connected(self) -> bool:
-        """True if both connections are open."""
+        """Check if both connections are open.
+
+        Returns
+        -------
+        bool
+            True if both command and transfer hosts are connected.
+        """
         return self.command_host.is_connected and self.transfer_host.is_connected
 
     @property
     def interactive_login(self) -> bool:
-        """True if either host requires interactive login."""
+        """Check if either host requires interactive login.
+
+        Returns
+        -------
+        bool
+            True if either host requires interactive login.
+        """
         return (
             self.command_host.interactive_login
             or self.transfer_host.interactive_login
