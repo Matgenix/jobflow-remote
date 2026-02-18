@@ -439,14 +439,26 @@ class RemoteWorker(WorkerBase):
         default=False,
         description="Whether the authentication to the host should be interactive",
     )
+    transfer: ConnectionData | None = Field(
+        None,
+        description="Connection data for a separate file transfer host. Use this when "
+        "the main host has SFTP disabled but a dedicated transfer node is available "
+        "(e.g., HPC systems with separate login and data transfer nodes). File "
+        "operations (put/get) will use this connection while commands use the main host.",
+    )
 
     def get_host(self) -> BaseHost:
         """
-        Return the RemoteHost.
+        Return the Host for this worker.
+
+        If a transfer host is configured, returns a SeparatedTransferHost that
+        delegates commands to the main host and file operations to the transfer host.
+        Otherwise, returns a standard RemoteHost.
 
         Returns
         -------
-        The RemoteHost.
+        BaseHost
+            The host instance for this worker.
         """
         connect_kwargs = dict(self.connect_kwargs) if self.connect_kwargs else {}
         if self.password:
@@ -455,7 +467,8 @@ class RemoteWorker(WorkerBase):
             connect_kwargs["key_filename"] = self.key_filename
         if self.passphrase:
             connect_kwargs["passphrase"] = self.passphrase
-        return RemoteHost(
+
+        command_host = RemoteHost(
             host=self.host,
             user=self.user,
             port=self.port,
@@ -470,6 +483,39 @@ class RemoteWorker(WorkerBase):
             login_shell=self.login_shell,
             interactive_login=self.interactive_login,
             sanitize=self.sanitize_command,
+        )
+
+        if self.transfer is None:
+            return command_host
+
+        # Create separate transfer host
+        from jobflow_remote.remote.host import SeparatedTransferHost
+
+        transfer_connect_kwargs = self.transfer.get_connect_kwargs()
+        if not transfer_connect_kwargs:
+            # Fall back to main connection credentials if not specified
+            transfer_connect_kwargs = connect_kwargs
+
+        transfer_host = RemoteHost(
+            host=self.transfer.host,
+            user=self.transfer.user or self.user,
+            port=self.transfer.port or self.port,
+            gateway=self.transfer.gateway,
+            forward_agent=self.forward_agent,
+            connect_timeout=self.connect_timeout,
+            connect_kwargs=transfer_connect_kwargs,
+            inline_ssh_env=self.inline_ssh_env,
+            timeout_execute=self.timeout_execute,
+            keepalive=self.keepalive,
+            shell_cmd=self.shell_cmd,
+            login_shell=self.login_shell,
+            interactive_login=self.interactive_login,
+            sanitize=self.sanitize_command,
+        )
+
+        return SeparatedTransferHost(
+            command_host=command_host,
+            transfer_host=transfer_host,
         )
 
     @property
