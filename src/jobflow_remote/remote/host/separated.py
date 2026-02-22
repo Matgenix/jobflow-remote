@@ -301,6 +301,5 @@ class SeparatedTransferHost(BaseHost):
             True if either host requires interactive login.
         """
         return (
-            self.command_host.interactive_login
-            or self.transfer_host.interactive_login
+            self.command_host.interactive_login or self.transfer_host.interactive_login
         )
