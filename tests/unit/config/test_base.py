@@ -38,3 +38,34 @@ def test_scheduler_type_subclass():
     assert isinstance(sched_io, MyShellIO)
     assert isinstance(sched_io, BaseSchedulerIO)
     assert sched_io.USERNAME_MAXCHARS == MyShellIO.USERNAME_MAXCHARS
+
+
+def test_remote_worker_with_transfer():
+    """Test that RemoteWorker with transfer option returns SeparatedTransferHost."""
+    from jobflow_remote.config.base import RemoteWorker
+    from jobflow_remote.remote.host import RemoteHost, SeparatedTransferHost
+
+    # Without transfer option - returns RemoteHost
+    worker = RemoteWorker.model_validate(
+        {
+            "host": "login.cluster.edu",
+            "work_dir": "/scratch/work",
+            "scheduler_type": "slurm",
+        }
+    )
+    host = worker.get_host()
+    assert isinstance(host, RemoteHost)
+
+    # With transfer option - returns SeparatedTransferHost
+    worker = RemoteWorker.model_validate(
+        {
+            "host": "login.cluster.edu",
+            "work_dir": "/scratch/work",
+            "scheduler_type": "slurm",
+            "transfer": {"host": "dtn.cluster.edu"},
+        }
+    )
+    host = worker.get_host()
+    assert isinstance(host, SeparatedTransferHost)
+    assert host.command_host.host == "login.cluster.edu"
+    assert host.transfer_host.host == "dtn.cluster.edu"
