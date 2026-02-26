@@ -439,27 +439,93 @@ class RemoteWorker(WorkerBase):
         default=False,
         description="Whether the authentication to the host should be interactive",
     )
-    transfer: ConnectionData | None = Field(
-        None,
-        description="Connection data for a separate file transfer host. Use this when "
-        "the main host has SFTP disabled but a dedicated transfer node is available "
-        "(e.g., HPC systems with separate login and data transfer nodes). File "
-        "operations (put/get) will use this connection while commands use the main host.",
+    def get_host(self) -> BaseHost:
+        """
+        Return the RemoteHost for this worker.
+
+        Returns
+        -------
+        RemoteHost
+            The RemoteHost instance for this worker.
+        """
+        connect_kwargs = dict(self.connect_kwargs) if self.connect_kwargs else {}
+        if self.password:
+            connect_kwargs["password"] = self.password
+        if self.key_filename:
+            connect_kwargs["key_filename"] = self.key_filename
+        if self.passphrase:
+            connect_kwargs["passphrase"] = self.passphrase
+
+        return RemoteHost(
+            host=self.host,
+            user=self.user,
+            port=self.port,
+            gateway=self.gateway,
+            forward_agent=self.forward_agent,
+            connect_timeout=self.connect_timeout,
+            connect_kwargs=connect_kwargs,
+            inline_ssh_env=self.inline_ssh_env,
+            timeout_execute=self.timeout_execute,
+            keepalive=self.keepalive,
+            shell_cmd=self.shell_cmd,
+            login_shell=self.login_shell,
+            interactive_login=self.interactive_login,
+            sanitize=self.sanitize_command,
+        )
+
+    @property
+    def cli_info(self) -> dict:
+        """
+        Short information about the worker to be displayed in the command line
+        interface.
+
+        Returns
+        -------
+        A dictionary with the Worker short information.
+        """
+        return dict(
+            host=self.host,
+            scheduler_type=self.scheduler_type,
+            work_dir=self.work_dir,
+        )
+
+
+class SeparatedTransferWorker(RemoteWorker):
+    """
+    Worker with separate hosts for commands and file transfers.
+
+    This is useful for HPC systems where login nodes have SFTP disabled but a
+    dedicated data transfer node is available (e.g., LRC at LBNL).
+
+    Command execution goes through the main host connection, while file operations
+    (put, get, mkdir, etc.) go through the transfer host.
+    """
+
+    type: Literal["separated_transfer"] = Field(
+        "separated_transfer",
+        description="The discriminator field to determine the worker type",
+    )
+    transfer: ConnectionData = Field(
+        description="Connection data for the file transfer host. Use this when "
+        "the main host has SFTP disabled but a dedicated transfer node is available. "
+        "File operations (put/get) will use this connection while commands use the "
+        "main host.",
     )
 
     def get_host(self) -> BaseHost:
         """
-        Return the Host for this worker.
+        Return a SeparatedTransferHost for this worker.
 
-        If a transfer host is configured, returns a SeparatedTransferHost that
-        delegates commands to the main host and file operations to the transfer host.
-        Otherwise, returns a standard RemoteHost.
+        Creates a host that delegates commands to the main connection and file
+        operations to the transfer connection.
 
         Returns
         -------
-        BaseHost
-            The host instance for this worker.
+        SeparatedTransferHost
+            The host instance with separate command and transfer connections.
         """
+        from jobflow_remote.remote.host import SeparatedTransferHost
+
         connect_kwargs = dict(self.connect_kwargs) if self.connect_kwargs else {}
         if self.password:
             connect_kwargs["password"] = self.password
@@ -484,12 +550,6 @@ class RemoteWorker(WorkerBase):
             interactive_login=self.interactive_login,
             sanitize=self.sanitize_command,
         )
-
-        if self.transfer is None:
-            return command_host
-
-        # Create separate transfer host
-        from jobflow_remote.remote.host import SeparatedTransferHost
 
         transfer_connect_kwargs = self.transfer.get_connect_kwargs()
         if not transfer_connect_kwargs:
@@ -521,21 +581,24 @@ class RemoteWorker(WorkerBase):
     @property
     def cli_info(self) -> dict:
         """
-        Short information about the worker to be displayed in the command line
-        interface.
+        Short information about the worker to be displayed in the CLI.
 
         Returns
         -------
-        A dictionary with the Worker short information.
+        dict
+            A dictionary with the Worker short information.
         """
         return dict(
             host=self.host,
+            transfer_host=self.transfer.host,
             scheduler_type=self.scheduler_type,
             work_dir=self.work_dir,
         )
 
 
-WorkerConfig = Annotated[LocalWorker | RemoteWorker, Field(discriminator="type")]
+WorkerConfig = Annotated[
+    LocalWorker | RemoteWorker | SeparatedTransferWorker, Field(discriminator="type")
+]
 
 
 class ExecutionConfig(BaseModel):
