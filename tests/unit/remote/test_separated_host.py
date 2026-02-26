@@ -35,20 +35,20 @@ def test_put_delegates_to_transfer_host():
     command_host.put.assert_not_called()
 
 
-def test_mkdir_delegates_to_transfer_host():
-    """Test that mkdir() delegates to transfer_host."""
+def test_mkdir_delegates_to_command_host():
+    """Test that mkdir() delegates to command_host (uses SSH, not SFTP)."""
     from jobflow_remote.remote.host import SeparatedTransferHost
 
     command_host = MagicMock()
     command_host.sanitize = False
+    command_host.mkdir.return_value = True
     transfer_host = MagicMock()
-    transfer_host.mkdir.return_value = True
 
     host = SeparatedTransferHost(command_host=command_host, transfer_host=transfer_host)
     result = host.mkdir("/path/to/dir")
 
-    transfer_host.mkdir.assert_called_once()
-    command_host.mkdir.assert_not_called()
+    command_host.mkdir.assert_called_once()
+    transfer_host.mkdir.assert_not_called()
     assert result is True
 
 
