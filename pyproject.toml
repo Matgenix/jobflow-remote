@@ -39,8 +39,7 @@ dependencies = [
     "rich >= 13.7,< 15.0",
     "ruamel.yaml >= 0.17",
     "schedule ~= 1.2",
-    "supervisor ~= 4.2; python_version < '3.12'",
-    "supervisor >= 4.2.5; python_version >= '3.12'",
+    "supervisor >= 4.3.0",
     "tomlkit ~= 0.12",
     "typer >= 0.16",
 ]
