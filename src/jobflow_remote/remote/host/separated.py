@@ -101,14 +101,10 @@ class SeparatedTransferHost(BaseHost):
         """
         return self.command_host.shell(pre_cmd, shell)
 
-    # -------------------------------------------------------------------------
-    # File operations - delegated to transfer_host
-    # -------------------------------------------------------------------------
-
     def mkdir(
         self, directory: str | Path, recursive: bool = True, exist_ok: bool = True
     ) -> bool:
-        """Create directory on the transfer host.
+        """Create directory on the command host.
 
         Parameters
         ----------
@@ -124,7 +120,53 @@ class SeparatedTransferHost(BaseHost):
         bool
             True if the directory was created successfully.
         """
-        return self.transfer_host.mkdir(directory, recursive, exist_ok)
+        return self.command_host.mkdir(directory, recursive, exist_ok)
+
+    def copy(self, src, dst) -> None:
+        """Copy a file on the command host.
+
+        Parameters
+        ----------
+        src : str or Path
+            Source path on remote host.
+        dst : str or Path
+            Destination path on remote host.
+        """
+        return self.command_host.copy(src, dst)
+
+    def move(self, src, dst) -> None:
+        """Move a file on the command host.
+
+        Parameters
+        ----------
+        src : str or Path
+            Source path on remote host.
+        dst : str or Path
+            Destination path on remote host.
+        """
+        return self.command_host.move(src, dst)
+
+    def rmtree(self, path: str | Path, raise_on_error: bool = False) -> bool:
+        """Recursively delete a directory tree on the command host.
+
+        Parameters
+        ----------
+        path : str or Path
+            Path to the directory tree to be removed.
+        raise_on_error : bool
+            If False (default), errors will be ignored. Otherwise, errors
+            will raise an exception.
+
+        Returns
+        -------
+        bool
+            True if the directory tree was successfully removed.
+        """
+        return self.command_host.rmtree(path, raise_on_error)
+
+    # -------------------------------------------------------------------------
+    # File operations via SSH commands - delegated to command_host
+    # -------------------------------------------------------------------------
 
     def write_text_file(self, filepath: str | Path, content: str) -> None:
         """Write content to a file on the transfer host.
@@ -177,30 +219,6 @@ class SeparatedTransferHost(BaseHost):
         """
         return self.transfer_host.get(src, dst)
 
-    def copy(self, src, dst) -> None:
-        """Copy a file on the transfer host.
-
-        Parameters
-        ----------
-        src : str or Path
-            Source path on remote host.
-        dst : str or Path
-            Destination path on remote host.
-        """
-        return self.transfer_host.copy(src, dst)
-
-    def move(self, src, dst) -> None:
-        """Move a file on the transfer host.
-
-        Parameters
-        ----------
-        src : str or Path
-            Source path on remote host.
-        dst : str or Path
-            Destination path on remote host.
-        """
-        return self.transfer_host.move(src, dst)
-
     def listdir(self, path: str | Path) -> list[str]:
         """List directory contents on the transfer host.
 
@@ -225,24 +243,6 @@ class SeparatedTransferHost(BaseHost):
             Path to the file to remove.
         """
         return self.transfer_host.remove(path)
-
-    def rmtree(self, path: str | Path, raise_on_error: bool = False) -> bool:
-        """Recursively delete a directory tree on the transfer host.
-
-        Parameters
-        ----------
-        path : str or Path
-            Path to the directory tree to be removed.
-        raise_on_error : bool
-            If False (default), errors will be ignored. Otherwise, errors
-            will raise an exception.
-
-        Returns
-        -------
-        bool
-            True if the directory tree was successfully removed.
-        """
-        return self.transfer_host.rmtree(path, raise_on_error)
 
     def exists(self, path: str | Path) -> bool:
         """Check if a path exists on the transfer host.
