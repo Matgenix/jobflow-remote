@@ -382,17 +382,14 @@ class ConnectionData(BaseModel):
         return connect_kwargs
 
 
-class RemoteWorker(WorkerBase):
+class BaseRemoteWorker(WorkerBase):
     """
-    Worker representing a remote host reached through an SSH connection.
+    Base class for workers that connect to remote hosts via SSH.
 
-    Uses a Fabric Connection. Check Fabric documentation for more details on the
-    options defining a Connection.
+    Contains all common SSH connection attributes. Subclasses must define
+    their own `type` field and implement `get_host()`.
     """
 
-    type: Literal["remote"] = Field(
-        "remote", description="The discriminator field to determine the worker type"
-    )
     host: str = Field(description="The host to which to connect")
     user: str | None = Field(None, description="Login username")
     port: int | None = Field(None, description="Port number")
@@ -439,6 +436,31 @@ class RemoteWorker(WorkerBase):
         default=False,
         description="Whether the authentication to the host should be interactive",
     )
+
+    def _get_connect_kwargs(self) -> dict:
+        """Build connect_kwargs dict with password/key/passphrase merged in."""
+        connect_kwargs = dict(self.connect_kwargs) if self.connect_kwargs else {}
+        if self.password:
+            connect_kwargs["password"] = self.password
+        if self.key_filename:
+            connect_kwargs["key_filename"] = self.key_filename
+        if self.passphrase:
+            connect_kwargs["passphrase"] = self.passphrase
+        return connect_kwargs
+
+
+class RemoteWorker(BaseRemoteWorker):
+    """
+    Worker representing a remote host reached through an SSH connection.
+
+    Uses a Fabric Connection. Check Fabric documentation for more details on the
+    options defining a Connection.
+    """
+
+    type: Literal["remote"] = Field(
+        "remote", description="The discriminator field to determine the worker type"
+    )
+
     def get_host(self) -> BaseHost:
         """
         Return the RemoteHost for this worker.
@@ -448,14 +470,6 @@ class RemoteWorker(WorkerBase):
         RemoteHost
             The RemoteHost instance for this worker.
         """
-        connect_kwargs = dict(self.connect_kwargs) if self.connect_kwargs else {}
-        if self.password:
-            connect_kwargs["password"] = self.password
-        if self.key_filename:
-            connect_kwargs["key_filename"] = self.key_filename
-        if self.passphrase:
-            connect_kwargs["passphrase"] = self.passphrase
-
         return RemoteHost(
             host=self.host,
             user=self.user,
@@ -463,7 +477,7 @@ class RemoteWorker(WorkerBase):
             gateway=self.gateway,
             forward_agent=self.forward_agent,
             connect_timeout=self.connect_timeout,
-            connect_kwargs=connect_kwargs,
+            connect_kwargs=self._get_connect_kwargs(),
             inline_ssh_env=self.inline_ssh_env,
             timeout_execute=self.timeout_execute,
             keepalive=self.keepalive,
@@ -490,7 +504,7 @@ class RemoteWorker(WorkerBase):
         )
 
 
-class SeparatedTransferWorker(RemoteWorker):
+class SeparatedTransferWorker(BaseRemoteWorker):
     """
     Worker with separate hosts for commands and file transfers.
 
@@ -526,13 +540,7 @@ class SeparatedTransferWorker(RemoteWorker):
         """
         from jobflow_remote.remote.host import SeparatedTransferHost
 
-        connect_kwargs = dict(self.connect_kwargs) if self.connect_kwargs else {}
-        if self.password:
-            connect_kwargs["password"] = self.password
-        if self.key_filename:
-            connect_kwargs["key_filename"] = self.key_filename
-        if self.passphrase:
-            connect_kwargs["passphrase"] = self.passphrase
+        connect_kwargs = self._get_connect_kwargs()
 
         command_host = RemoteHost(
             host=self.host,
@@ -850,7 +858,7 @@ class Project(BaseModel):
         True if any of the workers have interactive_login set to True.
         """
         for worker in self.workers.values():
-            if isinstance(worker, RemoteWorker) and worker.interactive_login:
+            if isinstance(worker, BaseRemoteWorker) and worker.interactive_login:
                 return True
         return False
 
