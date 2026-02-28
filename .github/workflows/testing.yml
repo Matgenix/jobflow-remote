@@ -154,7 +154,7 @@ jobs:
 
       - name: Upload coverage files as artifact for coverage upload job
         if: ${{ matrix.config.os == 'ubuntu-latest' && matrix.config.resolution == 'highest' }}
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-files-artifact-${{ matrix.config.python }}
           if-no-files-found: error
@@ -163,7 +163,7 @@ jobs:
 
       - name: Upload DB dump
         if: failure()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: db_dump_${{ matrix.config.os }}_${{ matrix.config.python }}_${{ matrix.config.resolution }}
           path: test_folder
@@ -217,7 +217,7 @@ jobs:
           uv pip install --system .[tests]
 
       - name: Get files from artifact
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: coverage-files-artifact-${{ env.PYTHON_VERSION }}
 
