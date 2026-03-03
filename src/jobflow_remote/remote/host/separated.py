@@ -165,7 +165,7 @@ class SeparatedTransferHost(BaseHost):
         return self.command_host.rmtree(path, raise_on_error)
 
     # -------------------------------------------------------------------------
-    # File operations via SSH commands - delegated to command_host
+    # File operations via SFTP commands - delegated to transfer_host
     # -------------------------------------------------------------------------
 
     def write_text_file(self, filepath: str | Path, content: str) -> None:
