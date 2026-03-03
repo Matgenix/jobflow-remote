@@ -111,3 +111,31 @@ def test_separated_transfer_worker_cli_info():
     info = worker.cli_info
     assert info["host"] == "login.cluster.edu"
     assert info["transfer_host"] == "dtn.cluster.edu"
+
+
+def test_separated_transfer_worker_transfer_own_credentials():
+    """Test that transfer host uses its own credentials when specified."""
+    from jobflow_remote.config.base import SeparatedTransferWorker
+
+    worker = SeparatedTransferWorker.model_validate(
+        {
+            "host": "login.cluster.edu",
+            "user": "mainuser",
+            "password": "mainpassword",
+            "work_dir": "/scratch/work",
+            "scheduler_type": "slurm",
+            "transfer": {
+                "host": "dtn.cluster.edu",
+                "user": "transferuser",
+                "password": "transferpassword",
+            },
+        }
+    )
+    host = worker.get_host()
+    # Transfer host should use its own credentials
+    assert host.transfer_host.user == "transferuser"
+    # Connect kwargs should include the transfer password
+    assert host.transfer_host.connect_kwargs.get("password") == "transferpassword"
+    # Command host should use main credentials
+    assert host.command_host.user == "mainuser"
+    assert host.command_host.connect_kwargs.get("password") == "mainpassword"
