@@ -106,7 +106,7 @@ def test_shell_delegates_to_command_host():
     transfer_host = MagicMock()
 
     host = SeparatedTransferHost(command_host=command_host, transfer_host=transfer_host)
-    host.shell(pre_cmd="source ~/.bashrc", shell="zsh")
+    host.shell(pre_cmd="source ~/.bashrc", shell="zsh")  # noqa: S604
 
     command_host.shell.assert_called_once_with("source ~/.bashrc", "zsh")
     transfer_host.shell.assert_not_called()
@@ -154,7 +154,7 @@ def test_rmtree_delegates_to_command_host():
     host = SeparatedTransferHost(command_host=command_host, transfer_host=transfer_host)
     result = host.rmtree("/remote/dir", raise_on_error=True)
 
-    command_host.rmtree.assert_called_once_with("/remote/dir", True)
+    command_host.rmtree.assert_called_once_with("/remote/dir", raise_on_error=True)
     transfer_host.rmtree.assert_not_called()
     assert result is True
 
