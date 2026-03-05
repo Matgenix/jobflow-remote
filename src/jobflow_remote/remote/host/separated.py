@@ -162,7 +162,7 @@ class SeparatedTransferHost(BaseHost):
         bool
             True if the directory tree was successfully removed.
         """
-        return self.command_host.rmtree(path, raise_on_error)
+        return self.command_host.rmtree(path, raise_on_error=raise_on_error)
 
     # -------------------------------------------------------------------------
     # File operations via SFTP commands - delegated to transfer_host
