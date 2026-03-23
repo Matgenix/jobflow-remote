@@ -11,7 +11,7 @@ from jobflow_remote.utils.db import MongoLock
 def test_collection(mongoclient, store_database_name):
     collection = mongoclient[store_database_name]["test_lock_collection"]
     collection.delete_many({})
-    collection.insert_many([{"test_id": 1}, {"test_id": 2}])
+    collection.insert_many([{"test_id": 1, "xxx": 3}, {"test_id": 2, "xxx": 4}])
     yield collection
     collection.delete_many({})
 
@@ -34,6 +34,12 @@ def test_mongo_lock_acquire(test_collection):
     assert (
         test_collection.count_documents({"test_id": 1, MongoLock.LOCK_KEY: None}) == 1
     )
+
+    # test projection
+    with MongoLock(test_collection, {"test_id": 1}, projection=["xxx"]) as lock:
+        assert lock.locked_document is not None
+        assert "test_id" not in lock.locked_document
+        assert "xxx" in lock.locked_document
 
 
 def test_mongo_lock_acquire_already_locked(test_collection):
