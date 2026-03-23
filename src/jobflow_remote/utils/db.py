@@ -34,68 +34,125 @@ class MongoLock:
     Context manager to lock a document in a MongoDB database.
 
     Main characteristics and functionalities:
-        * Lock is acquired by setting a lock_id and lock_time value in the
-          locked document.
+        * Lock is acquired by setting a ``lock_id`` and ``lock_time`` (UTC
+          timestamp) value in the locked document.
         * Filter the document to select based on a query and sorting.
-          It uses find_one_and_update, thus resulting in a single document locked.
-        * Can wait for a lock to be released.
-        * Can forcibly break an existing lock
+          It uses ``find_one_and_update``, thus resulting in a single document locked.
+        * Can wait for a lock to be released (set ``sleep`` to enable polling).
+        * Can forcibly break an existing lock (``break_lock=True``).
         * Can return the locked document even if the lock could not be acquired
           (useful for determining if a document is locked or no document matches
-          the query)
-        * Accepts all the arguments that can be passed to find_one_and_update
-        * A custom update can be performed on the document when acquiring the lock.
+          the query).
+        * Accepts all the arguments that can be passed to ``find_one_and_update``.
+        * A custom update can be performed on the document when acquiring the lock
+          via the ``update`` parameter.
         * Allows to pass properties that will be set in the document at the moment
-          of releasing the lock.
-        * Lock id value can be customized. If not a randomly generated uuid is used.
+          of releasing the lock via ``update_on_release``.
+        * Lock id value can be customized. If not provided, a randomly generated
+          uuid is used.
+
+    Attributes
+    ----------
+    locked_document : dict | None
+        The document that was locked. ``None`` if the lock could not be acquired.
+    unavailable_document : dict | None
+        The document that matched the filter but was already locked. Only
+        populated when ``get_locked_doc=True`` and the lock could not be acquired.
+    lock_id : str
+        The identifier used for this lock instance. Stored in the document
+        under the ``lock_id`` key together with a ``lock_time`` UTC timestamp
+        recording when the lock was acquired. Both fields are cleared on
+        release.
+    update_on_release : dict | list
+        MongoDB update to apply to the document when the lock is released.
+        Cannot be set together with ``delete_on_release``.
+    delete_on_release : bool
+        If ``True``, the document will be deleted when the lock is released.
+        Cannot be set together with ``update_on_release``.
+
+    Notes
+    -----
+    If an exception is raised inside the ``with`` block, both
+    ``update_on_release`` and ``delete_on_release`` are ignored: the lock is
+    released but the document is left unchanged and not deleted. A warning is
+    logged in either case.
+
+    Setting both ``update_on_release`` and ``delete_on_release`` raises a
+    ``ValueError``.
+
+    If the lock cannot be released (e.g. the document was modified externally),
+    a warning is emitted. If ``delete_on_release`` is set and the deletion
+    fails, a ``RuntimeError`` is raised.
 
     Examples
     --------
-    Trying to acquire the lock on a document based on the state
+    Trying to acquire the lock on a document based on the state:
+
     >>> with MongoLock(collection, {"state": "READY"}) as lock:
     ...     print(lock.locked_document["state"])
     READY
 
     If lock cannot be acquired (no document matching filter or that
-    document is locked) the `lock.locked_document` is None.
+    document is locked) the ``locked_document`` is ``None``:
 
     >>> with MongoLock(collection, {"state": "READY"}) as lock:
     ...     print(lock.locked_document)
     None
 
-    Wait for 60 seconds in case the required document is already locked.
-    Check the status every 10 seconds. If lock cannot be acquired
-    locked_document is None
+    Wait for up to 60 seconds in case the required document is already locked,
+    checking every 10 seconds. Note that ``sleep`` must be set for the retry
+    loop to activate (it defaults to ``None``, meaning no waiting):
 
     >>> with MongoLock(
-            collection,
-            {"uuid": "5b84228b-d019-47fe-b0a0-564b36aa85ed"},
-            sleep=10,
-            max_wait=60,
-        ) as lock:
+    ...     collection,
+    ...     {"uuid": "5b84228b-d019-47fe-b0a0-564b36aa85ed"},
+    ...     sleep=10,
+    ...     max_wait=60,
+    ... ) as lock:
     ...     print(lock.locked_document)
     None
 
-    In case lock cannot be acquired expose the locked document
+    In case the lock cannot be acquired, expose the already-locked document
+    via ``unavailable_document``:
 
     >>> with MongoLock(
-            collection,
-            {"uuid": "5b84228b-d019-47fe-b0a0-564b36aa85ed"},
-            get_locked_doc=True,
-        ) as lock:
-    ...     print(lock.locked_document)
-    None
-    ...     print(lock.unavailable_document['lock_id'])
+    ...     collection,
+    ...     {"uuid": "5b84228b-d019-47fe-b0a0-564b36aa85ed"},
+    ...     get_locked_doc=True,
+    ... ) as lock:
+    ...     if lock.locked_document is None and lock.unavailable_document:
+    ...         print(lock.unavailable_document["lock_id"])
     8d68404f-c77a-461b-859c-40bb0af1979f
 
-    Set values in the document upon lock release
+    Forcibly break an existing lock on a document:
+
+    >>> with MongoLock(
+    ...     collection,
+    ...     {"uuid": "5b84228b-d019-47fe-b0a0-564b36aa85ed"},
+    ...     break_lock=True,
+    ... ) as lock:
+    ...     print(lock.locked_document is not None)
+    True
+
+    Atomically update the document when acquiring the lock:
+
+    >>> with MongoLock(
+    ...     collection,
+    ...     {"state": "READY"},
+    ...     update={"$set": {"state": "CHECKED_OUT"}},
+    ... ) as lock:
+    ...     if lock.locked_document:
+    ...         print(lock.locked_document["state"])
+    CHECKED_OUT
+
+    Set values in the document upon lock release:
 
     >>> with MongoLock(collection, {"state": "READY"}) as lock:
     ...     if lock.locked_document:
     ...         # Perform some operations based on the job...
     ...         lock.update_on_release = {"$set": {"state": "CHECKED_OUT"}}
 
-    Delete the locked document upon lock release
+    Delete the locked document upon lock release:
 
     >>> with MongoLock(collection, {"state": "READY"}) as lock:
     ...     if lock.locked_document:
@@ -261,7 +318,7 @@ class MongoLock:
         # if projecting always get the lock as well
         if projection:
             projection = list(projection)
-            projection.extend([self.LOCK_KEY, self.lock_id, self.LOCK_TIME_KEY])
+            projection.extend([self.LOCK_KEY, self.LOCK_TIME_KEY])
 
         # Modify the filter if the document should not be fetched if
         # the lock cannot be acquired. Otherwise, keep the original filter.
