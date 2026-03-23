@@ -261,7 +261,7 @@ class MongoLock:
         # if projecting always get the lock as well
         if projection:
             projection = list(projection)
-            projection.extend([self.LOCK_KEY, self.lock_id])
+            projection.extend([self.LOCK_KEY, self.lock_id, self.LOCK_TIME_KEY])
 
         # Modify the filter if the document should not be fetched if
         # the lock cannot be acquired. Otherwise, keep the original filter.
@@ -305,6 +305,7 @@ class MongoLock:
                 update,
                 upsert=False,
                 return_document=ReturnDocument.AFTER,
+                projection=projection,
                 **self.kwargs,
             )
 

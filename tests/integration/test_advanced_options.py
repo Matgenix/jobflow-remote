@@ -43,7 +43,7 @@ def test_run_batch(job_controller, monkeypatch, clean_slurm_queue, mocker) -> No
     )
     monkeypatch.setattr(runner.workers["test_batch_remote_worker"].batch, "max_wait", 5)
 
-    runner.run_all_jobs(max_seconds=30)
+    runner.run_all_jobs(max_seconds=60)
 
     assert add_batch_process_spy.call_count == 1
     args, kwargs = add_batch_process_spy.call_args

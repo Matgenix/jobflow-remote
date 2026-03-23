@@ -2312,16 +2312,21 @@ class JobController:
                 d["db_id"] for d in self.jobs.find(jobs_filter, projection=["db_id"])
             ]
 
-            job_lock_kwargs = dict(
-                projection=["uuid", "index", "db_id", "state", "job.config", "parents"]
-            )
+            job_lock_projection = [
+                "uuid",
+                "index",
+                "db_id",
+                "state",
+                "job.config",
+                "parents",
+            ]
             n_updated_jobs = 0
             for job_db_id in job_db_ids_to_resume:
                 job_lock_filter = {"db_id": job_db_id}
                 with self.lock_job(
                     filter=job_lock_filter,
                     break_lock=break_lock,
-                    projection=job_lock_kwargs,
+                    projection=job_lock_projection,
                     sleep=sleep,
                     max_wait=wait,
                     get_locked_doc=True,
@@ -5354,7 +5359,11 @@ class JobController:
             The db_id of the deleted Job.
         """
 
-        job_lock_kwargs = dict(projection=["uuid", "index", "db_id", "state"])
+        job_lock_kwargs = dict(projection=projection_job_info)
+        if not delete_files:
+            job_lock_kwargs = dict(
+                projection=["uuid", "index", "db_id", "state", "job"]
+            )
         # avoid deleting jobs in batch states. It would require additional
         # specific handling and it is an unlikely use case.
         with self.lock_job_flow(
