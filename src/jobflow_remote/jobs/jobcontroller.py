@@ -1969,7 +1969,7 @@ class JobController:
             job_doc = job_lock.locked_document
 
             job_state = JobState(job_doc["state"])
-            if job_state in [JobState.SUBMITTED.value, JobState.RUNNING.value]:
+            if job_state in [JobState.SUBMITTED, JobState.RUNNING]:
                 # try cancelling the job submitted to the remote queue
                 try:
                     self._cancel_queue_process(job_doc)
