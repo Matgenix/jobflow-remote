@@ -1518,3 +1518,68 @@ def test_batches(job_controller):
     )
     assert job_controller.count_batches(db_ids="1") == 1
     assert job_controller.count_batches(db_ids=["1", "3"]) == 2
+
+
+def test_stop_job_submitted(job_controller, runner) -> None:
+    """Test stopping a job in SUBMITTED state cancels the queue process."""
+    from jobflow import Flow
+
+    from jobflow_remote import submit_flow
+    from jobflow_remote.jobs.state import FlowState, JobState
+    from jobflow_remote.testing import add_sleep
+
+    job = add_sleep(1, 30)
+    flow = Flow([job])
+    submit_flow(flow, worker="test_local_worker")
+
+    runner.run_one_job(max_seconds=20, target_state=JobState.RUNNING)
+
+    qm = runner.get_queue_manager("test_local_worker")
+    job_info = job_controller.get_job_info(job_id=job.uuid, job_index=job.index)
+    process_id = job_info.remote.process_id
+
+    jobs_list = qm.get_jobs_list([process_id])
+    assert len(jobs_list) == 1
+
+    # Manually set state back to SUBMITTED to test that branch
+    job_controller.set_job_state(
+        JobState.SUBMITTED, job_id=job.uuid, job_index=job.index
+    )
+    assert job_controller.get_job_info(job_id=job.uuid).state == JobState.SUBMITTED
+
+    job_controller.stop_job(job_id=job.uuid)
+
+    jobs_list = qm.get_jobs_list([process_id])
+    assert len(jobs_list) == 0
+    assert job_controller.get_job_info(job_id=job.uuid).state == JobState.USER_STOPPED
+    assert job_controller.get_flows_info(job_ids=job.uuid)[0].state == FlowState.STOPPED
+
+
+def test_stop_job_running(job_controller, runner) -> None:
+    """Test stopping a job in RUNNING state cancels the queue process."""
+    from jobflow import Flow
+
+    from jobflow_remote import submit_flow
+    from jobflow_remote.jobs.state import FlowState, JobState
+    from jobflow_remote.testing import add_sleep
+
+    job = add_sleep(1, 30)
+    flow = Flow([job])
+    submit_flow(flow, worker="test_local_worker")
+
+    runner.run_one_job(max_seconds=20, target_state=JobState.RUNNING)
+
+    qm = runner.get_queue_manager("test_local_worker")
+    job_info = job_controller.get_job_info(job_id=job.uuid, job_index=job.index)
+    process_id = job_info.remote.process_id
+
+    assert job_info.state == JobState.RUNNING
+    jobs_list = qm.get_jobs_list([process_id])
+    assert len(jobs_list) == 1
+
+    job_controller.stop_job(job_id=job.uuid)
+
+    jobs_list = qm.get_jobs_list([process_id])
+    assert len(jobs_list) == 0
+    assert job_controller.get_job_info(job_id=job.uuid).state == JobState.USER_STOPPED
+    assert job_controller.get_flows_info(job_ids=job.uuid)[0].state == FlowState.STOPPED
