@@ -247,14 +247,25 @@ def stop_processes(
             ),
         ),
     ] = None,
+    max_wait: Annotated[
+        int,
+        typer.Option(
+            "--max-wait",
+            "-m",
+            help=(
+                "Maximum time in seconds to wait for the runner to stop when --wait is set. "
+                "0 means wait indefinitely."
+            ),
+        ),
+    ] = 120,
 ) -> None:
     """
     Send a stop signal to the Runner processes.
     Each of the Runner processes will stop when finished the task being executed.
     By default, return immediately.
     """
+    cm = get_config_manager()
     if all_projects:
-        cm = get_config_manager()
         stop_projects = []
         daemon_managers = {}
         with loading_spinner(processing=False) as progress:
@@ -267,7 +278,7 @@ def stop_processes(
                     if current_status not in (
                         DaemonStatus.SHUT_DOWN,
                         DaemonStatus.SHUTTING_DOWN,
-                        DaemonStatus,
+                        DaemonStatus.STOPPING,
                         DaemonStatus.STOPPED,
                     ):
                         dm.stop(raise_on_error=True, wait=False)
@@ -280,7 +291,6 @@ def stop_processes(
 
             if wait:
                 stopped_missing = set(stop_projects)
-                max_wait = 120
                 t0 = time.time()
                 while stopped_missing:
                     for project_name in list(stopped_missing):
@@ -295,7 +305,7 @@ def stop_processes(
                                 f"Error while checking runner for project {project_name}",
                                 exc_info=True,
                             )
-                    if time.time() - t0 > max_wait:
+                    if max_wait and time.time() - t0 > max_wait:
                         break
                     time.sleep(2)
 
@@ -319,7 +329,6 @@ def stop_processes(
         out_console.print(msg)
 
     else:
-        cm = get_config_manager()
         dm = DaemonManager.from_project(cm.get_project())
         stop_sent = False
         with loading_spinner(processing=False) as progress:
@@ -373,12 +382,23 @@ def stop(
             ),
         ),
     ] = None,
+    max_wait: Annotated[
+        int,
+        typer.Option(
+            "--max-wait",
+            "-m",
+            help=(
+                "Maximum time in seconds to wait for the runner to shut down when --wait is set. "
+                "0 means wait indefinitely."
+            ),
+        ),
+    ] = 120,
 ) -> None:
     """
     Shuts down the supervisord process.
     Note that the supervisord process will stop after all the runner processes have finished.
     """
-    shutdown(wait=wait, all_projects=all_projects, json_out=json_out)
+    shutdown(wait=wait, all_projects=all_projects, json_out=json_out, max_wait=max_wait)
 
 
 @app_runner.command()
@@ -433,13 +453,24 @@ def shutdown(
             ),
         ),
     ] = None,
+    max_wait: Annotated[
+        int,
+        typer.Option(
+            "--max-wait",
+            "-m",
+            help=(
+                "Maximum time in seconds to wait for the runner to shut down when --wait is set. "
+                "0 means wait indefinitely."
+            ),
+        ),
+    ] = 120,
 ) -> None:
     """
     Shuts down the supervisord process.
     Note that the supervisord process will stop after all the runner processes have finished
     """
+    cm = get_config_manager()
     if all_projects:
-        cm = get_config_manager()
         shutdown_projects = []
         daemon_managers = {}
         with loading_spinner(processing=False) as progress:
@@ -464,7 +495,6 @@ def shutdown(
 
             if wait:
                 shutdown_missing = set(shutdown_projects)
-                max_wait = 120
                 t0 = time.time()
                 while shutdown_missing:
                     for project_name in list(shutdown_missing):
@@ -479,13 +509,13 @@ def shutdown(
                                 f"Error while checking runner for project {project_name}",
                                 exc_info=True,
                             )
-                    if time.time() - t0 > max_wait:
+                    if max_wait and time.time() - t0 > max_wait:
                         break
                     time.sleep(2)
 
                 if shutdown_missing:
                     exit_with_error_msg(
-                        "Not all the runners stopped within the allocated time. "
+                        "Not all the runners shut down within the allocated time. "
                         f"Not shut-down: {shutdown_missing}. "
                         f"Shut-down: {set(shutdown_projects).difference(shutdown_missing)}"
                     )
@@ -503,7 +533,6 @@ def shutdown(
         out_console.print(msg)
 
     else:
-        cm = get_config_manager()
         dm = DaemonManager.from_project(cm.get_project())
         with loading_spinner(processing=False) as progress:
             progress.add_task(description="Shutting down supervisor...", total=None)
