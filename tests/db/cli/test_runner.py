@@ -277,6 +277,50 @@ def test_stop_all_runners(
     dm2 = DaemonManager.from_project_name(pn2)
 
     daemon_manager.start()
+    dm2.start()
+
+    wait_daemon_started(daemon_manager)
+    wait_daemon_started(dm2)
+
+    run_check_cli(
+        [
+            "runner",
+            "stop-processes",
+            "--all",
+            "--wait",
+            "--json",
+            tmp_dir / "stopped_proj.json",
+        ],
+        required_out=[random_project_name, f"{random_project_name}_2"],
+        excluded_out=f"{random_project_name}_1",
+    )
+
+    assert daemon_manager.check_status() == DaemonStatus.STOPPED
+    assert dm1.check_status() == DaemonStatus.SHUT_DOWN
+    assert dm2.check_status() == DaemonStatus.STOPPED
+    stopped_set = set(loadfn(tmp_dir / "stopped_proj.json"))
+    assert stopped_set == {random_project_name, f"{random_project_name}_2"}
+
+
+def test_shutdown_all_runners(
+    job_controller,
+    wait_daemon_started,
+    run_check_cli,
+    crete_tmp_project,
+    daemon_manager,
+    tmp_dir,
+    random_project_name,
+):
+    from monty.serialization import loadfn
+
+    from jobflow_remote.jobs.daemon import DaemonManager, DaemonStatus
+
+    jc1, pn1 = crete_tmp_project(suffix="_1")
+    jc2, pn2 = crete_tmp_project(suffix="_2")
+    dm1 = DaemonManager.from_project_name(pn1)
+    dm2 = DaemonManager.from_project_name(pn2)
+
+    daemon_manager.start()
     dm1.start()
     wait_daemon_started(daemon_manager)
     wait_daemon_started(dm1)
@@ -302,27 +346,160 @@ def test_stop_all_runners(
     shutdown_set = set(loadfn(tmp_dir / "shutdown_proj.json"))
     assert shutdown_set == {random_project_name, f"{random_project_name}_1"}
 
+
+def test_stop_all_runners_with_error(
+    job_controller,
+    wait_daemon_started,
+    run_check_cli,
+    crete_tmp_project,
+    daemon_manager,
+    tmp_dir,
+    random_project_name,
+):
+    from unittest.mock import Mock, patch
+
+    from monty.serialization import loadfn
+
+    from jobflow_remote.jobs.daemon import DaemonManager, DaemonStatus
+
+    jc1, pn1 = crete_tmp_project(suffix="_1")
+    jc2, pn2 = crete_tmp_project(suffix="_2")
+    dm1 = DaemonManager.from_project_name(pn1)
+    dm2 = DaemonManager.from_project_name(pn2)
+
     daemon_manager.start()
+    dm1.start()
     dm2.start()
 
     wait_daemon_started(daemon_manager)
+    wait_daemon_started(dm1)
     wait_daemon_started(dm2)
 
-    run_check_cli(
-        [
-            "runner",
-            "stop-processes",
-            "--all",
-            "--wait",
-            "--json",
-            tmp_dir / "stopped_proj.json",
-        ],
-        required_out=[random_project_name, f"{random_project_name}_2"],
-        excluded_out=f"{random_project_name}_1",
-    )
+    original_stop = DaemonManager.stop
+
+    def stop_with_error(self, **kwargs):
+        if self.project.name == pn1:
+            raise RuntimeError(f"Simulated stop error for project {pn1}")
+        return original_stop(self, **kwargs)
+
+    with patch.object(DaemonManager, "stop", stop_with_error):
+        run_check_cli(
+            [
+                "runner",
+                "stop-processes",
+                "--all",
+                "--wait",
+                "--json",
+                tmp_dir / "stopped_proj_err.json",
+            ],
+            required_out=[
+                f"- {random_project_name}",
+                f"- {random_project_name}_2",
+                f"Simulated stop error for project {random_project_name}_1",
+            ],
+        )
 
     assert daemon_manager.check_status() == DaemonStatus.STOPPED
-    assert dm1.check_status() == DaemonStatus.SHUT_DOWN
+    # dm1 was not stopped due to the error; restart by the fixture teardown is fine
     assert dm2.check_status() == DaemonStatus.STOPPED
-    stopped_set = set(loadfn(tmp_dir / "stopped_proj.json"))
+    stopped_set = set(loadfn(tmp_dir / "stopped_proj_err.json"))
     assert stopped_set == {random_project_name, f"{random_project_name}_2"}
+    assert pn1 not in stopped_set
+
+    # Test timeout: dm1 is still running; mock stop so the daemon stays
+    # alive while the wait loop polls check_status, triggering the max-wait timeout.
+    with patch.object(DaemonManager, "stop", Mock(return_value=True)):
+        run_check_cli(
+            [
+                "runner",
+                "stop-processes",
+                "--all",
+                "--wait",
+                "--max-wait",
+                "1",
+            ],
+            required_out=[
+                "Not all the runners stopped within the allocated time",
+                f"{random_project_name}_1",
+            ],
+            error=True,
+        )
+
+
+def test_shutdown_all_runners_with_error(
+    job_controller,
+    wait_daemon_started,
+    run_check_cli,
+    crete_tmp_project,
+    daemon_manager,
+    tmp_dir,
+    random_project_name,
+):
+    from unittest.mock import Mock, patch
+
+    from monty.serialization import loadfn
+
+    from jobflow_remote.jobs.daemon import DaemonManager, DaemonStatus
+
+    jc1, pn1 = crete_tmp_project(suffix="_1")
+    jc2, pn2 = crete_tmp_project(suffix="_2")
+    dm1 = DaemonManager.from_project_name(pn1)
+    dm2 = DaemonManager.from_project_name(pn2)
+
+    daemon_manager.start()
+    dm1.start()
+    dm2.start()
+
+    wait_daemon_started(daemon_manager)
+    wait_daemon_started(dm1)
+    wait_daemon_started(dm2)
+
+    original_shut_down = DaemonManager.shut_down
+
+    def shut_down_with_error(self, **kwargs):
+        if self.project.name == pn2:
+            raise RuntimeError(f"Simulated shutdown error for project {pn2}")
+        return original_shut_down(self, **kwargs)
+
+    with patch.object(DaemonManager, "shut_down", shut_down_with_error):
+        run_check_cli(
+            [
+                "runner",
+                "shutdown",
+                "--all",
+                "--wait",
+                "--json",
+                tmp_dir / "shutdown_proj_err.json",
+            ],
+            required_out=[
+                f"- {random_project_name}",
+                f"- {random_project_name}_1",
+                f"Simulated shutdown error for project {random_project_name}_2",
+            ],
+        )
+
+    assert daemon_manager.check_status() == DaemonStatus.SHUT_DOWN
+    assert dm1.check_status() == DaemonStatus.SHUT_DOWN
+    # dm2 was not shut down due to the error
+    shutdown_set = set(loadfn(tmp_dir / "shutdown_proj_err.json"))
+    assert shutdown_set == {random_project_name, f"{random_project_name}_1"}
+    assert pn2 not in shutdown_set
+
+    # Test timeout: dm1 is still running; mock shutdown so the daemon stays
+    # alive while the wait loop polls check_status, triggering the max-wait timeout.
+    with patch.object(DaemonManager, "shut_down", Mock(return_value=True)):
+        run_check_cli(
+            [
+                "runner",
+                "shutdown",
+                "--all",
+                "--wait",
+                "--max-wait",
+                "1",
+            ],
+            required_out=[
+                "Not all the runners shut down within the allocated time",
+                f"{random_project_name}_2",
+            ],
+            error=True,
+        )
