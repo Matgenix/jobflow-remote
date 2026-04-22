@@ -187,7 +187,7 @@ def write_project_conf(mongoclient, project_name, database_name, tmp_proj_dir, w
 
 
 @pytest.fixture()
-def crete_tmp_project(
+def create_tmp_project(
     random_project_name,
     store_database_name,
     mongoclient,
