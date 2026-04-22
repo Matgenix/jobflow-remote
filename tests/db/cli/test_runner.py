@@ -262,7 +262,7 @@ def test_stop_all_runners(
     job_controller,
     wait_daemon_started,
     run_check_cli,
-    crete_tmp_project,
+    create_tmp_project,
     daemon_manager,
     tmp_dir,
     random_project_name,
@@ -271,8 +271,8 @@ def test_stop_all_runners(
 
     from jobflow_remote.jobs.daemon import DaemonManager, DaemonStatus
 
-    jc1, pn1 = crete_tmp_project(suffix="_1")
-    jc2, pn2 = crete_tmp_project(suffix="_2")
+    jc1, pn1 = create_tmp_project(suffix="_1")
+    jc2, pn2 = create_tmp_project(suffix="_2")
     dm1 = DaemonManager.from_project_name(pn1)
     dm2 = DaemonManager.from_project_name(pn2)
 
@@ -306,7 +306,7 @@ def test_shutdown_all_runners(
     job_controller,
     wait_daemon_started,
     run_check_cli,
-    crete_tmp_project,
+    create_tmp_project,
     daemon_manager,
     tmp_dir,
     random_project_name,
@@ -315,8 +315,8 @@ def test_shutdown_all_runners(
 
     from jobflow_remote.jobs.daemon import DaemonManager, DaemonStatus
 
-    jc1, pn1 = crete_tmp_project(suffix="_1")
-    jc2, pn2 = crete_tmp_project(suffix="_2")
+    jc1, pn1 = create_tmp_project(suffix="_1")
+    jc2, pn2 = create_tmp_project(suffix="_2")
     dm1 = DaemonManager.from_project_name(pn1)
     dm2 = DaemonManager.from_project_name(pn2)
 
@@ -351,7 +351,7 @@ def test_stop_all_runners_with_error(
     job_controller,
     wait_daemon_started,
     run_check_cli,
-    crete_tmp_project,
+    create_tmp_project,
     daemon_manager,
     tmp_dir,
     random_project_name,
@@ -362,8 +362,8 @@ def test_stop_all_runners_with_error(
 
     from jobflow_remote.jobs.daemon import DaemonManager, DaemonStatus
 
-    jc1, pn1 = crete_tmp_project(suffix="_1")
-    jc2, pn2 = crete_tmp_project(suffix="_2")
+    jc1, pn1 = create_tmp_project(suffix="_1")
+    jc2, pn2 = create_tmp_project(suffix="_2")
     dm1 = DaemonManager.from_project_name(pn1)
     dm2 = DaemonManager.from_project_name(pn2)
 
@@ -430,7 +430,7 @@ def test_shutdown_all_runners_with_error(
     job_controller,
     wait_daemon_started,
     run_check_cli,
-    crete_tmp_project,
+    create_tmp_project,
     daemon_manager,
     tmp_dir,
     random_project_name,
@@ -441,8 +441,8 @@ def test_shutdown_all_runners_with_error(
 
     from jobflow_remote.jobs.daemon import DaemonManager, DaemonStatus
 
-    jc1, pn1 = crete_tmp_project(suffix="_1")
-    jc2, pn2 = crete_tmp_project(suffix="_2")
+    jc1, pn1 = create_tmp_project(suffix="_1")
+    jc2, pn2 = create_tmp_project(suffix="_2")
     dm1 = DaemonManager.from_project_name(pn1)
     dm2 = DaemonManager.from_project_name(pn2)
 
