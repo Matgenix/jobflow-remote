@@ -10,4 +10,4 @@ psutil==7.2.2
 supervisor==4.3.0
 ruamel.yaml==0.17.35
 schedule==1.2.2
-flufl.lock==9.0.0
+flufl.lock==9.1.0
