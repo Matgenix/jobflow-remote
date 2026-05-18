@@ -107,6 +107,11 @@ def test_kill(job_controller, daemon_manager, wait_daemon_started) -> None:
     time.sleep(1)
     assert daemon_manager.check_status() == DaemonStatus.STOPPED
 
+    assert daemon_manager.start(raise_on_error=True)
+    wait_daemon_started(daemon_manager)
+    assert daemon_manager.kill(raise_on_error=True, wait=True)
+    assert daemon_manager.check_status() == DaemonStatus.STOPPED
+
 
 def test_kill_supervisord(job_controller, daemon_manager, wait_daemon_started) -> None:
     import signal
