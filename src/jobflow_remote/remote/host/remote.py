@@ -149,6 +149,11 @@ class RemoteHost(BaseHost):
             return False
         return self.as_dict() == other.as_dict()
 
+    def __hash__(self):
+        import json
+
+        return hash(json.dumps(self.as_dict(), sort_keys=True, default=str))
+
     @property
     def connection(self):
         return self._connection

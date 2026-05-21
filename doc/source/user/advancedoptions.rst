@@ -133,6 +133,14 @@ An minimal configuration for a *batch* worker would thus be:
 See the :ref:`projectconf` section for the list of all the configuration options available
 in the ``batch`` section.
 
+.. warning::
+
+    The ``jobs_handle_dir`` is used by the runner to exchange information with
+    the jobs being executed and cannot be shared between *batch* workers that
+    point to the same host, whether they belong to the same project or to
+    different projects. Sharing the same folder on the same filesystem may lead
+    to unpredictable behaviour at run time.
+
 Note that, since the completion of a Job and the subsequent potential switch of ``WAITING``
 Jobs to their ``READY`` state is still managed by the runner, this functionality is effective
 if several Jobs and Flows are managed at the same time. If too much time passes between the

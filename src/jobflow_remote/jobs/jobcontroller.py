@@ -4273,7 +4273,10 @@ class JobController:
             on_missing_ref = (
                 job.get("job", {}).get("config", {}).get("on_missing_references", None)
             )
-            if on_missing_ref == jobflow.OnMissing.NONE.value:
+            if on_missing_ref in (
+                jobflow.OnMissing.NONE.value,
+                jobflow.OnMissing.PASS.value,
+            ):
                 allowed_states.extend(
                     (JobState.FAILED.value, JobState.USER_STOPPED.value)
                 )

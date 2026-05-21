@@ -57,6 +57,9 @@ class SeparatedTransferHost(BaseHost):
             and self.transfer_host == other.transfer_host
         )
 
+    def __hash__(self):
+        return hash((SeparatedTransferHost, self.command_host, self.transfer_host))
+
     # -------------------------------------------------------------------------
     # Command execution - delegated to command_host
     # -------------------------------------------------------------------------

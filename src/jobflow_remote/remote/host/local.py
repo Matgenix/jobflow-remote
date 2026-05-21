@@ -19,6 +19,9 @@ class LocalHost(BaseHost):
     def __eq__(self, other):
         return isinstance(other, LocalHost)
 
+    def __hash__(self):
+        return hash(LocalHost)
+
     def execute(
         self,
         command: str | list[str],

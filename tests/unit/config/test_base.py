@@ -113,6 +113,116 @@ def test_separated_transfer_worker_cli_info():
     assert info["transfer_host"] == "dtn.cluster.edu"
 
 
+def test_project_unique_jobs_handle_dir():
+    """Test that the Project rejects duplicate ``batch.jobs_handle_dir``
+    only when the workers share a host."""
+    from jobflow_remote.config.base import Project
+
+    def _local_worker(work_dir: str, handle_dir: str) -> dict:
+        return {
+            "type": "local",
+            "scheduler_type": "shell",
+            "work_dir": work_dir,
+            "batch": {
+                "jobs_handle_dir": handle_dir,
+                "work_dir": work_dir + "_batch",
+            },
+        }
+
+    def _remote_worker(host: str, work_dir: str, handle_dir: str) -> dict:
+        return {
+            "type": "remote",
+            "host": host,
+            "scheduler_type": "slurm",
+            "work_dir": work_dir,
+            "batch": {
+                "jobs_handle_dir": handle_dir,
+                "work_dir": work_dir + "_batch",
+            },
+        }
+
+    def _project_dict(workers: dict) -> dict:
+        return {
+            "name": "test_project",
+            "queue": {"store": {}},
+            "workers": workers,
+        }
+
+    # Distinct directories on the same host are accepted
+    Project.model_validate(
+        _project_dict(
+            {
+                "w1": _local_worker("/some/test/path/work1", "/some/test/path/h1"),
+                "w2": _local_worker("/some/test/path/work2", "/some/test/path/h2"),
+            }
+        )
+    )
+
+    # Identical directories on the same host are rejected
+    with pytest.raises(
+        ValidationError,
+        match=r"share the same `jobs_handle_dir`",
+    ):
+        Project.model_validate(
+            _project_dict(
+                {
+                    "w1": _local_worker(
+                        "/some/test/path/work1", "/some/test/path/same"
+                    ),
+                    "w2": _local_worker(
+                        "/some/test/path/work2", "/some/test/path/same"
+                    ),
+                }
+            )
+        )
+
+    # Trailing-slash variants on the same host are treated as equal by Path
+    with pytest.raises(
+        ValidationError,
+        match=r"share the same `jobs_handle_dir`",
+    ):
+        Project.model_validate(
+            _project_dict(
+                {
+                    "w1": _local_worker(
+                        "/some/test/path/work1", "/some/test/path/same/"
+                    ),
+                    "w2": _local_worker(
+                        "/some/test/path/work2", "/some/test/path/same"
+                    ),
+                }
+            )
+        )
+
+    # The same path on different hosts is fine: the filesystems are independent
+    Project.model_validate(
+        _project_dict(
+            {
+                "w1": _remote_worker(
+                    "host_a", "/some/test/path/work1", "/some/test/path/same"
+                ),
+                "w2": _remote_worker(
+                    "host_b", "/some/test/path/work2", "/some/test/path/same"
+                ),
+            }
+        )
+    )
+
+    # Different paths on different remote hosts are also accepted
+    Project.model_validate(
+        _project_dict(
+            {
+                "w1": _remote_worker(
+                    "host_a", "/some/test/path/work1", "/some/test/path/h1"
+                ),
+                "w2": _remote_worker(
+                    "host_b", "/some/test/path/work2", "/some/test/path/h2"
+                ),
+            }
+        )
+    )
+
+
 def test_separated_transfer_worker_transfer_own_credentials():
     """Test that transfer host uses its own credentials when specified."""
     from jobflow_remote.config.base import SeparatedTransferWorker

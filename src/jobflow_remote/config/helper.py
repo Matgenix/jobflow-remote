@@ -4,6 +4,8 @@ import importlib.metadata
 import json
 import logging
 import traceback
+from dataclasses import dataclass, field
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from jobflow_remote.config.base import (
@@ -21,6 +23,27 @@ if TYPE_CHECKING:
     from jobflow_remote.remote.host import BaseHost
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class ConflictIssue:
+    """A single configuration conflict detected across projects.
+
+    Attributes
+    ----------
+    kind
+        Short identifier for the type of conflict (e.g. ``jobs_handle_dir``,
+        ``queue_collection``, ``directory``). Useful for grouping when
+        rendering.
+    message
+        Human-readable description of the conflict.
+    projects
+        Names of the projects involved in the conflict.
+    """
+
+    kind: str
+    message: str
+    projects: list[str] = field(default_factory=list)
 
 
 def generate_dummy_project(name: str, full: bool = False) -> Project:
@@ -120,8 +143,10 @@ def _check_workdir(worker: WorkerBase, host: BaseHost) -> str | None:
 
     Parameters
     ----------
-        worker: The worker configuration.
-        host: A connected host.
+        worker
+            The worker configuration.
+        host
+            A connected host.
 
     """
     try:
@@ -285,3 +310,139 @@ def _check_environment(
         msg += f"Mismatching versions: {', '.join(mismatch_str)}"
 
     return msg
+
+
+def _project_queue_stores(project: Project) -> dict[str, Store]:
+    """
+    Build one maggma ``Store`` per queue collection used by the project.
+
+    The auxiliary collections (``flows_collection``, ``auxiliary_collection``,
+    ``batches_collection``) live in the same database as ``queue.store``, so
+    they are obtained by deep-copying the queue store and overriding its
+    ``collection_name``.
+    """
+    import copy
+
+    main = project.get_queue_store()
+    if main is None:
+        return {}
+    stores: dict[str, Store] = {"queue.store": main}
+    sibling_fields = (
+        ("flows_collection", project.queue.flows_collection),
+        ("auxiliary_collection", project.queue.auxiliary_collection),
+        ("batches_collection", project.queue.batches_collection),
+    )
+    for field_name, collection_name in sibling_fields:
+        if not collection_name:
+            continue
+        sibling = copy.deepcopy(main)
+        sibling.collection_name = collection_name
+        stores[field_name] = sibling
+    return stores
+
+
+def check_projects_conflicts(
+    projects: dict[str, Project],
+) -> list[ConflictIssue]:
+    """
+    Detect configuration conflicts between different projects.
+
+    The rules checked are:
+
+    * ``batch.jobs_handle_dir`` of batch workers must be unique across all
+      batch workers that share a host. Hosts are compared via the ``__eq__``
+      of the ``BaseHost`` returned by ``worker.get_host()``.
+    * Queue collections (``queue.store`` collection plus ``flows_collection``,
+      ``auxiliary_collection`` and ``batches_collection``) must not be shared
+      across projects. Equality is determined by the maggma ``Store``
+      ``__eq__``.
+    * Project directories (``base_dir``, ``tmp_dir``, ``log_dir``,
+      ``daemon_dir``) must not be shared between projects.
+
+    Parameters
+    ----------
+    projects
+        Mapping of project name to ``Project`` instance, typically taken from
+        ``ConfigManager.projects``.
+
+    Returns
+    -------
+    list of ConflictIssue
+        One entry per detected conflict. Empty when no conflicts are found.
+    """
+    issues: list[ConflictIssue] = []
+
+    # 1. jobs_handle_dir across batch workers, grouped by (host, path)
+    handle_owners: dict[tuple[BaseHost, Path], list[tuple[str, str]]] = {}
+    for project_name, project in projects.items():
+        for worker_name, worker in project.workers.items():
+            if worker.batch is None:
+                continue
+            key = (worker.get_host(), Path(worker.batch.jobs_handle_dir))
+            handle_owners.setdefault(key, []).append((project_name, worker_name))
+    for (_, path_value), owners in handle_owners.items():
+        distinct_projects = {p for p, _ in owners}
+        if len(distinct_projects) < 2:
+            continue
+        owners_str = ", ".join(f"{p}/{w}" for p, w in owners)
+        issues.append(
+            ConflictIssue(
+                kind="jobs_handle_dir",
+                message=(
+                    f"Workers {owners_str} share the same `jobs_handle_dir` "
+                    f"({path_value}) on the same host. It must be unique "
+                    "across batch workers that share a host."
+                ),
+                projects=sorted(distinct_projects),
+            )
+        )
+
+    # 2. Queue collections across projects, grouped by Store equality
+    store_owners: dict[Store, list[tuple[str, str]]] = {}
+    for project_name, project in projects.items():
+        for field_name, store in _project_queue_stores(project).items():
+            store_owners.setdefault(store, []).append((project_name, field_name))
+    for store, owners in store_owners.items():
+        distinct_projects = {p for p, _ in owners}
+        if len(distinct_projects) < 2:
+            continue
+        owners_str = ", ".join(f"{p}.{f}" for p, f in owners)
+        collection_name = getattr(store, "collection_name", None)
+        issues.append(
+            ConflictIssue(
+                kind="queue_collection",
+                message=(
+                    f"Queue collection {collection_name!r} is used by "
+                    f"{owners_str}. Queue collections must not be shared "
+                    "across projects."
+                ),
+                projects=sorted(distinct_projects),
+            )
+        )
+
+    # 3. Project directories shared across projects (all on the local machine)
+    dir_fields = ("base_dir", "tmp_dir", "log_dir", "daemon_dir")
+    dir_owners: dict[Path, list[tuple[str, str]]] = {}
+    for project_name, project in projects.items():
+        for field_name in dir_fields:
+            value = getattr(project, field_name)
+            if value is None:
+                continue
+            dir_owners.setdefault(Path(value), []).append((project_name, field_name))
+    for path_value, owners in dir_owners.items():
+        distinct_projects = {p for p, _ in owners}
+        if len(distinct_projects) < 2:
+            continue
+        owners_str = ", ".join(f"{p}.{f}" for p, f in owners)
+        issues.append(
+            ConflictIssue(
+                kind="directory",
+                message=(
+                    f"Directory {path_value} is shared by {owners_str}. "
+                    "Project folders must not be shared between projects."
+                ),
+                projects=sorted(distinct_projects),
+            )
+        )
+
+    return issues
