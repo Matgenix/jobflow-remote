@@ -176,6 +176,104 @@ def test_check_fail(job_controller, monkeypatch, tmp_dir, run_check_cli) -> None
         )
 
 
+def test_check_conflicts(job_controller, monkeypatch, tmp_dir, run_check_cli) -> None:
+    import os
+
+    from monty.serialization import dumpfn
+
+    from jobflow_remote import SETTINGS
+
+    queue_dict = {
+        "type": "MongoStore",
+        "host": "h",
+        "port": 27017,
+        "database": "db_x",
+        "collection_name": "jobs",
+    }
+    local_batch_worker = {
+        "scheduler_type": "shell",
+        "type": "local",
+        "work_dir": "/some/test/path/work",
+        "batch": {
+            "jobs_handle_dir": "/some/test/path/shared_handles",
+            "work_dir": "/some/test/path/batch",
+        },
+    }
+
+    with monkeypatch.context() as m:
+        m.setattr(SETTINGS, "projects_folder", os.getcwd())
+
+        # Only one parseable project: nothing to cross-check.
+        dumpfn(
+            {
+                "name": "proj_a",
+                "queue": {"store": queue_dict},
+                "workers": {"w": local_batch_worker},
+                "base_dir": "/shared/base",
+            },
+            "proj_a.yaml",
+        )
+        run_check_cli(
+            ["project", "check-conflicts"],
+            required_out="nothing to cross-check",
+        )
+
+        # Two projects with no conflicts
+        dumpfn(
+            {
+                "name": "proj_b",
+                "queue": {"store": dict(queue_dict, host="h2")},
+                "base_dir": "/shared/base2",
+            },
+            "proj_b.yaml",
+        )
+        run_check_cli(
+            ["project", "check-conflicts"],
+            required_out="No conflicts found across 2 projects",
+        )
+
+        # Overwrite the second project with conflicts: jobs_handle_dir, queue
+        # collections (same DB + default names) and base_dir all collide.
+        dumpfn(
+            {
+                "name": "proj_b",
+                "queue": {"store": dict(queue_dict, collection_name="jobs_b")},
+                "workers": {"w": local_batch_worker},
+                "base_dir": "/shared/base",
+            },
+            "proj_b.yaml",
+        )
+
+        required = [
+            "Found 8 conflict(s)",
+            "jobs_handle_dir:",
+            "/some/test/path/shared_handles",
+            "queue_collection:",
+            "directory:",
+            "/shared/base",
+        ]
+        run_check_cli(
+            ["project", "check-conflicts"],
+            required_out=required,
+            error=True,
+        )
+
+        # Add an unparsable file: the command must warn about it but still
+        # run the check on the parsable projects.
+        with open("broken.yaml", "w") as f:
+            f.write("name: broken\nqueue: not_a_valid_queue\n")
+
+        run_check_cli(
+            ["project", "check-conflicts"],
+            required_out=[
+                *required,
+                "The following projects could not be parsed and are NOT included in the conflict check",
+                "broken",
+            ],
+            error=True,
+        )
+
+
 def test_remove(
     job_controller, random_project_name, monkeypatch, tmp_dir, run_check_cli
 ) -> None:

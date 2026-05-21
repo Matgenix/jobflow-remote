@@ -33,6 +33,7 @@ from jobflow_remote.cli.utils import (
 from jobflow_remote.config import ConfigError, ConfigManager, Project
 from jobflow_remote.config.helper import (
     check_jobstore,
+    check_projects_conflicts,
     check_queue_store,
     check_worker,
     generate_dummy_project,
@@ -320,6 +321,59 @@ def check(
         for e in errors:
             out_console.print(e[0], style="bold")
             out_console.print(e[1])
+
+
+@app_project.command(name="check-conflicts")
+def check_conflicts() -> None:
+    """Check for configuration conflicts between different projects.
+
+    Verifies that resources that must be unique are not shared between the projects
+    defined in the projects folder.
+    """
+    cm = ConfigManager(warn=False)
+
+    # Warn about the files that could not be parsed
+    all_project_names, erroneous_files = cm.project_names_from_files(
+        suppress_warnings=True
+    )
+    not_parsed = sorted(set(all_project_names).difference(cm.projects_data))
+    if not_parsed or erroneous_files:
+        msg = (
+            "The following projects could not be parsed and are NOT included "
+            "in the conflict check:"
+        )
+        if not_parsed:
+            msg += f"\n - projects: {', '.join(not_parsed)}"
+        if erroneous_files:
+            msg += f"\n - files: {', '.join(erroneous_files)}"
+        out_console.print(msg, style="yellow")
+
+    if len(cm.projects) < 2:
+        exit_with_warning_msg(
+            f"Only {len(cm.projects)} project(s) parsed in {cm.projects_folder}; "
+            "nothing to cross-check."
+        )
+
+    with loading_spinner(processing=False) as progress:
+        progress.add_task("Checking projects for conflicts")
+        issues = check_projects_conflicts(cm.projects)
+
+    if not issues:
+        print_success_msg(f"No conflicts found across {len(cm.projects)} projects.")
+        return
+
+    grouped: dict[str, list] = {}
+    for issue in issues:
+        grouped.setdefault(issue.kind, []).append(issue)
+
+    out_console.print(
+        f"Found {len(issues)} conflict(s) across projects:", style="red bold"
+    )
+    for kind, kind_issues in grouped.items():
+        out_console.print(f"\n{kind}:", style="bold")
+        for issue in kind_issues:
+            out_console.print(f" - {issue.message}")
+    raise typer.Exit(1)
 
 
 @app_project.command()

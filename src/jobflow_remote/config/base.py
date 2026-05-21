@@ -17,6 +17,7 @@ from pydantic import (
     Field,
     ValidationInfo,
     field_validator,
+    model_validator,
 )
 from qtoolkit.io import BaseSchedulerIO, scheduler_mapping
 
@@ -834,6 +835,34 @@ class Project(BaseModel):
                     f"error while converting jobstore to JobStore. Error: {traceback.format_exc()}"
                 ) from e
         return jobstore
+
+    @model_validator(mode="after")
+    def check_unique_jobs_handle_dir(self) -> Project:
+        """
+        Ensure ``batch.jobs_handle_dir`` is unique among batch workers that
+        share a host.
+
+        Sharing the same directory on the same host among multiple batch
+        workers leads to unpredictable behaviour at run time, since the runner
+        uses it to exchange information with the jobs being executed. The same
+        path on different hosts is fine, as the two filesystems are
+        independent. Hosts are compared via the ``__eq__`` of the
+        ``BaseHost`` returned by ``worker.get_host()``.
+        """
+        seen: dict[tuple[BaseHost, Path], str] = {}
+        for worker_name, worker in self.workers.items():
+            if worker.batch is None:
+                continue
+            key = (worker.get_host(), Path(worker.batch.jobs_handle_dir))
+            if key in seen:
+                raise ValueError(
+                    f"Workers {seen[key]!r} and {worker_name!r} share the "
+                    f"same `jobs_handle_dir` ({key[1]}) on the same host. It "
+                    "must be unique across batch workers that share a host, "
+                    "to avoid unpredictable behaviour at run time."
+                )
+            seen[key] = worker_name
+        return self
 
     @field_validator("optional_jobstores")
     @classmethod
