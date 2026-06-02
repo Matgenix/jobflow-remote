@@ -14,13 +14,6 @@ from jobflow_remote.cli.utils import (
 from jobflow_remote.config.base import LogLevel
 from jobflow_remote.jobs.state import BatchState, FlowState, JobState
 
-# since 0.26.0 typer dropped click and has its own ParamType
-# keep for backward compatibility
-try:
-    from typer._click.types import ParamType
-except ImportError:
-    from click import ParamType
-
 
 def deprecated_option(old_name: str, new_name: str):
     """Callback that warns about deprecated options and exits."""
@@ -477,27 +470,12 @@ cli_output_keys_opt = Annotated[
 ]
 
 
-# as of typer version 0.9.0 the dict is not a supported type. Define a custom one
-class DictType(dict):
-    pass
-
-
-# Python 3.10+ union types are fully supported now
-# These type aliases are kept for backward compatibility with typer's click integration
-OptionalStr = str | None
-OptionalDictType = DictType | None
-
-
-class DictTypeParser(ParamType):
-    name = "DictType"
-
-    def convert(self, value, param, ctx):
-        value = str_to_dict(value)
-        return DictType(value)
+def dict_type_parser(value: str) -> dict | None:
+    return str_to_dict(value)
 
 
 query_opt = Annotated[
-    OptionalDictType,
+    dict | None,
     typer.Option(
         "--query",
         "-q",
@@ -507,13 +485,13 @@ query_opt = Annotated[
         "Can be either a list of comma separated key=value pairs or a string with the JSON"
         " representation of a dictionary containing the mongoDB query that "
         'should be performed (e.g \'{"key1.key2": 1, "key3": "test"}\')',
-        click_type=DictTypeParser(),
+        parser=dict_type_parser,
     ),
 ]
 
 
 metadata_opt = Annotated[
-    OptionalDictType,
+    dict | None,
     typer.Option(
         "--metadata",
         "-meta",
@@ -521,6 +499,6 @@ metadata_opt = Annotated[
         " a list of comma separated key=value pairs or a string with the JSON"
         " representation of a dictionary containing the mongoDB query for "
         'the metadata subdocument (e.g \'{"key1.key2": 1, "key3": "test"}\')',
-        click_type=DictTypeParser(),
+        parser=dict_type_parser,
     ),
 ]
