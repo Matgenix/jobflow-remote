@@ -17,7 +17,7 @@ from jobflow_remote.jobs.state import BatchState, FlowState, JobState
 # since 0.26.0 typer dropped click and has its own ParamType
 # keep for backward compatibility
 try:
-    from typer._click.params import ParamType
+    from typer._click.types import ParamType
 except ImportError:
     from click import ParamType
 
