@@ -1,3 +1,6 @@
+import pytest
+
+
 def test_std_operations(
     wait_daemon_started,
     wait_daemon_stopped,
@@ -256,3 +259,151 @@ def test_info(
         required_out=[*req_out, "active on another machine"],
         excluded_out=excl_out,
     )
+
+
+@pytest.mark.parametrize(
+    ("subcommand", "started_suffix", "final_status_name"),
+    [
+        ("stop-processes", "_2", "STOPPED"),
+        ("shutdown", "_1", "SHUT_DOWN"),
+        ("kill", "_2", "STOPPED"),
+    ],
+    ids=["stop", "shutdown", "kill"],
+)
+def test_all_runners_termination(
+    job_controller,
+    wait_daemon_started,
+    run_check_cli,
+    create_tmp_project,
+    daemon_manager,
+    tmp_dir,
+    random_project_name,
+    subcommand,
+    started_suffix,
+    final_status_name,
+):
+    from monty.serialization import loadfn
+
+    from jobflow_remote.jobs.daemon import DaemonManager, DaemonStatus
+
+    final_status = DaemonStatus[final_status_name]
+    unstarted_suffix = "_1" if started_suffix == "_2" else "_2"
+    _, pn_started = create_tmp_project(suffix=started_suffix)
+    _, pn_unstarted = create_tmp_project(suffix=unstarted_suffix)
+    dm_started = DaemonManager.from_project_name(pn_started)
+    dm_unstarted = DaemonManager.from_project_name(pn_unstarted)
+
+    daemon_manager.start()
+    dm_started.start()
+    wait_daemon_started(daemon_manager)
+    wait_daemon_started(dm_started)
+
+    assert dm_unstarted.check_status() == DaemonStatus.SHUT_DOWN
+
+    json_path = tmp_dir / "affected_proj.json"
+    run_check_cli(
+        ["runner", subcommand, "--all", "--wait", "--json", json_path],
+        required_out=[random_project_name, pn_started],
+        excluded_out=pn_unstarted,
+    )
+
+    assert daemon_manager.check_status() == final_status
+    assert dm_started.check_status() == final_status
+    assert dm_unstarted.check_status() == DaemonStatus.SHUT_DOWN
+    assert set(loadfn(json_path)) == {random_project_name, pn_started}
+
+
+@pytest.mark.parametrize(
+    ("subcommand", "patched_method_name", "action_name", "final_status_name"),
+    [
+        ("stop-processes", "stop", "stopping", "STOPPED"),
+        ("shutdown", "shut_down", "shutting down", "SHUT_DOWN"),
+        ("kill", "kill", "killing", "STOPPED"),
+    ],
+    ids=["stop", "shutdown", "kill"],
+)
+def test_all_runners_termination_with_error(
+    job_controller,
+    wait_daemon_started,
+    run_check_cli,
+    create_tmp_project,
+    daemon_manager,
+    tmp_dir,
+    random_project_name,
+    subcommand,
+    patched_method_name,
+    action_name,
+    final_status_name,
+):
+    from unittest.mock import Mock, patch
+
+    from monty.serialization import loadfn
+
+    from jobflow_remote.jobs.daemon import DaemonManager, DaemonStatus
+
+    final_status = DaemonStatus[final_status_name]
+    _, pn1 = create_tmp_project(suffix="_1")
+    _, pn2 = create_tmp_project(suffix="_2")
+    dm1 = DaemonManager.from_project_name(pn1)
+    dm2 = DaemonManager.from_project_name(pn2)
+
+    daemon_manager.start()
+    dm1.start()
+    dm2.start()
+
+    wait_daemon_started(daemon_manager)
+    wait_daemon_started(dm1)
+    wait_daemon_started(dm2)
+
+    original_method = getattr(DaemonManager, patched_method_name)
+    error_project = pn1
+
+    def with_error(self, **kwargs):
+        if self.project.name == error_project:
+            raise RuntimeError(f"Simulated test error for project {error_project}")
+        return original_method(self, **kwargs)
+
+    json_path = tmp_dir / "affected_proj_err.json"
+
+    with patch.object(DaemonManager, patched_method_name, with_error):
+        run_check_cli(
+            [
+                "runner",
+                subcommand,
+                "--all",
+                "--wait",
+                "--json",
+                json_path,
+            ],
+            required_out=[
+                f"- {random_project_name}",
+                f"- {pn2}",
+                f"Simulated test error for project {error_project}",
+            ],
+        )
+
+    assert daemon_manager.check_status() == final_status
+    assert dm2.check_status() == final_status
+    # dm1 was not affected due to the error
+    affected_set = set(loadfn(json_path))
+    assert affected_set == {random_project_name, pn2}
+    assert pn1 not in affected_set
+
+    # Test timeout: dm1 is still running; mock the action so the daemon stays
+    # alive while the wait loop polls check_status, triggering the max-wait timeout.
+    with patch.object(DaemonManager, patched_method_name, Mock(return_value=True)):
+        run_check_cli(
+            [
+                "runner",
+                subcommand,
+                "--all",
+                "--wait",
+                "--max-wait",
+                "1",
+            ],
+            required_out=[
+                f"Not all the runners finished {action_name} within the allocated time",
+                pn1,
+            ],
+            error=True,
+        )

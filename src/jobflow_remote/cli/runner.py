@@ -1,8 +1,11 @@
 import datetime
+import logging
 import os
+import time
 from typing import Annotated
 
 import typer
+from monty.serialization import dumpfn
 from rich.prompt import Confirm
 from rich.scope import render_scope
 from rich.table import Table
@@ -38,6 +41,9 @@ from jobflow_remote.jobs.daemon import (
 from jobflow_remote.jobs.runner import Runner
 from jobflow_remote.utils.data import convert_utc_time
 
+logger = logging.getLogger(__name__)
+
+
 app_runner = JFRTyper(
     name="runner", help="Commands for handling the Runner", no_args_is_help=True
 )
@@ -50,6 +56,145 @@ _running_daemon_error_msg = (
     "or for another project[/bold], clean the DB with `jf runner reset`.\n"
     "[bold]If you are unsure about the meaning of this message check the documentation:[/bold] [link=https://matgenix.github.io/jobflow-remote/user/troubleshooting.html]https://matgenix.github.io/jobflow-remote/user/troubleshooting.html[/link]"
 )
+
+
+def _stop_runners(
+    wait: bool,
+    all_projects: bool,
+    json_out: str | None,
+    max_wait: int,
+    dm_method_name: str,
+    skip_action_statuses: tuple[DaemonStatus, ...],
+    completed_statuses: tuple[DaemonStatus, ...],
+    target_status: DaemonStatus,
+    action_name: str,
+    done_label: str,
+) -> None:
+    """
+    Shared implementation for the stopping the runners.
+
+    Parameters
+    ----------
+    wait
+        If True, poll until each affected runner reaches ``target_status``.
+    all_projects
+        If True, iterate over every configured project; otherwise act on the
+        currently selected project only.
+    json_out
+        Optional file path to dump the list of affected project names as JSON.
+    max_wait
+        Maximum time in seconds to wait when ``wait`` is True (0 = forever).
+    dm_method_name
+        Name of the ``DaemonManager`` method that issues the action
+        (e.g. ``"stop"`` or ``"shut_down"``).
+    skip_action_statuses
+        Statuses for which the action should NOT be issued (already complete
+        or in progress).
+    completed_statuses
+        Statuses considered fully terminal; projects in one of these are not
+        appended to the result list.
+    target_status
+        Status to poll for when ``wait`` is True.
+    action_name
+        Gerund describing the action (e.g. ``"stopping"`` or
+        ``"shutting down"``), used in spinner descriptions, per-project
+        warnings, single-project error messages, and the timeout message.
+    done_label
+        Label for completed projects in the timeout breakdown (e.g. ``"Stopped"``);
+        the "not done" counterpart is derived as ``f"Not {done_label.lower()}"``,
+        and the all-projects success summary uses the lowercased form too.
+    """
+    cm = get_config_manager()
+    if all_projects:
+        done_projects: list[str] = []
+        daemon_managers: dict[str, DaemonManager] = {}
+        with loading_spinner(processing=False) as progress:
+            progress.add_task(
+                description=f"{action_name.capitalize()} all runners...", total=None
+            )
+            for project_name in cm.projects_data:
+                try:
+                    dm = DaemonManager.from_project_name(project_name=project_name)
+                    daemon_managers[project_name] = dm
+                    current_status = dm.check_status(raise_on_shutdown=False)
+                    if current_status not in skip_action_statuses:
+                        getattr(dm, dm_method_name)(raise_on_error=True, wait=False)
+                    if current_status not in completed_statuses:
+                        done_projects.append(project_name)
+                except Exception:
+                    logger.warning(
+                        f"Error while checking or {action_name} runner for project {project_name}",
+                        exc_info=True,
+                    )
+
+            if wait:
+                pending = set(done_projects)
+                t0 = time.time()
+                while pending:
+                    for project_name in list(pending):
+                        try:
+                            current_status = daemon_managers[project_name].check_status(
+                                raise_on_shutdown=False
+                            )
+                            if current_status == target_status:
+                                pending.remove(project_name)
+                        except Exception:
+                            logger.warning(
+                                f"Error while checking runner for project {project_name}",
+                                exc_info=True,
+                            )
+                    if max_wait and time.time() - t0 > max_wait:
+                        break
+                    time.sleep(2)
+
+                if pending:
+                    exit_with_error_msg(
+                        f"Not all the runners finished {action_name} within the allocated time. "
+                        f"Not {done_label.lower()}: {pending}. "
+                        f"{done_label}: {set(done_projects).difference(pending)}"
+                    )
+
+        if json_out:
+            dumpfn(done_projects, json_out, fmt="json")
+
+        if not done_projects:
+            exit_with_warning_msg("No active runner found for any (parsable) project")
+
+        msg = Text.from_markup(
+            f"The runners for the following projects have been {done_label.lower()}:\n"
+            + "\n".join(f"- {pn}" for pn in done_projects)
+        )
+        out_console.print(msg)
+
+    else:
+        dm = DaemonManager.from_project(cm.get_project())
+        action_result = None
+        with loading_spinner(processing=False) as progress:
+            progress.add_task(
+                description=f"{action_name.capitalize()} the runner...", total=None
+            )
+            try:
+                action_result = getattr(dm, dm_method_name)(
+                    raise_on_error=True, wait=wait
+                )
+            except RunningDaemonError as e:
+                exit_with_error_msg(
+                    f"Error while {action_name} the runner:\n{getattr(e, 'message', e)}{_running_daemon_error_msg}"
+                )
+            except DaemonError as e:
+                exit_with_error_msg(
+                    f"Error while {action_name} the runner: {getattr(e, 'message', e)}"
+                )
+
+        if action_result and not wait:
+            from jobflow_remote import SETTINGS
+
+            if SETTINGS.cli_suggestions:
+                msg = (
+                    f"The {dm_method_name} signal has been sent to the Runner. "
+                    f"Run 'jf runner status' to verify if it {done_label.lower()}"
+                )
+                out_console.print(msg, style="yellow")
 
 
 @app_runner.command()
@@ -223,34 +368,63 @@ def stop_processes(
             ),
         ),
     ] = False,
+    all_projects: Annotated[
+        bool,
+        typer.Option(
+            "--all",
+            "-a",
+            help=("Stop the runner for all the projects"),
+        ),
+    ] = False,
+    json_out: Annotated[
+        str | None,
+        typer.Option(
+            "--json",
+            "-j",
+            help=(
+                "if --all dump the list of stopped runners in json format to a file at this path"
+            ),
+        ),
+    ] = None,
+    max_wait: Annotated[
+        int,
+        typer.Option(
+            "--max-wait",
+            "-m",
+            help=(
+                "Maximum time in seconds to wait for the runner to stop when --wait is set. "
+                "0 means wait indefinitely."
+            ),
+        ),
+    ] = 120,
 ) -> None:
     """
     Send a stop signal to the Runner processes.
     Each of the Runner processes will stop when finished the task being executed.
     By default, return immediately.
     """
-    cm = get_config_manager()
-    dm = DaemonManager.from_project(cm.get_project())
-    stop_sent = False
-    with loading_spinner(processing=False) as progress:
-        progress.add_task(description="Stopping the daemon...", total=None)
-        try:
-            stop_sent = dm.stop(wait=wait, raise_on_error=True)
-        except RunningDaemonError as e:
-            exit_with_error_msg(
-                f"Error while stopping the daemon:\n{getattr(e, 'message', e)}{_running_daemon_error_msg}"
-            )
-        except DaemonError as e:
-            exit_with_error_msg(
-                f"Error while stopping the daemon: {getattr(e, 'message', e)}"
-            )
-    from jobflow_remote import SETTINGS
-
-    if stop_sent and not wait and SETTINGS.cli_suggestions:
-        out_console.print(
-            "The stop signal has been sent to the Runner. Run 'jf runner status' to verify if it stopped",
-            style="yellow",
-        )
+    _stop_runners(
+        wait=wait,
+        all_projects=all_projects,
+        json_out=json_out,
+        max_wait=max_wait,
+        dm_method_name="stop",
+        skip_action_statuses=(
+            DaemonStatus.SHUT_DOWN,
+            DaemonStatus.SHUTTING_DOWN,
+            DaemonStatus.STOPPING,
+            DaemonStatus.STOPPED,
+        ),
+        completed_statuses=(
+            DaemonStatus.SHUT_DOWN,
+            DaemonStatus.SHUTTING_DOWN,
+            DaemonStatus.STOPPING,
+            DaemonStatus.STOPPED,
+        ),
+        target_status=DaemonStatus.STOPPED,
+        action_name="stopping",
+        done_label="Stopped",
+    )
 
 
 @app_runner.command()
@@ -261,38 +435,103 @@ def stop(
             "--wait",
             "-w",
             help=(
-                "Wait until the daemon has stopped. NOTE: this may take a while if a large file is being transferred!"
+                "Wait until the daemon has shut down. NOTE: this may take a while if a large file is being transferred!"
             ),
         ),
     ] = False,
+    all_projects: Annotated[
+        bool,
+        typer.Option(
+            "--all",
+            "-a",
+            help=("Shutdown the runner for all the projects"),
+        ),
+    ] = False,
+    json_out: Annotated[
+        str | None,
+        typer.Option(
+            "--json",
+            "-j",
+            help=(
+                "if --all dump the list of shutdown runners in json format to a file at this path"
+            ),
+        ),
+    ] = None,
+    max_wait: Annotated[
+        int,
+        typer.Option(
+            "--max-wait",
+            "-m",
+            help=(
+                "Maximum time in seconds to wait for the runner to shut down when --wait is set. "
+                "0 means wait indefinitely."
+            ),
+        ),
+    ] = 120,
 ) -> None:
     """
     Shuts down the supervisord process.
     Note that the supervisord process will stop after all the runner processes have finished.
     """
-    shutdown(wait=wait)
+    shutdown(wait=wait, all_projects=all_projects, json_out=json_out, max_wait=max_wait)
 
 
 @app_runner.command()
-def kill() -> None:
+def kill(
+    wait: Annotated[
+        bool,
+        typer.Option(
+            "--wait",
+            "-w",
+            help=("Wait until the runner processes have been killed."),
+        ),
+    ] = False,
+    all_projects: Annotated[
+        bool,
+        typer.Option(
+            "--all",
+            "-a",
+            help=("Kill the runner for all the projects"),
+        ),
+    ] = False,
+    json_out: Annotated[
+        str | None,
+        typer.Option(
+            "--json",
+            "-j",
+            help=(
+                "if --all dump the list of killed runners in json format to a file at this path"
+            ),
+        ),
+    ] = None,
+    max_wait: Annotated[
+        int,
+        typer.Option(
+            "--max-wait",
+            "-m",
+            help=(
+                "Maximum time in seconds to wait for the runner to be killed when --wait is set. "
+                "0 means wait indefinitely."
+            ),
+        ),
+    ] = 120,
+) -> None:
     """
     Send a kill signal to the Runner processes.
-    Return immediately, does not wait for processes to be killed.
+    By default, return immediately and do not wait for processes to be killed.
     """
-    cm = get_config_manager()
-    dm = DaemonManager.from_project(cm.get_project())
-    with loading_spinner(processing=False) as progress:
-        progress.add_task(description="Killing the daemon...", total=None)
-        try:
-            dm.kill(raise_on_error=True)
-        except RunningDaemonError as e:
-            exit_with_error_msg(
-                f"Error while killing the daemon:\n{getattr(e, 'message', e)}{_running_daemon_error_msg}"
-            )
-        except DaemonError as e:
-            exit_with_error_msg(
-                f"Error while killing the daemon: {getattr(e, 'message', e)}"
-            )
+    _stop_runners(
+        wait=wait,
+        all_projects=all_projects,
+        json_out=json_out,
+        max_wait=max_wait,
+        dm_method_name="kill",
+        skip_action_statuses=(DaemonStatus.SHUT_DOWN, DaemonStatus.STOPPED),
+        completed_statuses=(DaemonStatus.SHUT_DOWN, DaemonStatus.STOPPED),
+        target_status=DaemonStatus.STOPPED,
+        action_name="killing",
+        done_label="Killed",
+    )
 
 
 @app_runner.command()
@@ -307,25 +546,55 @@ def shutdown(
             ),
         ),
     ] = False,
+    all_projects: Annotated[
+        bool,
+        typer.Option(
+            "--all",
+            "-a",
+            help=("Shutdown the runner for all the projects"),
+        ),
+    ] = False,
+    json_out: Annotated[
+        str | None,
+        typer.Option(
+            "--json",
+            "-j",
+            help=(
+                "if --all dump the list of shutdown runners in json format to a file at this path"
+            ),
+        ),
+    ] = None,
+    max_wait: Annotated[
+        int,
+        typer.Option(
+            "--max-wait",
+            "-m",
+            help=(
+                "Maximum time in seconds to wait for the runner to shut down when --wait is set. "
+                "0 means wait indefinitely."
+            ),
+        ),
+    ] = 120,
 ) -> None:
     """
     Shuts down the supervisord process.
     Note that the supervisord process will stop after all the runner processes have finished
     """
-    cm = get_config_manager()
-    dm = DaemonManager.from_project(cm.get_project())
-    with loading_spinner(processing=False) as progress:
-        progress.add_task(description="Shutting down supervisor...", total=None)
-        try:
-            dm.shut_down(raise_on_error=True, wait=wait)
-        except RunningDaemonError as e:
-            exit_with_error_msg(
-                f"Error while shutting down supervisor:\n{getattr(e, 'message', e)}{_running_daemon_error_msg}"
-            )
-        except DaemonError as e:
-            exit_with_error_msg(
-                f"Error while shutting down supervisor: {getattr(e, 'message', e)}"
-            )
+    _stop_runners(
+        wait=wait,
+        all_projects=all_projects,
+        json_out=json_out,
+        max_wait=max_wait,
+        dm_method_name="shut_down",
+        skip_action_statuses=(
+            DaemonStatus.SHUT_DOWN,
+            DaemonStatus.SHUTTING_DOWN,
+        ),
+        completed_statuses=(DaemonStatus.SHUT_DOWN,),
+        target_status=DaemonStatus.SHUT_DOWN,
+        action_name="shutting down",
+        done_label="Shut-down",
+    )
 
 
 @app_runner.command()
