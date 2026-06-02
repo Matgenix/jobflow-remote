@@ -30,10 +30,10 @@ from jobflow_remote.jobs.daemon import DaemonError, DaemonManager, DaemonStatus
 # Handle all the possible cases for broder compatibility with typer
 # older versions. Remove if the minimum typer version is increased.
 try:
-    from click import ClickException
+    from typer._click import ClickException
 except ImportError:
     try:
-        from typer._click import ClickException
+        from click import ClickException
     except ImportError:
 
         class ClickException(Exception):  # type: ignore[no-redef] # noqa: N818

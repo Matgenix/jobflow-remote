@@ -1,7 +1,6 @@
 from datetime import datetime
 from typing import Annotated
 
-import click
 import typer
 
 from jobflow_remote.cli.formatting import header_name_data_getter_map
@@ -14,6 +13,13 @@ from jobflow_remote.cli.utils import (
 )
 from jobflow_remote.config.base import LogLevel
 from jobflow_remote.jobs.state import BatchState, FlowState, JobState
+
+# since 0.26.0 typer dropped click and has its own ParamType
+# keep for backward compatibility
+try:
+    from typer.params import ParamType
+except ImportError:
+    from click import ParamType
 
 
 def deprecated_option(old_name: str, new_name: str):
@@ -482,7 +488,7 @@ OptionalStr = str | None
 OptionalDictType = DictType | None
 
 
-class DictTypeParser(click.ParamType):
+class DictTypeParser(ParamType):
     name = "DictType"
 
     def convert(self, value, param, ctx):
