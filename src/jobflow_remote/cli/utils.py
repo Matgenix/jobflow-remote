@@ -13,7 +13,6 @@ from enum import Enum
 from typing import TYPE_CHECKING, Any, NoReturn
 
 import typer
-from click import ClickException
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.prompt import Confirm
@@ -24,6 +23,22 @@ from typer.core import TyperCommand, TyperGroup
 from jobflow_remote import ConfigManager, JobController
 from jobflow_remote.config.base import ProjectParsingError, ProjectUndefinedError
 from jobflow_remote.jobs.daemon import DaemonError, DaemonManager, DaemonStatus
+
+# From version 0.26.0 typer does not rely on click anymore.
+# As of 0.26.5 ClickException has been moved to an internal module
+# that will probably be removed in the future.
+# Handle all the possible cases for broder compatibility with typer
+# older versions. Remove if the minimum typer version is increased.
+try:
+    from typer._click import ClickException
+except ImportError:
+    try:
+        from click import ClickException
+    except ImportError:
+
+        class ClickException(Exception):  # type: ignore[no-redef] # noqa: N818
+            pass
+
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping

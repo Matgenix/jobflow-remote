@@ -781,7 +781,22 @@ class DaemonManager:
 
         return None
 
-    def kill(self, raise_on_error: bool = False) -> bool:
+    def kill(self, raise_on_error: bool = False, wait: bool = False) -> bool:
+        """
+        Kill the processes daemon.
+
+        Parameters
+        ----------
+        wait
+            If True wait until the processes have been killed.
+        raise_on_error
+            Raise an exception if the processes cannot be killed.
+
+        Returns
+        -------
+        bool
+            True if the processes were killed successfully, False otherwise.
+        """
         with self.lock_runner_doc() as lock:
             doc_error = self._check_running_runner(
                 lock.locked_document, raise_on_error=raise_on_error
@@ -822,6 +837,21 @@ class DaemonManager:
 
                 if error is None:
                     lock.update_on_release = {"$set": {"running_runner": None}}
+                    if wait:
+                        while True:
+                            time.sleep(1)
+                            try:
+                                current_status = self.check_status(
+                                    raise_on_shutdown=False
+                                )
+                            except Exception as exc:
+                                if raise_on_error:
+                                    raise DaemonError(
+                                        "Error while waiting for the daemon to be killed"
+                                    ) from exc
+                                return False
+                            if current_status == DaemonStatus.STOPPED:
+                                break
                 return error is None
 
         raise DaemonError(f"Daemon status {status} could not be handled")
