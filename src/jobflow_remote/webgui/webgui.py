@@ -746,7 +746,9 @@ def get_info_job_flow(jf_id: str, what: str, proj_name: str):
 
 @rt("/{proj_name}/flows/graph/{jf_id}")
 def get_graph_job_flow(jf_id: str, proj_name: str):
-    flowinfo = job_controller.get_flows_info(limit=1, with_jobs_info=True)[0]
+    flowinfo = job_controller.get_flows_info(
+        flow_ids=[jf_id], limit=1, with_jobs_info=True
+    )[0]
     graph = get_mermaid(flowinfo)
     m_script = f"""
 (async function() {{
