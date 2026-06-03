@@ -1,7 +1,6 @@
 from datetime import datetime
 from typing import Annotated
 
-import click
 import typer
 
 from jobflow_remote.cli.formatting import header_name_data_getter_map
@@ -471,27 +470,12 @@ cli_output_keys_opt = Annotated[
 ]
 
 
-# as of typer version 0.9.0 the dict is not a supported type. Define a custom one
-class DictType(dict):
-    pass
-
-
-# Python 3.10+ union types are fully supported now
-# These type aliases are kept for backward compatibility with typer's click integration
-OptionalStr = str | None
-OptionalDictType = DictType | None
-
-
-class DictTypeParser(click.ParamType):
-    name = "DictType"
-
-    def convert(self, value, param, ctx):
-        value = str_to_dict(value)
-        return DictType(value)
+def dict_type_parser(value: str) -> dict | None:
+    return str_to_dict(value)
 
 
 query_opt = Annotated[
-    OptionalDictType,
+    dict | None,
     typer.Option(
         "--query",
         "-q",
@@ -501,13 +485,13 @@ query_opt = Annotated[
         "Can be either a list of comma separated key=value pairs or a string with the JSON"
         " representation of a dictionary containing the mongoDB query that "
         'should be performed (e.g \'{"key1.key2": 1, "key3": "test"}\')',
-        click_type=DictTypeParser(),
+        parser=dict_type_parser,
     ),
 ]
 
 
 metadata_opt = Annotated[
-    OptionalDictType,
+    dict | None,
     typer.Option(
         "--metadata",
         "-meta",
@@ -515,6 +499,6 @@ metadata_opt = Annotated[
         " a list of comma separated key=value pairs or a string with the JSON"
         " representation of a dictionary containing the mongoDB query for "
         'the metadata subdocument (e.g \'{"key1.key2": 1, "key3": "test"}\')',
-        click_type=DictTypeParser(),
+        parser=dict_type_parser,
     ),
 ]
