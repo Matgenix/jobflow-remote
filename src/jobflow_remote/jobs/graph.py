@@ -186,6 +186,13 @@ def get_mermaid(flow: FlowInfo, show_subflows: bool = True):
     nodes, edges, hosts, replace_edges = get_graph_elements(flow)
     from monty.collections import tree
 
+    def sanitize_name(name: str) -> str:
+        """
+        Helper function to sanitize a node name in mermaid.
+        """
+        name = name.replace('"', "#34;")
+        return f'"{name}"'
+
     hosts_hierarchy = tree()
     for db_id, job_hosts in hosts.items():
         d = hosts_hierarchy
@@ -205,14 +212,12 @@ def get_mermaid(flow: FlowInfo, show_subflows: bool = True):
     for parent_db_id, child_db_id in edges:
         parent = nodes[parent_db_id]
         child = nodes[child_db_id]
-        line = (
-            f"    {parent_db_id}({parent['name']}) --> {child_db_id}({child['name']})"
-        )
+        line = f"    {parent_db_id}({sanitize_name(parent['name'])}) --> {child_db_id}({sanitize_name(child['name'])})"
         lines.append(line)
 
     # add replace edges
     for parent_db_id, child_id in replace_edges:
-        line = f"    {parent_db_id}({nodes[parent_db_id]['name']}) -.-> {child_id}"
+        line = f"    {parent_db_id}({sanitize_name(nodes[parent_db_id]['name'])}) -.-> {child_id}"
         lines.append(line)
 
     subgraph_styles = []
