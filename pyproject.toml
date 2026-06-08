@@ -58,7 +58,8 @@ docs = [
     "json-schema-for-humans",
 ]
 gui = [
-    "python-fasthtml>=0.12.0"
+    "python-fasthtml>=0.12.0",
+    "bokeh>=3.5",
 ]
 
 [project.scripts]

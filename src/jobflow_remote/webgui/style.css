@@ -128,6 +128,104 @@ th {
     }
 }
 
+.bokeh-chart {
+    margin: 10px 0;
+    width: 100%;
+}
+
+.progress-headline {
+    margin: 10px 0;
+}
+
+.progress-num {
+    font-weight: bold;
+    font-size: 1.1em;
+}
+
+.progress-pct {
+    color: #666;
+}
+
+.progress-track {
+    background: #e0e0e0;
+    border-radius: 6px;
+    height: 18px;
+    width: 100%;
+    overflow: hidden;
+    margin-top: 4px;
+}
+
+.progress-fill {
+    background: var(--secondary-color);
+    height: 100%;
+    border-radius: 6px;
+}
+
+.dashboard-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.health-strip {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+    background: white;
+    border-radius: 5px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    padding: 10px 16px;
+    margin: 12px 0;
+}
+
+.health-badge {
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-weight: bold;
+    color: white;
+}
+
+.kpi-row {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin: 12px 0;
+}
+
+.kpi-card {
+    flex: 1;
+    min-width: 120px;
+    background: white;
+    border-radius: 5px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    padding: 12px;
+    text-align: center;
+}
+
+.kpi-value {
+    font-size: 1.6em;
+    font-weight: bold;
+    color: var(--primary-color);
+}
+
+.kpi-label {
+    font-size: 0.85em;
+    color: #666;
+}
+
+.dashboard-two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+
+@media (max-width: 768px) {
+    .dashboard-two-col {
+        grid-template-columns: 1fr;
+    }
+}
+
 .job-details-content {
     padding: 30px;
     background-color: #f9f9f9;
