@@ -225,6 +225,13 @@ table tr:nth-child(even) { background-color: #f7f9fa; }
 .job-row { cursor: pointer; }
 .job-row:hover { background-color: #eef3f6; }
 
+/* Id shown as link-styled text; the click is handled by the whole row. */
+.row-id { color: var(--brand-blue); font-weight: 600; }
+
+/* Protected action column: a comfortable click target that does not open the
+   details popup (the cell stops click propagation). */
+.action-cell { text-align: right; cursor: default; }
+
 /* =========================================================================
    Pagination
    ========================================================================= */
@@ -399,6 +406,77 @@ input, select {
 .detail-key { font-weight: 600; color: var(--text); }
 .detail-val { margin-left: 10px; color: var(--text-muted); word-break: break-word; }
 
+/* Job/flow details: scalar fields in a compact two-column table, with the
+   key column kept narrow and the value column allowed to wrap. */
+.detail-table { width: 100%; margin-bottom: var(--space-3); }
+.detail-table td { vertical-align: top; }
+.detail-table td.detail-key {
+    width: 1%;
+    white-space: nowrap;
+    padding-right: var(--space-4);
+}
+
+/* Nested dict/list fields rendered as collapsible, pretty-printed JSON. */
+.detail-json {
+    margin: var(--space-1) 0 var(--space-3) 0;
+    padding: var(--space-3);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.82rem;
+    line-height: 1.4;
+    white-space: pre;
+    overflow-x: auto;
+}
+
+details > summary.detail-key { cursor: pointer; padding: var(--space-1) 0; }
+
+/* Detail header: name as the prominent title, with a muted type/id/state line. */
+.detail-header { margin-bottom: var(--space-3); }
+.detail-title { margin: 0 0 var(--space-1) 0; }
+.detail-subtitle {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    flex-wrap: wrap;
+}
+.detail-type {
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    font-size: 0.78rem;
+    letter-spacing: 0.04em;
+}
+.detail-id {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
+/* Remote error callout: highlight the failure reason at the top of the details. */
+.error-callout {
+    border-left: 4px solid var(--danger);
+    background: #fdecea;
+    border-radius: var(--radius-sm);
+    padding: var(--space-2) var(--space-3);
+    margin-bottom: var(--space-3);
+}
+.error-callout h4 { color: var(--danger-dark); margin-bottom: var(--space-2); }
+
+/* Details body: scrolls inside the modal popup (so the dialog never exceeds the
+   viewport), but flows naturally with the page on the standalone detail page. */
+.dialog .detail-body { max-height: 70vh; overflow-y: auto; }
+
+/* On the standalone detail page the card is a direct child of #prj-container
+   (popups live in #dialog-container instead). Flatten the modal card chrome so
+   the content uses the whole page rather than a floating, inset box. */
+#prj-container > .tabbed-card .card-dialog {
+    box-shadow: none;
+    padding: 0;
+    min-width: 0;
+}
+
 /* =========================================================================
    Dialog
    ========================================================================= */
@@ -412,13 +490,30 @@ dialog {
     z-index: 1000;
     border: none;
     border-radius: var(--radius);
-    max-width: 1200px;
+    max-width: 95vw;
     min-width: 200px;
     padding: 0;
     display: flex;
     flex-direction: column;
     align-items: center;
 }
+
+/* Flow-graph viewport: a large box that svg-pan-zoom fills and controls.
+   In the modal popup it claims most of the screen; on the standalone detail
+   page it just fills its container. */
+.graph-card { width: 100%; }
+.dialog .graph-card { width: 90vw; }
+
+.graph-viewport {
+    width: 100%;
+    height: 80vh;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    background: var(--surface);
+}
+
+.graph-viewport svg { display: block; }
 
 .scrollable-area {
     height: 300px;
