@@ -21,36 +21,15 @@ from bokeh.models import ColumnDataSource
 from bokeh.plotting import figure
 from fasthtml.common import Div, Script
 
+# The state-color palette lives in a Bokeh-free module so it can be shared with
+# the plain-HTML state badges in ``webgui`` (which must work without Bokeh).
+from jobflow_remote.webgui.palette import _DEFAULT_COLOR, STATE_COLORS
+
 if TYPE_CHECKING:
     from fastcore.xml import FT
 
     from jobflow_remote.jobs.report import FlowTrends, JobTrends
     from jobflow_remote.jobs.state import FlowState, JobState
-
-# Color associated with each state, keyed by the state *name* so that the same
-# map can be shared by both ``JobState`` and ``FlowState`` (their members
-# overlap by name). Greens are terminal-success, reds/oranges are error states,
-# warm tones are "active", and greys are idle/inactive.
-STATE_COLORS: dict[str, str] = {
-    "WAITING": "#95a5a6",
-    "READY": "#5dade2",
-    "CHECKED_OUT": "#48c9b0",
-    "UPLOADED": "#45b39d",
-    "SUBMITTED": "#5499c7",
-    "RUNNING": "#f39c12",
-    "RUN_FINISHED": "#16a085",
-    "DOWNLOADED": "#1abc9c",
-    "REMOTE_ERROR": "#e67e22",
-    "COMPLETED": "#2ecc71",
-    "FAILED": "#e74c3c",
-    "PAUSED": "#9b59b6",
-    "STOPPED": "#7f8c8d",
-    "USER_STOPPED": "#34495e",
-    "BATCH_SUBMITTED": "#85c1e9",
-    "BATCH_RUNNING": "#f8c471",
-}
-
-_DEFAULT_COLOR = "#bdc3c7"
 
 # Operational categories grouping the raw states. ``COMPLETED`` is deliberately
 # excluded: it is reported separately as a headline metric so that the
