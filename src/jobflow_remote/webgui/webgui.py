@@ -1,12 +1,19 @@
 from __future__ import annotations
 
+import json
 from collections import Counter
-from datetime import datetime, timezone
+from datetime import datetime, timezone, tzinfo
+from enum import Enum
 from math import ceil
 from pathlib import Path
+from typing import Any, cast
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from monty.dev import requires
+
+# ``Request`` is used as a runtime annotation: FastHTML resolves the annotation
+# to inject the request object, so it must stay a real (non-TYPE_CHECKING) import.
+from starlette.requests import Request  # noqa: TCH002
 
 try:
     import fasthtml
@@ -30,6 +37,7 @@ try:
         Main,
         Option,
         P,
+        Pre,
         Script,
         Select,
         Span,
@@ -127,6 +135,11 @@ app, rt = fast_app(
     hdrs=(
         Link(rel="stylesheet", href="/style.css", type="text/css"),
         Script(mermaid_js, type="module"),
+        # svg-pan-zoom powers the wheel-zoom / drag-pan on the rendered flow
+        # graph SVG (the same approach used by mermaid.live).
+        Script(
+            src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js"
+        ),
         *bokeh_headers,
         Favicon("/jfr_favicon.ico", "/jfr_favicon.ico"),
     ),  # Add custom CSS as a header
@@ -222,8 +235,11 @@ def update_report(
 ) -> JobsReport | FlowsReport:
     """Regenerate and cache the report for the given project and type."""
     jc = get_job_controller(proj_name)
-    report_cls = FlowsReport if what == "flows" else JobsReport
-    report = report_cls.generate_report(jc, interval=interval, num_intervals=ni)
+    report: JobsReport | FlowsReport
+    if what == "flows":
+        report = FlowsReport.generate_report(jc, interval=interval, num_intervals=ni)
+    else:
+        report = JobsReport.generate_report(jc, interval=interval, num_intervals=ni)
     reports[(proj_name, what)] = report
     return report
 
@@ -411,7 +427,7 @@ def dashboard_attention_list(proj_name: str):
     """Build the table of jobs that need attention (failed / remote-error / paused)."""
     job_controller = get_job_controller(proj_name)
     jobs = job_controller.get_jobs_info(
-        states=ATTENTION_STATES, sort=[["updated_on", -1]], limit=20
+        states=ATTENTION_STATES, sort=[("updated_on", -1)], limit=20
     )
     if not jobs:
         return Div(
@@ -500,7 +516,7 @@ def get_dashboard_trends(proj_name: str, interval: str = "days", ni: int = 7):
         or report.trends.num_intervals != ni
     ):
         report = update_report(proj_name, "jobs", interval, ni)
-    return dashboard_trends_chart(report)
+    return dashboard_trends_chart(cast("JobsReport", report))
 
 
 def build_dashboard(proj_name: str):
@@ -511,8 +527,13 @@ def build_dashboard(proj_name: str):
     otherwise, so the dashboard is cheap to re-render but refreshes its data only
     when explicitly asked to (the "Refresh" button regenerates the reports).
     """
-    jobs_report = get_report(proj_name, "jobs") or update_report(proj_name, "jobs")
-    flows_report = get_report(proj_name, "flows") or update_report(proj_name, "flows")
+    jobs_report = cast(
+        "JobsReport", get_report(proj_name, "jobs") or update_report(proj_name, "jobs")
+    )
+    flows_report = cast(
+        "FlowsReport",
+        get_report(proj_name, "flows") or update_report(proj_name, "flows"),
+    )
 
     return Div(
         Div(
@@ -652,20 +673,34 @@ def ScrollableArea(*content, height: str = "300px"):
 
 @rt("/")
 def get_home():
+    projects = cm.projects
+    if projects:
+        projects_view = Div(
+            P("Select a project to view its dashboard and query its jobs and flows."),
+            Table(
+                Tr(Th("Project"), Th("Workers")),
+                *[
+                    Tr(
+                        Td(Span(name, cls="row-id")),
+                        Td(str(len(project.workers))),
+                        hx_get=f"/projects?proj_name={name}",
+                        hx_target="body",
+                        hx_push_url="true",
+                        cls="job-row",
+                    )
+                    for name, project in projects.items()
+                ],
+                cls="card",
+            ),
+        )
+    else:
+        projects_view = P("No projects are currently configured.", cls="muted")
+
     return PAGE_TITLE, Main(
         projectbar(),
         Div(
             H3("Jobflow Remote manager"),
-            P(
-                "Select a project from the navigation bar above to view its "
-                "dashboard and query its jobs and flows."
-            ),
-            P(
-                f"Available projects: {', '.join(list_projects)}."
-                if list_projects
-                else "No projects are currently configured.",
-                cls="muted",
-            ),
+            projects_view,
             cls="container",
             id="prj-container",
         ),
@@ -741,15 +776,20 @@ def run_action(proj_name: str, action: str, what: str, kwargs: dict):
     else:
         response = actions[what][action](db_ids=selected)
 
+    # A single "Close" button both dismisses the dialog and refreshes the list:
+    # re-posting the query rebuilds ``#query-results`` (which contains the
+    # dialog), so the updated states show up and the dialog disappears in one
+    # step. The current filters are taken from the still-present search form.
     return Dialog(
         Div(
-            H3(f"Action Selected: {action}"),
-            P(f"Applied on {response} {what}"),
-            P(f"{delete_options}"),
+            H3(f"{action} applied"),
+            P(f"Applied {action} to {response} {what}."),
             Button(
-                "Cancel",
-                hx_get="/test/close_dialog",
-                hx_target="#dialog-container",
+                "Close",
+                hx_post=f"/{proj_name}/{what}/query",
+                hx_include="#search-form",
+                hx_target="#query-results",
+                hx_swap="innerHTML",
                 style="font-weight: bold",
             ),
             cls="card-dialog",
@@ -999,11 +1039,12 @@ def sum_report(proj_name: str, what: str):
     ]
     # The following metrics are only available in the jobs report.
     if what == "jobs":
+        jobs_data = cast("JobsReport", report_data)
         rows.extend(
             [
-                Tr(Td(f"Sum of all active {what}:"), Td(f"{report_data.active}")),
-                Tr(Td("Longest running:"), Td(f"{report_data.longest_running}")),
-                Tr(Td("Worker utilization:"), Td(f"{report_data.worker_utilization}")),
+                Tr(Td(f"Sum of all active {what}:"), Td(f"{jobs_data.active}")),
+                Tr(Td("Longest running:"), Td(f"{jobs_data.longest_running}")),
+                Tr(Td("Worker utilization:"), Td(f"{jobs_data.worker_utilization}")),
             ]
         )
 
@@ -1051,7 +1092,7 @@ def trends(proj_name: str, what: str, interval: str = "days", ni: int = 7):
                     report_data.trends.dates,
                     report_data.trends.completed,
                     report_data.trends.failed,
-                    report_data.trends.remote_error,
+                    cast("JobsReport", report_data).trends.remote_error,
                     strict=True,
                 )
             ],
@@ -1138,28 +1179,135 @@ def state_distro(proj_name: str, what: str):
 @rt("/{proj_name}/{what}/info/{jf_id}")
 def get_info_job_flow(jf_id: str, what: str, proj_name: str):
     info = None
+    flow_obj = None
     job_controller = get_job_controller(proj_name)
 
     if what == "jobs":
         job_info = job_controller.get_job_info(db_id=jf_id)
         info = job_info.model_dump() if job_info else None
     elif what == "flows":
-        flow_info = job_controller.get_flows_info(flow_ids=[jf_id], limit=1)
-        info = flow_info[0].model_dump() if flow_info else None
+        # ``with_jobs_info`` runs a per-flow aggregation joining the flow with
+        # its jobs so the per-job fields (states/names/workers) are populated.
+        # This is a single-flow lookup (the same one the graph tab already
+        # does), so it is cheap; it is deliberately *not* used in the flows
+        # list, where it would join every flow's jobs.
+        flow_info = job_controller.get_flows_info(
+            flow_ids=[jf_id], limit=1, with_jobs_info=True
+        )
+        flow_obj = flow_info[0] if flow_info else None
+        info = flow_obj.model_dump() if flow_obj else None
 
     label = "Flow" if what == "flows" else "Job"
     if info:
-        return Div(
-            H3(f"{label} {jf_id} details"),
-            H3(f"{label} name: {info.pop('name')}"),
-            ScrollableArea(
-                *[
-                    Ul(
-                        Li(f"{k}:", cls="detail-key"),
-                        Li(f"{v}", cls="detail-val"),
+        name = info.pop("name", "")
+        state_val = info.pop("state", None)
+
+        # Surface a remote error (the reason a job is in REMOTE_ERROR) as a
+        # prominent callout at the top. Jobs-only: flows carry no ``remote``.
+        callout_blocks = []
+        remote = info.get("remote")
+        if isinstance(remote, dict) and remote.get("error"):
+            callout_blocks.append(
+                Div(
+                    H4("Remote error"),
+                    Pre(str(remote["error"]), cls="detail-json"),
+                    cls="error-callout",
+                )
+            )
+
+        # For flows, render the per-job data as a dedicated table and drop the
+        # redundant parallel lists / nested jobs dump from the field rendering.
+        extra_blocks = []
+        if what == "flows" and flow_obj is not None:
+            for redundant in (
+                "db_ids",
+                "job_ids",
+                "job_indexes",
+                "workers",
+                "job_states",
+                "job_names",
+                "parents",
+                "hosts",
+                "jobs_info",
+            ):
+                info.pop(redundant, None)
+            job_rows = [
+                Tr(
+                    Td(
+                        A(
+                            db_id,
+                            hx_get=f"/{proj_name}/jobs/dialog/{db_id}",
+                            hx_target="#dialog-container",
+                            hx_swap="innerHTML",
+                        )
+                    ),
+                    Td(jname),
+                    Td(state_badge(jstate)),
+                    Td(worker or "-"),
+                )
+                for db_id, jname, jstate, worker in zip(
+                    flow_obj.db_ids,
+                    flow_obj.job_names,
+                    flow_obj.job_states,
+                    flow_obj.workers,
+                    strict=False,
+                )
+            ]
+            extra_blocks.append(
+                Div(
+                    H4(f"Jobs ({len(flow_obj.db_ids)})"),
+                    Table(
+                        Tr(Th("DB id"), Th("Name"), Th("State"), Th("Worker")),
+                        *job_rows,
+                    ),
+                )
+            )
+
+        # Split fields into simple scalars (shown as a compact two-column table)
+        # and nested structures (shown as collapsible, pretty-printed JSON).
+        simple_rows = []
+        complex_blocks = []
+        open_by_default = {"metadata", "flow_metadata"}
+        for k, v in info.items():
+            if isinstance(v, dict | list) and v:
+                json_text = json.dumps(v, indent=2, default=str)
+                complex_blocks.append(
+                    Details(
+                        Summary(k, cls="detail-key"),
+                        Pre(json_text, cls="detail-json"),
+                        open=k in open_by_default,
                     )
-                    for k, v in info.items()
-                ]
+                )
+                continue
+            if isinstance(v, datetime):
+                cell = v.strftime("%Y-%m-%d %H:%M:%S")
+            elif isinstance(v, Enum):
+                cell = v.name
+            elif v is None or v == [] or v == {}:
+                cell = "-"
+            else:
+                cell = str(v)
+            simple_rows.append(Tr(Td(f"{k}", cls="detail-key"), Td(cell)))
+
+        return Div(
+            Div(
+                H3(name or "(unnamed)", cls="detail-title"),
+                Div(
+                    Span(label, cls="detail-type"),
+                    Span(jf_id, cls="detail-id"),
+                    state_badge(state_val)
+                    if isinstance(state_val, JobState | FlowState)
+                    else None,
+                    cls="detail-subtitle",
+                ),
+                cls="detail-header",
+            ),
+            Div(
+                *callout_blocks,
+                Table(*simple_rows, cls="detail-table"),
+                *extra_blocks,
+                *complex_blocks,
+                cls="detail-body",
             ),
             cls="card-dialog active",
         )
@@ -1174,22 +1322,90 @@ def get_graph_job_flow(jf_id: str, proj_name: str):
         flow_ids=[jf_id], limit=1, with_jobs_info=True
     )[0]
     graph = get_mermaid(flowinfo)
+    # Render the mermaid SVG into a large viewport, then attach svg-pan-zoom so
+    # the graph can be zoomed (wheel) and panned (drag) like on mermaid.live.
+    # The render call retries until both mermaid and svg-pan-zoom are loaded
+    # from their CDNs (they may not be ready when this fragment is swapped in).
     m_script = f"""
-(async function() {{
-    const container = document.getElementById('flow-graph');
-    const {{ svg }} = await window.mermaid.render('graphDiv', `{graph}`);
-    container.innerHTML = svg;
+(function() {{
+    async function render() {{
+        if (!window.mermaid || !window.svgPanZoom) {{
+            setTimeout(render, 50);
+            return;
+        }}
+        const container = document.getElementById('flow-graph');
+        const {{ svg }} = await window.mermaid.render('graphDiv', `{graph}`);
+        container.innerHTML = svg;
+        const svgEl = container.querySelector('svg');
+        svgEl.style.maxWidth = 'none';
+        svgEl.style.width = '100%';
+        svgEl.style.height = '100%';
+        window.svgPanZoom(svgEl, {{
+            zoomEnabled: true,
+            controlIcons: true,
+            fit: true,
+            center: true,
+            minZoom: 0.1,
+            maxZoom: 20,
+            // Bigger step per wheel tick: the default (0.2) makes wheel
+            // zooming feel sluggish on large graphs.
+            zoomScaleSensitivity: 0.5,
+        }});
+    }}
+    render();
 }})();
 """
     return Div(
-        ScrollableArea(Div(id="flow-graph"), Script(m_script)), cls="card-dialog"
+        Div(id="flow-graph", cls="graph-viewport"),
+        Script(m_script),
+        cls="card-dialog graph-card",
     )
 
 
-@rt("/{proj_name}/{what}/dialog/{jf_id}")
-def get_info_graph_dialog(jf_id: str, what: str, proj_name: str):
-    return Dialog(
-        Card(
+def detail_card(jf_id: str, what: str, proj_name: str, *, as_page: bool = False):
+    """
+    Build the tabbed details/graph card for a job or flow.
+
+    The same card is used both inside the modal popup (``as_page=False``) and on
+    the standalone, URL-addressable detail page (``as_page=True``); only the
+    header navigation control differs.
+
+    Parameters
+    ----------
+    jf_id
+        The job ``db_id`` or flow ``flow_id``.
+    what
+        Either ``"jobs"`` or ``"flows"``.
+    proj_name
+        The project name.
+    as_page
+        When ``True`` render a "Back to list" link (page mode); when ``False``
+        render the popup "Close" button plus an "Open full page" link.
+
+    Returns
+    -------
+    FT
+        A ``Card`` element with the tab buttons and tab content.
+    """
+    if as_page:
+        nav = A(
+            "← Back to list",
+            hx_get=f"/{proj_name}/{what}/query",
+            hx_target="#prj-container",
+            hx_push_url="true",
+            cls="btn toolbar-right",
+        )
+    else:
+        # Navigating #prj-container replaces the whole project container (which
+        # holds the popup), so "Open full page" also dismisses the popup.
+        nav = Div(
+            A(
+                "Open full page",
+                hx_get=f"/{proj_name}/{what}/detail/{jf_id}",
+                hx_target="#prj-container",
+                hx_push_url="true",
+                cls="btn",
+            ),
             Button(
                 "Close",
                 hx_get="/test/close_dialog",
@@ -1197,37 +1413,65 @@ def get_info_graph_dialog(jf_id: str, what: str, proj_name: str):
                 style="font-weight: bold",
                 cls="btn toolbar-right",
             ),
-            Div(
-                Button(
-                    f"Details {what}",
-                    cls="tab active",
-                    hx_get=f"/{proj_name}/{what}/info/{jf_id}",
-                    hx_target="#tab-content",
-                    hx_swap="innerHTML",
-                    _="on click remove .active from .tab then add .active to me",
-                ),
-                Button(
-                    "Graph Flow",
-                    cls="tab",
-                    hx_get=f"/{proj_name}/flows/graph/{jf_id}",
-                    hx_target="#tab-content",
-                    hx_swap="innerHTML",
-                    _="on click remove .active from .tab then add .active to me",
-                ),
-                cls="tab-buttons btn",
-            )
-            if what == "flows"
-            else None,
-            Div(
-                get_info_job_flow(jf_id, what, proj_name),
-                id="tab-content",
-                cls="tab-content",
+        )
+    return Card(
+        nav,
+        Div(
+            Button(
+                f"Details {what}",
+                cls="tab active",
+                hx_get=f"/{proj_name}/{what}/info/{jf_id}",
+                hx_target="#tab-content",
+                hx_swap="innerHTML",
+                _="on click remove .active from .tab then add .active to me",
             ),
-            cls="tabbed-card",
+            Button(
+                "Graph Flow",
+                cls="tab",
+                hx_get=f"/{proj_name}/flows/graph/{jf_id}",
+                hx_target="#tab-content",
+                hx_swap="innerHTML",
+                _="on click remove .active from .tab then add .active to me",
+            ),
+            cls="tab-buttons btn",
+        )
+        if what == "flows"
+        else None,
+        Div(
+            get_info_job_flow(jf_id, what, proj_name),
+            id="tab-content",
+            cls="tab-content",
         ),
+        cls="tabbed-card",
+    )
+
+
+@rt("/{proj_name}/{what}/dialog/{jf_id}")
+def get_info_graph_dialog(jf_id: str, what: str, proj_name: str):
+    return Dialog(
+        detail_card(jf_id, what, proj_name, as_page=False),
         id="my-dialog",
         open="open",
         cls="dialog",
+    )
+
+
+@rt("/{proj_name}/{what}/detail/{jf_id}")
+def get_detail_page(jf_id: str, what: str, proj_name: str, request: Request):
+    """Render the job/flow detail as a standalone, URL-addressable page."""
+    content = Div(
+        detail_card(jf_id, what, proj_name, as_page=True),
+        Div(Script(mermaid_js, type="module"), id="dialog-container"),
+        id="prj-container",
+    )
+    # HTMX navigation only needs the fragment; a direct load (refresh/bookmark)
+    # has no HX-Request header and must get the full page (navbar included).
+    if request.headers.get("HX-Request") == "true":
+        return content
+    return PAGE_TITLE, Main(
+        Script(mermaid_js, type="module"),
+        projectbar(proj_name),
+        content,
     )
 
 
@@ -1237,7 +1481,7 @@ def close_info():
 
 
 @rt("/{proj_name}/{what}/query")
-def get(proj_name: str, what: str):
+def get(proj_name: str, what: str, request: Request):
     form = Form(
         Group(
             Input(name="db_id", placeholder="DB ID")
@@ -1258,6 +1502,12 @@ def get(proj_name: str, what: str):
                 name="state",
                 id="select-job-state",
             ),
+            Label(
+                "Errors only",
+                Input(type="checkbox", name="errors_only", value="1"),
+            )
+            if what == "jobs"
+            else None,
             Input(name="worker", placeholder="Worker") if what == "jobs" else None,
             cls="group",
         ),
@@ -1306,12 +1556,23 @@ def get(proj_name: str, what: str):
     elif what == "flows":
         total_entries = job_controller.count_flows()
 
-    return Div(
+    content = Div(
         H3(f"{what.capitalize()} Query"),
         P(f"Total number of {what}: {total_entries}", cls="muted"),
         form,
         Div(id="query-results"),
         id="prj-container",
+    )
+
+    # HTMX navigation only needs the fragment (swapped into #prj-container). A
+    # direct browser load (refresh / pasted URL) has no HX-Request header, so
+    # return the full page (navbar included) to avoid a header-less, broken view.
+    if request.headers.get("HX-Request") == "true":
+        return content
+    return PAGE_TITLE, Main(
+        Script(mermaid_js, type="module"),
+        projectbar(proj_name),
+        content,
     )
 
 
@@ -1324,6 +1585,7 @@ def post(
     uuid: str = "",
     name: str = "",
     state: str = "",
+    errors_only: str = "",
     worker: str = "",
     start_date: str = "",
     start_time: str = "",
@@ -1335,18 +1597,9 @@ def post(
     page: int = 1,
     entries_per_page: int = 20,
 ):
-    query: dict[
-        str,
-        str
-        | list[str]
-        | tuple[str, None]
-        | list[tuple[str, None]]
-        | None
-        | JobState
-        | FlowState
-        | dict[str, str]
-        | datetime,
-    ] = {}
+    # Built dynamically from optional filters and splatted into the controller
+    # query methods, so a permissive value type keeps the call sites type-clean.
+    query: dict[str, Any] = {}
     if db_id:
         query["db_ids"] = [db_id]
     if flow_id:
@@ -1357,12 +1610,16 @@ def post(
     custom_query = {"uuid": uuid} if uuid else None
     if name:
         query["name"] = name
-    if state:
+    # "Errors only" (jobs) overrides the single-state select to match both error
+    # states at once.
+    if errors_only and what == "jobs":
+        query["states"] = [JobState.FAILED, JobState.REMOTE_ERROR]
+    elif state:
         query["states"] = FlowState(state) if what == "flows" else JobState(state)
     if worker:
         query["workers"] = [worker]
 
-    tz = None
+    tz: tzinfo | None = None
     if timezone_in:
         try:
             tz = ZoneInfo(timezone_in)
@@ -1372,7 +1629,7 @@ def post(
         # Fall back to the local timezone of the machine running the GUI. This
         # is a fixed offset captured now (no IANA name needed), which is correct
         # for a local single-user GUI where the server clock is the user clock.
-        tz = datetime.now(timezone.utc).astimezone().tzinfo  # type: ignore
+        tz = datetime.now(timezone.utc).astimezone().tzinfo or timezone.utc
 
     if start_time and not start_date:
         start_date = datetime.now().strftime("%Y-%m-%d")
@@ -1399,13 +1656,13 @@ def post(
         jobs_flows = job_controller.get_jobs_info(
             **query,
             custom_query=custom_query,
-            sort=[[sort_by, sort_order]],
+            sort=[(sort_by, sort_order)],
             limit=entries_per_page,
             skip=skip,
         )
     elif what == "flows":
         jobs_flows = job_controller.get_flows_info(
-            **query, sort=[[sort_by, sort_order]], limit=entries_per_page, skip=skip
+            **query, sort=[(sort_by, sort_order)], limit=entries_per_page, skip=skip
         )
 
     if not jobs_flows:
@@ -1452,6 +1709,7 @@ def post(
                     hx_target="#query-results",
                 )
             ),
+            Th("Jobs") if what == "flows" else None,
             Th(
                 A(
                     "State",
@@ -1491,27 +1749,16 @@ def post(
         ),
         *[
             Tr(
-                Td(
-                    A(
-                        entry.db_id,
-                        hx_get=f"/{proj_name}/{what}/dialog/{entry.db_id}",
-                        hx_target="#dialog-container",
-                        hx_swap="innerHTML",
-                    )
-                )
-                if what == "jobs"
-                else None,
+                # The whole row opens the details popup; the id is shown as
+                # link-styled text (no nested link, to avoid a double request).
+                Td(Span(entry.db_id, cls="row-id")) if what == "jobs" else None,
                 Td(entry.uuid)
                 if what == "jobs"
-                else Td(
-                    A(
-                        entry.flow_id,
-                        hx_get=f"/{proj_name}/{what}/dialog/{entry.flow_id}",
-                        hx_target="#dialog-container",
-                        hx_swap="innerHTML",
-                    )
-                ),
+                else Td(Span(entry.flow_id, cls="row-id")),
                 Td(entry.name),
+                # ``db_ids`` is always populated (no extra query needed), so the
+                # job count is free for the flows list.
+                Td(str(len(entry.db_ids))) if what == "flows" else None,
                 Td(state_badge(entry.state)),
                 Td(entry.worker) if what == "jobs" else None,
                 Td(
@@ -1519,6 +1766,8 @@ def post(
                     .astimezone(tz)
                     .strftime("%Y-%m-%d %H:%M:%S")
                 ),
+                # Protected "safe zone": clicking anywhere in this cell toggles
+                # the checkbox without bubbling up to open the details popup.
                 Td(
                     Input(
                         type="checkbox",
@@ -1526,8 +1775,13 @@ def post(
                         value=f"{entry.db_id if what == 'jobs' else entry.flow_id}",
                         id=f"{entry.db_id if what == 'jobs' else entry.flow_id}",
                     ),
-                    style="text-align: right",
+                    onclick="event.stopPropagation()",
+                    cls="action-cell",
                 ),
+                hx_get=f"/{proj_name}/{what}/dialog/{entry.db_id if what == 'jobs' else entry.flow_id}",
+                hx_target="#dialog-container",
+                hx_swap="innerHTML",
+                cls="job-row",
             )
             for entry in all_entries
         ],
