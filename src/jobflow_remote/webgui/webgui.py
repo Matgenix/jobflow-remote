@@ -69,6 +69,7 @@ from jobflow_remote.jobs.graph import get_mermaid
 from jobflow_remote.jobs.jobcontroller import JobController
 from jobflow_remote.jobs.report import FlowsReport, JobsReport
 from jobflow_remote.jobs.state import FlowState, JobState
+from jobflow_remote.webgui.palette import state_color
 
 # Bokeh is part of the optional ``gui`` extra. Import the chart helpers and the
 # versioned BokehJS CDN URLs together: if Bokeh is missing, charts are simply
@@ -236,6 +237,29 @@ def get_report(proj_name: str, what: str = "jobs") -> JobsReport | FlowsReport |
 ATTENTION_STATES = [JobState.FAILED, JobState.REMOTE_ERROR, JobState.PAUSED]
 
 
+def state_badge(state: JobState | FlowState):
+    """
+    Render a job/flow state as a small colored badge.
+
+    The badge color comes from the shared :data:`~jobflow_remote.webgui.palette`
+    map, so tables, the dashboard attention list and the charts all use the same
+    visual language for a given state.
+
+    Parameters
+    ----------
+    state
+        The ``JobState`` or ``FlowState`` to render.
+
+    Returns
+    -------
+    FT
+        A ``Span`` element styled as a state badge.
+    """
+    return Span(
+        state.name, cls="state-badge", style=f"background:{state_color(state.name)};"
+    )
+
+
 def state_overview(state_counts: dict, what: str):
     """
     Build the "completed" headline metric and the category bar chart.
@@ -311,10 +335,7 @@ def dashboard_health_strip(proj_name: str, jobs_report: JobsReport):
         badges = [Span("All clear", cls="health-badge", style="background:#2ecc71;")]
     return Div(
         Span("Runner:", style="font-weight:bold;"),
-        Span(
-            status,
-            style=f"color:{color}; background:black; padding:3px 8px; border-radius:4px;",
-        ),
+        Span(status, cls="runner-pill", style=f"color:{color};"),
         Span("Attention:", style="font-weight:bold; margin-left:16px;"),
         *badges,
         cls="health-strip",
@@ -409,7 +430,7 @@ def dashboard_attention_list(proj_name: str):
                 )
             ),
             Td(job.name),
-            Td(job.state.value),
+            Td(state_badge(job.state)),
             Td(job.worker),
             Td(job.updated_on.replace(tzinfo=timezone.utc).strftime("%Y-%m-%d %H:%M")),
         )
@@ -601,10 +622,7 @@ def projectbar(proj_name: str = "", what: str = ""):
                 Group(
                     Ul(
                         Li("Runner:"),
-                        Li(
-                            f"{status}",
-                            style=f"color: {color}; background-color: black; padding: 3px 5px; border-radius: 4px;",
-                        ),
+                        Li(f"{status}", cls="runner-pill", style=f"color: {color};"),
                         Li(
                             Button(
                                 f"{start_stop_btn_lbl[status]}",
@@ -627,11 +645,9 @@ def projectbar(proj_name: str = "", what: str = ""):
     )
 
 
-def ScrollableArea(*content, height="300px"):
-    return Div(
-        *content,
-        style=f"height: {height}; overflow-y: auto; border: 1px solid #ccc; padding: 10px;",
-    )
+def ScrollableArea(*content, height: str = "300px"):
+    """Wrap content in a fixed-height, vertically scrollable box."""
+    return Div(*content, cls="scrollable-area", style=f"height: {height};")
 
 
 @rt("/")
@@ -639,10 +655,17 @@ def get_home():
     return PAGE_TITLE, Main(
         projectbar(),
         Div(
-            H4(
-                "Select project from the navigation bar above to view and query Jobs and Flows."
+            H3("Jobflow Remote manager"),
+            P(
+                "Select a project from the navigation bar above to view its "
+                "dashboard and query its jobs and flows."
             ),
-            P("Add here some general information, e.g. the list of available projects"),
+            P(
+                f"Available projects: {', '.join(list_projects)}."
+                if list_projects
+                else "No projects are currently configured.",
+                cls="muted",
+            ),
             cls="container",
             id="prj-container",
         ),
@@ -752,10 +775,7 @@ def start_runner_route(proj_name: str):
     return Group(
         Ul(
             Li("Runner:"),
-            Li(
-                status,
-                style=f"color: {color}; background-color: black; padding-right: 10px; border-radius: 4px;",
-            ),
+            Li(status, cls="runner-pill", style=f"color: {color};"),
         ),
         id="runner-status",
         hx_get=f"/runner/{proj_name}/status",
@@ -774,10 +794,7 @@ def stop_runner_route(proj_name: str):
     return Group(
         Ul(
             Li("Runner:"),
-            Li(
-                status,
-                style=f"color: {color}; background-color: black; padding-right: 10px; border-radius: 4px;",
-            ),
+            Li(status, cls="runner-pill", style=f"color: {color};"),
         ),
         id="runner-status",
         hx_get=f"/runner/{proj_name}/status",
@@ -793,10 +810,7 @@ def get_runner_status_update(proj_name: str):
     return Group(
         Ul(
             Li("Runner:"),
-            Li(
-                f"{status}",
-                style=f"color: {color}; background-color: black; padding-right: 10px; border-radius: 4px;",
-            ),
+            Li(f"{status}", cls="runner-pill", style=f"color: {color};"),
             Li(
                 Button(
                     f"{start_stop_btn_lbl[status]}",
@@ -1141,8 +1155,8 @@ def get_info_job_flow(jf_id: str, what: str, proj_name: str):
             ScrollableArea(
                 *[
                     Ul(
-                        Li(f"{k}:", style="font-weight: bold"),
-                        Li(f"{v}", style="margin-left: 10px;"),
+                        Li(f"{k}:", cls="detail-key"),
+                        Li(f"{v}", cls="detail-val"),
                     )
                     for k, v in info.items()
                 ]
@@ -1180,8 +1194,8 @@ def get_info_graph_dialog(jf_id: str, what: str, proj_name: str):
                 "Close",
                 hx_get="/test/close_dialog",
                 hx_target="#dialog-container",
-                style="float: right; font-weight: bold",
-                cls="btn",
+                style="font-weight: bold",
+                cls="btn toolbar-right",
             ),
             Div(
                 Button(
@@ -1279,6 +1293,9 @@ def get(proj_name: str, what: str):
         Script(mermaid_js, type="module"),
         hx_post=f"/{proj_name}/{what}/query",
         hx_target="#query-results",
+        # Run the query once on initial load (in addition to manual submit) so
+        # the table is populated with default values without an explicit search.
+        hx_trigger="load, submit",
         cls="card",
         id="search-form",
     )
@@ -1291,7 +1308,7 @@ def get(proj_name: str, what: str):
 
     return Div(
         H3(f"{what.capitalize()} Query"),
-        H3(f"Total number of {what}: {total_entries}"),
+        P(f"Total number of {what}: {total_entries}", cls="muted"),
         form,
         Div(id="query-results"),
         id="prj-container",
@@ -1495,7 +1512,7 @@ def post(
                     )
                 ),
                 Td(entry.name),
-                Td(entry.state.value),
+                Td(state_badge(entry.state)),
                 Td(entry.worker) if what == "jobs" else None,
                 Td(
                     entry.updated_on.replace(tzinfo=timezone.utc)
@@ -1506,14 +1523,13 @@ def post(
                     Input(
                         type="checkbox",
                         name="ckbx_action",
-                        value=f"{entry.db_id if what=='jobs' else entry.flow_id}",
-                        id=f"{entry.db_id if what=='jobs' else entry.flow_id}",
+                        value=f"{entry.db_id if what == 'jobs' else entry.flow_id}",
+                        id=f"{entry.db_id if what == 'jobs' else entry.flow_id}",
                     ),
                     style="text-align: right",
                 ),
-                style="background-color: #f5f5f5;" if i % 2 == 0 else "",
             )
-            for i, entry in enumerate(all_entries)
+            for entry in all_entries
         ],
         cls="card",
     )
@@ -1532,6 +1548,8 @@ def post(
         # all_job_flow_ids = [entry.flow_id for entry in all_entries]
         action_btns_lbl = ("Delete",)  # type: ignore[assignment]
 
+    # Destructive actions get the danger (red) button variant.
+    danger_actions = {"Stop", "Delete"}
     action_btns = Group(
         Label("Actions:   "),
         *[
@@ -1540,12 +1558,11 @@ def post(
                 hx_post=f"/actions/{proj_name}/{name}/{what}/open_dialog",
                 hx_target="#dialog-container",
                 hx_include="[name='ckbx_action']",
-                cls="btn",
+                cls="btn btn-danger" if name in danger_actions else "btn",
             )
             for name in action_btns_lbl
         ],
-        style="float: right",
-        cls="group",
+        cls="group toolbar-right",
     )
 
     pagination = Div(
@@ -1553,7 +1570,7 @@ def post(
             "Previous",
             hx_post=f"/{proj_name}/{what}/query",
             hx_include="previous form",
-            hx_vals=f'{{"page":{page-1}, "sort_by":"{sort_by}", "sort_order":"{sort_order}"}}',
+            hx_vals=f'{{"page":{page - 1}, "sort_by":"{sort_by}", "sort_order":"{sort_order}"}}',
             hx_swap="innerHTML",
             hx_target="#query-results",
         )
@@ -1574,7 +1591,7 @@ def post(
             "Next",
             hx_post=f"/{proj_name}/{what}/query",
             hx_include="previous form",
-            hx_vals=f'{{"page":{page+1}, "sort_by":"{sort_by}", "sort_order":"{sort_order}"}}',
+            hx_vals=f'{{"page":{page + 1}, "sort_by":"{sort_by}", "sort_order":"{sort_order}"}}',
             hx_swap="innerHTML",
             hx_target="#query-results",
         )
