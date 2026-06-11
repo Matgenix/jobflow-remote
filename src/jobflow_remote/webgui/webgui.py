@@ -100,7 +100,7 @@ PAGE_TITLE = Title("Jobflow remote manager")
 
 mermaid_js = """
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
-mermaid.initialize({ startOnLoad: false });
+mermaid.initialize({ startOnLoad: false, securityLevel: 'loose' });
 window.mermaid = mermaid;
 """
 
@@ -1322,6 +1322,13 @@ def get_graph_job_flow(jf_id: str, proj_name: str):
         flow_ids=[jf_id], limit=1, with_jobs_info=True
     )[0]
     graph = get_mermaid(flowinfo)
+    # Make each job box link to its standalone detail page. Mermaid node IDs are
+    # the job db_ids, which flowinfo.db_ids enumerates directly.
+    click_lines = "\n".join(
+        f'    click {db_id} "/{proj_name}/jobs/detail/{db_id}"'
+        for db_id in flowinfo.db_ids
+    )
+    graph = f"{graph}\n{click_lines}"
     # Render the mermaid SVG into a large viewport, then attach svg-pan-zoom so
     # the graph can be zoomed (wheel) and panned (drag) like on mermaid.live.
     # The render call retries until both mermaid and svg-pan-zoom are loaded
