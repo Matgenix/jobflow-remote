@@ -190,6 +190,9 @@ def get_mermaid(flow: FlowInfo, show_subflows: bool = True):
         """
         Helper function to sanitize a node name in mermaid.
         """
+        # If a node name contains special characters, like a parenthesis,
+        # the name needs to be in quotation marks. If the name contains a
+        # quotation mark replace it with the html entity number.
         name = name.replace('"', "#34;")
         return f'"{name}"'
 
