@@ -210,9 +210,15 @@ def update_store(store: JobStore, remote_store: JobStore, db_id: int) -> None:
                 data.pop("_id", None)
                 add_store.update(data)
         main_docs_list = list(remote_store.docs_store.query({}))
-        if len(main_docs_list) > 1:
-            raise RuntimeError(
-                "The downloaded output store contains more than one document"
+        if len(main_docs_list) != 1:
+            # both an empty and a multi-document store are unexpected and
+            # deterministic for the downloaded files, so do not retry. An empty
+            # store typically means the output file was created but no data was
+            # stored during the remote execution.
+            raise RemoteError(
+                "The downloaded output store should contain exactly one document, "
+                f"but it contains {len(main_docs_list)}.",
+                no_retry=True,
             )
         main_doc = main_docs_list[0]
         main_doc.pop("_id", None)
@@ -353,7 +359,7 @@ class MinimalFileStore(Store):
         skip: int = 0,
         limit: int = 0,
     ) -> Iterator[dict]:
-        if criteria or properties or sort or skip or sort:
+        if criteria or properties or sort or skip or limit:
             raise NotImplementedError(
                 "Query only implemented to return the whole set of docs"
             )

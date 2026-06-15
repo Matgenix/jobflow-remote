@@ -323,6 +323,7 @@ def test_set_state(job_controller, two_flows_four_jobs, run_check_cli) -> None:
     run_check_cli(
         ["job", "set-state", "UPLOADED", "10"],
         required_out="No Job matching criteria",
+        error=True,
     )
 
     run_check_cli(
@@ -733,6 +734,7 @@ def test_queries(job_controller, two_flows_four_jobs, run_check_cli) -> None:
     run_check_cli(
         ["job", "pause", "--start-date", yesterday, "--days", "1"],
         required_out="Options start_date, days are incompatible",
+        error=True,
     )
 
     run_check_cli(

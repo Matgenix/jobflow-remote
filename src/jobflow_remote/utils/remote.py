@@ -24,6 +24,11 @@ class SharedHosts:
     Hosts connections are all closed only when leaving the last context
     manager.
 
+    A single project can be active at a time: the project is bound when the
+    outermost context is opened and released when the last one is closed.
+    Opening a nested context for a different project raises an error, since
+    sharing host connections across projects is not supported.
+
     Examples
     --------
 
@@ -49,11 +54,24 @@ class SharedHosts:
         project
             The project configuration.
         """
-        if self._project is None:
+        cls = self.__class__
+        if cls._ref_count == 0:
+            # No context is currently active: this is (or precedes) the
+            # outermost context, so (re)bind to the requested project,
+            # discarding any project left over from a previous operation.
             if project is None:
                 config_manager: ConfigManager = ConfigManager()
                 project = config_manager.get_project(None)
-            self._project = project
+            cls._project = project
+        elif project is not None and project.name != cls._project.name:
+            # A context is already open and bound to another project. Sharing
+            # host connections across projects is not supported, so refuse
+            # instead of silently using the wrong project's workers.
+            raise ValueError(
+                f"SharedHosts is already active for project '{cls._project.name}' "
+                f"and cannot be used for a different project ('{project.name}') "
+                "at the same time."
+            )
 
     def get_host(self, worker: str) -> BaseHost:
         """
@@ -104,6 +122,8 @@ class SharedHosts:
         # Cleanup only when the last context exits
         if self.__class__._ref_count == 0:
             self.close_hosts()
+            # Release the project so the next operation rebinds a fresh one
+            self.__class__._project = None
 
 
 class UnsafeDeletionError(Exception):

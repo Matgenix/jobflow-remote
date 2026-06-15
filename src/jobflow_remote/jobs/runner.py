@@ -1111,12 +1111,16 @@ class Runner:
                             if start_time:
                                 set_output["$set"]["start_time"] = start_time
                             lock.update_on_release = set_output
-                    # decrease the amount of jobs running if it is a limited worker
-                    if (
-                        next_state in (JobState.RUN_FINISHED, JobState.DOWNLOADED)
-                        and worker_name in self.limited_workers
-                    ):
-                        self.limited_workers[doc["worker"]]["current"] -= 1
+                            # decrease the amount of jobs running if it is a
+                            # limited worker. Only if the document was locked
+                            # and the state is being updated, otherwise the
+                            # count would be wrongly decreased.
+                            if (
+                                next_state
+                                in (JobState.RUN_FINISHED, JobState.DOWNLOADED)
+                                and worker_name in self.limited_workers
+                            ):
+                                self.limited_workers[worker_name]["current"] -= 1
 
     def checkout(self) -> None:
         """Checkout READY Jobs."""

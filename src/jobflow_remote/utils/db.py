@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import copy
+import json
 import logging
 import os
 import re
 import subprocess
+import tempfile
 import time
 import warnings
 from collections import defaultdict
@@ -528,6 +530,14 @@ def mongo_operation(
     -------
     tuple[str, str]
         The stdout and stderr of the executed command.
+
+    Notes
+    -----
+    If the store defines credentials (username/password or a URI), these are
+    passed to the executable through a temporary configuration file, to avoid
+    exposing them in the process list. This requires the mongodb database
+    tools version 100.3 or higher. With older versions use the pure python
+    implementation instead.
     """
     if operation not in ("mongodump", "mongorestore"):
         raise ValueError(f"Operation {operation} not supported")
@@ -541,13 +551,15 @@ def mongo_operation(
             f"installing the mongodb database tools. Alternatively use the pure python implementation."
         )
 
+    # Sensitive values (the password or the URI, that may embed credentials)
+    # are not added to the command line, where they would be visible in the
+    # process list, but passed through a temporary configuration file.
+    secrets: dict[str, str] = {}
+
     # here is not checked with isinstance(), because the current other subclasses will fail
     if type(store) is MongoURIStore:
-        cmd = [
-            operation,
-            "--uri",
-            store.uri,
-        ]
+        cmd = [operation]
+        secrets["uri"] = store.uri
     elif type(store) is MongoStore:
         cmd = [
             operation,
@@ -557,7 +569,8 @@ def mongo_operation(
             str(store.port),
         ]
         if store.username and store.password:
-            cmd.extend(["--username", store.username, "--password", store.password])
+            cmd.extend(["--username", store.username])
+            secrets["password"] = store.password
             if store.auth_source:
                 cmd.extend(["--authenticationDatabase", store.auth_source])
         elif store.username or store.password:
@@ -582,14 +595,31 @@ def mongo_operation(
         cmd.append("--gzip")
 
     if operation.endswith("mongodump"):
-        cmd.extend(["--out", file_path])
+        cmd.extend(["--out", str(file_path)])
     elif operation.endswith("mongorestore"):
-        cmd.append(file_path)
+        cmd.append(str(file_path))
 
-    str_cmd = " ".join(str(s) for s in cmd)
-    result = subprocess.run(
-        str_cmd, check=True, capture_output=True, text=True, shell=True
-    )
+    config_path = None
+    try:
+        if secrets:
+            with tempfile.NamedTemporaryFile(
+                mode="w", suffix=".yaml", delete=False
+            ) as config_file:
+                # JSON escaping of the values is also valid YAML for double-quoted
+                # scalars, so arbitrary passwords are handled without a YAML dumper
+                for key, value in secrets.items():
+                    config_file.write(f"{key}: {json.dumps(value)}\n")
+            config_path = config_file.name
+            cmd.extend(["--config", config_path])
+
+        # Do not use shell=True: with the list form the arguments are not
+        # processed by a shell, so they cannot be altered or interpreted as
+        # additional commands.
+        result = subprocess.run(cmd, check=True, capture_output=True, text=True)  # noqa: S603
+    finally:
+        if config_path:
+            os.unlink(config_path)
+    str_cmd = " ".join(cmd)
     logger.debug(
         f"output during execution of '{str_cmd}'. Stdout: {result.stdout}. Stderr: {result.stderr}"
     )
