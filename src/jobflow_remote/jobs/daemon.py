@@ -767,11 +767,11 @@ class DaemonManager:
         if not result:
             error = f"The action {action} was not applied to the processes"
         else:
-            failed = [r for r in result if r.get("status") == Faults.SUCCESS]
-            if len(failed) != len(result):
+            failed = [r for r in result if r.get("status") != Faults.SUCCESS]
+            if failed:
                 error = f"The action {action} was not applied to all the processes. Details: \n"
                 for f in failed:
-                    error += f"  - {f.get('description')}\n"
+                    error += f"  - {f.get('description')} - {f.get('status')}\n"
 
         if error is not None:
             if raise_on_error:

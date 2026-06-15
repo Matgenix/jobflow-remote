@@ -172,13 +172,13 @@ def jobs_list(
         if state:
             state.extend(ERROR_STATES)
         else:
-            state = ERROR_STATES
+            state = list(ERROR_STATES)
 
     if running:
         if state:
             state.extend(RUNNING_STATES)
         else:
-            state = RUNNING_STATES
+            state = list(RUNNING_STATES)
 
     if count:
         with loading_spinner():

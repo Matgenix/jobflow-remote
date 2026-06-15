@@ -287,7 +287,7 @@ def run_single_batch_jobs(
                 with cd(job_path):
                     result = subprocess.run(
                         ["bash", "submit.sh"],  # noqa: S603, S607
-                        check=True,
+                        check=False,
                         text=True,
                         capture_output=True,
                     )
@@ -298,7 +298,7 @@ def run_single_batch_jobs(
                 batch_manager.set_job_finished(job_id, index)
             except Exception:
                 logger.exception(
-                    "Error while running job with id {job_id} and index {index}"
+                    f"Error while running job with id {job_id} and index {index}"
                 )
             else:
                 logger.info(f"Completed job with id {job_id} and index {index}")

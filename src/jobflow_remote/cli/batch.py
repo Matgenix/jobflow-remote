@@ -220,7 +220,7 @@ def delete(
             text = Text.from_markup(
                 "[red]This operation may remove batch processes in states other than 'FINISHED'. "
                 "This could lead to [bold]inconsistencies or data loss[/bold]. "
-                "Overall it will [bold]delete {len(to_delete)} batch processes[/bold]. Proceed anyway?[/red]"
+                f"Overall it will [bold]delete {len(to_delete)} batch processes[/bold]. Proceed anyway?[/red]"
             )
         else:
             text = Text.from_markup(

@@ -21,6 +21,7 @@ from jobflow_remote.cli.types import (
     index_direction_arg,
     index_key_arg,
     job_ids_indexes_opt,
+    job_ids_opt,
     job_state_opt,
     start_date_opt,
     yes_opt,
@@ -120,15 +121,17 @@ def upgrade(
     if jobflow_check:
         out_console.print(jobflow_check)
 
+    full_check = ""
     if check_env:
         full_check = jc.upgrade_full_check()
-        if jobflow_check or full_check:
-            text = Text.from_markup(
-                +full_check
-                + "This does not necessarily pose a problem. Just check if there is any potential "
-                "incompatible upgrade"
-            )
-            out_console.print(text)
+        if full_check:
+            out_console.print(full_check)
+
+    if jobflow_check or full_check:
+        out_console.print(
+            "This does not necessarily pose a problem. Just check if there is any "
+            "potential incompatible upgrade"
+        )
 
     if not no_dry_run:
         actions, failed_conditions = upgrader.dry_run(
@@ -271,7 +274,7 @@ def unlock(
         progress.add_task(description="Unlocking jobs...", total=None)
 
         num_unlocked = jc.unlock_jobs(
-            job_ids=job_id,
+            job_ids=job_ids_indexes,
             db_ids=db_id,
             states=state,
             start_date=start_date,
@@ -283,7 +286,7 @@ def unlock(
 
 @app_admin.command()
 def unlock_flow(
-    job_id: job_ids_indexes_opt = None,
+    job_id: job_ids_opt = None,
     db_id: db_ids_opt = None,
     flow_id: flow_ids_opt = None,
     state: flow_state_opt = None,
@@ -297,8 +300,6 @@ def unlock_flow(
     If no criteria is specified all the locked flows will be selected.
     WARNING: can lead to inconsistencies if the processes is actually running.
     """
-    job_ids_indexes = get_job_ids_indexes(job_id)
-
     jc = get_job_controller()
 
     if not yes_all:
@@ -308,7 +309,7 @@ def unlock_flow(
             )
 
             flows_info = jc.get_flows_info(
-                job_ids=job_ids_indexes,
+                job_ids=job_id,
                 db_ids=db_id,
                 flow_ids=flow_id,
                 states=state,

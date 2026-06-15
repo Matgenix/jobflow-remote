@@ -205,7 +205,7 @@ def check_at_least_one_opt(d: dict) -> None:
         if v:
             not_none.append(k)
 
-    if len(not_none) > 1:
+    if len(not_none) <= 1:
         options_list = ", ".join(d)
         exit_with_error_msg(
             f"At least one of the options {options_list} should be defined"
@@ -496,74 +496,74 @@ def execute_multi_jobs_cmd(
         out_console.print("Processing...")
     else:
         spinner_cm = loading_spinner()
-    try:
-        if job_db_id is not None:
-            if any(query_values):
-                msg = "If job_db_id is defined all the other query options should be disabled"
-                exit_with_error_msg(msg)
-            db_id, job_id = get_job_db_ids(job_db_id, job_index)
-            with spinner_cm:
-                modified_ids = single_cmd(
-                    job_id=job_id, job_index=job_index, db_id=db_id, **kwargs
-                )
-                if not isinstance(modified_ids, list | tuple):
-                    modified_ids = [] if modified_ids is None else [modified_ids]
-                if not modified_ids:
-                    exit_with_error_msg("Could not perform the requested operation")
-        else:
-            check_incompatible_opt(
-                {"start_date": start_date, "days": days, "hours": hours}
+    # Exceptions are not caught here: they propagate to the cli_error_handler
+    # wrapper applied by JFRTyper.command, which prints the error message and
+    # exits with a non-zero code.
+    if job_db_id is not None:
+        if any(query_values):
+            msg = (
+                "If job_db_id is defined all the other query options should be disabled"
             )
-            check_incompatible_opt({"end_date": end_date, "days": days, "hours": hours})
+            exit_with_error_msg(msg)
+        db_id, job_id = get_job_db_ids(job_db_id, job_index)
+        with spinner_cm:
+            modified_ids = single_cmd(
+                job_id=job_id, job_index=job_index, db_id=db_id, **kwargs
+            )
+            if not isinstance(modified_ids, list | tuple):
+                modified_ids = [] if modified_ids is None else [modified_ids]
+            if not modified_ids:
+                exit_with_error_msg("Could not perform the requested operation")
+    else:
+        check_incompatible_opt({"start_date": start_date, "days": days, "hours": hours})
+        check_incompatible_opt({"end_date": end_date, "days": days, "hours": hours})
 
-            job_ids_indexes = get_job_ids_indexes(job_ids)
-            start_date = get_start_date(start_date, days, hours)
+        job_ids_indexes = get_job_ids_indexes(job_ids)
+        start_date = get_start_date(start_date, days, hours)
 
-            if not any(
-                (
-                    job_ids_indexes,
-                    db_ids,
-                    flow_ids,
-                    states,
-                    start_date,
-                    end_date,
-                    name,
-                    metadata,
-                    workers,
-                    custom_query,
-                )
-            ):
-                text = Text.from_markup(
-                    "[yellow]No filter has been set. This will apply the change to all "
-                    "the jobs in the DB. Proceed anyway?[/yellow]"
-                )
+        if not any(
+            (
+                job_ids_indexes,
+                db_ids,
+                flow_ids,
+                states,
+                start_date,
+                end_date,
+                name,
+                metadata,
+                workers,
+                custom_query,
+            )
+        ):
+            text = Text.from_markup(
+                "[yellow]No filter has been set. This will apply the change to all "
+                "the jobs in the DB. Proceed anyway?[/yellow]"
+            )
 
-                confirmed = Confirm.ask(text, default=False)
-                if not confirmed:
-                    raise typer.Exit(0)  # noqa: TRY301
+            confirmed = Confirm.ask(text, default=False)
+            if not confirmed:
+                raise typer.Exit(0)
 
-            with spinner_cm:
-                modified_ids = multi_cmd(
-                    job_ids=job_ids_indexes,
-                    db_ids=db_ids,
-                    flow_ids=flow_ids,
-                    states=states,
-                    start_date=start_date,
-                    end_date=end_date,
-                    name=name,
-                    metadata=metadata,
-                    workers=workers,
-                    custom_query=custom_query,
-                    raise_on_error=raise_on_error,
-                    **kwargs,
-                )
+        with spinner_cm:
+            modified_ids = multi_cmd(
+                job_ids=job_ids_indexes,
+                db_ids=db_ids,
+                flow_ids=flow_ids,
+                states=states,
+                start_date=start_date,
+                end_date=end_date,
+                name=name,
+                metadata=metadata,
+                workers=workers,
+                custom_query=custom_query,
+                raise_on_error=raise_on_error,
+                **kwargs,
+            )
 
-        if verbosity:
-            print_success_msg(f"Operation completed. Modified jobs: {modified_ids}")
-        else:
-            print_success_msg(f"Operation completed: {len(modified_ids)} jobs modified")
-    except Exception:
-        logger.exception("Error executing the operation")
+    if verbosity:
+        print_success_msg(f"Operation completed. Modified jobs: {modified_ids}")
+    else:
+        print_success_msg(f"Operation completed: {len(modified_ids)} jobs modified")
 
 
 def check_stopped_runner(error: bool = True) -> None:

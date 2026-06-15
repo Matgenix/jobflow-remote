@@ -268,9 +268,9 @@ def run(
         daemon_id = os.getppid()
     runner = Runner(
         log_level=log_level,
-        runner_id=str(runner_id),
+        runner_id=str(runner_id) if runner_id else None,
         connect_interactive=connect_interactive,
-        daemon_id=str(daemon_id),
+        daemon_id=str(daemon_id) if daemon_id else None,
     )
     if not (transfer or complete or queue or checkout):
         transfer = complete = queue = checkout = True
@@ -812,7 +812,7 @@ def reset(
             f"- last_pinged: {running_runner['last_pinged']}\n"
             f"- daemon_dir: {running_runner['daemon_dir']}\n"
             f"- user: {running_runner['user']}\n"
-            "[red]Do you want to proceed?[\red]"
+            "[red]Do you want to proceed?[/red]"
         )
 
         confirmed = Confirm.ask(text, default=False)

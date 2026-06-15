@@ -330,7 +330,7 @@ def flow_info(
     with loading_spinner():
         jc = get_job_controller()
         with_jobs_info: bool | list[str] = True
-        if report:
+        if print_report:
             with_jobs_info = ["start_time", "end_time"]
 
         flows_info = jc.get_flows_info(
@@ -626,7 +626,7 @@ def clean(
             if yes_all or confirmed:
                 with open("skipped_cleanup.dat", "w") as f:
                     for ji in skipped_jobs:
-                        f.writelines(f" - {ji.db_id} - {ji.state}")
+                        f.writelines(f" - {ji.db_id} - {ji.state}\n")
 
     out_console.print(f"Deleted execution folders of {len(deleted)} Jobs")
 

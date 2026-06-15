@@ -430,11 +430,11 @@ class JobController:
             query["state"] = {"$in": [s.value for s in states]}
 
         if start_date:
-            start_date_str = start_date.astimezone(timezone.utc)
-            query["updated_on"] = {"$gte": start_date_str}
+            start_date_utc = start_date.astimezone(timezone.utc)
+            query.setdefault("updated_on", {})["$gte"] = start_date_utc
         if end_date:
-            end_date_str = end_date.astimezone(timezone.utc)
-            query["updated_on"] = {"$lte": end_date_str}
+            end_date_utc = end_date.astimezone(timezone.utc)
+            query.setdefault("updated_on", {})["$lte"] = end_date_utc
 
         if name:
             mongo_regex = "^" + fnmatch.translate(name).replace("\\\\", "\\")
@@ -4376,9 +4376,7 @@ class JobController:
             A list of uuids of Jobs belong to the selected Flows.
         """
         job_uuids = []
-        for flow in self.flows.find_one(
-            {"uuid": {"$in": flow_uuids}}, projection=["jobs"]
-        ):
+        for flow in self.flows.find({"uuid": {"$in": flow_uuids}}, projection=["jobs"]):
             job_uuids.extend(flow["jobs"])
         return job_uuids
 
@@ -5035,11 +5033,9 @@ class JobController:
                 ]
         if db_ids:
             if isinstance(db_ids, str):
-                query["jobs"] = {"$elemMatch": {"0": db_ids[0]}}
+                query["jobs"] = {"$elemMatch": {"0": db_ids}}
             else:
-                query["$or"] = [
-                    {"jobs": {"$elemMatch": {"0": did[0]}}} for did in db_ids
-                ]
+                query["jobs"] = {"$elemMatch": {"0": {"$in": db_ids}}}
         return query
 
     def get_batches(
@@ -5445,10 +5441,10 @@ class JobController:
                     if store_name:
                         jobstore = self.optional_jobstores[store_name]
                 try:
-                    jobstore.remove_docs({"uuid": job_id, "index": job_index})
+                    jobstore.remove_docs({"uuid": job_uuid, "index": job_index})
                 except Exception:
                     warnings.warn(
-                        f"Error while delete the output of job {job_id} {job_index}",
+                        f"Error while delete the output of job {job_uuid} {job_index}",
                         stacklevel=2,
                     )
 
@@ -5890,7 +5886,7 @@ class JobController:
                     ]
                 )
                 msg += (
-                    f"The following {len(missing_packages)} packages "
+                    f"The following {len(different_version_packages)} packages "
                     f"have different versions:\n "
                     f"{different_str}\n"
                 )

@@ -774,6 +774,7 @@ def test_delete_job(job_controller, two_flows_four_jobs, runner):
     ):
         job_controller.delete_job(job_id=two_flows_four_jobs[0][0].uuid)
 
+    # delete a completed job
     runner.run_one_job(job_id=[two_flows_four_jobs[1][0].uuid, 1])
 
     job3_info = job_controller.get_job_info(two_flows_four_jobs[1][0].uuid)
@@ -794,6 +795,26 @@ def test_delete_job(job_controller, two_flows_four_jobs, runner):
         job_controller.jobstore.get_output(two_flows_four_jobs[1][0].uuid)
 
     assert not os.path.isdir(job3_info.run_dir)
+
+    # delete a completed job with delete_jobs
+    add1 = add(1, 2)
+    add2 = add(add1.output, 2)
+    new_flow = Flow([add1, add2])
+    submit_flow(new_flow)
+    runner.run_all_jobs()
+    add2_info = job_controller.get_job_info(add2.uuid)
+    assert (
+        len(
+            job_controller.delete_jobs(
+                job_ids=[(add2.uuid, 1)], delete_output=True, delete_files=True
+            )
+        )
+        == 1
+    )
+    with pytest.raises(ValueError, match=".*has no outputs.*"):
+        job_controller.jobstore.get_output(add2.uuid)
+
+    assert not os.path.isdir(add2_info.run_dir)
 
     # add a big flow and try deleting it with small limit
     many_jobs = [add(1, 2)]
