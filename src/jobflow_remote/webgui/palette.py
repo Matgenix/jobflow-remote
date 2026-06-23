@@ -14,6 +14,11 @@ greys are idle/inactive.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from jobflow_remote.jobs.state import FlowState, JobState
+
 STATE_COLORS: dict[str, str] = {
     "WAITING": "#95a5a6",
     "READY": "#5dade2",
@@ -51,3 +56,86 @@ def state_color(state_name: str) -> str:
         A hex color string for the state, or a neutral grey when unknown.
     """
     return STATE_COLORS.get(state_name, _DEFAULT_COLOR)
+
+
+# Operational categories grouping the raw states. ``COMPLETED`` is deliberately
+# excluded: it is reported separately as a headline metric so that the
+# (continuously growing) pile of completed jobs does not dominate the chart.
+# The list order is the display order.
+#
+# Note the distinction between "Pending" (``WAITING``/``READY``: not yet started
+# by jobflow-remote) and "Queued" (``SUBMITTED``/``BATCH_SUBMITTED``: actually
+# sitting in the HPC scheduler queue, e.g. SLURM/PBS). Jobs and flows use
+# different category sets because ``FlowState`` has no scheduler/transfer states.
+#
+# These live in this dependency-free module (rather than in the Bokeh-backed
+# ``charts`` module) so the plain-HTML views can reuse them even without Bokeh.
+JOB_CATEGORIES: list[tuple[str, list[str]]] = [
+    ("Pending", ["WAITING", "READY"]),
+    ("Queued", ["SUBMITTED", "BATCH_SUBMITTED"]),
+    (
+        "Active",
+        [
+            "CHECKED_OUT",
+            "UPLOADED",
+            "RUNNING",
+            "RUN_FINISHED",
+            "DOWNLOADED",
+            "BATCH_RUNNING",
+        ],
+    ),
+    ("Error", ["FAILED", "REMOTE_ERROR"]),
+    ("Paused/Stopped", ["PAUSED", "STOPPED", "USER_STOPPED"]),
+]
+
+FLOW_CATEGORIES: list[tuple[str, list[str]]] = [
+    ("Pending", ["WAITING", "READY"]),
+    ("Running", ["RUNNING"]),
+    ("Error", ["FAILED"]),
+    ("Paused/Stopped", ["PAUSED", "STOPPED"]),
+]
+
+# Representative color for each category (reusing the per-state palette).
+CATEGORY_COLORS: dict[str, str] = {
+    "Pending": STATE_COLORS["WAITING"],
+    "Queued": STATE_COLORS["SUBMITTED"],
+    "Active": STATE_COLORS["RUNNING"],
+    "Running": STATE_COLORS["RUNNING"],
+    "Error": STATE_COLORS["FAILED"],
+    "Paused/Stopped": STATE_COLORS["PAUSED"],
+}
+
+
+def categories_for(what: str) -> list[tuple[str, list[str]]]:
+    """Return the ordered category definition for ``"jobs"`` or ``"flows"``."""
+    return FLOW_CATEGORIES if what == "flows" else JOB_CATEGORIES
+
+
+def categorize_state_counts(
+    state_counts: dict[JobState | FlowState, int], what: str = "jobs"
+) -> tuple[int, int, dict[str, int]]:
+    """
+    Split a state-count mapping into the headline numbers and category counts.
+
+    Parameters
+    ----------
+    state_counts
+        Mapping of state to the number of jobs/flows in that state.
+    what
+        Either ``"jobs"`` or ``"flows"``, selecting the category definition.
+
+    Returns
+    -------
+    tuple of (int, int, dict)
+        The number of completed jobs/flows, the total number, and a mapping of
+        operational category name to count (excluding completed). All categories
+        for the chosen entity are present, even when their count is zero.
+    """
+    by_name = {state.name: count for state, count in state_counts.items()}
+    total = sum(by_name.values())
+    completed = by_name.get("COMPLETED", 0)
+    categories = {
+        category: sum(by_name.get(name, 0) for name in names)
+        for category, names in categories_for(what)
+    }
+    return completed, total, categories
