@@ -6,7 +6,7 @@ from datetime import datetime, timezone, tzinfo
 from enum import Enum
 from math import ceil
 from pathlib import Path
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from monty.dev import requires
@@ -77,11 +77,19 @@ from jobflow_remote.jobs.graph import get_mermaid
 from jobflow_remote.jobs.jobcontroller import JobController
 from jobflow_remote.jobs.report import FlowsReport, JobsReport
 from jobflow_remote.jobs.state import FlowState, JobState
-from jobflow_remote.webgui.palette import state_color
+from jobflow_remote.webgui.palette import (
+    CATEGORY_COLORS,
+    STATE_COLORS,
+    categorize_state_counts,
+    state_color,
+)
+
+if TYPE_CHECKING:
+    from jobflow_remote.jobs.data import FlowInfo
 
 # Bokeh is part of the optional ``gui`` extra. Import the chart helpers and the
-# versioned BokehJS CDN URLs together: if Bokeh is missing, charts are simply
-# skipped and the existing tables remain.
+# versioned BokehJS CDN URLs together. Bokeh is a hard requirement to start the
+# gui.
 try:
     from bokeh.resources import CDN
 
@@ -276,6 +284,106 @@ def state_badge(state: JobState | FlowState):
     )
 
 
+def flow_progress_bar(flow_info: FlowInfo):
+    """
+    Build a horizontal, segmented bar summarizing a flow's job states.
+
+    The jobs of the flow are grouped into the shared operational categories
+    (see :func:`~jobflow_remote.webgui.palette.categorize_state_counts`), with
+    completed jobs shown as a leading green segment. Each segment's width is
+    proportional to its job count and its color comes from the shared palette,
+    so the bar uses the same visual language as the dashboard charts.
+
+    Parameters
+    ----------
+    flow_info
+        A ``FlowInfo`` with its per-job ``job_states`` populated (i.e. queried
+        ``with_jobs_info=True``).
+
+    Returns
+    -------
+    FT
+        A ``Div`` with one colored segment per non-empty category.
+    """
+    state_counts = Counter(flow_info.job_states)
+    completed, total, categories = categorize_state_counts(dict(state_counts), "jobs")
+    if total == 0:
+        return Div(cls="flow-bar")
+    segments = [("Completed", completed, STATE_COLORS["COMPLETED"])]
+    segments += [
+        (name, count, CATEGORY_COLORS.get(name, "#bdc3c7"))
+        for name, count in categories.items()
+    ]
+    seg_divs = [
+        Div(
+            style=f"width:{count / total * 100:.4f}%;background:{color};",
+            cls="flow-bar-seg",
+            title=f"{label}: {count}",
+        )
+        for label, count, color in segments
+        if count
+    ]
+    return Div(*seg_divs, cls="flow-bar", title=f"{completed}/{total} completed")
+
+
+def flow_board_card(flow_info: FlowInfo, proj_name: str):
+    """
+    Build one collapsible flow card for the flows board.
+
+    The (always visible) header shows the flow name, its job count, a state
+    badge and the :func:`flow_progress_bar`. Expanding the card reveals a
+    scrollable list of the flow's jobs; clicking a job row opens the existing
+    job-detail popup (reusing the ``/{proj}/jobs/dialog/{db_id}`` route).
+
+    Parameters
+    ----------
+    flow_info
+        A ``FlowInfo`` queried ``with_jobs_info=True``.
+    proj_name
+        The project name (used to build the job-dialog links).
+
+    Returns
+    -------
+    FT
+        A ``Details`` accordion element.
+    """
+    rows = [
+        Tr(
+            Td(state_badge(jstate)),
+            Td(Span(db_id, cls="row-id")),
+            Td(jname),
+            Td(worker or "-"),
+            hx_get=f"/{proj_name}/jobs/dialog/{db_id}",
+            hx_target="#dialog-container",
+            hx_swap="innerHTML",
+            cls="job-row",
+        )
+        for db_id, jname, jstate, worker in zip(
+            flow_info.db_ids,
+            flow_info.job_names,
+            flow_info.job_states,
+            flow_info.workers,
+            strict=False,
+        )
+    ]
+    body = (
+        ScrollableArea(Table(*rows), height="260px")
+        if rows
+        else P("No jobs in this flow.", cls="muted")
+    )
+    return Details(
+        Summary(
+            Span(flow_info.name or "(unnamed)", cls="flow-board-name"),
+            Span(f"{len(flow_info.db_ids)} jobs", cls="muted flow-board-count"),
+            state_badge(flow_info.state),
+            flow_progress_bar(flow_info),
+            cls="flow-board-summary",
+        ),
+        body,
+        cls="flow-board-card card",
+    )
+
+
 def state_overview(state_counts: dict, what: str):
     """
     Build the "completed" headline metric and the category bar chart.
@@ -295,9 +403,7 @@ def state_overview(state_counts: dict, what: str):
     """
     if charts is None:
         return None
-    completed, total, categories = charts.categorize_state_counts(
-        dict(state_counts), what
-    )
+    completed, total, categories = categorize_state_counts(dict(state_counts), what)
     if total == 0:
         return P(f"No {what} found.")
     pct = (completed / total * 100) if total else 0.0
@@ -633,6 +739,16 @@ def projectbar(proj_name: str = "", what: str = ""):
                                 hx_target="#prj-container",
                                 hx_push_url="true",
                                 # _="on click remove .active from .navbar a then add .active to me",
+                                onclick="setActiveLink(this)",
+                                cls="navbar-link",
+                            )
+                        ),
+                        Li(
+                            A(
+                                "Flows board",
+                                hx_get=f"/{proj_name}/flows/board",
+                                hx_target="#prj-container",
+                                hx_push_url="true",
                                 onclick="setActiveLink(this)",
                                 cls="navbar-link",
                             )
@@ -1877,8 +1993,176 @@ def post(
     ), Div(Script(mermaid_js, type="module"), id="dialog-container")
 
 
+@rt("/{proj_name}/flows/board", methods=["GET"])
+def get_flows_board(proj_name: str, request: Request):
+    """
+    Render the flows board: a filterable, paginated accordion of flow cards.
+
+    The filter form mirrors the flows query form and posts back to this same
+    path; the results (the accordion list) are swapped into ``#board-results``.
+    Reuses the existing flows query/pagination machinery and the per-job dialog.
+    """
+    form = Form(
+        Group(
+            Input(name="flow_id", placeholder="Flow ID"),
+            Input(name="name", placeholder="Flow Name"),
+            cls="group",
+        ),
+        Group(
+            Label("State"),
+            Select(
+                Option("Any", value=""),
+                *[Option(s.name, value=s.value) for s in FlowState],
+                name="state",
+            ),
+            cls="group",
+        ),
+        Group(
+            Label("Start Date/Time"),
+            Input(type="date", name="start_date"),
+            Input(type="time", name="start_time"),
+            Label("End Date/Time"),
+            Input(type="date", name="end_date"),
+            Input(type="time", name="end_time"),
+            cls="group",
+        ),
+        Group(
+            Label("Entries per page"),
+            Select(
+                *[
+                    Option(str(i), value=str(i), selected=(i == 20))
+                    for i in (10, 20, 50, 100)
+                ],
+                name="entries_per_page",
+            ),
+            cls="group",
+        ),
+        Input(type="hidden", name="timezone_in", value="", id="timezone_in"),
+        Button("Search", cls="btn"),
+        Script(js_timezone),
+        hx_post=f"/{proj_name}/flows/board",
+        hx_target="#board-results",
+        # Run once on load (besides manual submit) so the board is populated
+        # with default values without an explicit search.
+        hx_trigger="load, submit",
+        cls="card",
+        id="board-form",
+    )
+
+    content = Div(
+        H3("Flows board"),
+        form,
+        Div(id="board-results"),
+        Div(Script(mermaid_js, type="module"), id="dialog-container"),
+        id="prj-container",
+    )
+
+    # HTMX navigation only needs the fragment; a direct browser load (refresh /
+    # pasted URL) has no HX-Request header and must get the full page.
+    if request.headers.get("HX-Request") == "true":
+        return content
+    return PAGE_TITLE, Main(
+        Script(mermaid_js, type="module"),
+        projectbar(proj_name),
+        content,
+    )
+
+
+@rt("/{proj_name}/flows/board", methods=["POST"])
+def post_flows_board(
+    proj_name: str,
+    flow_id: str = "",
+    name: str = "",
+    state: str = "",
+    start_date: str = "",
+    start_time: str = "",
+    end_date: str = "",
+    end_time: str = "",
+    page: int = 1,
+    entries_per_page: int = 20,
+):
+    """Query flows (with their jobs) and return the paginated accordion list."""
+    query: dict[str, Any] = {}
+    if flow_id:
+        query["flow_ids"] = [flow_id]
+    if name:
+        query["name"] = name
+    if state:
+        query["states"] = FlowState(state)
+
+    if start_time and not start_date:
+        start_date = datetime.now().strftime("%Y-%m-%d")
+    if start_date:
+        fmt = "%Y-%m-%d %H:%M" if start_time else "%Y-%m-%d"
+        value = f"{start_date} {start_time}" if start_time else start_date
+        query["start_date"] = datetime.strptime(value, fmt)
+    if end_time and not end_date:
+        end_date = datetime.now().strftime("%Y-%m-%d")
+    if end_date:
+        fmt = "%Y-%m-%d %H:%M" if end_time else "%Y-%m-%d"
+        value = f"{end_date} {end_time}" if end_time else end_date
+        query["end_date"] = datetime.strptime(value, fmt)
+
+    skip = (page - 1) * entries_per_page
+    job_controller = get_job_controller(proj_name)
+    flows = job_controller.get_flows_info(
+        **query,
+        with_jobs_info=True,
+        sort=[("updated_on", -1)],
+        limit=entries_per_page,
+        skip=skip,
+    )
+
+    if not flows:
+        return Div(P("No flows found matching the criteria."), cls="card")
+
+    total_entries = job_controller.count_flows(**query)
+    total_pages = ceil(total_entries / entries_per_page)
+
+    pagination = Div(
+        A(
+            "Previous",
+            hx_post=f"/{proj_name}/flows/board",
+            hx_include="#board-form",
+            hx_vals=f'{{"page":{page - 1}}}',
+            hx_target="#board-results",
+        )
+        if page > 1
+        else Span("Previous"),
+        *[
+            A(
+                str(i),
+                hx_post=f"/{proj_name}/flows/board",
+                hx_include="#board-form",
+                hx_vals=f'{{"page":{i}}}',
+                hx_target="#board-results",
+            )
+            for i in range(max(1, page - 2), min(total_pages + 1, page + 3))
+        ],
+        A(
+            "Next",
+            hx_post=f"/{proj_name}/flows/board",
+            hx_include="#board-form",
+            hx_vals=f'{{"page":{page + 1}}}',
+            hx_target="#board-results",
+        )
+        if page < total_pages
+        else Span("Next"),
+        cls="pagination",
+    )
+
+    return Div(
+        H4(f"Total after filter: {total_entries}"),
+        *[flow_board_card(flow, proj_name) for flow in flows],
+        pagination,
+        id="board-results",
+    )
+
+
 @requires(
-    fasthtml is not None, "The 'python-fasthtml' package is required to run the gui."
+    fasthtml is not None and charts is not None,
+    "The 'gui' extra is required to run the gui. Install it with "
+    "`pip install jobflow-remote[gui]`.",
 )
 def start_gui(port: int | None = None):
     serve(

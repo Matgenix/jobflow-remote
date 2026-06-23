@@ -570,6 +570,58 @@ dialog {
 }
 
 /* =========================================================================
+   Flows board (collapsible flow cards with a per-flow state bar)
+   ========================================================================= */
+.flow-board-card {
+    padding: 0;
+    margin-bottom: var(--space-3);
+    overflow: hidden;
+}
+
+/* The summary is the always-visible header: name + count + badge + bar. */
+.flow-board-summary {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-3);
+    cursor: pointer;
+    list-style: none;            /* hide the default disclosure triangle... */
+}
+.flow-board-summary::-webkit-details-marker { display: none; }
+
+/* ...and draw our own chevron that rotates when the card is open. */
+.flow-board-summary::before {
+    content: "›";
+    display: inline-block;
+    font-size: 1.3em;
+    line-height: 1;
+    color: var(--text-muted);
+    transition: transform 0.15s ease;
+}
+.flow-board-card[open] > .flow-board-summary::before { transform: rotate(90deg); }
+
+.flow-board-name { font-weight: 600; }
+.flow-board-count { font-size: 0.85em; }
+
+/* The segmented bar is pushed to the right edge of the header. */
+.flow-bar {
+    margin-left: auto;
+    display: flex;
+    width: 160px;
+    height: 16px;
+    border-radius: var(--radius);
+    overflow: hidden;
+    background: var(--border);
+    flex-shrink: 0;
+}
+.flow-bar-seg { height: 100%; }
+
+.flow-board-card > .scrollable-area,
+.flow-board-card > p {
+    margin: 0 var(--space-3) var(--space-3);
+}
+
+/* =========================================================================
    Responsive
    ========================================================================= */
 @media (max-width: 768px) {
