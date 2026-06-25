@@ -103,12 +103,10 @@ def jobs_list(
         typer.Option(
             "--latest-flow",
             "-lf",
-            is_flag=False,
-            flag_value=1,
             help="Only show Jobs belonging to the most recently created Flows (by "
-            "creation date). Optionally provide an integer to set the number of latest "
-            "Flows to consider (e.g. --latest-flow=3); the bare flag selects the single "
-            "latest Flow. Incompatible with --flow-id; applied before all other filters.",
+            "creation date). Provide an integer to set the number of latest Flows to "
+            "consider, e.g. '--latest-flow 3' or '-lf 1' for the single latest Flow. "
+            "Incompatible with --flow-id; applied before all other filters.",
         ),
     ] = 0,
     error: Annotated[
