@@ -174,11 +174,91 @@ js_set_color = """
   }
 """
 
-start_stop_btn_lbl = {
-    "RUNNING": "Stop",
-    "SHUT_DOWN": "Start",
-    "STOPPED": "Start",
+# Daemon states in which the runner is up (or coming up): the toggle button
+# should offer "Stop". Every other state offers "Start".
+running_daemon_status = {
+    DaemonStatus.RUNNING,
+    DaemonStatus.PARTIALLY_RUNNING,
+    DaemonStatus.STARTING,
 }
+
+
+def start_stop_btn_label(status: DaemonStatus) -> str:
+    """Return the toggle-button label ("Stop"/"Start") for a daemon status.
+
+    Parameters
+    ----------
+    status
+        The current status of the daemon.
+
+    Returns
+    -------
+    str
+        ``"Stop"`` if the runner is running (or starting), ``"Start"`` otherwise.
+
+    Notes
+    -----
+    This is reached only on the steady-state / polling path (``projectbar`` on
+    page load and the ``/runner/{proj_name}/status`` poll). The ``start``/``stop``
+    POST handlers instead render a button-less transitional fragment, so the
+    ``STARTING``/``STOPPING`` branches here act as a fallback when those states
+    are observed directly.
+    """
+    return "Stop" if status in running_daemon_status else "Start"
+
+
+def runner_control_items(proj_name: str, status: str, color: str) -> list:
+    """Build the ``Li`` children for the runner-status control group.
+
+    Renders the status pill and the start/stop button. When the runner is
+    stopped (i.e. the button action is ``"Start"``), a "Single process" toggle
+    is included so the user can opt into a single-process runner; when left
+    unchecked the runner starts as a multiprocess daemon.
+
+    Parameters
+    ----------
+    proj_name
+        Name of the project whose runner is controlled.
+    status
+        Current status of the daemon, as a ``DaemonStatus`` name.
+    color
+        Color used to render the status pill.
+
+    Returns
+    -------
+    list
+        The ``Li`` children for the ``#runner-status`` group.
+    """
+    label = start_stop_btn_label(DaemonStatus(status))
+    items = [
+        Li("Runner:"),
+        Li(status, cls="runner-pill", style=f"color: {color};"),
+    ]
+    if label == "Start":
+        items.append(
+            Li(
+                Label(
+                    Input(
+                        type="checkbox",
+                        name="single",
+                        id="runner-single-toggle",
+                    ),
+                    " Single process",
+                )
+            )
+        )
+    items.append(
+        Li(
+            Button(
+                label,
+                hx_post=f"/runner/{proj_name}/{label.lower()}",
+                hx_include="#runner-single-toggle",
+                hx_target="#runner-status",
+            )
+        )
+    )
+    return items
+
 
 status_colors = {
     DaemonStatus.STOPPED: "red",
@@ -758,15 +838,7 @@ def projectbar(proj_name: str = "", what: str = ""):
                 ),
                 Group(
                     Ul(
-                        Li("Runner:"),
-                        Li(f"{status}", cls="runner-pill", style=f"color: {color};"),
-                        Li(
-                            Button(
-                                f"{start_stop_btn_lbl[status]}",
-                                hx_post=f"/runner/{proj_name}/{start_stop_btn_lbl[status].lower()}",
-                                hx_target="#runner-status",
-                            )
-                        ),
+                        *runner_control_items(proj_name, status, color),
                     ),
                     hx_get=f"/runner/{proj_name}/status",
                     hx_trigger="every 30s",
@@ -923,9 +995,9 @@ def close_dialog():
 
 # handle starting and stopping the runner
 @rt("/runner/{proj_name}/start", methods=["POST"])
-def start_runner_route(proj_name: str):
+def start_runner_route(proj_name: str, single: bool = False):
     dm = get_daemon_manager(proj_name)
-    dm.start()
+    dm.start(single=single)
     status = "STARTING"
     color = status_colors[DaemonStatus(status)]
     return Group(
@@ -965,15 +1037,7 @@ def get_runner_status_update(proj_name: str):
     status, color = get_runner_status(proj_name)
     return Group(
         Ul(
-            Li("Runner:"),
-            Li(f"{status}", cls="runner-pill", style=f"color: {color};"),
-            Li(
-                Button(
-                    f"{start_stop_btn_lbl[status]}",
-                    hx_post=f"/runner/{proj_name}/{start_stop_btn_lbl[status].lower()}",
-                    hx_target="#runner-status",
-                )
-            ),
+            *runner_control_items(proj_name, status, color),
         ),
         hx_get=f"/runner/{proj_name}/status",
         hx_trigger="every 30s",
