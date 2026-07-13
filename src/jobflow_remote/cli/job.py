@@ -155,17 +155,13 @@ def jobs_list(
 
     if latest_flow:
         if flow_id:
-            raise typer.BadParameter(
-                "--latest-flow cannot be combined with --flow-id"
-            )
+            raise typer.BadParameter("--latest-flow cannot be combined with --flow-id")
         if latest_flow < 1:
             raise typer.BadParameter("--latest-flow must be a positive integer")
         flows_info = jc.get_flows_info(
             sort=[("created_on", -1)],
             limit=latest_flow,
         )
-        if not flows_info:
-            exit_with_error_msg("No Flows in the database")
         flow_id = [fi.flow_id for fi in flows_info]
 
     start_date = get_start_date(start_date, days, hours)
