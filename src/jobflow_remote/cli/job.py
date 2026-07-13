@@ -99,7 +99,7 @@ def jobs_list(
     locked: locked_opt = False,
     custom_query: query_opt = None,
     latest_flow: Annotated[
-        int,
+        int | None,
         typer.Option(
             "--latest-flow",
             "-lf",
@@ -108,7 +108,7 @@ def jobs_list(
             "consider, e.g. '--latest-flow 3' or '-lf 1' for the single latest Flow. "
             "Incompatible with --flow-id; applied before all other filters.",
         ),
-    ] = 0,
+    ] = None,
     error: Annotated[
         bool,
         typer.Option(
@@ -153,7 +153,7 @@ def jobs_list(
 
     jc = get_job_controller()
 
-    if latest_flow:
+    if latest_flow is not None:
         if flow_id:
             raise typer.BadParameter("--latest-flow cannot be combined with --flow-id")
         if latest_flow < 1:

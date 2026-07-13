@@ -147,6 +147,59 @@ def test_jobs_list(job_controller, two_flows_four_jobs, run_check_cli) -> None:
     )
 
 
+def test_jobs_list_latest_flow(job_controller, two_flows_four_jobs, run_check_cli) -> None:
+
+    run_check_cli(
+        ["job", "list", "-lf", "1"],
+        required_out=["add_job3", "add_job4"],
+        excluded_out=["add_job1", "add_job2"],
+    )
+    run_check_cli(
+        ["job", "list", "-lf", "1", "--count"], required_out="Number of jobs: 2"
+    )
+
+    run_check_cli(
+        ["job", "list", "--latest-flow", "2", "--count"],
+        required_out="Number of jobs: 4",
+    )
+
+    run_check_cli(
+        ["job", "list", "-lf", "5", "--count"], required_out="Number of jobs: 4"
+    )
+
+    run_check_cli(
+        ["job", "list", "-lf", "1", "-s", "READY"],
+        required_out=["add_job3"],
+        excluded_out=["add_job1", "add_job2", "add_job4"],
+    )
+    run_check_cli(
+        ["job", "list", "-lf", "1", "--name", "add_job4", "--count"],
+        required_out="Number of jobs: 1",
+    )
+
+    run_check_cli(
+        ["job", "list", "-lf", "1", "-fid", "1"],
+        error=True,
+        required_out="--latest-flow cannot be combined with --flow-id",
+    )
+    run_check_cli(
+        ["job", "list", "--latest-flow", "0"],
+        error=True,
+        required_out="--latest-flow must be a positive integer",
+    )
+    run_check_cli(
+        ["job", "list", "--latest-flow=-1"],
+        error=True,
+        required_out="--latest-flow must be a positive integer",
+    )
+
+
+def test_jobs_list_latest_flow_empty_db(job_controller, run_check_cli) -> None:
+    run_check_cli(
+        ["job", "list", "-lf", "1", "--count"], required_out="Number of jobs: 0"
+    )
+
+
 def test_jobs_list_settings(
     job_controller, two_flows_four_jobs, monkeypatch, run_check_cli
 ) -> None:
