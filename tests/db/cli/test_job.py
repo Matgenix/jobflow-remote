@@ -147,7 +147,9 @@ def test_jobs_list(job_controller, two_flows_four_jobs, run_check_cli) -> None:
     )
 
 
-def test_jobs_list_latest_flow(job_controller, two_flows_four_jobs, run_check_cli) -> None:
+def test_jobs_list_latest_flow(
+        job_controller, two_flows_four_jobs, run_check_cli
+) -> None:
 
     run_check_cli(
         ["job", "list", "-lf", "1"],
