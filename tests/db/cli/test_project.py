@@ -434,9 +434,7 @@ def test_edit_replace(
                 "--all",
                 "--yes",
             ],
-            required_out=[
-                "✓ Modified: test_project_1",
-            ],
+            required_out=["✓ Modified: test_project_1", "No changes: test_project_2"],
             excluded_out="invalid_project",
         )
 

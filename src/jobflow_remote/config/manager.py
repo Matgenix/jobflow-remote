@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import glob
+import json
 import logging
 import os
 import shutil
@@ -11,7 +12,8 @@ from typing import TYPE_CHECKING, NamedTuple
 import tomlkit
 from monty.json import jsanitize
 from monty.os import makedirs_p
-from monty.serialization import dumpfn, loadfn
+from monty.serialization import dumpfn
+from ruamel.yaml import YAML
 
 from jobflow_remote.config.base import (
     ConfigError,
@@ -99,13 +101,17 @@ class ConfigManager:
             Dictionary with project name as key and ProjectData as value.
         """
         projects_data: dict[str, ProjectData] = {}
+        _yaml = None
         for ext in self.projects_ext:
             for filepath in self.projects_folder.glob(str(f"*.{ext}")):
                 try:
-                    if ext in ["json", "yaml"]:
-                        d = loadfn(filepath, cls=None)
-                    else:
-                        with open(filepath) as f:
+                    with open(filepath) as f:
+                        if ext == "json":
+                            d = json.load(f)
+                        elif ext == "yaml":
+                            _yaml = _yaml or YAML()
+                            d = _yaml.load(f)
+                        else:
                             d = tomlkit.parse(f.read())
                     project = Project.model_validate(d)
                 except Exception:
@@ -297,13 +303,18 @@ class ConfigManager:
         """
         project_names = []
         erroneous_files = []
+
         for ext in self.projects_ext:
+            _yaml = None
             for filepath in glob.glob(str(self.projects_folder / f"*.{ext}")):
                 try:
-                    if ext in ["json", "yaml"]:
-                        d = loadfn(filepath, cls=None)
-                    else:
-                        with open(filepath) as f:
+                    with open(filepath) as f:
+                        if ext == "json":
+                            d = json.load(f)
+                        elif ext == "yaml":
+                            _yaml = _yaml or YAML()
+                            d = _yaml.load(f)
+                        else:
                             d = tomlkit.parse(f.read())
                     if "name" in d:
                         project_names.append(d["name"])
