@@ -230,6 +230,15 @@ def test_info(
 
     daemon_manager.start(single=True)
     wait_daemon_started(daemon_manager)
+
+    # wait for the runner to have pinged the DB before proceeding
+    for _ in range(30):
+        time.sleep(1)
+        if len(job_controller.get_runner_pings()) > 0:
+            break
+    else:
+        raise RuntimeError("The runner did not ping the DB within the allocated time")
+
     job_controller.ping_running_runner(data=ping_data)
 
     req_out = [
