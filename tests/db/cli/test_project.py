@@ -150,13 +150,6 @@ def test_check_fail(job_controller, monkeypatch, tmp_dir, run_check_cli) -> None
             "testtest.yaml",
         )
 
-        print(os.listdir(os.getcwd()))
-
-        run_check_cli(
-            ["project", "list", "-w"],
-            required_out="XXXXXXXXX",
-        )
-
         # project check fails as it cannot connect
         err_required = ["Errors:", "x Worker fake_remote_worker"]
         run_check_cli(
