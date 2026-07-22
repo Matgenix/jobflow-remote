@@ -101,6 +101,7 @@ class ConfigManager:
             Dictionary with project name as key and ProjectData as value.
         """
         projects_data: dict[str, ProjectData] = {}
+        # avoid instantiating YAML multiple times
         _yaml = None
         for ext in self.projects_ext:
             for filepath in self.projects_folder.glob(str(f"*.{ext}")):
@@ -304,8 +305,9 @@ class ConfigManager:
         project_names = []
         erroneous_files = []
 
+        # avoid instantiating YAML multiple times
+        _yaml = None
         for ext in self.projects_ext:
-            _yaml = None
             for filepath in glob.glob(str(self.projects_folder / f"*.{ext}")):
                 try:
                     with open(filepath) as f:
