@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import glob
+import json
 import logging
 import os
 import shutil
@@ -11,7 +12,8 @@ from typing import TYPE_CHECKING, NamedTuple
 import tomlkit
 from monty.json import jsanitize
 from monty.os import makedirs_p
-from monty.serialization import dumpfn, loadfn
+from monty.serialization import dumpfn
+from ruamel.yaml import YAML
 
 from jobflow_remote.config.base import (
     ConfigError,
@@ -99,15 +101,20 @@ class ConfigManager:
             Dictionary with project name as key and ProjectData as value.
         """
         projects_data: dict[str, ProjectData] = {}
+        # avoid instantiating YAML multiple times
+        _yaml = None
         for ext in self.projects_ext:
             for filepath in self.projects_folder.glob(str(f"*.{ext}")):
                 try:
-                    if ext in ["json", "yaml"]:
-                        d = loadfn(filepath)
-                    else:
-                        with open(filepath) as f:
+                    with open(filepath) as f:
+                        if ext == "json":
+                            d = json.load(f)
+                        elif ext == "yaml":
+                            _yaml = _yaml or YAML()
+                            d = _yaml.load(f)
+                        else:
                             d = tomlkit.parse(f.read())
-                    project = Project.parse_obj(d)
+                    project = Project.model_validate(d)
                 except Exception:
                     if self.warn:
                         logger.warning(
@@ -270,7 +277,7 @@ class ConfigManager:
         """
         project_data = self.projects_data.pop(project_name)
         proj_dict = project_data.project.dict()
-        new_project = Project.parse_obj(deep_merge_dict(proj_dict, config))
+        new_project = Project.model_validate(deep_merge_dict(proj_dict, config))
         project_data = ProjectData(project_data.filepath, new_project, project_data.ext)
         self.dump_project(project_data)
         self.projects_data[project_data.project.name] = project_data
@@ -297,13 +304,19 @@ class ConfigManager:
         """
         project_names = []
         erroneous_files = []
+
+        # avoid instantiating YAML multiple times
+        _yaml = None
         for ext in self.projects_ext:
             for filepath in glob.glob(str(self.projects_folder / f"*.{ext}")):
                 try:
-                    if ext in ["json", "yaml"]:
-                        d = loadfn(filepath)
-                    else:
-                        with open(filepath) as f:
+                    with open(filepath) as f:
+                        if ext == "json":
+                            d = json.load(f)
+                        elif ext == "yaml":
+                            _yaml = _yaml or YAML()
+                            d = _yaml.load(f)
+                        else:
                             d = tomlkit.parse(f.read())
                     if "name" in d:
                         project_names.append(d["name"])
