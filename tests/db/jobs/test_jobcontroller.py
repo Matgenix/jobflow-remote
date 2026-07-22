@@ -803,6 +803,8 @@ def test_delete_job(job_controller, two_flows_four_jobs, runner):
     submit_flow(new_flow)
     runner.run_all_jobs()
     add2_info = job_controller.get_job_info(add2.uuid)
+    assert job_controller.jobstore.get_output(add2.uuid)
+    assert os.path.isdir(add2_info.run_dir)
     assert (
         len(
             job_controller.delete_jobs(

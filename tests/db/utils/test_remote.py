@@ -1,5 +1,9 @@
+import pytest
+
+
 def test_share_hosts(mocker):
     import jobflow_remote
+    from jobflow_remote.config.base import Project
     from jobflow_remote.utils.remote import SharedHosts
 
     mocker.patch("jobflow_remote.remote.host.local.LocalHost.close")
@@ -19,3 +23,12 @@ def test_share_hosts(mocker):
 
     # close() called only once after leaving the outermost context manager
     jobflow_remote.remote.host.local.LocalHost.close.assert_called_once()
+
+    # validate incompatibility with multiple projects
+    fake_project = Project(name="fake", queue={})
+    with (
+        SharedHosts() as shared_hosts1,
+        pytest.raises(ValueError, match="SharedHosts is already active for project"),
+        SharedHosts(project=fake_project),
+    ):
+        pass
