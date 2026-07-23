@@ -197,13 +197,14 @@ def check(
     import os
 
     from jobflow_remote import SETTINGS
+    from jobflow_remote.config.settings import JobflowRemoteSettings
 
     prefix = SETTINGS.model_config["env_prefix"]
     extra_vars = [
         k
         for k in os.environ
         if k.lower().startswith(prefix)
-        and k[len(prefix) :].lower() not in SETTINGS.model_fields
+        and k[len(prefix) :].lower() not in JobflowRemoteSettings.model_fields
     ]
     if extra_vars:
         out_console.print(
@@ -321,6 +322,12 @@ def check(
         for e in errors:
             out_console.print(e[0], style="bold")
             out_console.print(e[1])
+    if not errors and SETTINGS.cli_suggestions:
+        out_console.print(
+            "The project configuration is correct. You might want to check for "
+            "conflicts with other project by running `jf project check-conflicts`",
+            style="green",
+        )
 
 
 @app_project.command(name="check-conflicts")
@@ -349,10 +356,11 @@ def check_conflicts() -> None:
         out_console.print(msg, style="yellow")
 
     if len(cm.projects) < 2:
-        exit_with_warning_msg(
-            f"Only {len(cm.projects)} project(s) parsed in {cm.projects_folder}; "
-            "nothing to cross-check."
-        )
+        if len(cm.projects) == 1:
+            msg = f"Only 1 project parsed in {cm.projects_folder}; "
+        else:
+            msg = f"No projects parsed in {cm.projects_folder}; "
+        exit_with_warning_msg(msg + "nothing to cross-check.")
 
     with loading_spinner(processing=False) as progress:
         progress.add_task("Checking projects for conflicts")
