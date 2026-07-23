@@ -71,7 +71,7 @@ def _stop_runners(
     done_label: str,
 ) -> None:
     """
-    Shared implementation for the stopping the runners.
+    Shared implementation for the stopping of the runners.
 
     Parameters
     ----------

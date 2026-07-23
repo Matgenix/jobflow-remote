@@ -55,6 +55,16 @@ You can generate the example in the other formats using the ``--format`` option.
 
         jf project list --warn
 
+.. warning::
+
+    Some configuration options should not be shared among different projects.
+    For example, sharing the same queue store between two different projects will result in
+    unpredictable behaviour. The following command checks the presence of potentially
+    problematic collisions among different projects::
+
+        jf project check-conflicts
+
+
 Name and folders
 ----------------
 
