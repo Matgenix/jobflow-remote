@@ -1,5 +1,38 @@
 # Changelog
 
+## [v1.0.1](https://github.com/Matgenix/jobflow-remote/tree/v1.0.1) (2026-07-23)
+
+[Full Changelog](https://github.com/Matgenix/jobflow-remote/compare/v1.0.0...v1.0.1)
+
+**Closed issues:**
+
+- wk\_name and worker\_name different [\#483](https://github.com/Matgenix/jobflow-remote/issues/483)
+- New release \(\>0.1.8\) [\#426](https://github.com/Matgenix/jobflow-remote/issues/426)
+- Cannot use the secondly defined local worker [\#411](https://github.com/Matgenix/jobflow-remote/issues/411)
+- Remote Error while batch job is still running [\#403](https://github.com/Matgenix/jobflow-remote/issues/403)
+
+**Merged pull requests:**
+
+- Fix failing tests [\#509](https://github.com/Matgenix/jobflow-remote/pull/509) ([gpetretto](https://github.com/gpetretto))
+- Bump actions/setup-python from 6 to 7 [\#507](https://github.com/Matgenix/jobflow-remote/pull/507) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Add --latest-flow / -lf option to jf job list [\#498](https://github.com/Matgenix/jobflow-remote/pull/498) ([Luguza](https://github.com/Luguza))
+- Bump actions/checkout from 6 to 7 [\#495](https://github.com/Matgenix/jobflow-remote/pull/495) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Several small bugfix [\#494](https://github.com/Matgenix/jobflow-remote/pull/494) ([gpetretto](https://github.com/gpetretto))
+- Fix get\_flows\_info call in gui [\#491](https://github.com/Matgenix/jobflow-remote/pull/491) ([gpetretto](https://github.com/gpetretto))
+- compatibility for typer dropping click depenency [\#489](https://github.com/Matgenix/jobflow-remote/pull/489) ([gpetretto](https://github.com/gpetretto))
+- Improve project validation and add project cross checks [\#484](https://github.com/Matgenix/jobflow-remote/pull/484) ([gpetretto](https://github.com/gpetretto))
+- Bump actions/upload-pages-artifact from 4 to 5 [\#471](https://github.com/Matgenix/jobflow-remote/pull/471) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Bump actions/deploy-pages from 4 to 5 [\#467](https://github.com/Matgenix/jobflow-remote/pull/467) ([dependabot[bot]](https://github.com/apps/dependabot))
+- fix: correct enum comparison in stop\_job for SUBMITTED/RUNNING states [\#466](https://github.com/Matgenix/jobflow-remote/pull/466) ([bud-primordium](https://github.com/bud-primordium))
+- Use projection in MongoLock [\#464](https://github.com/Matgenix/jobflow-remote/pull/464) ([gpetretto](https://github.com/gpetretto))
+- Bump docker/bake-action from 6 to 7 [\#462](https://github.com/Matgenix/jobflow-remote/pull/462) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Bump docker/setup-buildx-action from 3 to 4 [\#461](https://github.com/Matgenix/jobflow-remote/pull/461) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Bump actions/download-artifact from 7 to 8 [\#460](https://github.com/Matgenix/jobflow-remote/pull/460) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Bump actions/upload-artifact from 6 to 7 [\#459](https://github.com/Matgenix/jobflow-remote/pull/459) ([dependabot[bot]](https://github.com/apps/dependabot))
+- bump minimum supervisor requirement [\#458](https://github.com/Matgenix/jobflow-remote/pull/458) ([gpetretto](https://github.com/gpetretto))
+- New SeparatedTransferHost that accommodates SFTP-disabled submission nodes [\#456](https://github.com/Matgenix/jobflow-remote/pull/456) ([mcgalcode](https://github.com/mcgalcode))
+- Shutdown all runners [\#444](https://github.com/Matgenix/jobflow-remote/pull/444) ([gpetretto](https://github.com/gpetretto))
+
 ## [v1.0.0](https://github.com/Matgenix/jobflow-remote/tree/v1.0.0) (2026-01-14)
 
 [Full Changelog](https://github.com/Matgenix/jobflow-remote/compare/v0.1.8...v1.0.0)
