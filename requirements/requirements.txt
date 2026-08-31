@@ -1,5 +1,5 @@
 jobflow==0.3.1
-pydantic==2.13.4
+pydantic==2.13.5
 pymongo==4.10.1
 fabric==3.2.3
 tomlkit==0.15.1
