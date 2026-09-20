@@ -180,6 +180,13 @@ RUN cd /tmp &&\
 COPY ./tests/integration/dockerfiles/pbs_startup.sh /etc/startup.sh
 
 
+# -== FRONTEND ==-
+FROM --platform=linux/amd64 ubuntu:22.04 AS frontend
+USER root
+COPY ./tests/integration/dockerfiles/frontend_startup.sh /etc/startup.sh
+# HEALTHCHECK CMD sinfo || exit 1
+
+
 # 2) Add common options from ubuntu server
 FROM --platform=linux/amd64 ${QUEUE_SYSTEM} as jobflow
 

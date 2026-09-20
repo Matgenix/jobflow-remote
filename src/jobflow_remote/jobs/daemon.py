@@ -569,7 +569,7 @@ class DaemonManager:
             check=False,
         )
         if cp.returncode != 0:
-            return f"Error staring the supervisord process. stdout: {cp.stdout}. stderr: {cp.stderr}"
+            return f"Error starting the supervisord process. stdout: {cp.stdout}. stderr: {cp.stderr}"
 
         # TODO check if actually started?
 
