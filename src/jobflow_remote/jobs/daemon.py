@@ -690,7 +690,12 @@ class DaemonManager:
             }
             return True
 
-    def stop(self, wait: bool = False, raise_on_error: bool = False) -> bool:
+    def stop(
+        self,
+        wait: bool = False,
+        raise_on_error: bool = False,
+        enforce_runner_doc: bool = True,
+    ) -> bool:
         """
         Stop the daemon.
 
@@ -700,6 +705,11 @@ class DaemonManager:
             If True wait until the daemon has stopped.
         raise_on_error
             Raise an exception if the daemon cannot be stopped.
+        enforce_runner_doc
+            If False and a daemon is active for this project on the current machine,
+            proceed even if the running runner document does not match the local
+            machine. The document is cleared only if the hostname is the only
+            difference.
 
         Returns
         -------
@@ -707,23 +717,25 @@ class DaemonManager:
             True if the daemon was stopped successfully, False otherwise.
         """
         with self.lock_runner_doc(allow_missing=True) as lock:
-            # This check is done to allow users to switch off the runner
-            # even if the running_runner document is not present.
+            # The document is allowed to be missing to let users switch off
+            # the runner even if the running_runner document is not present.
             # If the document is locked the error will be raised by lock_runner_doc
-            if lock.locked_document:
-                doc_error = self._check_running_runner(
-                    lock.locked_document, raise_on_error=raise_on_error
-                )
-                if doc_error:
-                    logger.error(doc_error)
-                    return False
             status = self.check_status()
+            proceed, clear_doc = self._check_runner_doc_on_stop(
+                lock.locked_document,
+                status=status,
+                enforce_runner_doc=enforce_runner_doc,
+                raise_on_error=raise_on_error,
+            )
+            if not proceed:
+                return False
             if status in (
                 DaemonStatus.STOPPED,
                 DaemonStatus.STOPPING,
                 DaemonStatus.SHUT_DOWN,
             ):
-                lock.update_on_release = {"$set": {"running_runner": None}}
+                if clear_doc:
+                    lock.update_on_release = {"$set": {"running_runner": None}}
                 logger.info("The runner is not running")
                 return False
 
@@ -736,7 +748,7 @@ class DaemonManager:
 
                 error = self._verify_call_result(result, "stop", raise_on_error)
 
-                if error is None:
+                if error is None and clear_doc:
                     lock.update_on_release = {"$set": {"running_runner": None}}
                 return error is None
 
@@ -781,7 +793,12 @@ class DaemonManager:
 
         return None
 
-    def kill(self, raise_on_error: bool = False, wait: bool = False) -> bool:
+    def kill(
+        self,
+        raise_on_error: bool = False,
+        wait: bool = False,
+        enforce_runner_doc: bool = True,
+    ) -> bool:
         """
         Kill the processes daemon.
 
@@ -791,6 +808,11 @@ class DaemonManager:
             If True wait until the processes have been killed.
         raise_on_error
             Raise an exception if the processes cannot be killed.
+        enforce_runner_doc
+            If False and a daemon is active for this project on the current machine,
+            proceed even if the running runner document does not match the local
+            machine. The document is cleared only if the hostname is the only
+            difference.
 
         Returns
         -------
@@ -798,32 +820,36 @@ class DaemonManager:
             True if the processes were killed successfully, False otherwise.
         """
         with self.lock_runner_doc() as lock:
-            doc_error = self._check_running_runner(
-                lock.locked_document, raise_on_error=raise_on_error
-            )
-            if doc_error:
-                logger.error(doc_error)
-                return False
             # If the daemon is shutting down supervisord may not be able to identify
             # the state. Try proceeding in that case, since we really want to kill
             # the process
             status = None
             try:
                 status = self.check_status()
-                if status == DaemonStatus.SHUT_DOWN:
-                    logger.info("supervisord is not running. No process is running")
-                    lock.update_on_release = {"$set": {"running_runner": None}}
-                    return True
-                if status == DaemonStatus.STOPPED:
-                    logger.info("Processes are already stopped.")
-                    lock.update_on_release = {"$set": {"running_runner": None}}
-                    return True
             except DaemonError as e:
                 msg = (
                     f"Error while determining the state of the runner: {getattr(e, 'message', str(e))}."
                     f"Proceeding with the kill command."
                 )
                 logger.warning(msg)
+            proceed, clear_doc = self._check_runner_doc_on_stop(
+                lock.locked_document,
+                status=status,
+                enforce_runner_doc=enforce_runner_doc,
+                raise_on_error=raise_on_error,
+            )
+            if not proceed:
+                return False
+
+            if status == DaemonStatus.SHUT_DOWN:
+                logger.info("supervisord is not running. No process is running")
+                lock.update_on_release = {"$set": {"running_runner": None}}
+                return True
+            if status == DaemonStatus.STOPPED:
+                logger.info("Processes are already stopped.")
+                if clear_doc:
+                    lock.update_on_release = {"$set": {"running_runner": None}}
+                return True
 
             if status in (
                 None,
@@ -836,7 +862,8 @@ class DaemonManager:
                 error = self._verify_call_result(result, "kill", raise_on_error)
 
                 if error is None:
-                    lock.update_on_release = {"$set": {"running_runner": None}}
+                    if clear_doc:
+                        lock.update_on_release = {"$set": {"running_runner": None}}
                     if wait:
                         while True:
                             time.sleep(1)
@@ -856,7 +883,12 @@ class DaemonManager:
 
         raise DaemonError(f"Daemon status {status} could not be handled")
 
-    def shut_down(self, raise_on_error: bool = False, wait: bool = False) -> bool:
+    def shut_down(
+        self,
+        raise_on_error: bool = False,
+        wait: bool = False,
+        enforce_runner_doc: bool = True,
+    ) -> bool:
         """
         Shut down the supervisord process and all the processes of the daemon.
 
@@ -866,23 +898,30 @@ class DaemonManager:
             If True, raise an exception if an error occurs.
         wait
             If True wait until the daemon has stopped.
+        enforce_runner_doc
+            If False and a daemon is active for this project on the current machine,
+            proceed even if the running runner document does not match the local
+            machine. The document is cleared only if the hostname is the only
+            difference.
+
         Returns
         -------
         bool
             True if the daemon is shut down correctly, False otherwise.
         """
         with self.lock_runner_doc(allow_missing=True) as lock:
-            # This check is done to allow users to switch off the runner
-            # even if the running_runner document is not present.
-            # If the document is locked the error will be raised by lock_runner_doc
-            if lock.locked_document:
-                doc_error = self._check_running_runner(
-                    lock.locked_document, raise_on_error=raise_on_error
-                )
-                if doc_error:
-                    logger.error(doc_error)
-                    return False
+            # The document is allowed to be missing to let users switch off
+            # the runner even if the running_runner document is not present.
+            # If the document is locked the error will be raised by lock_runner_doc.
             status = self.check_status()
+            proceed, clear_doc = self._check_runner_doc_on_stop(
+                lock.locked_document,
+                status=status,
+                enforce_runner_doc=enforce_runner_doc,
+                raise_on_error=raise_on_error,
+            )
+            if not proceed:
+                return False
             if status == DaemonStatus.SHUT_DOWN:
                 logger.info("supervisord is already shut down.")
                 lock.update_on_release = {"$set": {"running_runner": None}}
@@ -907,17 +946,29 @@ class DaemonManager:
                         return False
                     if current_status == DaemonStatus.SHUT_DOWN:
                         break
-            lock.update_on_release = {"$set": {"running_runner": None}}
+            if clear_doc:
+                lock.update_on_release = {"$set": {"running_runner": None}}
             return True
 
-    def restart(self, raise_on_error: bool = False) -> bool:
+    def restart(
+        self, raise_on_error: bool = False, enforce_runner_doc: bool = True
+    ) -> bool:
         """
-        Restart the daemon by stopping and waiting then starting it with the same options.
+        Restart the daemon by shutting it down and waiting, then starting it with the same options.
+
+        Since supervisord is started again, the daemon processes will run with the
+        environment of the process calling this method.
 
         Parameters
         ----------
         raise_on_error
             If True, raise an exception if an error occurs.
+        enforce_runner_doc
+            If False and a daemon is active for this project on the current machine,
+            shut it down even if the running runner document does not match the local
+            machine. The document is cleared only if the hostname is the only
+            difference, otherwise the start will fail and the daemon will remain
+            shut down.
 
         Returns
         -------
@@ -925,31 +976,59 @@ class DaemonManager:
             True if the daemon is restarted correctly, False otherwise.
         """
         with self.lock_runner_doc(allow_missing=True) as lock:
-            doc = lock.locked_document
-            doc_error = self._check_running_runner(doc, raise_on_error=raise_on_error)
-            if doc_error:
-                logger.error(doc_error)
-                return False
             status = self.check_status()
+            proceed, _ = self._check_runner_doc_on_stop(
+                lock.locked_document,
+                status=status,
+                enforce_runner_doc=enforce_runner_doc,
+                raise_on_error=raise_on_error,
+            )
+            if not proceed:
+                return False
             if status not in (
                 DaemonStatus.RUNNING,
                 DaemonStatus.PARTIALLY_RUNNING,
             ):
                 logger.warning(f"Status of the runner {status.value}. Cannot restart")
                 return False
-        stop_out = self.stop(wait=True, raise_on_error=raise_on_error)
-        if not stop_out:
-            logger.warning("Could not stop the runner")
+        shut_down_out = self.shut_down(
+            wait=True,
+            raise_on_error=raise_on_error,
+            enforce_runner_doc=enforce_runner_doc,
+        )
+        if not shut_down_out:
+            logger.warning("Could not shut down the runner")
             return False
         old_config = self.parse_config_file()
-        return self.start(
-            num_procs_transfer=old_config["num_procs_transfer"],
-            num_procs_complete=old_config["num_procs_complete"],
-            single=old_config["single"],
-            log_level=old_config["log_level"],
-            raise_on_error=raise_on_error,
-            connect_interactive=old_config["connect_interactive"],
+        not_started_msg = (
+            "The runner has been shut down, but it could not be started again"
         )
+        try:
+            started = self.start(
+                num_procs_transfer=old_config["num_procs_transfer"],
+                num_procs_complete=old_config["num_procs_complete"],
+                single=old_config["single"],
+                log_level=old_config["log_level"],
+                raise_on_error=raise_on_error,
+                connect_interactive=old_config["connect_interactive"],
+            )
+        except RunningDaemonError as exc:
+            raise RunningDaemonError(f"{not_started_msg}.\n{exc}") from exc
+        if not started:
+            logger.warning(not_started_msg)
+            return False
+        # Starting supervisord does not wait for the processes to be running.
+        # Wait for them, so that the daemon is running when the method returns.
+        try:
+            self.wait_start()
+        except DaemonError:
+            if raise_on_error:
+                raise
+            logger.warning(
+                "The runner processes did not start correctly", exc_info=True
+            )
+            return False
+        return True
 
     def wait_start(self, timeout: int = 30) -> None:
         """
@@ -963,8 +1042,10 @@ class DaemonManager:
         time_limit = time.time() + timeout
         while True:
             processes_info = self.get_processes_info()
-            all_started = True
-            for name, proc_info in processes_info.items():
+            # None if supervisord has just been started and the pid file
+            # has not been written yet.
+            all_started = processes_info is not None
+            for name, proc_info in (processes_info or {}).items():
                 if proc_info["state"] not in RUNNING_STATES:
                     raise DaemonError(f"Process {name} is not in a running state")
                 if proc_info["state"] != ProcessStates.RUNNING:
@@ -1162,8 +1243,29 @@ class DaemonManager:
         str | None
             If the information matches, return None. Otherwise, return a string with the error message.
         """
+        _, error = self._compare_running_runner(doc)
+
+        if error and raise_on_error:
+            raise RunningDaemonError(error)
+        return error
+
+    def _compare_running_runner(self, doc: dict) -> tuple[list[str], str | None]:
+        """
+        Compare the information in the DB about the running runner with the information about the local machine.
+
+        Parameters
+        ----------
+        doc
+            The document from the DB with the information about the running runner.
+
+        Returns
+        -------
+        tuple[list[str], str | None]
+            The list of the fields that do not match and a string with the error
+            message. If the information matches, the list is empty and the message is None.
+        """
         if not doc["running_runner"]:
-            return None
+            return [], None
 
         db_data = doc["running_runner"]
 
@@ -1183,7 +1285,7 @@ class DaemonManager:
             logger.info(
                 "The DB reports that there is a running runner and it corresponds to this machine"
             )
-            return None
+            return [], None
 
         error = "A daemon runner process associated to this database may be already running.\n"
         helper_sentences = {
@@ -1202,9 +1304,71 @@ class DaemonManager:
             f"- The last time it pinged the database was: {db_data['last_pinged']}\n"
         )
 
-        if raise_on_error:
-            raise RunningDaemonError(error)
-        return error
+        return diffs, error
+
+    def _check_runner_doc_on_stop(
+        self,
+        doc: dict | None,
+        status: DaemonStatus | None,
+        enforce_runner_doc: bool,
+        raise_on_error: bool,
+    ) -> tuple[bool, bool]:
+        """
+        Check the running runner document before stopping, killing or shutting
+        down the local daemon.
+
+        If the document does not match the local machine the action is prevented,
+        unless the check is not enforced and a local daemon is active. In that case
+        the action can proceed, but the document is cleared only if the hostname
+        is the only difference (e.g. the hostname of the machine changed while the
+        runner was active). Otherwise the document likely refers to another runner
+        and is left untouched.
+
+        Parameters
+        ----------
+        doc
+            The locked document from the DB with the information about the running
+            runner. None if the document is missing.
+        status
+            The local status of the daemon. None if it could not be determined.
+        enforce_runner_doc
+            If True, any mismatch in the document prevents the action.
+        raise_on_error
+            If True, raise a RunningDaemonError if the action is prevented,
+            otherwise log the error.
+
+        Returns
+        -------
+        tuple[bool, bool]
+            Whether the action should proceed and whether the running runner
+            document should be cleared once the action is completed.
+        """
+        if not doc:
+            return True, True
+
+        diffs, doc_error = self._compare_running_runner(doc)
+        if not doc_error:
+            return True, True
+
+        if enforce_runner_doc or status in (DaemonStatus.SHUT_DOWN, None):
+            if raise_on_error:
+                raise RunningDaemonError(doc_error)
+            logger.error(doc_error)
+            return False, False
+
+        if diffs == ["hostname"]:
+            logger.warning(
+                "The running runner document differs from the local machine only "
+                "for the hostname. Assuming that the hostname of the machine changed, "
+                "the document will be cleared."
+            )
+            return True, True
+
+        logger.warning(
+            "The running runner document does not match the local machine. Proceeding "
+            f"with the local daemon, but the document will be left untouched.\n{doc_error}"
+        )
+        return True, False
 
     def check_matching_runner(
         self, raise_on_error: bool = False, allow_missing: bool = False
