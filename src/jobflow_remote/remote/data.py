@@ -246,6 +246,11 @@ def resolve_job_dict_args(job_dict: dict, store: JobStore) -> dict:
     The references are resolved inplace.
 
     If resolve_references in job.config is False references are not resolved.
+    If it is "both", each reference is replaced by a ResolvedReference
+    containing both the reference and its resolved value. In this case
+    resolve_references is set to False in the returned dictionary, so that the
+    references are not resolved and wrapped a second time when the Job is
+    executed on the worker.
 
     Parameters
     ----------
@@ -256,26 +261,42 @@ def resolve_job_dict_args(job_dict: dict, store: JobStore) -> dict:
 
     Returns
     -------
+    dict
         The updated version of the input dictionary with references resolved.
     """
     from jobflow.core.reference import OnMissing, find_and_resolve_references
 
-    if not job_dict["config"]["resolve_references"]:
+    resolve_references = job_dict["config"]["resolve_references"]
+    if not resolve_references:
         return job_dict
 
     on_missing = OnMissing(job_dict["config"]["on_missing_references"])
     cache: dict[str, Any] = {}
+    resolve_kwargs: dict[str, Any] = {"cache": cache, "on_missing": on_missing}
+    wrap_resolved = resolve_references == "both"
+    # Only pass wrap_resolved if needed, to keep compatibility with versions
+    # of jobflow that do not support it.
+    if wrap_resolved:
+        resolve_kwargs["wrap_resolved"] = True
     resolved_args = find_and_resolve_references(
-        job_dict["function_args"], store, cache=cache, on_missing=on_missing
+        job_dict["function_args"], store, **resolve_kwargs
     )
     resolved_kwargs = find_and_resolve_references(
-        job_dict["function_kwargs"], store, cache=cache, on_missing=on_missing
+        job_dict["function_kwargs"], store, **resolve_kwargs
     )
     resolved_args = tuple(resolved_args)
 
     # substitution is in place
     job_dict["function_args"] = resolved_args
     job_dict["function_kwargs"] = resolved_kwargs
+
+    if wrap_resolved:
+        # Job.run on the worker would resolve the arguments again. This is
+        # harmless for already wrapped values, but references left unresolved
+        # (e.g. with OnMissing.PASS) would end up wrapped twice in a
+        # ResolvedReference. Since the resolution has already been performed
+        # here, disable it in the copy of the Job that is sent to the worker.
+        job_dict["config"]["resolve_references"] = False
 
     missing_stores = check_additional_stores(job_dict, store)
     if missing_stores:
