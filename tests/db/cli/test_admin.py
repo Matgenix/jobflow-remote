@@ -331,7 +331,7 @@ def test_index_rebuild(job_controller, one_job, run_check_cli):
     )
     job_indexes = list(job_controller.jobs.list_indexes())
     flows_indexes = list(job_controller.flows.list_indexes())
-    assert len(job_indexes) == 11
+    assert len(job_indexes) == 12
     assert len(flows_indexes) == 7
 
 
@@ -350,7 +350,7 @@ def test_index_create(job_controller, one_job, run_check_cli):
 
     job_indexes = list(job_controller.jobs.list_indexes())
     flows_indexes = list(job_controller.flows.list_indexes())
-    assert len(job_indexes) == 12
+    assert len(job_indexes) == 13
     assert len(flows_indexes) == 8
 
     run_check_cli(
@@ -360,5 +360,5 @@ def test_index_create(job_controller, one_job, run_check_cli):
 
     job_indexes = list(job_controller.jobs.list_indexes())
     flows_indexes = list(job_controller.flows.list_indexes())
-    assert len(job_indexes) == 11
+    assert len(job_indexes) == 12
     assert len(flows_indexes) == 7
