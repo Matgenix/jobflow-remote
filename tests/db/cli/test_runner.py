@@ -117,7 +117,13 @@ def test_std_operations(
     )
 
 
-def test_reset(wait_daemon_started, daemon_manager, job_controller, run_check_cli):
+def test_reset(
+    wait_daemon_started,
+    wait_daemon_shutdown,
+    daemon_manager,
+    job_controller,
+    run_check_cli,
+):
     # set some fake value inside the running_runner document
     runner_info = daemon_manager._get_runner_info()
     runner_info["mac_address"] = "XXXXXXX"
@@ -154,6 +160,241 @@ def test_reset(wait_daemon_started, daemon_manager, job_controller, run_check_cl
 
     wait_daemon_started(daemon_manager)
     assert daemon_manager.check_status().value == "RUNNING"
+
+    # if the runner is active on the same machine the reset should fail
+    run_check_cli(
+        ["runner", "reset"],
+        required_out="Resetting could result in orphaning such process",
+        excluded_out=[
+            "Do you want to proceed?",
+            "The running runner document was reset",
+        ],
+        error=True,
+    )
+
+    # with --force the document is reset, but the supervisord files are kept,
+    # so that the local runner can still be controlled.
+    run_check_cli(
+        ["runner", "reset", "--force", "-y"],
+        required_out="The running runner document was reset",
+    )
+
+    assert job_controller.get_running_runner() is None
+    assert daemon_manager.pid_filepath.exists()
+    assert daemon_manager.sock_filepath.exists()
+
+    run_check_cli(["runner", "shutdown"])
+
+    wait_daemon_shutdown(daemon_manager)
+    assert daemon_manager.check_status().value == "SHUT_DOWN"
+
+
+def test_reset_processes_check_error(
+    daemon_manager, job_controller, monkeypatch, run_check_cli
+):
+    from jobflow_remote.jobs.daemon import DaemonError, DaemonManager
+
+    runner_info = daemon_manager._get_runner_info()
+    runner_info["hostname"] = "YYYYYYY"
+    job_controller.auxiliary.find_one_and_update(
+        {"running_runner": {"$exists": True}}, {"$set": {"running_runner": runner_info}}
+    )
+
+    def raise_error(self):
+        raise DaemonError("fake error")
+
+    with monkeypatch.context() as m:
+        m.setattr(DaemonManager, "get_processes_info", raise_error)
+
+        # if the processes cannot be checked the reset should fail
+        run_check_cli(
+            ["runner", "reset", "-y"],
+            required_out=[
+                "Could not determine if runner processes are active on this machine",
+                "fake error",
+                "--force",
+            ],
+            excluded_out="The running runner document was reset",
+            error=True,
+        )
+
+        assert job_controller.get_running_runner()["hostname"] == "YYYYYYY"
+
+        # with --force the processes are not checked
+        run_check_cli(
+            ["runner", "reset", "--force", "-y"],
+            required_out="The running runner document was reset",
+        )
+
+        assert job_controller.get_running_runner() is None
+
+
+def test_skip_doc_check(
+    wait_daemon_started,
+    wait_daemon_shutdown,
+    daemon_manager,
+    job_controller,
+    run_check_cli,
+):
+    daemon_manager.start()
+    wait_daemon_started(daemon_manager)
+    # set some fake value inside the running_runner document
+    runner_info = daemon_manager._get_runner_info()
+    runner_info["mac_address"] = "XXXXXXX"
+    runner_info["hostname"] = "YYYYYYY"
+    job_controller.auxiliary.find_one_and_update(
+        {"running_runner": {"$exists": True}}, {"$set": {"running_runner": runner_info}}
+    )
+
+    run_check_cli(
+        ["-fe", "runner", "shutdown"],
+        required_out=[
+            "A daemon runner process associated to this database may be already running",
+            "YYYYYYY",
+            "jf runner reset",
+            "--skip-doc",
+        ],
+        error=True,
+    )
+
+    assert daemon_manager.check_status().value == "RUNNING"
+
+    run_check_cli(
+        ["runner", "shutdown", "--skip-doc"],
+        required_out="The shut_down signal has been sent",
+    )
+
+    wait_daemon_shutdown(daemon_manager)
+
+    assert daemon_manager.check_status().value == "SHUT_DOWN"
+
+    assert job_controller.get_running_runner() is None
+
+
+def test_skip_doc_check_mismatch(
+    wait_daemon_started,
+    wait_daemon_shutdown,
+    daemon_manager,
+    job_controller,
+    run_check_cli,
+):
+    daemon_manager.start()
+    wait_daemon_started(daemon_manager)
+    # set a running_runner document that refers to a different runner.
+    # The local runner can be shut down, but the document should not be cleared.
+    runner_info = daemon_manager._get_runner_info()
+    runner_info["hostname"] = "YYYYYYY"
+    runner_info["daemon_dir"] = "/fake/daemon/dir"
+    job_controller.auxiliary.find_one_and_update(
+        {"running_runner": {"$exists": True}}, {"$set": {"running_runner": runner_info}}
+    )
+
+    run_check_cli(
+        ["runner", "shutdown", "--skip-doc"],
+        required_out=[
+            "The shut_down signal has been sent",
+            "was left untouched",
+            "jf runner reset",
+        ],
+    )
+
+    wait_daemon_shutdown(daemon_manager)
+
+    assert daemon_manager.check_status().value == "SHUT_DOWN"
+
+    running_runner = job_controller.get_running_runner()
+    assert running_runner["daemon_dir"] == "/fake/daemon/dir"
+    assert running_runner["hostname"] == "YYYYYYY"
+
+
+@pytest.mark.parametrize("command", ["stop-processes", "kill"])
+def test_skip_doc_check_stop_kill(
+    command,
+    wait_daemon_started,
+    wait_daemon_stopped,
+    daemon_manager,
+    job_controller,
+    run_check_cli,
+):
+    daemon_manager.start()
+    wait_daemon_started(daemon_manager)
+    # only the hostname differs: the runner is stopped and the document cleared
+    runner_info = daemon_manager._get_runner_info()
+    runner_info["hostname"] = "YYYYYYY"
+    job_controller.auxiliary.find_one_and_update(
+        {"running_runner": {"$exists": True}}, {"$set": {"running_runner": runner_info}}
+    )
+
+    run_check_cli(
+        ["runner", command],
+        required_out=[
+            "A daemon runner process associated to this database may be already running",
+            "YYYYYYY",
+            "--skip-doc",
+        ],
+        error=True,
+    )
+
+    assert daemon_manager.check_status().value == "RUNNING"
+
+    run_check_cli(["runner", command, "--skip-doc"])
+
+    wait_daemon_stopped(daemon_manager)
+    assert daemon_manager.check_status().value == "STOPPED"
+    assert job_controller.get_running_runner() is None
+
+
+def test_restart_skip_doc_check(
+    wait_daemon_started, daemon_manager, job_controller, run_check_cli
+):
+    daemon_manager.start()
+    wait_daemon_started(daemon_manager)
+    # only the hostname differs: the runner is restarted and the document
+    # is updated with the information of the current machine.
+    runner_info = daemon_manager._get_runner_info()
+    runner_info["hostname"] = "YYYYYYY"
+    job_controller.auxiliary.find_one_and_update(
+        {"running_runner": {"$exists": True}}, {"$set": {"running_runner": runner_info}}
+    )
+
+    run_check_cli(
+        ["runner", "restart"],
+        required_out=["Error while restarting the daemon", "YYYYYYY", "--skip-doc"],
+        error=True,
+    )
+    assert daemon_manager.check_status().value == "RUNNING"
+
+    run_check_cli(["runner", "restart", "--skip-doc"])
+    wait_daemon_started(daemon_manager)
+    assert daemon_manager.check_status().value == "RUNNING"
+    running_runner = job_controller.get_running_runner()
+    assert running_runner["hostname"] == daemon_manager._get_runner_info()["hostname"]
+
+
+def test_restart_skip_doc_check_mismatch(
+    wait_daemon_started, daemon_manager, job_controller, run_check_cli
+):
+    daemon_manager.start()
+    wait_daemon_started(daemon_manager)
+    # the document refers to a different runner: the local runner is shut down,
+    # but cannot be started again.
+    runner_info = daemon_manager._get_runner_info()
+    runner_info["daemon_dir"] = "/fake/daemon/dir"
+    job_controller.auxiliary.find_one_and_update(
+        {"running_runner": {"$exists": True}}, {"$set": {"running_runner": runner_info}}
+    )
+
+    run_check_cli(
+        ["runner", "restart", "--skip-doc"],
+        required_out=[
+            "Error while restarting the daemon",
+            "The runner has been shut down, but it could not be started again",
+        ],
+        error=True,
+    )
+
+    assert daemon_manager.check_status().value == "SHUT_DOWN"
+    assert job_controller.get_running_runner()["daemon_dir"] == "/fake/daemon/dir"
 
 
 def test_info(

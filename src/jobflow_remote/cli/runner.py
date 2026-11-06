@@ -16,13 +16,14 @@ from jobflow_remote.cli.jf import app
 from jobflow_remote.cli.jfr_typer import JFRTyper
 from jobflow_remote.cli.types import (
     break_lock_opt,
-    force_opt_deprecated,
     log_level_opt,
+    skip_doc_opt,
     verbosity_opt,
     yes_opt,
 )
 from jobflow_remote.cli.utils import (
     check_stopped_runner,
+    err_console,
     exit_with_error_msg,
     exit_with_warning_msg,
     fmt_datetime,
@@ -54,6 +55,8 @@ _running_daemon_error_msg = (
     "\nRun `jf runner info` to get more details about the active runner reported in the database.\n"
     "If you are [bold]absolutely sure that no other runner is active on another machine "
     "or for another project[/bold], clean the DB with `jf runner reset`.\n"
+    "If instead you know that the runner is active on the current machine (e.g. the hostname "
+    "of the machine changed), you can stop, kill or shut it down with the `--skip-doc` option.\n"
     "[bold]If you are unsure about the meaning of this message check the documentation:[/bold] [link=https://matgenix.github.io/jobflow-remote/user/troubleshooting.html]https://matgenix.github.io/jobflow-remote/user/troubleshooting.html[/link]"
 )
 
@@ -69,6 +72,7 @@ def _stop_runners(
     target_status: DaemonStatus,
     action_name: str,
     done_label: str,
+    enforce_runner_doc: bool,
 ) -> None:
     """
     Shared implementation for the stopping of the runners.
@@ -103,6 +107,10 @@ def _stop_runners(
         Label for completed projects in the timeout breakdown (e.g. ``"Stopped"``);
         the "not done" counterpart is derived as ``f"Not {done_label.lower()}"``,
         and the all-projects success summary uses the lowercased form too.
+    enforce_runner_doc
+        If False and a daemon is active for the project on the current machine,
+        proceed even if the running runner document does not match the local
+        machine. The document is cleared only if the hostname is the only difference.
     """
     cm = get_config_manager()
     if all_projects:
@@ -118,7 +126,11 @@ def _stop_runners(
                     daemon_managers[project_name] = dm
                     current_status = dm.check_status(raise_on_shutdown=False)
                     if current_status not in skip_action_statuses:
-                        getattr(dm, dm_method_name)(raise_on_error=True, wait=False)
+                        getattr(dm, dm_method_name)(
+                            raise_on_error=True,
+                            wait=False,
+                            enforce_runner_doc=enforce_runner_doc,
+                        )
                     if current_status not in completed_statuses:
                         done_projects.append(project_name)
                 except Exception:
@@ -175,7 +187,9 @@ def _stop_runners(
             )
             try:
                 action_result = getattr(dm, dm_method_name)(
-                    raise_on_error=True, wait=wait
+                    raise_on_error=True,
+                    wait=wait,
+                    enforce_runner_doc=enforce_runner_doc,
                 )
             except RunningDaemonError as e:
                 exit_with_error_msg(
@@ -195,6 +209,21 @@ def _stop_runners(
                     f"Run 'jf runner status' to verify if it {done_label.lower()}"
                 )
                 out_console.print(msg, style="yellow")
+
+        # The backend leaves the running runner document untouched if it does not
+        # match the local runner. Check the DB to suggest how to clean it.
+        jc = get_job_controller()
+        if (
+            action_result
+            and not enforce_runner_doc
+            and jc.get_running_runner() not in (None, "NO_DOCUMENT")
+        ):
+            err_console.print(
+                "The running runner document in the DB does not match the local runner "
+                "and was left untouched. Run `jf runner info` to check it and, if you "
+                "are sure that no other runner is active, clean it with `jf runner reset`.",
+                style="gold1",
+            )
 
 
 @app_runner.command()
@@ -397,6 +426,7 @@ def stop_processes(
             ),
         ),
     ] = 120,
+    skip_doc_check: skip_doc_opt = False,
 ) -> None:
     """
     Send a stop signal to the Runner processes.
@@ -424,6 +454,7 @@ def stop_processes(
         target_status=DaemonStatus.STOPPED,
         action_name="stopping",
         done_label="Stopped",
+        enforce_runner_doc=not skip_doc_check,
     )
 
 
@@ -468,12 +499,20 @@ def stop(
             ),
         ),
     ] = 120,
+    skip_doc_check: skip_doc_opt = False,
 ) -> None:
     """
     Shuts down the supervisord process.
     Note that the supervisord process will stop after all the runner processes have finished.
+    Equivalent to `jf runner shutdown`.
     """
-    shutdown(wait=wait, all_projects=all_projects, json_out=json_out, max_wait=max_wait)
+    shutdown(
+        wait=wait,
+        all_projects=all_projects,
+        json_out=json_out,
+        max_wait=max_wait,
+        skip_doc_check=skip_doc_check,
+    )
 
 
 @app_runner.command()
@@ -515,6 +554,7 @@ def kill(
             ),
         ),
     ] = 120,
+    skip_doc_check: skip_doc_opt = False,
 ) -> None:
     """
     Send a kill signal to the Runner processes.
@@ -531,6 +571,7 @@ def kill(
         target_status=DaemonStatus.STOPPED,
         action_name="killing",
         done_label="Killed",
+        enforce_runner_doc=not skip_doc_check,
     )
 
 
@@ -575,6 +616,7 @@ def shutdown(
             ),
         ),
     ] = 120,
+    skip_doc_check: skip_doc_opt = False,
 ) -> None:
     """
     Shuts down the supervisord process.
@@ -594,21 +636,23 @@ def shutdown(
         target_status=DaemonStatus.SHUT_DOWN,
         action_name="shutting down",
         done_label="Shut-down",
+        enforce_runner_doc=not skip_doc_check,
     )
 
 
 @app_runner.command()
-def restart() -> None:
+def restart(skip_doc_check: skip_doc_opt = False) -> None:
     """
-    Restart the runner. Send a stop signal, wait for the runner to stop and
-    restart it. The options to start the runner (e.g. --single) remain the same.
+    Restart the runner. Shut down the runner, wait for it to stop and
+    restart it. The options to start the runner (e.g. --single) remain the same,
+    but the runner will use the environment of the current shell.
     """
     cm = get_config_manager()
     dm = DaemonManager.from_project(cm.get_project())
     with loading_spinner(processing=False) as progress:
         progress.add_task(description="Restarting the daemon...", total=None)
         try:
-            dm.restart(raise_on_error=True)
+            dm.restart(raise_on_error=True, enforce_runner_doc=not skip_doc_check)
         except RunningDaemonError as e:
             exit_with_error_msg(
                 f"Error while restarting the daemon:\n{getattr(e, 'message', e)}{_running_daemon_error_msg}"
@@ -788,7 +832,14 @@ def foreground() -> None:
 @app_runner.command()
 def reset(
     yes_all: yes_opt = False,
-    force_deprecated: force_opt_deprecated = False,
+    force: Annotated[
+        bool,
+        typer.Option(
+            "--force",
+            "-f",
+            help="Reset the runner even if supervisor processes are active for this project on this machine",
+        ),
+    ] = False,
     break_lock: break_lock_opt = False,
 ) -> None:
     """
@@ -797,11 +848,30 @@ def reset(
     machine anymore.
     """
     jc = get_job_controller()
-
     running_runner = jc.get_running_runner()
     if running_runner in ("NO_DOCUMENT", None):
         exit_with_warning_msg("No running runner present in the database")
         raise typer.Exit(0)
+
+    cm = get_config_manager()
+    dm = DaemonManager.from_project(cm.get_project())
+
+    if not force:
+        try:
+            pinfo = dm.get_processes_info()
+        except Exception as e:
+            exit_with_error_msg(
+                "Could not determine if runner processes are active on this machine: "
+                f"{getattr(e, 'message', e)}\nIf you are sure you want to reset, "
+                "run the command with the --force option."
+            )
+        if pinfo:
+            exit_with_error_msg(
+                f"Processes with ids {','.join(str(p['pid']) for p in pinfo.values())} active "
+                "on this machine. Resetting could result in orphaning such process. If you "
+                "are sure you want to reset you can run the command with the --force option."
+            )
+
     if not yes_all:
         text = Text.from_markup(
             "[red]This operation will remove the information about the current "
@@ -823,10 +893,10 @@ def reset(
         progress.add_task(description="Resetting runner information...", total=None)
         jc.clean_running_runner(break_lock=break_lock)
 
-        # Also clean supervisord files, if they exist.
-        cm = get_config_manager()
-        dm = DaemonManager.from_project(cm.get_project())
-        dm.clean_files()
+        # Also clean supervisord files, if they exist and supervisord is not running
+        # on this machine. Otherwise the processes could not be controlled anymore.
+        if not dm.check_supervisord_process():
+            dm.clean_files()
 
     out_console.print("The running runner document was reset")
 
