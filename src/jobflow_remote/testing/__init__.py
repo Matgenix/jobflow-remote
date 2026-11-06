@@ -117,6 +117,16 @@ def no_resolve(ref):
     return ref
 
 
+@job(config=JobConfig(resolve_references="both"))
+def resolve_both(ref):
+    """
+    A job that receives both the reference and its resolved value.
+
+    Returns the type of the input, the uuid of the reference and its value.
+    """
+    return {"type": type(ref).__name__, "uuid": ref.uuid, "value": ref.value}
+
+
 @job(config=JobConfig(on_missing_references=OnMissing.NONE))
 def onmissing_none(args):
     """

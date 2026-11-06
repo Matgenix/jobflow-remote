@@ -152,6 +152,29 @@ def test_resolve_references(job_controller, runner):
     assert out_doc["output"]["uuid"] == j1.uuid
 
 
+def test_resolve_references_both(job_controller, runner):
+    from jobflow import Flow
+
+    from jobflow_remote import submit_flow
+    from jobflow_remote.jobs.state import JobState
+    from jobflow_remote.testing import add, resolve_both
+
+    j1 = add(1, 2)
+    j2 = resolve_both(j1.output)
+    flow = Flow([j1, j2])
+
+    submit_flow(flow, worker="test_local_worker")
+
+    runner.run_all_jobs(max_seconds=20)
+
+    assert job_controller.get_job_info(job_id=j2.uuid).state == JobState.COMPLETED
+
+    # Since j2 has resolve_references="both" in the JobConfig, the job should
+    # receive a ResolvedReference with both the reference and its value.
+    output = job_controller.jobstore.get_output(j2.uuid)
+    assert output == {"type": "ResolvedReference", "uuid": j1.uuid, "value": 3}
+
+
 def test_optional_store(job_controller, runner, two_flows_four_jobs):
     # test that the jobs will run in different stores and that
     # references are correctly resolved within a Flow.
