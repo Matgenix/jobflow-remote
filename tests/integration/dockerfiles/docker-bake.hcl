@@ -15,7 +15,8 @@ group "default" {
     targets = [
         "slurm",
         "sge",
-        "pbs"
+        "pbs",
+        "frontend"
     ]
 }
 
@@ -68,5 +69,19 @@ target "pbs" {
     tags = [
         "${IMAGE_BASE}-pbs:${IMAGE_TAG}",
     ]
+    platforms = ["linux/amd64"]
+}
+
+target "frontend" {
+    dockerfile = "./tests/integration/dockerfiles/Dockerfile"
+    args = {
+        QUEUE_SYSTEM = "frontend"
+    }
+    cache-from = []
+    cache-to = []
+    tags = [
+        "${IMAGE_BASE}-frontend:${IMAGE_TAG}",
+    ]
+    output = ["type=docker"]
     platforms = ["linux/amd64"]
 }
