@@ -267,7 +267,7 @@ def resolve_job_dict_args(job_dict: dict, store: JobStore) -> dict:
     from jobflow.core.reference import OnMissing, find_and_resolve_references
 
     resolve_references = job_dict["config"]["resolve_references"]
-    if not resolve_references:
+    if not (resolve_references := job_dict["config"]["resolve_references"]):
         return job_dict
 
     on_missing = OnMissing(job_dict["config"]["on_missing_references"])
