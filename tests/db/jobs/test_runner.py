@@ -1,12 +1,4 @@
-from importlib.metadata import version
-
 import pytest
-from packaging.version import Version
-
-requires_jobflow_resolved_reference = pytest.mark.skipif(
-    Version(version("jobflow")) < Version("0.4.0"),
-    reason="ResolvedReference requires jobflow>=0.4.0",
-)
 
 
 def test_upload_cleanup_error(job_controller, runner, monkeypatch):
@@ -160,7 +152,7 @@ def test_resolve_references(job_controller, runner):
     assert out_doc["output"]["uuid"] == j1.uuid
 
 
-@requires_jobflow_resolved_reference
+@pytest.mark.requires_jobflow("0.4.0")
 def test_resolve_references_both(job_controller, runner):
     from jobflow import Flow
 

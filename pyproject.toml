@@ -175,6 +175,7 @@ markers = [
     "unit: Unit tests",
     "db: Tests running with a database",
     "integration: Full integration tests",
+    "requires_jobflow(min_version): Skip the test if the installed jobflow is older than min_version",
 ]
 
 [tool.coverage.run]

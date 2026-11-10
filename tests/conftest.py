@@ -329,9 +329,26 @@ def job_controller_drop(random_project_name, job_controller):
 
 
 def pytest_collection_modifyitems(config, items):
+    from importlib.metadata import version
+
+    from packaging.version import Version
+
     valid_markers = {"unit", "db", "integration"}
 
+    jobflow_version = Version(version("jobflow"))
+
     for item in items:
+        requires_jobflow = item.get_closest_marker("requires_jobflow")
+        if requires_jobflow:
+            min_version = requires_jobflow.args[0]
+            if jobflow_version < Version(min_version):
+                item.add_marker(
+                    pytest.mark.skip(
+                        reason=f"Requires jobflow>={min_version}, "
+                        f"installed version is {jobflow_version}"
+                    )
+                )
+
         if item.nodeid.startswith(os.path.join("tests", "integration", "")):
             item.add_marker(pytest.mark.integration)
         elif item.nodeid.startswith(os.path.join("tests", "db", "")):

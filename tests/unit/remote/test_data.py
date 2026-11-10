@@ -1,12 +1,4 @@
-from importlib.metadata import version
-
 import pytest
-from packaging.version import Version
-
-requires_jobflow_resolved_reference = pytest.mark.skipif(
-    Version(version("jobflow")) < Version("0.4.0"),
-    reason="ResolvedReference requires jobflow>=0.4.0",
-)
 
 
 @pytest.fixture()
@@ -56,7 +48,7 @@ def test_resolve_job_dict_args_bool(memory_jobstore, resolve_references):
         assert isinstance(job.function_kwargs["b"], OutputReference)
 
 
-@requires_jobflow_resolved_reference
+@pytest.mark.requires_jobflow("0.4.0")
 def test_resolve_job_dict_args_both(memory_jobstore):
     from jobflow import ResolvedReference
 
@@ -80,7 +72,7 @@ def test_resolve_job_dict_args_both(memory_jobstore):
         assert rr.reference == j1.output
 
 
-@requires_jobflow_resolved_reference
+@pytest.mark.requires_jobflow("0.4.0")
 def test_resolve_job_dict_args_both_on_missing_pass(memory_jobstore):
     from jobflow import JobStore, OnMissing, OutputReference, ResolvedReference
     from maggma.stores import MemoryStore
