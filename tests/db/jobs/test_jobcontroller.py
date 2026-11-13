@@ -900,16 +900,16 @@ def test_add_flow(job_controller):
 
 
 def test_indexes(job_controller, one_job):
-    assert len(list(job_controller.jobs.list_indexes())) == 11
+    assert len(list(job_controller.jobs.list_indexes())) == 12
     job_controller.create_indexes(
         [[("xxx", pymongo.DESCENDING), ("yyy", pymongo.ASCENDING)]],
         unique=True,
         background=False,
     )
-    assert len(list(job_controller.jobs.list_indexes())) == 12
+    assert len(list(job_controller.jobs.list_indexes())) == 13
 
     job_controller.build_indexes(background=False, drop=True)
-    assert len(list(job_controller.jobs.list_indexes())) == 11
+    assert len(list(job_controller.jobs.list_indexes())) == 12
 
 
 @pytest.mark.parametrize(

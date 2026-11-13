@@ -273,6 +273,38 @@ def test_runner_different_machine(
     assert not daemon_manager.pid_filepath.exists()
 
 
+def test_runner_different_machine_skip_doc(
+    daemon_manager, job_controller, pid_file
+) -> None:
+    # Test that disabling the check on the running_runner document has no effect
+    # if no daemon is active on the current machine, even if only the hostname differs
+    from jobflow_remote.jobs.daemon import DaemonStatus, RunningDaemonError
+
+    runner_info = daemon_manager._get_runner_info()
+    runner_info["hostname"] = "YYYYYYY"
+    job_controller.auxiliary.find_one_and_update(
+        {"running_runner": {"$exists": True}}, {"$set": {"running_runner": runner_info}}
+    )
+
+    assert daemon_manager.check_status() == DaemonStatus.SHUT_DOWN
+
+    for method in (daemon_manager.kill, daemon_manager.stop, daemon_manager.shut_down):
+        with pytest.raises(
+            RunningDaemonError,
+            match=r"A daemon runner process associated to this database may be already running",
+        ):
+            method(raise_on_error=True, enforce_runner_doc=False)
+
+        assert not method(raise_on_error=False, enforce_runner_doc=False)
+        assert daemon_manager.pid_filepath.exists()
+        assert daemon_manager.check_status() == DaemonStatus.SHUT_DOWN
+        _check_running_runner_doc(
+            job_controller=job_controller, runner_info=runner_info
+        )
+
+    daemon_manager.clean_files()
+
+
 def test_stop_restart_diff(daemon_manager, caplog, wait_daemon_started):
     from jobflow_remote.jobs.daemon import DaemonStatus
 
