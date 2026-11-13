@@ -67,6 +67,9 @@ Common scenarios leading to this issues can be:
 * **Multiple projects pointing to the same "queue" database and collections** in the project
   configuration (see the documentation for the :ref:`projectconf queuestore`. Note that
   this is a misconfiguration: each Project should have a different Queue Store)
+* The **hostname of the machine changed** while the Runner was active (e.g. a laptop
+  connected to a different network). In this case the Runner is actually running on the
+  current machine. See :ref:`troubleshooting hostname_change`.
 
 Daemon already running warning
 ------------------------------
@@ -89,6 +92,44 @@ If you have already verified that the daemon is **no longer active** in the othe
 daemon record from the database by running::
 
     jf runner reset
+
+If Runner processes for the same project are active on the **current** machine,
+``jf runner reset`` refuses to proceed, since resetting the database record would leave
+those processes running without the protection against starting a second Runner.
+In that case stop the local Runner first (see :ref:`troubleshooting hostname_change`).
+If you are sure you want to reset anyway, use the ``--force`` option::
+
+    jf runner reset --force
+
+.. _troubleshooting hostname_change:
+
+Runner active on the current machine
+------------------------------------
+
+If the **hostname of the machine changed** after the Runner was started, the Runner will
+be reported as active on another machine, even if it is actually running on the current
+one. As a consequence the commands to stop the Runner will fail.
+
+If you know that the Runner is active on the current machine, you can stop it anyway
+by adding the ``--skip-doc`` option to the ``kill``, ``shutdown``, ``stop`` and
+``restart`` commands, e.g.::
+
+    jf runner shutdown --skip-doc
+
+The option only acts if a daemon for the project is running on the current machine:
+if no local daemon is found, the command fails as usual.
+
+What happens to the database record depends on the differences found:
+
+* If **only the hostname differs**, it is assumed that the hostname of the machine
+  changed, and the record is cleared as usual. ``jf runner restart --skip-doc`` will
+  also write a new record with the current hostname.
+* If **other information differs** (e.g. the project folder or the user), the record most
+  likely belongs to another Runner. The local Runner is stopped, but the record is left
+  untouched and a warning is printed. In this case ``jf runner restart --skip-doc``
+  will shut down the local Runner, but will not be able to start it again.
+  Check the record with ``jf runner info`` and, only if you are sure that no other
+  Runner is active, clean it with ``jf runner reset``.
 
 Lost daemon processes
 ---------------------
