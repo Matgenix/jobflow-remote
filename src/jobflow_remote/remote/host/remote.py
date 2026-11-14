@@ -3,6 +3,7 @@ from __future__ import annotations
 import getpass
 import io
 import logging
+import os
 import shlex
 import traceback
 import warnings
@@ -506,9 +507,18 @@ def inter_handler(title, instructions, prompt_list):
 
     resp = []  # Initialize the response container
 
+    # The runner daemon processes (supervisord programs named run_jobflow*) have
+    # no terminal, so getpass warns that the input may be echoed. It is not:
+    # `jf runner start --connect-interactive` reads it with echo off and
+    # forwards it.
+    in_daemon = os.environ.get("SUPERVISOR_PROCESS_NAME", "").startswith("run_jobflow")
+
     # Walk the list of prompts that the server sent that we need to answer
     for pr in prompt_list:
-        in_value = input(pr[0]) if pr[1] else getpass.getpass(pr[0])
+        if pr[1] or in_daemon:
+            in_value = input(pr[0])
+        else:
+            in_value = getpass.getpass(pr[0])
         resp.append(in_value)
 
     return tuple(resp)  # Convert the response list to a tuple and return it
