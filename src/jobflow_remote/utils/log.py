@@ -4,9 +4,8 @@ from __future__ import annotations
 
 import logging
 import logging.config
+import os
 from pathlib import Path
-
-from monty.os import makedirs_p
 
 
 def initialize_runner_logger(
@@ -24,7 +23,7 @@ def initialize_runner_logger(
     # an unclear error message. Since this is only for the runner logger
     # it should not be a problem to check that the directory exists when the
     # runner is started.
-    makedirs_p(log_folder)
+    os.makedirs(log_folder, exist_ok=True)
 
     if runner_id:
         msg_format = f"%(asctime)s [%(levelname)s] ID {runner_id} %(name)s: %(message)s"
