@@ -6,6 +6,7 @@ import getpass
 import json
 import logging
 import math
+import os
 import shutil
 import signal
 import socket
@@ -18,7 +19,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from monty.json import MontyDecoder
-from monty.os import makedirs_p
 from qtoolkit.core.data_objects import QState, SubmissionStatus
 from rich.prompt import Confirm
 
@@ -909,7 +909,7 @@ class Runner:
                 run_dir=remote_path,
             )
 
-            makedirs_p(local_path)
+            os.makedirs(local_path, exist_ok=True)
 
             def download_file(fname: str, mandatory: bool):
                 # in principle fabric should work by just passing the

@@ -11,7 +11,6 @@ from typing import TYPE_CHECKING, NamedTuple
 
 import tomlkit
 from monty.json import jsanitize
-from monty.os import makedirs_p
 from monty.serialization import dumpfn
 from ruamel.yaml import YAML
 
@@ -233,9 +232,9 @@ class ConfigManager:
         if project.name in self.projects_data:
             raise ConfigError(f"Project with name {project.name} already exists")
 
-        makedirs_p(project.base_dir)
-        makedirs_p(project.tmp_dir)
-        makedirs_p(project.log_dir)
+        os.makedirs(project.base_dir, exist_ok=True)
+        os.makedirs(project.tmp_dir, exist_ok=True)
+        os.makedirs(project.log_dir, exist_ok=True)
         filepath = self.projects_folder / f"{project.name}.{ext}"
         if filepath.exists():
             raise ConfigError(

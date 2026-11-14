@@ -4,6 +4,7 @@ import contextlib
 import datetime
 import getpass
 import logging
+import os
 import re
 import socket
 import subprocess
@@ -15,7 +16,6 @@ from typing import TYPE_CHECKING
 from xmlrpc.client import Fault
 
 import psutil
-from monty.os import makedirs_p
 from supervisor import childutils, states, xmlrpc
 from supervisor.compat import xmlrpclib
 from supervisor.options import ClientOptions
@@ -551,8 +551,8 @@ class DaemonManager:
         str | None
             An error message if the daemon could not be started, otherwise None.
         """
-        makedirs_p(self.daemon_dir)
-        makedirs_p(self.log_dir)
+        os.makedirs(self.daemon_dir, exist_ok=True)
+        os.makedirs(self.log_dir, exist_ok=True)
         self.write_config(
             num_procs_transfer=num_procs_transfer,
             num_procs_complete=num_procs_complete,
