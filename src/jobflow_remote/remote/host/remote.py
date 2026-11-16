@@ -507,16 +507,17 @@ def inter_handler(title, instructions, prompt_list):
 
     resp = []  # Initialize the response container
 
-    # The runner daemon processes (supervisord programs named run_jobflow*) have
-    # no terminal, so getpass warns that the input may be echoed. It is not:
-    # `jf runner start --connect-interactive` reads it with echo off and
-    # forwards it.
-    in_daemon = os.environ.get("SUPERVISOR_PROCESS_NAME", "").startswith("run_jobflow")
-
     # Walk the list of prompts that the server sent that we need to answer
     for pr in prompt_list:
-        if pr[1] or in_daemon:
+        if pr[1]:
             in_value = input(pr[0])
+        # In a runner process (a supervisord program named run_jobflow*),
+        # hide getpass's false "may be echoed" warning.
+        elif os.environ.get("SUPERVISOR_PROCESS_NAME", "").startswith("run_jobflow"):
+            print(pr[0], end="", flush=True)
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", getpass.GetPassWarning)
+                in_value = getpass.getpass("", stream=io.StringIO())
         else:
             in_value = getpass.getpass(pr[0])
         resp.append(in_value)
