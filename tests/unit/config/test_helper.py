@@ -113,3 +113,28 @@ def test_check_projects_conflicts():
         for issue in kind_issues:
             assert "C" not in issue.projects
             assert "D" not in issue.projects
+
+
+def test_check_environment_pre_run_with_comment(tmp_path):
+    import json
+    from importlib.metadata import version
+
+    from jobflow_remote.config.base import LocalWorker
+    from jobflow_remote.config.helper import _check_environment
+    from jobflow_remote.remote.host import LocalHost
+
+    # a stand-in pip that lists the local versions, so the check finds no mismatch
+    packages = [
+        {"name": n, "version": version(n)} for n in ("jobflow", "jobflow-remote")
+    ]
+    pip = tmp_path / "pip"
+    pip.write_text(f"#!/bin/sh\necho '{json.dumps(packages)}'\n")
+    pip.chmod(0o755)
+
+    worker = LocalWorker(
+        scheduler_type="shell",
+        work_dir=str(tmp_path),
+        pre_run=f'export PATH="{tmp_path}:$PATH"  # use the stand-in pip',
+    )
+
+    assert _check_environment(worker=worker, host=LocalHost()) is None

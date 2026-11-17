@@ -272,7 +272,7 @@ def _check_environment(
     }
     cmd = "pip list --format=json"
     if worker.pre_run:
-        cmd = "; ".join(worker.pre_run.strip().splitlines()) + "; " + cmd
+        cmd = worker.pre_run.strip() + "\n" + cmd
 
     stdout, stderr, errcode = host.execute(cmd)
     if errcode != 0:
