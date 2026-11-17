@@ -1,3 +1,5 @@
+import sys
+
 import pytest
 
 NAMES = [
@@ -58,6 +60,12 @@ def test_fnmatch_to_mongo_query_form():
     }
 
 
+# TODO remove when dropping support for python 3.10
+@pytest.mark.skipif(
+    sys.version_info < (3, 11),
+    reason="fnmatch.translate in python 3.10 generates group names from a global "
+    "counter, so two translations of the same pattern differ",
+)
 def test_fnmatch_to_mongo_query_leading_wildcard():
     import fnmatch
 
