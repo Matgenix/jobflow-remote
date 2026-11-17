@@ -24,6 +24,10 @@ def test_flows_list(job_controller, two_flows_four_jobs, run_check_cli) -> None:
     outputs = ["The number of Flows printed is limited by the maximum selected"]
     run_check_cli(["flow", "list", "-m", "1"], required_out=outputs)
 
+    # sort, but not on db_id that is not defined for flows
+    run_check_cli(["flow", "list", "--sort", "created_on"], required_out="flow_1")
+    run_check_cli(["flow", "list", "--sort", "db_id"], error=True)
+
     outputs = ["READY"]
     run_check_cli(
         ["flow", "list", "-fid", two_flows_four_jobs[0].uuid], required_out=outputs

@@ -1,16 +1,13 @@
 from typing import Annotated
 
 import typer
-from rich.text import Text
 
 from jobflow_remote.cli.jfr_typer import JFRTyper
 from jobflow_remote.cli.types import tree_opt
 from jobflow_remote.cli.utils import (
     cleanup_job_controller,
     complete_profiling,
-    get_config_manager,
     initialize_config_manager,
-    out_console,
     start_profiling,
 )
 
@@ -37,10 +34,11 @@ def add_cli_logger_names(loggers: str | list[str]):
 
 def main_result_callback(*args, **kwargs) -> None:
     """
-    Callback executed after the main command is completed.
-    Allowing to make cleanup and other final actions.
+    Callback executed after the main command is completed successfully.
+    Allowing to perform final actions. The cleanup of the shared resources is
+    not done here, as this callback is not executed if the command fails.
+    See the ``ctx.call_on_close`` registration in :func:`main`.
     """
-    cleanup_job_controller()
     profile = kwargs.get("profile", False)
     if profile:
         complete_profiling()
@@ -48,6 +46,7 @@ def main_result_callback(*args, **kwargs) -> None:
 
 @app.callback(result_callback=main_result_callback)
 def main(
+    ctx: typer.Context,
     project: Annotated[
         str,
         typer.Option(
@@ -89,8 +88,13 @@ def main(
 ) -> None:
     """The controller CLI for jobflow-remote."""
     from jobflow_remote import SETTINGS
-    from jobflow_remote.config import ConfigError
     from jobflow_remote.utils.log import initialize_cli_logger
+
+    # Close the shared JobController (if created) when the context is closed.
+    # Unlike the result callback, this also happens if the command fails, so the
+    # connections are always released and a controller is never reused by a
+    # subsequent execution in the same process (e.g., in tests).
+    ctx.call_on_close(cleanup_job_controller)
 
     if full_exc:
         SETTINGS.cli_full_exc = True
@@ -104,20 +108,10 @@ def main(
         loggers=ADDITIONAL_LOGGERS,
     )
 
-    # initialize the ConfigManager only once, to avoid parsing the configuration
-    # files multiple times when the command is executed.
-    initialize_config_manager(warn=warn_project)
-    cm = get_config_manager()
     if project:
         SETTINGS.project = project
 
-    try:
-        project_data = cm.get_project_data()
-        text = Text.from_markup(
-            f"The selected project is [green]{project_data.project.name}[/green] "
-            f"from config file [green]{project_data.filepath}[/green]"
-        )
-        out_console.print(text)
-    except ConfigError:
-        # no warning printed if not needed as this seems to be confusing for the user
-        pass
+    # Only set the options of the shared ConfigManager. It will be created, and
+    # the selected project printed, on first use. This avoids parsing the
+    # configuration files for commands that do not need them (e.g. --help).
+    initialize_config_manager(warn=warn_project)

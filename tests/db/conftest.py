@@ -199,6 +199,7 @@ def create_tmp_project(
 
     project_names = []
     database_names = []
+    job_controllers = []
     tmp_proj_dir, workdir = tmp_proj_work_dirs
 
     def create_with_suffix(suffix):
@@ -214,6 +215,7 @@ def create_tmp_project(
             workdir=workdir,
         )
         jc = JobController.from_project_name(project_name)
+        job_controllers.append(jc)
         jc.reset()
         return jc, project_name
 
@@ -236,6 +238,9 @@ def create_tmp_project(
                 mongoclient.drop_database(dn)
             except Exception:
                 pass
+        # close the connections to avoid accumulating open sockets across tests
+        for jc in job_controllers:
+            jc.close()
 
 
 @pytest.fixture()

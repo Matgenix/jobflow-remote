@@ -210,7 +210,7 @@ def test_upgrade_to_0_1_5(
     [True, False],
 )
 def test_upgrade_to_1_0(
-    job_controller,
+    job_controller_reset,
     upgrade_test_dir,
     random_project_name,
     run_check_cli,
@@ -220,17 +220,19 @@ def test_upgrade_to_1_0(
 
     from jobflow_remote.jobs.state import JobState
 
-    job_controller.backup_restore(upgrade_test_dir / "1.0", python=True)
-    assert job_controller.count_jobs() == 2
-    assert job_controller.count_jobs(states=JobState.RUN_FINISHED) == 0
-    assert job_controller.count_jobs(query={"state": "TERMINATED"}) == 1
-    assert job_controller.count_jobs(query={"previous_state": "TERMINATED"}) == 1
-    assert job_controller.count_jobs(query={"previous_state": "RUN_FINISHED"}) == 0
+    job_controller_reset.backup_restore(upgrade_test_dir / "1.0", python=True)
+    assert job_controller_reset.count_jobs() == 2
+    assert job_controller_reset.count_jobs(states=JobState.RUN_FINISHED) == 0
+    assert job_controller_reset.count_jobs(query={"state": "TERMINATED"}) == 1
+    assert job_controller_reset.count_jobs(query={"previous_state": "TERMINATED"}) == 1
+    assert (
+        job_controller_reset.count_jobs(query={"previous_state": "RUN_FINISHED"}) == 0
+    )
 
-    assert str(job_controller.get_current_db_version()) == "0.1.8"
+    assert str(job_controller_reset.get_current_db_version()) == "0.1.8"
 
     # Create a fake terminated directory with some empty files in it
-    local_batch_worker = job_controller.project.workers["test_local_batch_worker"]
+    local_batch_worker = job_controller_reset.project.workers["test_local_batch_worker"]
     terminated_dir = local_batch_worker.batch.jobs_handle_dir / "terminated"
     run_finished_dir = local_batch_worker.batch.jobs_handle_dir / "run_finished"
     if not terminated_dir.exists():
@@ -243,22 +245,22 @@ def test_upgrade_to_1_0(
     with pytest.raises(
         ValidationError, match=r"The TERMINATED state has been replaced by RUN_FINISHED"
     ):
-        job_controller.get_jobs_doc_query({"db_id": "1"})
+        job_controller_reset.get_jobs_doc_query({"db_id": "1"})
 
     with pytest.raises(
         ValidationError, match=r"The TERMINATED state has been replaced by RUN_FINISHED"
     ):
-        job_controller.get_jobs_doc_query({"db_id": "2"})
+        job_controller_reset.get_jobs_doc_query({"db_id": "2"})
 
     with pytest.raises(
         ValidationError, match=r"The TERMINATED state has been replaced by RUN_FINISHED"
     ):
-        job_controller.get_jobs_info_query({"db_id": "1"})
+        job_controller_reset.get_jobs_info_query({"db_id": "1"})
 
     with pytest.raises(
         ValidationError, match=r"The TERMINATED state has been replaced by RUN_FINISHED"
     ):
-        job_controller.get_jobs_info_query({"db_id": "2"})
+        job_controller_reset.get_jobs_info_query({"db_id": "2"})
 
     run_check_cli(
         ["job", "list"],
@@ -276,7 +278,7 @@ def test_upgrade_to_1_0(
         }
     else:
         set_batch_doc = {"batch_processes.fake_batch_worker": {}}
-    job_controller.auxiliary.find_one_and_update(
+    job_controller_reset.auxiliary.find_one_and_update(
         {"batch_processes": {"$exists": True}},
         {"$set": set_batch_doc},
         upsert=True,
@@ -311,14 +313,18 @@ def test_upgrade_to_1_0(
     assert "job_sentinel_ABC" in files
     assert "job_sentinel_123" in files
 
-    assert job_controller.count_jobs(states=JobState.RUN_FINISHED) == 1
-    assert job_controller.count_jobs(query={"state": "TERMINATED"}) == 0
-    assert job_controller.count_jobs(query={"previous_state": "RUN_FINISHED"}) == 1
-    assert job_controller.count_jobs(query={"previous_state": "TERMINATED"}) == 0
+    assert job_controller_reset.count_jobs(states=JobState.RUN_FINISHED) == 1
+    assert job_controller_reset.count_jobs(query={"state": "TERMINATED"}) == 0
+    assert (
+        job_controller_reset.count_jobs(query={"previous_state": "RUN_FINISHED"}) == 1
+    )
+    assert job_controller_reset.count_jobs(query={"previous_state": "TERMINATED"}) == 0
 
-    assert str(job_controller.get_current_db_version()) == "1.0"
+    assert str(job_controller_reset.get_current_db_version()) == "1.0"
 
-    assert not job_controller.auxiliary.find_one({"batch_processes": {"$exists": True}})
+    assert not job_controller_reset.auxiliary.find_one(
+        {"batch_processes": {"$exists": True}}
+    )
 
 
 def test_index_rebuild(job_controller, one_job, run_check_cli):
@@ -332,7 +338,7 @@ def test_index_rebuild(job_controller, one_job, run_check_cli):
     job_indexes = list(job_controller.jobs.list_indexes())
     flows_indexes = list(job_controller.flows.list_indexes())
     assert len(job_indexes) == 11
-    assert len(flows_indexes) == 7
+    assert len(flows_indexes) == 8
 
 
 def test_index_create(job_controller, one_job, run_check_cli):
@@ -351,7 +357,7 @@ def test_index_create(job_controller, one_job, run_check_cli):
     job_indexes = list(job_controller.jobs.list_indexes())
     flows_indexes = list(job_controller.flows.list_indexes())
     assert len(job_indexes) == 12
-    assert len(flows_indexes) == 8
+    assert len(flows_indexes) == 9
 
     run_check_cli(
         ["admin", "index", "rebuild", "-fg"],
@@ -361,4 +367,32 @@ def test_index_create(job_controller, one_job, run_check_cli):
     job_indexes = list(job_controller.jobs.list_indexes())
     flows_indexes = list(job_controller.flows.list_indexes())
     assert len(job_indexes) == 11
-    assert len(flows_indexes) == 7
+    assert len(flows_indexes) == 8
+
+
+def test_index_list(job_controller, one_job, run_check_cli):
+    from jobflow_remote.jobs.data import DbCollection
+
+    # all the collections by default
+    run_check_cli(
+        ["admin", "index", "list"],
+        required_out=[
+            "Indexes of jobs",
+            "Indexes of flows",
+            "Indexes of aux",
+            "uuid_1_index_1",
+            "uuid: 1, index: 1",
+            "unique=True",
+            "job.hosts_1",
+            "created_on_1",
+        ],
+    )
+
+    job_controller.create_indexes(
+        ["test_ind"], collection=DbCollection.FLOWS, background=False
+    )
+    run_check_cli(
+        ["admin", "index", "list", "-c", "flows"],
+        required_out=["Indexes of flows", "test_ind_1", "created_on_1"],
+        excluded_out=["Indexes of jobs", "job.hosts_1"],
+    )

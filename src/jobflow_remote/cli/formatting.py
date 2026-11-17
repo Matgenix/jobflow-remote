@@ -824,6 +824,38 @@ def get_runner_pings_table(runner_pings: list[dict]) -> Table:
     return table
 
 
+def get_indexes_table(indexes: dict[str, dict], title: str) -> Table:
+    """
+    Create a table with the information about the indexes of a collection.
+
+    Parameters
+    ----------
+    indexes
+        The indexes of a collection, as returned by pymongo's index_information.
+    title
+        The title of the table.
+
+    Returns
+    -------
+    Table
+        The table with the name, the keys and the options of each index.
+    """
+    # keys that are not relevant for the user
+    skip_keys = {"key", "v", "ns", "background"}
+
+    table = Table(title=title)
+    table.add_column("Name")
+    table.add_column("Keys")
+    table.add_column("Options")
+
+    for name, info in indexes.items():
+        keys = ", ".join(f"{field}: {direction}" for field, direction in info["key"])
+        options = ", ".join(f"{k}={v}" for k, v in info.items() if k not in skip_keys)
+        table.add_row(name, keys, options)
+
+    return table
+
+
 BATCH_INFO_ORDER = [
     "process_id",
     "batch_uid",

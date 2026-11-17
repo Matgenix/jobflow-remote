@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import contextlib
-import fnmatch
 import importlib.metadata
 import logging
 import shutil
@@ -75,6 +74,7 @@ from jobflow_remote.utils.db import (
     LockedDocumentError,
     MissingDocumentError,
     MongoLock,
+    fnmatch_to_mongo_query,
     mongodump_from_store,
     mongorestore_to_store,
     pymongo_dump,
@@ -88,6 +88,7 @@ if TYPE_CHECKING:
 
     from maggma.stores import MongoStore
     from monty.json import MSONable
+    from pymongo.collection import Collection
 
     obj_type = str | Enum | type[MSONable] | list[Enum | str | type[MSONable]]
     load_type = bool | dict[str, bool | obj_type]
@@ -97,6 +98,41 @@ logger = logging.getLogger(__name__)
 
 
 _MAX_ARCHIVED_RUNNER_PINGS = 50
+
+
+def _references_field(obj: Any, field: str) -> bool:
+    """
+    Check if a MongoDB filter or pipeline stage refers to a field.
+
+    Looks for keys equal to the field or starting with "field.", and for string
+    values referring to it as "$field" or "$field." (e.g. in $expr).
+
+    Parameters
+    ----------
+    obj
+        The filter, stage or list of stages to inspect.
+    field
+        The name of the top level field.
+
+    Returns
+    -------
+    bool
+        True if the field is referenced anywhere in the object.
+    """
+
+    def matches(s: str) -> bool:
+        return s == field or s.startswith(f"{field}.")
+
+    if isinstance(obj, dict):
+        return any(
+            (isinstance(k, str) and matches(k)) or _references_field(v, field)
+            for k, v in obj.items()
+        )
+    if isinstance(obj, list | tuple):
+        return any(_references_field(v, field) for v in obj)
+    if isinstance(obj, str):
+        return obj.startswith("$") and matches(obj[1:])
+    return False
 
 
 class JobController:
@@ -296,14 +332,18 @@ class JobController:
         db_ids = [db_ids] if isinstance(db_ids, str) else db_ids or []
 
         flow_ids = [flow_ids] if isinstance(flow_ids, str) else flow_ids or []
-        flow_uuids = [
-            fid
-            if check_valid_uuid(fid)
-            else self.flows.find_one(
+        flow_uuids: list[str] = []
+        for fid in flow_ids:
+            if check_valid_uuid(fid):
+                flow_uuids.append(fid)
+                continue
+            # fid is the db_id of a Job: resolve it to the Flow containing that Job.
+            # If no Flow is found keep the original value, so the query
+            # matches nothing instead of silently dropping the filter.
+            doc = self.flows.find_one(
                 {"ids": {"$elemMatch": {"0": fid}}}, projection=["uuid"]
-            )["uuid"]
-            for fid in flow_ids
-        ]
+            )
+            flow_uuids.append(doc["uuid"] if doc else fid)
 
         if isinstance(states, JobState):
             states = [states]
@@ -338,10 +378,7 @@ class JobController:
             query["lock_id"] = {"$ne": None}
 
         if name:
-            # Add the beginning of the line, so that it will match the string
-            # exactly if no wildcard is given. Otherwise will match substrings.
-            mongo_regex = "^" + fnmatch.translate(name).replace("\\\\", "\\")
-            query["job.name"] = {"$regex": mongo_regex}
+            query["job.name"] = fnmatch_to_mongo_query(name)
 
         if metadata:
             metadata_dict = {f"job.metadata.{k}": v for k, v in metadata.items()}
@@ -437,8 +474,7 @@ class JobController:
             query.setdefault("updated_on", {})["$lte"] = end_date_utc
 
         if name:
-            mongo_regex = "^" + fnmatch.translate(name).replace("\\\\", "\\")
-            query["name"] = {"$regex": mongo_regex}
+            query["name"] = fnmatch_to_mongo_query(name)
 
         if metadata:
             metadata_dict = {f"metadata.{k}": v for k, v in metadata.items()}
@@ -639,6 +675,83 @@ class JobController:
         )
         return self.get_jobs_doc_query(query=query, sort=sort, limit=limit)
 
+    def get_jobs_db_ids(
+        self,
+        custom_query: dict | None = None,
+        job_ids: tuple[str, int] | list[tuple[str, int]] | None = None,
+        db_ids: str | list[str] | None = None,
+        flow_ids: str | list[str] | None = None,
+        states: JobState | list[JobState] | None = None,
+        start_date: datetime | None = None,
+        end_date: datetime | None = None,
+        name: str | None = None,
+        metadata: dict | None = None,
+        workers: str | list[str] | None = None,
+        locked: bool = False,
+        sort: list[tuple[str, int]] | None = None,
+        limit: int = 0,
+    ) -> list[str]:
+        """
+        Query for Jobs based on standard parameters and return a list of Job db_id.
+
+        Parameters
+        ----------
+        custom_query
+            A dictionary representing the filter.
+        job_ids
+            One or more tuples, each containing the (uuid, index) pair of the
+            Jobs to retrieve.
+        db_ids
+            One or more db_ids of the Jobs to retrieve.
+        flow_ids
+            One or more Flow uuids to which the Jobs to retrieve belong. Can contain db_ids and uuids.
+        states
+            One or more states of the Jobs.
+        locked
+            If True only locked Jobs will be selected.
+        start_date
+            Filter Jobs that were updated_on after this date.
+            Should be in the machine local time zone. It will be converted to UTC.
+        end_date
+            Filter Jobs that were updated_on before this date.
+            Should be in the machine local time zone. It will be converted to UTC.
+        name
+            Pattern matching the name of Job. Default is an exact match, but all
+            conventions from python fnmatch can be used (e.g. *test*)
+        metadata
+            A dictionary of the values of the metadata to match. Should be an
+            exact match for all the values provided.
+        workers
+            One or more worker names.
+        sort
+            A list of (key, direction) pairs specifying the sort order for this
+            query. Follows pymongo conventions.
+        limit
+            Maximum number of entries to retrieve. 0 means no limit.
+
+        Returns
+        -------
+        list
+            A list of Job db_id matching the criteria.
+        """
+        query = self._build_query_job(
+            job_ids=job_ids,
+            db_ids=db_ids,
+            flow_ids=flow_ids,
+            states=states,
+            locked=locked,
+            start_date=start_date,
+            end_date=end_date,
+            name=name,
+            metadata=metadata,
+            workers=workers,
+            custom_query=custom_query,
+        )
+        docs = self.jobs.find(
+            query, projection={"db_id": 1, "_id": 0}, sort=sort, limit=limit
+        )
+        return [doc["db_id"] for doc in docs]
+
     @staticmethod
     def generate_job_id_query(
         db_id: str | None = None,
@@ -801,8 +914,6 @@ class JobController:
             One or more Flow uuids to which the Jobs to retrieve belong. Can contain db_ids and uuids.
         states
             The state of the Jobs.
-        locked
-            If True only locked Jobs will be selected.
         start_date
             Filter Jobs that were updated_on after this date.
             Should be in the machine local time zone. It will be converted to UTC.
@@ -833,7 +944,8 @@ class JobController:
         list
             List of db_ids of the updated Jobs.
         """
-        query = self._build_query_job(
+        queried_dbs_ids = self.get_jobs_db_ids(
+            custom_query=custom_query,
             job_ids=job_ids,
             db_ids=db_ids,
             flow_ids=flow_ids,
@@ -843,12 +955,7 @@ class JobController:
             name=name,
             metadata=metadata,
             workers=workers,
-            locked=False,
-            custom_query=custom_query,
         )
-        result = self.jobs.find(query, projection=["db_id"])
-
-        queried_dbs_ids = [r["db_id"] for r in result]
 
         if max_limit != 0 and len(queried_dbs_ids) > max_limit:
             raise ValueError(
@@ -2523,11 +2630,18 @@ class JobController:
         sort: list[tuple] | None = None,
         jobs_sort: list[tuple] | None = None,
         limit: int = 0,
+        skip: int = 0,
     ) -> list[dict]:
         """
         Retrieve data about Flows and all their Jobs through an aggregation.
 
         In the aggregation the list of Jobs are identified as `jobs_list`.
+
+        If the query and the sort only involve fields of the Flow document,
+        the filter, sort, skip and limit are applied before the $lookup, so
+        that only the Jobs of the selected Flows are fetched. If they refer to
+        `jobs_list`, they are applied after the $lookup, which can be much
+        slower on large databases.
 
         Parameters
         ----------
@@ -2540,30 +2654,26 @@ class JobController:
         sort
             A list of (key, direction) pairs specifying the sort order for this
             query. Follows pymongo conventions.
+        jobs_sort
+            A list of (key, direction) pairs specifying the sort order of the
+            Jobs in `jobs_list`. Only used if projection_job is defined.
         limit
             Maximum number of entries to retrieve. 0 means no limit.
+        skip
+            The number of documents to omit (from the start of the result set).
 
         Returns
         -------
         list
             The list of dictionaries resulting from the query.
         """
-        pipeline: list[dict] = [
-            {
-                "$lookup": {
-                    "from": self.jobs_collection,
-                    "localField": "jobs",
-                    "foreignField": "uuid",
-                    "as": "jobs_list",
-                }
-            }
-        ]
-
-        if query:
-            pipeline.append({"$match": query})
-
-        if projection_flow:
-            pipeline.append({"$project": projection_flow})
+        lookup: dict = {
+            "from": self.jobs_collection,
+            "localField": "jobs",
+            "foreignField": "uuid",
+            "as": "jobs_list",
+        }
+        project = dict(projection_flow) if projection_flow else None
 
         if projection_job:
             # insert the pipeline for the projection of the Job fields
@@ -2578,18 +2688,37 @@ class JobController:
                 ]
             else:
                 job_pipeline = [{"$project": projection_job}]
-            pipeline[0]["$lookup"]["pipeline"] = job_pipeline
+            lookup["pipeline"] = job_pipeline
             # if the additional projection is set, the keys need to be specified
             # in that part of the pipeline as well.
-            if projection_flow:
+            if project:
                 for k in projection_job:
-                    pipeline[-1]["$project"][f"jobs_list.{k}"] = 1
+                    project[f"jobs_list.{k}"] = 1
 
+        selection: list[dict] = []
+        if query:
+            selection.append({"$match": query})
         if sort:
-            pipeline.append({"$sort": dict(sort)})
-
+            selection.append({"$sort": dict(sort)})
+        if skip:
+            selection.append({"$skip": skip})
         if limit:
-            pipeline.append({"$limit": limit})
+            selection.append({"$limit": limit})
+
+        project_stage = [{"$project": project}] if project else []
+        if _references_field(selection, "jobs_list"):
+            # the selection needs the Jobs: apply it after the $lookup.
+            # The $match goes before the $project, as it may need fields
+            # excluded by the projection.
+            pipeline = [{"$lookup": lookup}]
+            if query:
+                pipeline.append(selection.pop(0))
+            pipeline += project_stage + selection
+        else:
+            # MongoDB cannot move $sort, $skip and $limit before the $lookup
+            # by itself if the $project refers to jobs_list. Put them first,
+            # so that only the Jobs of the selected Flows are looked up.
+            pipeline = [*selection, {"$lookup": lookup}, *project_stage]
 
         return list(self.flows.aggregate(pipeline))
 
@@ -2686,6 +2815,7 @@ class JobController:
                 sort=sort,
                 jobs_sort=jobs_sort,
                 limit=limit,
+                skip=skip,
                 projection_flow=projection_flow,
                 projection_job=projection_job,
             )
@@ -2693,6 +2823,74 @@ class JobController:
             data = list(self.flows.find(query, sort=sort, limit=limit, skip=skip))
 
         return [FlowInfo.from_query_dict(d) for d in data]
+
+    def get_flows_uuids(
+        self,
+        job_ids: str | list[str] | None = None,
+        db_ids: str | list[str] | None = None,
+        flow_ids: str | list[str] | None = None,
+        states: FlowState | list[FlowState] | None = None,
+        start_date: datetime | None = None,
+        end_date: datetime | None = None,
+        name: str | None = None,
+        metadata: dict | None = None,
+        locked: bool = False,
+        sort: list[tuple] | None = None,
+        limit: int = 0,
+    ) -> list[str]:
+        """
+        Query for Flows based on standard parameters and return a list of Flow uuids.
+
+        Parameters
+        ----------
+        job_ids
+            One or more strings with uuids of Jobs belonging to the Flow.
+        db_ids
+            One or more db_ids of Jobs belonging to the Flow.
+        flow_ids
+            One or more Flow uuids.
+        states
+            One or more states of the Flow.
+        start_date
+            Filter Flows that were updated_on after this date.
+            Should be in the machine local time zone. It will be converted to UTC.
+        end_date
+            Filter Flows that were updated_on before this date.
+            Should be in the machine local time zone. It will be converted to UTC.
+        name
+            Pattern matching the name of Flow. Default is an exact match, but all
+            conventions from python fnmatch can be used (e.g. *test*)
+        metadata
+            A dictionary of the values of the metadata to match. Should be an
+            exact match for all the values provided.
+        locked
+            If True only locked Flows will be selected.
+        sort
+            A list of (key, direction) pairs specifying the sort order for this
+            query. Follows pymongo conventions.
+        limit
+            Maximum number of entries to retrieve. 0 means no limit.
+
+        Returns
+        -------
+        list
+            A list of Flow uuids matching the criteria.
+        """
+        query = self._build_query_flow(
+            job_ids=job_ids,
+            db_ids=db_ids,
+            flow_ids=flow_ids,
+            states=states,
+            start_date=start_date,
+            end_date=end_date,
+            name=name,
+            metadata=metadata,
+            locked=locked,
+        )
+        docs = self.flows.find(
+            query, projection={"uuid": 1, "_id": 0}, sort=sort, limit=limit
+        )
+        return [doc["uuid"] for doc in docs]
 
     def get_flow_store(self, flow_id: str) -> str | None:
         """
@@ -3226,13 +3424,16 @@ class JobController:
             background=background,
         )
 
+        # No index on "uuid" alone: the compound (uuid, index) index above
+        # serves the queries on uuid through its prefix.
         job_indexes = [
-            "uuid",
             "index",
             "state",
             "updated_on",
             "name",
             "worker",
+            # used to fetch the Jobs of a Flow (e.g. in update_flow_state)
+            "job.hosts",
             [("priority", pymongo.DESCENDING)],
             ["state", "remote.retry_time_limit"],
         ]
@@ -3248,6 +3449,7 @@ class JobController:
             "name",
             "state",
             "updated_on",
+            "created_on",
             "ids",
             "jobs",
         ]
@@ -3331,6 +3533,26 @@ class JobController:
         coll = self.get_collection(collection)
         for idx in indexes:
             coll.create_index(idx, background=background, unique=unique)
+
+    def get_indexes(
+        self, collection: DbCollection = DbCollection.JOBS
+    ) -> dict[str, dict[str, Any]]:
+        """
+        Get the indexes present in a collection.
+
+        Parameters
+        ----------
+        collection
+            The collection whose indexes are listed.
+
+        Returns
+        -------
+        dict
+            A dictionary with the index names as keys and their information as
+            values, as returned by pymongo's index_information. The "key"
+            entry of each value contains the list of (field, direction) pairs.
+        """
+        return self.get_collection(collection).index_information()
 
     def get_collection(self, collection: DbCollection):
         """
@@ -3430,6 +3652,8 @@ class JobController:
         name: str | None = None,
         metadata: dict | None = None,
         workers: str | list[str] | None = None,
+        limit: int = 0,
+        estimated: bool = False,
     ) -> int:
         """
         Count Jobs based on filters.
@@ -3464,6 +3688,17 @@ class JobController:
         workers
             One or more worker names.
 
+        limit
+            If larger than 0, stop counting when this number is reached, so that
+            the returned value is at most limit. Can be much faster than a full
+            count on large collections.
+        estimated
+            If True and no filter is applied, return the estimated number of
+            documents from the collection metadata, instead of counting them.
+            Much faster on large collections, but the value may be inaccurate,
+            e.g. after an unclean shutdown of MongoDB. Ignored if any filter is
+            applied.
+
         Returns
         -------
         int
@@ -3482,7 +3717,9 @@ class JobController:
             workers=workers,
             custom_query=query,
         )
-        return self.jobs.count_documents(full_query)
+        return self._count_documents(
+            self.jobs, full_query, limit=limit, estimated=estimated
+        )
 
     def count_flows(
         self,
@@ -3496,6 +3733,8 @@ class JobController:
         name: str | None = None,
         metadata: dict | None = None,
         locked: bool = False,
+        limit: int = 0,
+        estimated: bool = False,
     ) -> int:
         """
         Count flows based on filter parameters.
@@ -3527,6 +3766,17 @@ class JobController:
         locked
             If True only locked Flows will be counted.
 
+        limit
+            If larger than 0, stop counting when this number is reached, so that
+            the returned value is at most limit. Can be much faster than a full
+            count on large collections.
+        estimated
+            If True and no filter is applied, return the estimated number of
+            documents from the collection metadata, instead of counting them.
+            Much faster on large collections, but the value may be inaccurate,
+            e.g. after an unclean shutdown of MongoDB. Ignored if any filter is
+            applied.
+
         Returns
         -------
         int
@@ -3544,7 +3794,40 @@ class JobController:
                 metadata=metadata,
                 locked=locked,
             )
-        return self.flows.count_documents(query)
+        return self._count_documents(
+            self.flows, query, limit=limit, estimated=estimated
+        )
+
+    @staticmethod
+    def _count_documents(
+        collection: Collection, query: dict, limit: int = 0, estimated: bool = False
+    ) -> int:
+        """
+        Count the documents of a collection matching a query.
+
+        Parameters
+        ----------
+        collection
+            The collection where the documents are counted.
+        query
+            The filter for the documents.
+        limit
+            If larger than 0, the maximum number of documents counted.
+        estimated
+            If True and the query is empty, use the estimated number of documents
+            from the collection metadata.
+
+        Returns
+        -------
+        int
+            The number of documents.
+        """
+        if estimated and not query:
+            count = collection.estimated_document_count()
+            return min(count, limit) if limit > 0 else count
+        # count_documents adds a $limit stage if limit is passed, even if 0
+        kwargs = {"limit": limit} if limit > 0 else {}
+        return collection.count_documents(query, **kwargs)
 
     def count_jobs_states(
         self, states: list[JobState], worker: str | None = None
@@ -3608,6 +3891,20 @@ class JobController:
             out[state] = out.get(state, 0)
 
         return out
+
+    def get_assigned_workers(self) -> list[str]:
+        """
+        Get the names of the workers assigned to the Jobs in the database.
+
+        Can include workers that are no longer defined in the project
+        configuration, but are still assigned to existing Jobs.
+
+        Returns
+        -------
+        list[str]
+            The sorted list of the distinct worker names.
+        """
+        return sorted(w for w in self.jobs.distinct("worker") if w is not None)
 
     def get_trends(
         self,

@@ -115,6 +115,8 @@ def current_project(
     """Print the list of the project currently selected."""
     # only run if no other subcommand is executed
     if ctx.invoked_subcommand is None:
+        # creating the shared ConfigManager prints the selected project
+        get_config_manager()
         out_console.print("Run 'jf project -h' to get the list of available commands")
 
 

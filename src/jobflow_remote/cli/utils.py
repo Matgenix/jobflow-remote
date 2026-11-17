@@ -59,24 +59,78 @@ fmt_datetime = "%Y-%m-%d %H:%M"
 
 
 # shared instances of the config manager and job controller, to avoid parsing
-# the files multiple times. Needs to be initialized with the
-# initialize_config_manager function.
+# the files multiple times. The options of the config manager need to be set
+# with the initialize_config_manager function. The instance is created on first
+# use by get_config_manager.
+_config_manager_kwargs: dict[str, Any] | None = None
 _shared_config_manager: ConfigManager | None = None
 _shared_job_controller: JobController | None = None
 
 _profiler: Profile | None = None
 
 
-def initialize_config_manager(*args, **kwargs) -> None:
-    global _shared_config_manager
-    _shared_config_manager = ConfigManager(*args, **kwargs)
+def initialize_config_manager(**kwargs) -> None:
+    """
+    Set the options of the shared ConfigManager.
+
+    The ConfigManager is not created here, but lazily on the first call to
+    get_config_manager, so that the configuration files are parsed only by
+    the commands that need them. Any previously created instance is discarded.
+
+    Parameters
+    ----------
+    kwargs
+        Keyword arguments passed to the ConfigManager when it is created.
+    """
+    global _config_manager_kwargs, _shared_config_manager
+    _config_manager_kwargs = kwargs
+    _shared_config_manager = None
 
 
 def get_config_manager() -> ConfigManager:
+    """
+    Get the shared ConfigManager, creating it on the first call.
+
+    When created, print the name of the selected project, if any.
+
+    Returns
+    -------
+    ConfigManager
+        The shared instance of the ConfigManager.
+    """
     global _shared_config_manager
-    if not _shared_config_manager:
-        raise RuntimeError("The shared config manager needs to be initialized")
+    if _shared_config_manager is None:
+        if _config_manager_kwargs is None:
+            raise RuntimeError("The shared config manager needs to be initialized")
+        _shared_config_manager = ConfigManager(**_config_manager_kwargs)
+        print_selected_project(_shared_config_manager)
     return _shared_config_manager
+
+
+def print_selected_project(cm: ConfigManager) -> None:
+    """
+    Print the name and the file of the selected project.
+
+    Nothing is printed if no project is selected or if it cannot be loaded.
+    The error will be raised by the commands that require the project.
+
+    Parameters
+    ----------
+    cm
+        The ConfigManager used to determine the selected project.
+    """
+    from jobflow_remote.config import ConfigError
+
+    try:
+        project_data = cm.get_project_data()
+    except ConfigError:
+        # no warning printed if not needed as this seems to be confusing for the user
+        return
+    text = Text.from_markup(
+        f"The selected project is [green]{project_data.project.name}[/green] "
+        f"from config file [green]{project_data.filepath}[/green]"
+    )
+    out_console.print(text)
 
 
 def get_job_controller():
@@ -120,6 +174,11 @@ class SortOption(str, Enum):
     CREATED_ON = "created_on"
     UPDATED_ON = "updated_on"
     DB_ID = "db_id"
+
+
+class FlowSortOption(str, Enum):
+    CREATED_ON = "created_on"
+    UPDATED_ON = "updated_on"
 
 
 class SerializeFileFormat(str, Enum):

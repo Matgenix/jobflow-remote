@@ -76,6 +76,11 @@ def test_queries(job_controller, runner) -> None:
     assert job_controller.count_jobs(states=JobState.READY) == 2
     assert job_controller.count_jobs(db_ids="1") == 1
     assert job_controller.count_jobs(job_ids=(add_first.uuid, 1)) == 1
+    # capped and estimated counts
+    assert job_controller.count_jobs(limit=2) == 2
+    assert job_controller.count_jobs(estimated=True) == 4
+    assert job_controller.count_jobs(states=JobState.READY, estimated=True) == 2
+    assert job_controller.count_flows(estimated=True, limit=1) == 1
     jobs_start_date = job_controller.get_jobs_info(start_date=date_create)
     assert len(jobs_start_date) == 2
     assert {j.uuid for j in jobs_start_date} == {add_first.uuid, add_second.uuid}
@@ -130,6 +135,289 @@ def test_queries(job_controller, runner) -> None:
         skipped_flows[0].updated_on
         == job_controller.get_flows_info(sort=["updated_on"])[1].updated_on
     )
+
+
+def test_get_jobs_db_ids(job_controller, two_flows_four_jobs) -> None:
+    from jobflow_remote.jobs.state import JobState
+
+    all_docs = job_controller.get_jobs_doc()
+    all_db_ids = [doc.db_id for doc in all_docs]
+    assert len(all_db_ids) == 4
+
+    # no filter: all the db_ids are returned, as strings
+    res = job_controller.get_jobs_db_ids()
+    assert all(isinstance(db_id, str) for db_id in res)
+    assert sorted(res) == sorted(all_db_ids)
+
+    # filter by name
+    doc_job1 = next(doc for doc in all_docs if doc.job.name == "add_job1")
+    assert job_controller.get_jobs_db_ids(name="add_job1") == [doc_job1.db_id]
+
+    # filter by flow id
+    flow_1_uuids = {job.uuid for job in two_flows_four_jobs[0]}
+    flow_1_db_ids = [doc.db_id for doc in all_docs if doc.uuid in flow_1_uuids]
+    assert len(flow_1_db_ids) == 2
+    res = job_controller.get_jobs_db_ids(flow_ids=two_flows_four_jobs[0].uuid)
+    assert sorted(res) == sorted(flow_1_db_ids)
+
+    # filter by state: only the first job of each flow is READY
+    ready_db_ids = [doc.db_id for doc in all_docs if doc.state == JobState.READY]
+    assert len(ready_db_ids) == 2
+    res = job_controller.get_jobs_db_ids(states=JobState.READY)
+    assert sorted(res) == sorted(ready_db_ids)
+
+    # combined filters
+    res = job_controller.get_jobs_db_ids(
+        flow_ids=two_flows_four_jobs[0].uuid, states=JobState.READY
+    )
+    assert res == [doc_job1.db_id]
+
+    # sort and limit
+    res = job_controller.get_jobs_db_ids(sort=[("db_id", -1)], limit=1)
+    assert len(res) == 1
+
+    # no match
+    assert job_controller.get_jobs_db_ids(name="missing_job") == []
+    assert job_controller.get_jobs_db_ids(custom_query={"db_id": "missing"}) == []
+
+
+def test_get_flows_uuids(job_controller, two_flows_four_jobs) -> None:
+    from jobflow_remote.jobs.state import FlowState
+
+    flow_1, flow_2 = two_flows_four_jobs
+
+    # no filter: all the flow uuids are returned
+    res = job_controller.get_flows_uuids()
+    assert sorted(res) == sorted([flow_1.uuid, flow_2.uuid])
+
+    # filter by name
+    assert job_controller.get_flows_uuids(name="flow_1") == [flow_1.uuid]
+
+    # filter by metadata
+    assert job_controller.get_flows_uuids(metadata={"f1_metadata": "some_info"}) == [
+        flow_1.uuid
+    ]
+
+    # filter by flow id
+    assert job_controller.get_flows_uuids(flow_ids=flow_2.uuid) == [flow_2.uuid]
+
+    # filter by uuid of a job belonging to the flow
+    assert job_controller.get_flows_uuids(job_ids=flow_2[0].uuid) == [flow_2.uuid]
+
+    # filter by db_id of a job belonging to the flow
+    job_doc = job_controller.get_job_doc(job_id=flow_1[0].uuid)
+    assert job_controller.get_flows_uuids(db_ids=job_doc.db_id) == [flow_1.uuid]
+
+    # filter by state
+    res = job_controller.get_flows_uuids(states=FlowState.READY)
+    assert sorted(res) == sorted([flow_1.uuid, flow_2.uuid])
+    assert job_controller.get_flows_uuids(states=FlowState.COMPLETED) == []
+
+    # sort and limit
+    res = job_controller.get_flows_uuids(sort=[("name", 1)], limit=1)
+    assert res == [flow_1.uuid]
+    res = job_controller.get_flows_uuids(sort=[("name", -1)], limit=1)
+    assert res == [flow_2.uuid]
+    res = job_controller.get_flows_uuids(sort=[("name", -1)])
+    assert res == [flow_2.uuid, flow_1.uuid]
+
+    # no match
+    assert job_controller.get_flows_uuids(name="missing_flow") == []
+
+
+def test_query_flow_ids_no_match(job_controller, two_flows_four_jobs) -> None:
+    flow_1, _ = two_flows_four_jobs
+    flow_1_job_uuids = sorted(job.uuid for job in flow_1)
+
+    # a value that is not a uuid is a Job db_id. If no Flow contains that
+    # Job, nothing should match.
+    assert job_controller.count_jobs(flow_ids="no-such-id") == 0
+    assert job_controller.get_jobs_info(flow_ids="no-such-id") == []
+    assert job_controller.get_jobs_db_ids(flow_ids="no-such-id") == []
+
+    # mixing a valid Flow uuid and an unknown value only returns that Flow's Jobs
+    jobs_info = job_controller.get_jobs_info(flow_ids=[flow_1.uuid, "no-such-id"])
+    assert sorted(ji.uuid for ji in jobs_info) == flow_1_job_uuids
+    assert job_controller.count_jobs(flow_ids=[flow_1.uuid, "no-such-id"]) == 2
+
+    # the db_id of a Job is resolved to the Flow containing it
+    db_id = job_controller.get_job_doc(job_id=flow_1[0].uuid).db_id
+    jobs_info = job_controller.get_jobs_info(flow_ids=[db_id, "no-such-id"])
+    assert sorted(ji.uuid for ji in jobs_info) == flow_1_job_uuids
+
+
+NAMES_FILTER = [
+    "relax",
+    "relax_1",
+    "relax_2",
+    "relaxation",
+    "pre_relax",
+    "relax.x-1",
+    "relax.x-2",
+    "relaxyx-1",
+    "rel+ax",
+    "re(l)ax",
+    "rel-ax",
+    "relbx",
+    "static",
+]
+
+
+@pytest.fixture()
+def flows_with_names(random_project_name):
+    """Add one flow with one job for each name. Flow and Job share the name."""
+    from jobflow import Flow
+
+    from jobflow_remote import submit_flow
+    from jobflow_remote.testing import add
+
+    for name in NAMES_FILTER:
+        job = add(1, 2)
+        job.name = name
+        flow = Flow([job], name=name)
+        submit_flow(flow, worker="test_local_worker")
+
+
+NAME_PATTERNS = [
+    "relax",
+    "relax*",
+    "*relax*",
+    "*relax",
+    "rel?x",
+    "rel[ab]x",
+    "relax.x*",
+    "relax.x-*",
+    "relax.*",
+    "rel+ax",
+    "re(l)ax",
+    "re(l*",
+    "rel-ax",
+    "r*x*1",
+    "missing",
+]
+
+
+def test_name_filter(job_controller, flows_with_names) -> None:
+    """
+    Check the name filter for all the patterns on the same set of Flows.
+
+    The patterns are checked in a loop, instead of parametrizing the test, to
+    avoid populating the DB for each of them. All the failures are collected
+    and reported together.
+    """
+    import fnmatch
+
+    failures: list[str] = []
+
+    def check(description: str, actual: object, expected: object) -> None:
+        if actual != expected:
+            failures.append(f"{description}: got {actual!r}, expected {expected!r}")
+
+    for pattern in NAME_PATTERNS:
+        expected = sorted(n for n in NAMES_FILTER if fnmatch.fnmatchcase(n, pattern))
+        # the regex used before the name filter could use the index
+        old_regex = {"$regex": "^" + fnmatch.translate(pattern).replace("\\\\", "\\")}
+
+        # jobs
+        check(
+            f"[{pattern}] count_jobs",
+            job_controller.count_jobs(name=pattern),
+            len(expected),
+        )
+        check(
+            f"[{pattern}] jobs old regex",
+            job_controller.jobs.count_documents({"job.name": old_regex}),
+            len(expected),
+        )
+        jobs_info = job_controller.get_jobs_info(name=pattern)
+        check(
+            f"[{pattern}] get_jobs_info", sorted(ji.name for ji in jobs_info), expected
+        )
+
+        # flows
+        check(
+            f"[{pattern}] count_flows",
+            job_controller.count_flows(name=pattern),
+            len(expected),
+        )
+        check(
+            f"[{pattern}] flows old regex",
+            job_controller.flows.count_documents({"name": old_regex}),
+            len(expected),
+        )
+        flows_info = job_controller.get_flows_info(name=pattern)
+        check(
+            f"[{pattern}] get_flows_info",
+            sorted(fi.name for fi in flows_info),
+            expected,
+        )
+
+    assert not failures, "\n".join(failures)
+
+
+def test_get_flows_info_with_jobs_info_pages(
+    job_controller, flows_with_names, mocker
+) -> None:
+    sort = [("name", 1)]
+    pages = []
+    for skip in (0, 3):
+        spy = mocker.spy(job_controller.flows, "aggregate")
+        flows_info = job_controller.get_flows_info(
+            sort=sort, limit=3, skip=skip, with_jobs_info=True
+        )
+        # the selection of the flows happens before the $lookup
+        stages = [next(iter(stage)) for stage in spy.call_args.args[0]]
+        skip_stage = ["$skip"] if skip else []
+        assert stages == ["$sort", *skip_stage, "$limit", "$lookup", "$project"]
+        mocker.stop(spy)
+
+        assert len(flows_info) == 3
+        assert all(len(fi.jobs_info) == 1 for fi in flows_info)
+        assert all(fi.jobs_info[0].name == fi.name for fi in flows_info)
+        ids = [fi.flow_id for fi in flows_info]
+        # same page as without the jobs info
+        ids_no_jobs = [
+            fi.flow_id
+            for fi in job_controller.get_flows_info(sort=sort, limit=3, skip=skip)
+        ]
+        assert ids == ids_no_jobs
+        pages.append(ids)
+
+    assert set(pages[0]).isdisjoint(pages[1])
+    expected_names = sorted(NAMES_FILTER)[3:6]
+    assert [
+        fi.name
+        for fi in job_controller.get_flows_info(
+            sort=sort, limit=3, skip=3, with_jobs_info=True
+        )
+    ] == expected_names
+
+    # with a filter as well
+    spy = mocker.spy(job_controller.flows, "aggregate")
+    flows_info = job_controller.get_flows_info(
+        name="relax*", sort=sort, limit=2, skip=1, with_jobs_info=True
+    )
+    stages = [next(iter(stage)) for stage in spy.call_args.args[0]]
+    assert stages == ["$match", "$sort", "$skip", "$limit", "$lookup", "$project"]
+    assert [fi.name for fi in flows_info] == sorted(
+        n for n in NAMES_FILTER if n.startswith("relax")
+    )[1:3]
+
+
+def test_get_flow_job_aggreg_jobs_list_query(
+    job_controller, flows_with_names, mocker
+) -> None:
+    # a query and a sort referring to the jobs need to be applied after the $lookup
+    spy = mocker.spy(job_controller.flows, "aggregate")
+    data = job_controller.get_flow_job_aggreg(
+        query={"jobs_list.job.name": {"$in": ["relax", "static", "relbx"]}},
+        sort=[("jobs_list.job.name", -1)],
+        skip=1,
+        limit=1,
+    )
+    stages = [next(iter(stage)) for stage in spy.call_args.args[0]]
+    assert stages == ["$lookup", "$match", "$sort", "$skip", "$limit"]
+    assert [d["name"] for d in data] == ["relbx"]
 
 
 def test_rerun_completed(job_controller, runner) -> None:
@@ -899,8 +1187,42 @@ def test_add_flow(job_controller):
     assert job_controller.count_jobs() == 1
 
 
+def test_get_indexes(job_controller, one_job):
+    from jobflow_remote.jobs.data import DbCollection
+
+    # jobs is the default collection
+    job_indexes = job_controller.get_indexes()
+    assert job_indexes == job_controller.jobs.index_information()
+    assert job_indexes["db_id_1"]["unique"]
+    assert job_indexes["uuid_1_index_1"]["key"] == [("uuid", 1), ("index", 1)]
+    assert "job.hosts_1" in job_indexes
+
+    flow_indexes = job_controller.get_indexes(DbCollection.FLOWS)
+    assert flow_indexes == job_controller.flows.index_information()
+    assert "created_on_1" in flow_indexes
+
+    # a newly created index is listed
+    job_controller.create_indexes(
+        [[("xxx", pymongo.DESCENDING), ("yyy", pymongo.ASCENDING)]],
+        collection=DbCollection.FLOWS,
+        background=False,
+    )
+    flow_indexes = job_controller.get_indexes(DbCollection.FLOWS)
+    assert flow_indexes["xxx_-1_yyy_1"]["key"] == [("xxx", -1), ("yyy", 1)]
+
+
 def test_indexes(job_controller, one_job):
-    assert len(list(job_controller.jobs.list_indexes())) == 11
+    job_indexes = job_controller.jobs.index_information()
+    assert len(job_indexes) == 11
+    assert "job.hosts_1" in job_indexes
+    # uuid alone is served by the prefix of the compound (uuid, index) index
+    assert "uuid_1" not in job_indexes
+    assert "uuid_1_index_1" in job_indexes
+
+    flow_indexes = job_controller.flows.index_information()
+    assert len(flow_indexes) == 8
+    assert "created_on_1" in flow_indexes
+
     job_controller.create_indexes(
         [[("xxx", pymongo.DESCENDING), ("yyy", pymongo.ASCENDING)]],
         unique=True,
@@ -1054,6 +1376,36 @@ def test_backup(job_controller_drop, python, compress):
                 job_controller_drop.backup_dump(
                     dir_path=dir_name, compress=compress, python=python
                 )
+
+
+def test_get_assigned_workers(job_controller) -> None:
+    from jobflow import Flow
+
+    from jobflow_remote import submit_flow
+    from jobflow_remote.testing import add
+
+    assert job_controller.get_assigned_workers() == []
+
+    submit_flow(Flow([add(1, 2), add(3, 4)]), worker="test_local_worker")
+    submit_flow(Flow([add(1, 2)]), worker="test_local_batch_worker")
+    submit_flow(Flow([add(1, 2)]), worker="test_local_worker")
+
+    # each worker once, sorted
+    assert job_controller.get_assigned_workers() == [
+        "test_local_batch_worker",
+        "test_local_worker",
+    ]
+
+    # a worker no longer in the configuration is still listed, while
+    # a worker without Jobs is not
+    job_controller.jobs.update_one(
+        {"worker": "test_local_batch_worker"},
+        {"$set": {"worker": "a_removed_worker"}},
+    )
+    assert job_controller.get_assigned_workers() == [
+        "a_removed_worker",
+        "test_local_worker",
+    ]
 
 
 def test_count_states(job_controller):
