@@ -175,9 +175,9 @@ def daemon_manager(random_project_name, job_controller):
     except MissingDocumentError:
         job_controller.auxiliary.insert_one({"running_runner": None})
     # kill processes and shut down daemon (otherwise will remain in the STOPPED state)
-    dm.kill(raise_on_error=True)
+    dm.kill(raise_on_error=True, enforce_runner_doc=False)
     time.sleep(0.5)
-    dm.shut_down(raise_on_error=True)
+    dm.shut_down(raise_on_error=True, enforce_runner_doc=False)
     for _ in range(10):
         time.sleep(1)
         try:

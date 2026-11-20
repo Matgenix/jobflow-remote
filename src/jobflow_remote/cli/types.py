@@ -502,3 +502,16 @@ metadata_opt = Annotated[
         parser=dict_type_parser,
     ),
 ]
+
+skip_doc_opt = Annotated[
+    bool,
+    typer.Option(
+        "--skip-doc",
+        "-sd",
+        help=(
+            "Act on the runner active for this project on the current machine even if "
+            "the running runner document in the DB does not match. The document is "
+            "cleared only if the hostname is the only difference."
+        ),
+    ),
+]
