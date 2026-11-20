@@ -511,10 +511,11 @@ def fnmatch_to_mongo_query(pattern: str) -> str | dict[str, str]:
     - if the pattern starts with a literal prefix, the prefix is put outside
       of any group in the regex, as MongoDB can bound the index scan only for
       regexes starting with ``^`` followed by literal characters.
-    - if the pattern starts with a wildcard, or contains a backslash, the whole
-      pattern is translated with ``fnmatch.translate``.
+    - if the pattern starts with a wildcard the whole pattern is translated
+      with ``fnmatch.translate``.
 
     In all cases the full string is matched, as with ``fnmatch.fnmatchcase``.
+    As in fnmatch, a backslash is a literal character and not an escape.
 
     Parameters
     ----------
@@ -527,18 +528,15 @@ def fnmatch_to_mongo_query(pattern: str) -> str | dict[str, str]:
         The string for an equality match or a dictionary with the ``$regex``
         operator.
     """
-    # backslashes are handled in a specific way in the full translation.
-    # Keep the same behaviour in that case.
-    if "\\" not in pattern:
-        wildcard_match = re.search(r"[*?\[]", pattern)
-        if wildcard_match is None:
-            return pattern
-        prefix = pattern[: wildcard_match.start()]
-        if prefix:
-            rest = pattern[wildcard_match.start() :]
-            return {"$regex": "^" + re.escape(prefix) + fnmatch.translate(rest)}
+    wildcard_match = re.search(r"[*?\[]", pattern)
+    if wildcard_match is None:
+        return pattern
+    prefix = pattern[: wildcard_match.start()]
+    if prefix:
+        rest = pattern[wildcard_match.start() :]
+        return {"$regex": "^" + re.escape(prefix) + fnmatch.translate(rest)}
 
-    return {"$regex": "^" + fnmatch.translate(pattern).replace("\\\\", "\\")}
+    return {"$regex": "^" + fnmatch.translate(pattern)}
 
 
 def mongo_operation(

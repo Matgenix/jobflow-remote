@@ -39,6 +39,7 @@ from jobflow_remote.cli.types import (
     max_results_opt,
     metadata_opt,
     name_opt,
+    query_opt,
     reverse_sort_flag_opt,
     start_date_opt,
     stored_data_keys_opt,
@@ -89,6 +90,7 @@ def flows_list(
     max_results: max_results_opt = 100,
     sort: flow_sort_opt = FlowSortOption.UPDATED_ON,
     reverse_sort: reverse_sort_flag_opt = False,
+    custom_query: query_opt = None,
 ) -> None:
     """Get the list of Flows in the database."""
     from jobflow_remote import SETTINGS
@@ -114,6 +116,7 @@ def flows_list(
                 name=name,
                 metadata=metadata,
                 locked=locked,
+                query=custom_query,
             )
         out_console.print(f"Number of Flows: {n_flows}")
     else:
@@ -131,6 +134,7 @@ def flows_list(
                 limit=max_results,
                 sort=db_sort,
                 with_jobs_info=verbosity > 0,
+                custom_query=custom_query,
             )
 
             table = get_flow_info_table(flows_info, verbosity=verbosity)

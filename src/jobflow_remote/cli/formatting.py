@@ -315,6 +315,12 @@ def format_flow_info(
     title = Text(
         f"Flow: {flow_info.name} - {flow_info.flow_id} - {flow_info.state.name}"
     )
+    if flow_info.is_locked:
+        locked = " - LOCKED"
+        if flow_info.lock_time:
+            lock_time = convert_utc_time(flow_info.lock_time).strftime(fmt_datetime)
+            locked += f" since {lock_time}{time_zone_str}"
+        title.append(locked, style="bold red")
     if verbosity > 0:
         title = Group(title, Text("Metadata:"), Pretty(flow_info.flow_metadata))
     table = get_job_info_table(

@@ -55,6 +55,39 @@ def test_flows_list(job_controller, two_flows_four_jobs, run_check_cli) -> None:
         required_out="Number of Flows: 1",
     )
 
+    # custom query
+    run_check_cli(
+        ["flow", "list", "-q", '{"name": "flow_1"}'],
+        required_out=[two_flows_four_jobs[0].uuid[:5]],
+        excluded_out=[two_flows_four_jobs[1].uuid[:5], flow.uuid[:5]],
+    )
+    run_check_cli(
+        ["flow", "list", "-q", '{"name": "flow_1"}', "--count"],
+        required_out="Number of Flows: 1",
+    )
+    run_check_cli(
+        ["flow", "list", "-q", "metadata.test=x", "-v"],
+        required_out=[flow.uuid[:5]],
+    )
+    # combined with the other filters
+    run_check_cli(
+        [
+            "flow",
+            "list",
+            "-q",
+            '{"name": {"$in": ["flow_1", "flow_2"]}}',
+            "-fid",
+            two_flows_four_jobs[1].uuid,
+            "--count",
+        ],
+        required_out="Number of Flows: 1",
+    )
+    run_check_cli(
+        ["flow", "list", "-q", '{"name": "flow_1"}', "-n", "flow_1"],
+        error=True,
+        required_out="Custom_query must not overlap with other query options",
+    )
+
 
 def test_delete(job_controller, two_flows_four_jobs, run_check_cli) -> None:
     from jobflow import Flow
@@ -226,6 +259,11 @@ def test_flow_info(job_controller, two_flows_four_jobs, run_check_cli, runner) -
     assert table_flow_info_vvv == table_job_list_vvv
 
     run_check_cli(["flow", "info", "-j", "3", "-v"], required_out=["Metadata: {}"])
+
+    # the lock is shown only for a locked Flow
+    run_check_cli(["flow", "info", "-j", "1"], excluded_out="LOCKED")
+    with job_controller.lock_flow(filter={"uuid": two_flows_four_jobs[0].uuid}):
+        run_check_cli(["flow", "info", "-j", "1"], required_out="LOCKED since")
 
     run_check_cli(
         ["flow", "info", "-j", "1", "--report"],

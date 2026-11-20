@@ -15,6 +15,8 @@ NAMES = [
     "re(l)ax",
     "rel-ax",
     "relbx",
+    "rel\\ax",
+    "relax\\b",
     "static",
 ]
 
@@ -35,6 +37,10 @@ PATTERNS = [
     "rel-ax",
     "r*x*1",
     "abc[def",
+    "rel\\ax",
+    "relax\\b",
+    "rel\\*",
+    "*\\*",
     "missing",
 ]
 
@@ -47,6 +53,8 @@ def test_fnmatch_to_mongo_query_form():
     # no wildcard: equality
     assert fnmatch_to_mongo_query("relax") == "relax"
     assert fnmatch_to_mongo_query("relax.x-1") == "relax.x-1"
+    # a backslash is a literal character
+    assert fnmatch_to_mongo_query("rel\\ax") == "rel\\ax"
 
     # literal prefix outside of the group, with the regex characters escaped
     assert fnmatch_to_mongo_query("relax*") == {
@@ -57,6 +65,9 @@ def test_fnmatch_to_mongo_query_form():
     }
     assert fnmatch_to_mongo_query("rel[ab]x") == {
         "$regex": "^rel" + fnmatch.translate("[ab]x")
+    }
+    assert fnmatch_to_mongo_query("rel\\ax*") == {
+        "$regex": "^rel\\\\ax" + fnmatch.translate("*")
     }
 
 
@@ -71,9 +82,9 @@ def test_fnmatch_to_mongo_query_leading_wildcard():
 
     from jobflow_remote.utils.db import fnmatch_to_mongo_query
 
-    # a leading wildcard or a backslash keep the full translation
-    for pattern in ("*relax*", "?elax", "[rs]elax", "rel\\ax*"):
-        expected = "^" + fnmatch.translate(pattern).replace("\\\\", "\\")
+    # a leading wildcard keeps the full translation
+    for pattern in ("*relax*", "?elax", "[rs]elax", "*rel\\ax"):
+        expected = "^" + fnmatch.translate(pattern)
         assert fnmatch_to_mongo_query(pattern) == {"$regex": expected}
 
 

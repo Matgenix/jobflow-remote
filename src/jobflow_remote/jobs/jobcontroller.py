@@ -100,12 +100,25 @@ logger = logging.getLogger(__name__)
 _MAX_ARCHIVED_RUNNER_PINGS = 50
 
 
+# Operators whose field references cannot be determined statically.
+_OPAQUE_OPERATORS = frozenset(
+    {"$where", "$function", "$getField", "$setField", "$unsetField"}
+)
+# Aggregation variables referring to the whole document.
+_ROOT_VARIABLES = ("$$ROOT", "$$CURRENT")
+
+
 def _references_field(obj: Any, field: str) -> bool:
     """
-    Check if a MongoDB filter or pipeline stage refers to a field.
+    Check if a MongoDB filter or pipeline stage may refer to a field.
 
     Looks for keys equal to the field or starting with "field.", and for string
-    values referring to it as "$field" or "$field." (e.g. in $expr).
+    values referring to it as "$field" or "$field." (e.g. in $expr), also
+    through the "$$ROOT" and "$$CURRENT" variables.
+
+    The check is conservative: if the object contains references that cannot
+    be resolved statically (operators like $where or $getField, or the whole
+    document as "$$ROOT"), the field is considered referenced.
 
     Parameters
     ----------
@@ -117,7 +130,7 @@ def _references_field(obj: Any, field: str) -> bool:
     Returns
     -------
     bool
-        True if the field is referenced anywhere in the object.
+        True if the field may be referenced anywhere in the object.
     """
 
     def matches(s: str) -> bool:
@@ -125,14 +138,52 @@ def _references_field(obj: Any, field: str) -> bool:
 
     if isinstance(obj, dict):
         return any(
-            (isinstance(k, str) and matches(k)) or _references_field(v, field)
+            (isinstance(k, str) and (k in _OPAQUE_OPERATORS or matches(k)))
+            or _references_field(v, field)
             for k, v in obj.items()
         )
     if isinstance(obj, list | tuple):
         return any(_references_field(v, field) for v in obj)
     if isinstance(obj, str):
+        for var in _ROOT_VARIABLES:
+            if obj == var:
+                # the whole document is used
+                return True
+            if obj.startswith(f"{var}."):
+                return matches(obj[len(var) + 1 :])
         return obj.startswith("$") and matches(obj[1:])
     return False
+
+
+def _merge_custom_query(query: dict, custom_query: dict | None) -> dict:
+    """
+    Add a custom query to the query built from the standard filters.
+
+    Parameters
+    ----------
+    query
+        The query built from the standard filters.
+    custom_query
+        A generic query. Its keys must not overlap with those of query.
+
+    Returns
+    -------
+    dict
+        The merged query.
+
+    Raises
+    ------
+    ValueError
+        If the keys of the two queries overlap.
+    """
+    custom_query = custom_query or {}
+    if not set(query).isdisjoint(custom_query):
+        raise ValueError(
+            "Custom_query must not overlap with other query options. "
+            f"Duplicates: {set(query) & set(custom_query)}"
+        )
+
+    return query | custom_query
 
 
 class JobController:
@@ -387,13 +438,7 @@ class JobController:
         if workers:
             query["worker"] = {"$in": workers}
 
-        custom_query = custom_query or {}
-        if not set(query).isdisjoint(custom_query):
-            raise ValueError(
-                f"Custom_query must not overlap with other query options. Duplicates: {set(query) & set(custom_query)}"
-            )
-
-        return query | custom_query
+        return _merge_custom_query(query, custom_query)
 
     def _build_query_flow(
         self,
@@ -406,6 +451,7 @@ class JobController:
         name: str | None,
         metadata: dict | None,
         locked: bool,
+        custom_query: dict | None = None,
     ) -> dict:
         """
         Build a query to search for Flows, based on standard parameters.
@@ -435,6 +481,9 @@ class JobController:
             exact match for all the values provided.
         locked
             If True only locked Flows will be selected.
+        custom_query
+            A generic query on the fields of the Flow document. Keys must not
+            overlap with other specified query options.
 
         Returns
         -------
@@ -483,7 +532,7 @@ class JobController:
         if locked:
             query["lock_id"] = {"$ne": None}
 
-        return query
+        return _merge_custom_query(query, custom_query)
 
     def get_jobs_info_query(self, query: dict = None, **kwargs) -> list[JobInfo]:
         """
@@ -690,6 +739,7 @@ class JobController:
         locked: bool = False,
         sort: list[tuple[str, int]] | None = None,
         limit: int = 0,
+        skip: int = 0,
     ) -> list[str]:
         """
         Query for Jobs based on standard parameters and return a list of Job db_id.
@@ -728,6 +778,8 @@ class JobController:
             query. Follows pymongo conventions.
         limit
             Maximum number of entries to retrieve. 0 means no limit.
+        skip
+            The number of documents to omit (from the start of the result set).
 
         Returns
         -------
@@ -748,7 +800,11 @@ class JobController:
             custom_query=custom_query,
         )
         docs = self.jobs.find(
-            query, projection={"db_id": 1, "_id": 0}, sort=sort, limit=limit
+            query,
+            projection={"db_id": 1, "_id": 0},
+            sort=sort,
+            limit=limit,
+            skip=skip,
         )
         return [doc["db_id"] for doc in docs]
 
@@ -2643,6 +2699,9 @@ class JobController:
         `jobs_list`, they are applied after the $lookup, which can be much
         slower on large databases.
 
+        All the Jobs of a Flow are added to a single document, so the aggregation
+        fails if their size exceeds the maximum size of a MongoDB document (16 MB).
+
         Parameters
         ----------
         query
@@ -2738,6 +2797,7 @@ class JobController:
         limit: int = 0,
         skip: int = 0,
         with_jobs_info: bool | list = False,
+        custom_query: dict | None = None,
     ) -> list[FlowInfo]:
         """
         Query for Flows based on standard parameters and return a list of FlowInfo.
@@ -2778,9 +2838,17 @@ class JobController:
             The number of documents to omit (from the start of the result set).
         with_jobs_info
             If True or a list, data is fetched from both the Flow collection and
-            Job collection with an aggregate and JobInfo for each job will be created.
+            Job collection and JobInfo for each job will be created.
             If a list, it should contain additional properties to add to the job info.
             If False, only the Job information in the Flow document will be used.
+            The Jobs are fetched with a separate query, so that there is no limit
+            on the number of Jobs in a Flow. Only if the sort refers to the
+            fields of the Jobs (as `jobs_list.<field>`) an aggregation is used,
+            which fails if the Jobs of a Flow exceed the maximum size of a
+            MongoDB document (about 30,000 Jobs).
+        custom_query
+            A generic query on the fields of the Flow document. Keys must not
+            overlap with other specified query options.
 
         Returns
         -------
@@ -2797,9 +2865,10 @@ class JobController:
             name=name,
             metadata=metadata,
             locked=locked,
+            custom_query=custom_query,
         )
 
-        # Only use the full aggregation if more job details are needed.
+        # Only fetch the Jobs if more job details are needed.
         # The single flow document is enough for basic information
         if with_jobs_info is not False:
             if isinstance(with_jobs_info, bool):
@@ -2808,21 +2877,93 @@ class JobController:
                 projection_job = {
                     f: 1 for f in projection_flow_info_jobs + with_jobs_info
                 }
-            projection_flow = {k: 1 for k in FlowDoc.model_fields}
 
-            data = self.get_flow_job_aggreg(
-                query=query,
-                sort=sort,
-                jobs_sort=jobs_sort,
-                limit=limit,
-                skip=skip,
-                projection_flow=projection_flow,
-                projection_job=projection_job,
-            )
+            if sort and _references_field(dict(sort), "jobs_list"):
+                # sorting on the fields of the Jobs requires joining them to
+                # the Flows. Subject to the size limit of the MongoDB documents.
+                data = self.get_flow_job_aggreg(
+                    query=query,
+                    sort=sort,
+                    jobs_sort=jobs_sort,
+                    limit=limit,
+                    skip=skip,
+                    projection_flow={k: 1 for k in FlowDoc.model_fields},
+                    projection_job=projection_job,
+                )
+            else:
+                data = self._find_flows_with_jobs(
+                    query=query,
+                    projection_job=projection_job,
+                    sort=sort,
+                    jobs_sort=jobs_sort,
+                    limit=limit,
+                    skip=skip,
+                )
         else:
             data = list(self.flows.find(query, sort=sort, limit=limit, skip=skip))
 
         return [FlowInfo.from_query_dict(d) for d in data]
+
+    def _find_flows_with_jobs(
+        self,
+        query: dict,
+        projection_job: dict,
+        sort: list[tuple] | None = None,
+        jobs_sort: list[tuple] | None = None,
+        limit: int = 0,
+        skip: int = 0,
+    ) -> list[dict]:
+        """
+        Fetch the Flow documents and add the list of their Jobs.
+
+        Equivalent to the output of `get_flow_job_aggreg`, but the Jobs are
+        fetched with a separate query, instead of a $lookup. This avoids the
+        limit on the size of a single document in an aggregation, that would
+        be exceeded for Flows with a large number of Jobs.
+
+        Parameters
+        ----------
+        query
+            The filter for the Flow documents. Should only involve fields of
+            the Flow document.
+        projection_job
+            Projection of the fields for the Job documents.
+        sort
+            A list of (key, direction) pairs specifying the sort order for the
+            Flows. Follows pymongo conventions.
+        jobs_sort
+            A list of (key, direction) pairs specifying the sort order of the
+            Jobs of each Flow.
+        limit
+            Maximum number of Flows to retrieve. 0 means no limit.
+        skip
+            The number of Flows to omit (from the start of the result set).
+
+        Returns
+        -------
+        list
+            The Flow documents, each with the list of its Jobs as `jobs_list`.
+        """
+        flows = list(self.flows.find(query, sort=sort, limit=limit, skip=skip))
+        if not flows:
+            return []
+
+        jobs_by_flow: dict[str, list[dict]] = {f["uuid"]: [] for f in flows}
+        # the hosts are needed to assign the Jobs to their Flow
+        projection = dict(projection_job)
+        projection["job.hosts"] = 1
+        jobs = self.jobs.find(
+            {"job.hosts": {"$in": list(jobs_by_flow)}},
+            projection=projection,
+            sort=jobs_sort,
+        )
+        for job in jobs:
+            # the root Flow is the last of the hosts
+            jobs_by_flow[job["job"]["hosts"][-1]].append(job)
+
+        for flow in flows:
+            flow["jobs_list"] = jobs_by_flow[flow["uuid"]]
+        return flows
 
     def get_flows_uuids(
         self,
@@ -2837,6 +2978,8 @@ class JobController:
         locked: bool = False,
         sort: list[tuple] | None = None,
         limit: int = 0,
+        skip: int = 0,
+        custom_query: dict | None = None,
     ) -> list[str]:
         """
         Query for Flows based on standard parameters and return a list of Flow uuids.
@@ -2870,6 +3013,11 @@ class JobController:
             query. Follows pymongo conventions.
         limit
             Maximum number of entries to retrieve. 0 means no limit.
+        skip
+            The number of documents to omit (from the start of the result set).
+        custom_query
+            A generic query on the fields of the Flow document. Keys must not
+            overlap with other specified query options.
 
         Returns
         -------
@@ -2886,9 +3034,14 @@ class JobController:
             name=name,
             metadata=metadata,
             locked=locked,
+            custom_query=custom_query,
         )
         docs = self.flows.find(
-            query, projection={"uuid": 1, "_id": 0}, sort=sort, limit=limit
+            query,
+            projection={"uuid": 1, "_id": 0},
+            sort=sort,
+            limit=limit,
+            skip=skip,
         )
         return [doc["uuid"] for doc in docs]
 
@@ -3742,7 +3895,8 @@ class JobController:
         Parameters
         ----------
         query
-            A generic query. Will override all the other parameters.
+            A generic query on the fields of the Flow document. Keys must not
+            overlap with other specified query options.
         job_ids
             One or more strings with uuids of Jobs belonging to the Flow.
         db_ids
@@ -3782,20 +3936,20 @@ class JobController:
         int
             Number of Flows matching the criteria.
         """
-        if not query:
-            query = self._build_query_flow(
-                job_ids=job_ids,
-                db_ids=db_ids,
-                flow_ids=flow_ids,
-                states=states,
-                start_date=start_date,
-                end_date=end_date,
-                name=name,
-                metadata=metadata,
-                locked=locked,
-            )
+        full_query = self._build_query_flow(
+            job_ids=job_ids,
+            db_ids=db_ids,
+            flow_ids=flow_ids,
+            states=states,
+            start_date=start_date,
+            end_date=end_date,
+            name=name,
+            metadata=metadata,
+            locked=locked,
+            custom_query=query,
+        )
         return self._count_documents(
-            self.flows, query, limit=limit, estimated=estimated
+            self.flows, full_query, limit=limit, estimated=estimated
         )
 
     @staticmethod

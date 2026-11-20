@@ -176,6 +176,15 @@ def test_get_jobs_db_ids(job_controller, two_flows_four_jobs) -> None:
     res = job_controller.get_jobs_db_ids(sort=[("db_id", -1)], limit=1)
     assert len(res) == 1
 
+    # pages with skip and limit: not overlapping and in the sort order
+    sort = [("db_id", 1)]
+    all_sorted = job_controller.get_jobs_db_ids(sort=sort)
+    page_1 = job_controller.get_jobs_db_ids(sort=sort, limit=2)
+    page_2 = job_controller.get_jobs_db_ids(sort=sort, limit=2, skip=2)
+    assert page_1 == all_sorted[:2]
+    assert page_2 == all_sorted[2:]
+    assert job_controller.get_jobs_db_ids(sort=sort, skip=4) == []
+
     # no match
     assert job_controller.get_jobs_db_ids(name="missing_job") == []
     assert job_controller.get_jobs_db_ids(custom_query={"db_id": "missing"}) == []
@@ -221,6 +230,13 @@ def test_get_flows_uuids(job_controller, two_flows_four_jobs) -> None:
     res = job_controller.get_flows_uuids(sort=[("name", -1)])
     assert res == [flow_2.uuid, flow_1.uuid]
 
+    # pages with skip and limit
+    assert job_controller.get_flows_uuids(sort=[("name", 1)], limit=1, skip=1) == [
+        flow_2.uuid
+    ]
+    assert job_controller.get_flows_uuids(sort=[("name", -1)], skip=1) == [flow_1.uuid]
+    assert job_controller.get_flows_uuids(sort=[("name", 1)], skip=2) == []
+
     # no match
     assert job_controller.get_flows_uuids(name="missing_flow") == []
 
@@ -246,6 +262,51 @@ def test_query_flow_ids_no_match(job_controller, two_flows_four_jobs) -> None:
     assert sorted(ji.uuid for ji in jobs_info) == flow_1_job_uuids
 
 
+def test_flows_custom_query(job_controller, two_flows_four_jobs) -> None:
+    from jobflow_remote.jobs.state import FlowState
+
+    flow_1, flow_2 = two_flows_four_jobs
+
+    def check(expected: list[str], **kwargs) -> None:
+        custom_query = kwargs.pop("custom_query")
+        infos = job_controller.get_flows_info(custom_query=custom_query, **kwargs)
+        assert sorted(fi.flow_id for fi in infos) == sorted(expected)
+        infos = job_controller.get_flows_info(
+            custom_query=custom_query, with_jobs_info=True, **kwargs
+        )
+        assert sorted(fi.flow_id for fi in infos) == sorted(expected)
+        uuids = job_controller.get_flows_uuids(custom_query=custom_query, **kwargs)
+        assert sorted(uuids) == sorted(expected)
+        assert job_controller.count_flows(query=custom_query, **kwargs) == len(expected)
+
+    # alone
+    check([flow_1.uuid], custom_query={"name": "flow_1"})
+    check(
+        [flow_1.uuid, flow_2.uuid],
+        custom_query={"name": {"$in": ["flow_1", "flow_2"]}},
+    )
+    check([], custom_query={"name": "missing"})
+
+    # combined with the other filters, not replaced by them
+    check(
+        [flow_1.uuid],
+        custom_query={"metadata.f1_metadata": "some_info"},
+        states=FlowState.READY,
+    )
+    check([], custom_query={"name": "flow_1"}, flow_ids=flow_2.uuid)
+    check([flow_2.uuid], custom_query={"uuid": {"$ne": flow_1.uuid}}, name="flow_*")
+
+    # keys overlapping with the other filters
+    with pytest.raises(ValueError, match="must not overlap"):
+        job_controller.get_flows_info(custom_query={"name": "flow_1"}, name="flow_1")
+    with pytest.raises(ValueError, match="must not overlap"):
+        job_controller.get_flows_uuids(
+            custom_query={"uuid": flow_1.uuid}, flow_ids=flow_1.uuid
+        )
+    with pytest.raises(ValueError, match="must not overlap"):
+        job_controller.count_flows(query={"state": "READY"}, states=FlowState.READY)
+
+
 NAMES_FILTER = [
     "relax",
     "relax_1",
@@ -259,6 +320,8 @@ NAMES_FILTER = [
     "re(l)ax",
     "rel-ax",
     "relbx",
+    "rel\\ax",
+    "relax\\b",
     "static",
 ]
 
@@ -293,6 +356,10 @@ NAME_PATTERNS = [
     "re(l*",
     "rel-ax",
     "r*x*1",
+    "rel\\ax",
+    "relax\\b",
+    "rel\\*",
+    "*\\*",
     "missing",
 ]
 
@@ -315,8 +382,8 @@ def test_name_filter(job_controller, flows_with_names) -> None:
 
     for pattern in NAME_PATTERNS:
         expected = sorted(n for n in NAMES_FILTER if fnmatch.fnmatchcase(n, pattern))
-        # the regex used before the name filter could use the index
-        old_regex = {"$regex": "^" + fnmatch.translate(pattern).replace("\\\\", "\\")}
+        # the full translation of the pattern, without the index optimizations
+        full_regex = {"$regex": "^" + fnmatch.translate(pattern)}
 
         # jobs
         check(
@@ -325,8 +392,8 @@ def test_name_filter(job_controller, flows_with_names) -> None:
             len(expected),
         )
         check(
-            f"[{pattern}] jobs old regex",
-            job_controller.jobs.count_documents({"job.name": old_regex}),
+            f"[{pattern}] jobs full regex",
+            job_controller.jobs.count_documents({"job.name": full_regex}),
             len(expected),
         )
         jobs_info = job_controller.get_jobs_info(name=pattern)
@@ -341,8 +408,8 @@ def test_name_filter(job_controller, flows_with_names) -> None:
             len(expected),
         )
         check(
-            f"[{pattern}] flows old regex",
-            job_controller.flows.count_documents({"name": old_regex}),
+            f"[{pattern}] flows full regex",
+            job_controller.flows.count_documents({"name": full_regex}),
             len(expected),
         )
         flows_info = job_controller.get_flows_info(name=pattern)
@@ -365,10 +432,8 @@ def test_get_flows_info_with_jobs_info_pages(
         flows_info = job_controller.get_flows_info(
             sort=sort, limit=3, skip=skip, with_jobs_info=True
         )
-        # the selection of the flows happens before the $lookup
-        stages = [next(iter(stage)) for stage in spy.call_args.args[0]]
-        skip_stage = ["$skip"] if skip else []
-        assert stages == ["$sort", *skip_stage, "$limit", "$lookup", "$project"]
+        # the jobs are fetched with a separate query, not with an aggregation
+        assert spy.call_count == 0
         mocker.stop(spy)
 
         assert len(flows_info) == 3
@@ -393,15 +458,114 @@ def test_get_flows_info_with_jobs_info_pages(
     ] == expected_names
 
     # with a filter as well
-    spy = mocker.spy(job_controller.flows, "aggregate")
     flows_info = job_controller.get_flows_info(
         name="relax*", sort=sort, limit=2, skip=1, with_jobs_info=True
     )
-    stages = [next(iter(stage)) for stage in spy.call_args.args[0]]
-    assert stages == ["$match", "$sort", "$skip", "$limit", "$lookup", "$project"]
     assert [fi.name for fi in flows_info] == sorted(
         n for n in NAMES_FILTER if n.startswith("relax")
     )[1:3]
+    assert all(fi.jobs_info[0].name == fi.name for fi in flows_info)
+
+
+def test_get_flows_info_with_jobs_info(
+    job_controller, two_flows_four_jobs, mocker
+) -> None:
+    from jobflow import Flow
+
+    from jobflow_remote import submit_flow
+    from jobflow_remote.jobs.data import FlowDoc, FlowInfo, projection_flow_info_jobs
+    from jobflow_remote.testing import add
+
+    # a nested Flow: the hosts of the inner Job include both Flows
+    inner_job = add(1, 2)
+    inner_job.name = "inner_job"
+    outer_job = add(inner_job.output, 3)
+    outer_job.name = "outer_job"
+    nested_flow = Flow([Flow([inner_job], name="inner"), outer_job], name="nested")
+    submit_flow(nested_flow, worker="test_local_worker")
+
+    flow_1, flow_2 = two_flows_four_jobs
+    expected_jobs = {
+        flow_1.uuid: ["add_job1", "add_job2"],
+        flow_2.uuid: ["add_job3", "add_job4"],
+        nested_flow.uuid: ["inner_job", "outer_job"],
+    }
+
+    sort = [("created_on", 1)]
+    jobs_sort = [("job.name", -1)]
+    flows_info = job_controller.get_flows_info(
+        sort=sort, jobs_sort=jobs_sort, with_jobs_info=True
+    )
+    assert [fi.flow_id for fi in flows_info] == list(expected_jobs)
+    for fi in flows_info:
+        # each Flow has its own Jobs, in the order of jobs_sort
+        names = [ji.name for ji in fi.jobs_info]
+        assert names == sorted(expected_jobs[fi.flow_id], reverse=True)
+        assert fi.job_names == names
+        assert [ji.db_id for ji in fi.jobs_info] == fi.db_ids
+
+    # same output as the aggregation
+    data = job_controller.get_flow_job_aggreg(
+        sort=sort,
+        jobs_sort=jobs_sort,
+        projection_flow={k: 1 for k in FlowDoc.model_fields},
+        projection_job={f: 1 for f in projection_flow_info_jobs},
+    )
+    assert [FlowInfo.from_query_dict(d) for d in data] == flows_info
+
+    # additional Job properties
+    flows_info = job_controller.get_flows_info(
+        flow_ids=flow_1.uuid, with_jobs_info=["remote"]
+    )
+    assert len(flows_info) == 1
+    assert len(flows_info[0].jobs_info) == 2
+
+    # a Flow without matching Jobs
+    assert (
+        job_controller.get_flows_info(flow_ids="no-such-id", with_jobs_info=True) == []
+    )
+
+    # sorting on the fields of the Jobs requires the aggregation
+    spy = mocker.spy(job_controller.flows, "aggregate")
+    flows_info = job_controller.get_flows_info(
+        sort=[("jobs_list.job.name", 1)], with_jobs_info=True
+    )
+    assert spy.call_count == 1
+    assert [fi.flow_id for fi in flows_info] == list(expected_jobs)
+
+
+def test_flows_info_lock(job_controller, two_flows_four_jobs) -> None:
+    flow_1, flow_2 = two_flows_four_jobs
+
+    # the three ways of reading the Flows: the Flow documents only, with the
+    # Jobs from a separate query and with the aggregation (sort on the Jobs)
+    read_options = [
+        {},
+        {"with_jobs_info": True},
+        {"with_jobs_info": True, "sort": [("jobs_list.db_id", 1)]},
+    ]
+
+    for kwargs in read_options:
+        for fi in job_controller.get_flows_info(**kwargs):
+            assert fi.lock_id is None
+            assert fi.lock_time is None
+            assert not fi.is_locked
+
+    with job_controller.lock_flow(filter={"uuid": flow_1.uuid}):
+        flow_doc = job_controller.flows.find_one({"uuid": flow_1.uuid})
+        assert flow_doc["lock_id"] is not None
+        for kwargs in read_options:
+            infos = {fi.flow_id: fi for fi in job_controller.get_flows_info(**kwargs)}
+            assert infos[flow_1.uuid].is_locked
+            assert infos[flow_1.uuid].lock_id == flow_doc["lock_id"]
+            assert infos[flow_1.uuid].lock_time == flow_doc["lock_time"]
+            assert not infos[flow_2.uuid].is_locked
+            assert infos[flow_2.uuid].lock_time is None
+
+        locked = job_controller.get_flows_info(locked=True)
+        assert [fi.flow_id for fi in locked] == [flow_1.uuid]
+
+    assert not job_controller.get_flows_info(flow_ids=flow_1.uuid)[0].is_locked
 
 
 def test_get_flow_job_aggreg_jobs_list_query(

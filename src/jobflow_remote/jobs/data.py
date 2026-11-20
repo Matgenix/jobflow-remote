@@ -522,6 +522,20 @@ class FlowInfo(BaseModel):
     hosts: list[list[str]]
     flow_metadata: dict
     jobs_info: list[JobInfo] | None = None
+    lock_id: str | None = None
+    lock_time: datetime | None = None
+
+    @property
+    def is_locked(self) -> bool:
+        """
+        Whether the Flow document is locked.
+
+        Returns
+        -------
+        bool
+            True if the Flow is locked.
+        """
+        return self.lock_id is not None
 
     @classmethod
     def from_query_dict(cls, d) -> "FlowInfo":
@@ -578,6 +592,8 @@ class FlowInfo(BaseModel):
             hosts=job_hosts,
             flow_metadata=d["metadata"],
             jobs_info=jobs_info or None,
+            lock_id=d.get("lock_id"),
+            lock_time=d.get("lock_time"),
         )
 
     @cached_property
