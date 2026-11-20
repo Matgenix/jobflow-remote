@@ -56,7 +56,8 @@ _running_daemon_error_msg = (
     "If you are [bold]absolutely sure that no other runner is active on another machine "
     "or for another project[/bold], clean the DB with `jf runner reset`.\n"
     "If instead you know that the runner is active on the current machine (e.g. the hostname "
-    "of the machine changed), you can stop, kill or shut it down with the `--skip-doc` option.\n"
+    "of the machine changed), use the `--skip-doc` option with `stop`, `stop-processes`, "
+    "`kill`, `shutdown` or `restart`.\n"
     "[bold]If you are unsure about the meaning of this message check the documentation:[/bold] [link=https://matgenix.github.io/jobflow-remote/user/troubleshooting.html]https://matgenix.github.io/jobflow-remote/user/troubleshooting.html[/link]"
 )
 
@@ -829,6 +830,36 @@ def foreground() -> None:
     dm.foreground_processes(print_function=out_console.print)
 
 
+def _check_no_local_processes(dm: DaemonManager) -> None:
+    """
+    Exit with an error if runner processes for the project are active on the
+    current machine, or if this cannot be determined.
+
+    Parameters
+    ----------
+    dm
+        The DaemonManager of the project.
+    """
+    try:
+        pinfo = dm.get_processes_info()
+    except Exception as e:
+        exit_with_error_msg(
+            "Could not determine if runner processes are active on this machine: "
+            f"{getattr(e, 'message', e)}\nIf you are sure you want to reset, "
+            "run the command with the --force option."
+        )
+    if pinfo:
+        # stopped processes have pid 0. Only list the ones actually running.
+        pids = [str(p["pid"]) for p in pinfo.values() if p.get("pid")]
+        exit_with_error_msg(
+            f"Processes with ids {','.join(pids)} active on this machine. Resetting "
+            "could result in orphaning such processes. Stop the local runner first "
+            "with `jf runner stop --skip-doc`. Only if you intend to reset the DB "
+            "document without stopping the local runner, run this command with the "
+            "--force option."
+        )
+
+
 @app_runner.command()
 def reset(
     yes_all: yes_opt = False,
@@ -857,20 +888,7 @@ def reset(
     dm = DaemonManager.from_project(cm.get_project())
 
     if not force:
-        try:
-            pinfo = dm.get_processes_info()
-        except Exception as e:
-            exit_with_error_msg(
-                "Could not determine if runner processes are active on this machine: "
-                f"{getattr(e, 'message', e)}\nIf you are sure you want to reset, "
-                "run the command with the --force option."
-            )
-        if pinfo:
-            exit_with_error_msg(
-                f"Processes with ids {','.join(str(p['pid']) for p in pinfo.values())} active "
-                "on this machine. Resetting could result in orphaning such process. If you "
-                "are sure you want to reset you can run the command with the --force option."
-            )
+        _check_no_local_processes(dm)
 
     if not yes_all:
         text = Text.from_markup(
@@ -888,6 +906,11 @@ def reset(
         confirmed = Confirm.ask(text, default=False)
         if not confirmed:
             raise typer.Exit(0)
+
+        # Check again, since a runner may have been started while waiting
+        # for the confirmation.
+        if not force:
+            _check_no_local_processes(dm)
 
     with loading_spinner(processing=False) as progress:
         progress.add_task(description="Resetting runner information...", total=None)

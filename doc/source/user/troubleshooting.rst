@@ -96,8 +96,10 @@ daemon record from the database by running::
 If Runner processes for the same project are active on the **current** machine,
 ``jf runner reset`` refuses to proceed, since resetting the database record would leave
 those processes running without the protection against starting a second Runner.
-In that case stop the local Runner first (see :ref:`troubleshooting hostname_change`).
-If you are sure you want to reset anyway, use the ``--force`` option::
+In that case stop the local Runner first, e.g. with ``jf runner stop --skip-doc``
+(see :ref:`troubleshooting hostname_change`).
+Only if you intend to reset the record without stopping the local Runner, use the
+``--force`` option::
 
     jf runner reset --force
 
@@ -111,8 +113,8 @@ be reported as active on another machine, even if it is actually running on the 
 one. As a consequence the commands to stop the Runner will fail.
 
 If you know that the Runner is active on the current machine, you can stop it anyway
-by adding the ``--skip-doc`` option to the ``kill``, ``shutdown``, ``stop`` and
-``restart`` commands, e.g.::
+by adding the ``--skip-doc`` option to the ``stop``, ``stop-processes``, ``kill``,
+``shutdown`` and ``restart`` commands, e.g.::
 
     jf runner shutdown --skip-doc
 

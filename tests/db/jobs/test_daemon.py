@@ -305,6 +305,71 @@ def test_runner_different_machine_skip_doc(
     daemon_manager.clean_files()
 
 
+def test_kill_skip_doc_undetermined_status(
+    daemon_manager, job_controller, monkeypatch, wait_daemon_started
+) -> None:
+    # If the status of the daemon cannot be determined (e.g. supervisord is
+    # shutting down), kill should proceed bypassing the check on the document
+    # as long as the local supervisord process is active.
+    from jobflow_remote.jobs.daemon import (
+        DaemonError,
+        DaemonManager,
+        DaemonStatus,
+        RunningDaemonError,
+    )
+
+    def raise_error(self, raise_on_shutdown=True):
+        raise DaemonError("fake error")
+
+    # no local daemon: the check on the document cannot be bypassed
+    runner_info = daemon_manager._get_runner_info()
+    runner_info["hostname"] = "YYYYYYY"
+    job_controller.auxiliary.find_one_and_update(
+        {"running_runner": {"$exists": True}}, {"$set": {"running_runner": runner_info}}
+    )
+    with monkeypatch.context() as m:
+        m.setattr(DaemonManager, "check_status", raise_error)
+        with pytest.raises(
+            RunningDaemonError,
+            match=r"A daemon runner process associated to this database may be already running",
+        ):
+            daemon_manager.kill(raise_on_error=True, enforce_runner_doc=False)
+    _check_running_runner_doc(job_controller=job_controller, runner_info=runner_info)
+
+    # local daemon active
+    job_controller.clean_running_runner()
+    assert daemon_manager.start(raise_on_error=True, single=False)
+    wait_daemon_started(daemon_manager)
+
+    runner_info = daemon_manager._get_runner_info()
+    runner_info["hostname"] = "YYYYYYY"
+    job_controller.auxiliary.find_one_and_update(
+        {"running_runner": {"$exists": True}}, {"$set": {"running_runner": runner_info}}
+    )
+
+    with monkeypatch.context() as m:
+        m.setattr(DaemonManager, "check_status", raise_error)
+        # the check is still enforced by default
+        with pytest.raises(
+            RunningDaemonError,
+            match=r"A daemon runner process associated to this database may be already running",
+        ):
+            daemon_manager.kill(raise_on_error=True)
+        _check_running_runner_doc(
+            job_controller=job_controller, runner_info=runner_info
+        )
+
+        assert daemon_manager.kill(raise_on_error=True, enforce_runner_doc=False)
+
+    # only the hostname differs: the document is cleared
+    assert job_controller.get_running_runner() is None
+    for _ in range(10):
+        if daemon_manager.check_status() == DaemonStatus.STOPPED:
+            break
+        time.sleep(1)
+    assert daemon_manager.check_status() == DaemonStatus.STOPPED
+
+
 def test_stop_restart_diff(daemon_manager, caplog, wait_daemon_started):
     from jobflow_remote.jobs.daemon import DaemonStatus
 

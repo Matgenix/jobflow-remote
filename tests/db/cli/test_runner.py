@@ -164,7 +164,10 @@ def test_reset(
     # if the runner is active on the same machine the reset should fail
     run_check_cli(
         ["runner", "reset"],
-        required_out="Resetting could result in orphaning such process",
+        required_out=[
+            "Resetting could result in orphaning such process",
+            "jf runner stop --skip-doc",
+        ],
         excluded_out=[
             "Do you want to proceed?",
             "The running runner document was reset",

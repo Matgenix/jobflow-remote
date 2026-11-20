@@ -1331,6 +1331,8 @@ class DaemonManager:
             runner. None if the document is missing.
         status
             The local status of the daemon. None if it could not be determined.
+            In that case the presence of a local daemon is verified by checking
+            the supervisord process.
         enforce_runner_doc
             If True, any mismatch in the document prevents the action.
         raise_on_error
@@ -1350,7 +1352,16 @@ class DaemonManager:
         if not doc_error:
             return True, True
 
-        if enforce_runner_doc or status in (DaemonStatus.SHUT_DOWN, None):
+        # A status None means that it could not be determined. This can happen
+        # only after the supervisord process has been found (e.g. while shutting
+        # down), but verify it explicitly to bypass the check only if a local
+        # daemon is active.
+        if status is None:
+            local_daemon = self.check_supervisord_process()
+        else:
+            local_daemon = status != DaemonStatus.SHUT_DOWN
+
+        if enforce_runner_doc or not local_daemon:
             if raise_on_error:
                 raise RunningDaemonError(doc_error)
             logger.error(doc_error)
