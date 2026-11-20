@@ -29,6 +29,7 @@ from jobflow_remote.cli.types import (
     end_date_opt,
     flow_db_id_arg,
     flow_ids_opt,
+    flow_sort_opt,
     flow_state_opt,
     force_opt_deprecated,
     hours_opt,
@@ -38,8 +39,8 @@ from jobflow_remote.cli.types import (
     max_results_opt,
     metadata_opt,
     name_opt,
+    query_opt,
     reverse_sort_flag_opt,
-    sort_opt,
     start_date_opt,
     stored_data_keys_opt,
     verbosity_opt,
@@ -47,6 +48,7 @@ from jobflow_remote.cli.types import (
     yes_opt,
 )
 from jobflow_remote.cli.utils import (
+    FlowSortOption,
     ReportInterval,
     SortOption,
     check_incompatible_opt,
@@ -86,8 +88,9 @@ def flows_list(
     verbosity: verbosity_opt = 0,
     count: count_opt = False,
     max_results: max_results_opt = 100,
-    sort: sort_opt = SortOption.UPDATED_ON,
+    sort: flow_sort_opt = FlowSortOption.UPDATED_ON,
     reverse_sort: reverse_sort_flag_opt = False,
+    custom_query: query_opt = None,
 ) -> None:
     """Get the list of Flows in the database."""
     from jobflow_remote import SETTINGS
@@ -113,6 +116,7 @@ def flows_list(
                 name=name,
                 metadata=metadata,
                 locked=locked,
+                query=custom_query,
             )
         out_console.print(f"Number of Flows: {n_flows}")
     else:
@@ -130,6 +134,7 @@ def flows_list(
                 limit=max_results,
                 sort=db_sort,
                 with_jobs_info=verbosity > 0,
+                custom_query=custom_query,
             )
 
             table = get_flow_info_table(flows_info, verbosity=verbosity)
@@ -281,7 +286,6 @@ def flow_info(
     verbosity: verbosity_opt = 0,
     stored_data_keys: stored_data_keys_opt = None,
     cli_output_keys: cli_output_keys_opt = None,
-    sort: sort_opt = SortOption.UPDATED_ON,
     jobs_sort: Annotated[
         SortOption,
         typer.Option(
@@ -289,7 +293,6 @@ def flow_info(
             help="The field on which the jobs will be sorted. In descending order",
         ),
     ] = None,
-    reverse_sort: reverse_sort_flag_opt = False,
     reverse_jobs_sort: Annotated[
         bool,
         typer.Option(
@@ -322,7 +325,6 @@ def flow_info(
     else:
         flow_ids = [jf_id]
 
-    db_sort: list[tuple[str, int]] = [(sort.value, 1 if reverse_sort else -1)]
     db_jobs_sort: list[tuple[str, int]] | None = None
     if jobs_sort:
         db_jobs_sort = [(jobs_sort.value, 1 if reverse_jobs_sort else -1)]
@@ -337,7 +339,6 @@ def flow_info(
             job_ids=job_ids,
             db_ids=db_ids,
             flow_ids=flow_ids,
-            sort=db_sort,
             jobs_sort=db_jobs_sort,
             limit=1,
             with_jobs_info=with_jobs_info,

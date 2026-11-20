@@ -1,6 +1,7 @@
 import importlib
 import logging
 import traceback
+from dataclasses import dataclass
 from typing import Annotated
 
 import typer
@@ -8,7 +9,11 @@ from rich.padding import Padding
 
 from jobflow_remote.cli.jf import app
 from jobflow_remote.cli.jfr_typer import JFRTyper
-from jobflow_remote.cli.utils import exit_with_warning_msg, out_console
+from jobflow_remote.cli.utils import (
+    exit_with_error_msg,
+    exit_with_warning_msg,
+    out_console,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -24,13 +29,43 @@ app_plugin = JFRTyper(
 app.add_typer(app_plugin)
 
 
-def load_plugins():
+@dataclass
+class PluginStatus:
     """
-    Load and register plugins from entry points.
+    Outcome of the loading of a plugin.
 
-    Main function used to load the plugin that will be added to the main CLI
+    Attributes
+    ----------
+    value
+        The value of the entry point (i.e. the module of the plugin).
+    error
+        The error that prevented the plugin from being loaded. None if the
+        plugin was loaded successfully.
     """
 
+    value: str
+    error: str | None = None
+
+
+# The outcome of the plugins loaded by load_plugins, with the entry point names
+# as keys, and the error raised while discovering the plugins, if any.
+# _loaded_plugins is None if load_plugins has not been called.
+_loaded_plugins: dict[str, PluginStatus] | None = None
+_discovery_error: str | None = None
+
+
+def _setup_plugins() -> tuple[dict[str, PluginStatus], str | None]:
+    """
+    Load the plugins from the entry points and run their setup function.
+
+    Returns
+    -------
+    tuple
+        A dictionary with the entry point names as keys and the outcome of
+        the loading as values, and the traceback of the error raised while
+        discovering the entry points, if any.
+    """
+    plugins: dict[str, PluginStatus] = {}
     try:
         for entry_point in importlib.metadata.entry_points().select(group=PLUGIN_GROUP):
             try:
@@ -39,14 +74,38 @@ def load_plugins():
                 # Call the plugin's setup function
                 if hasattr(plugin_module, PLUGIN_LOAD_FUNCTION):
                     plugin_module.setup_jf_plugin()
+                    plugins[entry_point.name] = PluginStatus(entry_point.value)
+                else:
+                    plugins[entry_point.name] = PluginStatus(
+                        entry_point.value,
+                        error=f"No {PLUGIN_LOAD_FUNCTION} function",
+                    )
 
             except Exception:
                 logging.debug(
                     f"Failed to load plugin {entry_point.name}", exc_info=True
                 )
+                plugins[entry_point.name] = PluginStatus(
+                    entry_point.value, error=traceback.format_exc()
+                )
 
     except Exception:
         logging.debug("Error discovering plugins", exc_info=True)
+        return plugins, traceback.format_exc()
+
+    return plugins, None
+
+
+def load_plugins() -> None:
+    """
+    Load and register plugins from entry points.
+
+    Main function used to load the plugin that will be added to the main CLI.
+    The outcome for each plugin is stored, to be reported by `jf plugin list`
+    without running the setup of the plugins again.
+    """
+    global _loaded_plugins, _discovery_error
+    _loaded_plugins, _discovery_error = _setup_plugins()
 
 
 @app_plugin.command(name="list")
@@ -63,23 +122,19 @@ def list_plugins(
     """List all plugins with an entry point"""
     from jobflow_remote import SETTINGS
 
-    plugins = {}
-    error_msgs = {}
-    # if there is an error discovering plugins let it pass as it should
-    # be logged by the CLI
-    for entry_point in importlib.metadata.entry_points().select(group=PLUGIN_GROUP):
-        try:
-            plugin_module = entry_point.load()
+    if _loaded_plugins is None:
+        # plugins have not been loaded when starting the CLI (e.g. disabled
+        # in the settings). Load them here to check if they are available.
+        plugins_status, discovery_error = _setup_plugins()
+    else:
+        plugins_status, discovery_error = _loaded_plugins, _discovery_error
 
-            # Call the plugin's setup function
-            if hasattr(plugin_module, PLUGIN_LOAD_FUNCTION):
-                plugin_module.setup_jf_plugin()
-                plugins[entry_point.name] = entry_point.value
-            else:
-                error_msgs[entry_point.name] = f"No {PLUGIN_LOAD_FUNCTION} function"
+    if discovery_error:
+        msg = discovery_error if error else discovery_error.strip().splitlines()[-1]
+        exit_with_error_msg(f"Error discovering plugins: {msg}")
 
-        except Exception:
-            error_msgs[entry_point.name] = traceback.format_exc()
+    plugins = {n: s.value for n, s in plugins_status.items() if s.error is None}
+    error_msgs = {n: s.error for n, s in plugins_status.items() if s.error is not None}
 
     if plugins:
         out_console.print("Available plugins:")

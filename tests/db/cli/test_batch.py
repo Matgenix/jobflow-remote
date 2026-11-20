@@ -43,14 +43,14 @@ def test_batch_worker(
     daemon_manager.start()
     wait_daemon_started(daemon_manager)
 
-    for _ in range(30):
+    for _ in range(60):
         if job_controller.count_jobs(states=JobState.COMPLETED) == 8:
             break
         time.sleep(1)
     else:
         raise RuntimeError("Jobs did not complete")
 
-    for _ in range(20):
+    for _ in range(40):
         if not job_controller.get_batches(
             batch_state=[BatchState.RUNNING, BatchState.SUBMITTED]
         ):

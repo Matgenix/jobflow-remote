@@ -87,12 +87,17 @@ def submit_flow(
 
     jc = proj_obj.get_job_controller()
 
-    return jc.add_flow(
-        flow=flow,
-        worker=worker,
-        exec_config=exec_config,
-        resources=resources,
-        priority=priority,
-        allow_external_references=allow_external_references,
-        jobstore=jobstore,
-    )
+    # Always close the connections, otherwise the sockets and monitoring threads
+    # of the JobController accumulate when submitting many Flows.
+    try:
+        return jc.add_flow(
+            flow=flow,
+            worker=worker,
+            exec_config=exec_config,
+            resources=resources,
+            priority=priority,
+            allow_external_references=allow_external_references,
+            jobstore=jobstore,
+        )
+    finally:
+        jc.close()

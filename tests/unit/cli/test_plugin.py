@@ -1,6 +1,17 @@
 import types
 from unittest.mock import MagicMock, Mock
 
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def restore_loaded_plugins(monkeypatch):
+    """Restore the outcome of the plugins loading after each test."""
+    from jobflow_remote.cli import plugin
+
+    monkeypatch.setattr(plugin, "_loaded_plugins", plugin._loaded_plugins)
+    monkeypatch.setattr(plugin, "_discovery_error", plugin._discovery_error)
+
 
 def test_mock_load_plugins_with_valid_plugin(mocker, run_check_cli):
     """Test that a valid plugin with setup function is loaded and executed."""
@@ -406,4 +417,95 @@ def test_plugin_command_injection(mocker, remove_jfremote_modules, run_check_cli
     run_check_cli(
         ["plugin", "list"],
         required_out=["Available plugins:", "command_injection_plugin"],
+    )
+
+
+def _mock_plugin_entry_points(mocker, setup_side_effect=None):
+    """Mock one plugin entry point, returning its setup function."""
+    mock_entry_point = Mock()
+    mock_entry_point.name = "counted_plugin"
+    mock_entry_point.value = "counted_plugin.module"
+    mock_plugin_module = Mock()
+    mock_setup_function = Mock(side_effect=setup_side_effect)
+    mock_plugin_module.setup_jf_plugin = mock_setup_function
+    mock_entry_point.load.return_value = mock_plugin_module
+
+    mock_entry_points = Mock()
+    mock_entry_points.select.return_value = [mock_entry_point]
+    mocker.patch("importlib.metadata.entry_points", return_value=mock_entry_points)
+    return mock_setup_function
+
+
+def test_plugin_list_does_not_rerun_setup(mocker, run_check_cli):
+    """The list command reports the outcome of load_plugins."""
+    from jobflow_remote.cli.plugin import load_plugins
+
+    mock_setup_function = _mock_plugin_entry_points(mocker)
+    load_plugins()
+    mock_setup_function.assert_called_once()
+
+    run_check_cli(
+        ["plugin", "list"],
+        required_out=["Available plugins:", "counted_plugin: counted_plugin.module"],
+    )
+    run_check_cli(["plugin", "list", "-e"], required_out="counted_plugin")
+    mock_setup_function.assert_called_once()
+
+
+def test_plugin_list_recorded_error(mocker, run_check_cli):
+    """The exception raised by the setup in load_plugins is reported."""
+    from jobflow_remote.cli.plugin import load_plugins
+
+    mock_setup_function = _mock_plugin_entry_points(
+        mocker, setup_side_effect=RuntimeError("Recorded setup error")
+    )
+    load_plugins()
+
+    run_check_cli(
+        ["plugin", "list", "-e"],
+        required_out=[
+            "No plugins found.",
+            "counted_plugin",
+            "Traceback",
+            "Recorded setup error",
+        ],
+    )
+    mock_setup_function.assert_called_once()
+
+
+def test_plugin_list_plugins_not_loaded(mocker, monkeypatch, run_check_cli):
+    """If plugins were not loaded at startup, list loads them."""
+    from jobflow_remote.cli import plugin
+
+    monkeypatch.setattr(plugin, "_loaded_plugins", None)
+    monkeypatch.setattr(plugin, "_discovery_error", None)
+    mock_setup_function = _mock_plugin_entry_points(mocker)
+
+    run_check_cli(["plugin", "list"], required_out=["Available plugins:"])
+    mock_setup_function.assert_called_once()
+    # the outcome is not stored
+    assert plugin._loaded_plugins is None
+
+
+def test_plugin_list_discovery_error_details(mocker, run_check_cli):
+    """The full traceback of the discovery error is shown with --error."""
+    from jobflow_remote.cli.plugin import load_plugins
+
+    mocker.patch(
+        "importlib.metadata.entry_points",
+        side_effect=RuntimeError("Entry points error"),
+    )
+    load_plugins()
+
+    result = run_check_cli(
+        ["plugin", "list"],
+        error=True,
+        required_out="Error discovering plugins: RuntimeError: Entry points error",
+        excluded_out="Traceback",
+    )
+    assert result.exit_code == 1
+    run_check_cli(
+        ["plugin", "list", "-e"],
+        error=True,
+        required_out=["Traceback", "Entry points error"],
     )

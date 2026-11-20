@@ -8,6 +8,7 @@ from rich.text import Text
 from jobflow_remote.cli.formatting import (
     format_failed_conditions,
     format_upgrade_actions,
+    get_indexes_table,
 )
 from jobflow_remote.cli.jf import app
 from jobflow_remote.cli.jfr_typer import JFRTyper
@@ -436,3 +437,30 @@ def create(
         out_console.print("Index created")
     else:
         out_console.print("Index creation started in background")
+
+
+@app_index.command(name="list")
+def list_indexes(
+    collection: Annotated[
+        DbCollection | None,
+        typer.Option(
+            "--collection",
+            "-c",
+            help="The collection whose indexes are listed. If not given, the "
+            "indexes of all the collections are listed",
+        ),
+    ] = None,
+):
+    """
+    List the indexes of the queue collections
+    """
+    collections = [collection] if collection else list(DbCollection)
+    with loading_spinner(processing=False) as progress:
+        progress.add_task(description="Fetching the indexes...", total=None)
+        jc = get_job_controller()
+        indexes = {coll: jc.get_indexes(coll) for coll in collections}
+
+    for coll, coll_indexes in indexes.items():
+        out_console.print(
+            get_indexes_table(coll_indexes, title=f"Indexes of {coll.value}")
+        )
