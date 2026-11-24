@@ -14,6 +14,7 @@
 
 **Merged pull requests:**
 
+- update release workflow [\#552](https://github.com/Matgenix/jobflow-remote/pull/552) ([gpetretto](https://github.com/gpetretto))
 - update release workflow [\#551](https://github.com/Matgenix/jobflow-remote/pull/551) ([gpetretto](https://github.com/gpetretto))
 - Fix `jf project check` failing when `pre_run` has a comment [\#548](https://github.com/Matgenix/jobflow-remote/pull/548) ([computron](https://github.com/computron))
 - Remove false "password may be echoed" warning with `--connect-interactive` [\#543](https://github.com/Matgenix/jobflow-remote/pull/543) ([computron](https://github.com/computron))
@@ -40,7 +41,7 @@
 - Bump actions/checkout from 6 to 7 [\#495](https://github.com/Matgenix/jobflow-remote/pull/495) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Several small bugfix [\#494](https://github.com/Matgenix/jobflow-remote/pull/494) ([gpetretto](https://github.com/gpetretto))
 - Fix get\_flows\_info call in gui [\#491](https://github.com/Matgenix/jobflow-remote/pull/491) ([gpetretto](https://github.com/gpetretto))
-- compatibility for typer dropping click depenency [\#489](https://github.com/Matgenix/jobflow-remote/pull/489) ([gpetretto](https://github.com/gpetretto))
+- compatibility for typer dropping click dependency [\#489](https://github.com/Matgenix/jobflow-remote/pull/489) ([gpetretto](https://github.com/gpetretto))
 - Improve project validation and add project cross checks [\#484](https://github.com/Matgenix/jobflow-remote/pull/484) ([gpetretto](https://github.com/gpetretto))
 - Bump actions/upload-pages-artifact from 4 to 5 [\#471](https://github.com/Matgenix/jobflow-remote/pull/471) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Bump actions/deploy-pages from 4 to 5 [\#467](https://github.com/Matgenix/jobflow-remote/pull/467) ([dependabot[bot]](https://github.com/apps/dependabot))
