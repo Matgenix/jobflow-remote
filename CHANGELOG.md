@@ -1,6 +1,27 @@
 # Changelog
 
-## [v1.0.1](https://github.com/Matgenix/jobflow-remote/tree/v1.0.1) (2026-07-23)
+## [v1.0.2](https://github.com/Matgenix/jobflow-remote/tree/v1.0.2) (2026-11-24)
+
+[Full Changelog](https://github.com/Matgenix/jobflow-remote/compare/v1.0.1...v1.0.2)
+
+**Closed issues:**
+
+- `jf project check` fails when a `pre_run` line has a shell comment [\#547](https://github.com/Matgenix/jobflow-remote/issues/547)
+- `runner start --connect-interactive` warns that the password may be echoed, but it is not [\#541](https://github.com/Matgenix/jobflow-remote/issues/541)
+- `makedirs_p` FutureWarnings printed on every `jf runner start` [\#540](https://github.com/Matgenix/jobflow-remote/issues/540)
+- `jf gui` fails with "python-fasthtml package is required" even though it is installed [\#523](https://github.com/Matgenix/jobflow-remote/issues/523)
+- New release [\#508](https://github.com/Matgenix/jobflow-remote/issues/508)
+
+**Merged pull requests:**
+
+- update release workflow [\#551](https://github.com/Matgenix/jobflow-remote/pull/551) ([gpetretto](https://github.com/gpetretto))
+- Fix `jf project check` failing when `pre_run` has a comment [\#548](https://github.com/Matgenix/jobflow-remote/pull/548) ([computron](https://github.com/computron))
+- Remove false "password may be echoed" warning with `--connect-interactive` [\#543](https://github.com/Matgenix/jobflow-remote/pull/543) ([computron](https://github.com/computron))
+- Replace deprecated `makedirs_p` with `os.makedirs` [\#542](https://github.com/Matgenix/jobflow-remote/pull/542) ([computron](https://github.com/computron))
+- Allow `resolve_references="both"` from jobflow 0.4.0 [\#536](https://github.com/Matgenix/jobflow-remote/pull/536) ([gpetretto](https://github.com/gpetretto))
+- fix lint in CHANGELOG.md [\#517](https://github.com/Matgenix/jobflow-remote/pull/517) ([gpetretto](https://github.com/gpetretto))
+
+## [v1.0.1](https://github.com/Matgenix/jobflow-remote/tree/v1.0.1) (2026-07-24)
 
 [Full Changelog](https://github.com/Matgenix/jobflow-remote/compare/v1.0.0...v1.0.1)
 
@@ -19,7 +40,7 @@
 - Bump actions/checkout from 6 to 7 [\#495](https://github.com/Matgenix/jobflow-remote/pull/495) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Several small bugfix [\#494](https://github.com/Matgenix/jobflow-remote/pull/494) ([gpetretto](https://github.com/gpetretto))
 - Fix get\_flows\_info call in gui [\#491](https://github.com/Matgenix/jobflow-remote/pull/491) ([gpetretto](https://github.com/gpetretto))
-- compatibility for typer dropping click dependency [\#489](https://github.com/Matgenix/jobflow-remote/pull/489) ([gpetretto](https://github.com/gpetretto))
+- compatibility for typer dropping click depenency [\#489](https://github.com/Matgenix/jobflow-remote/pull/489) ([gpetretto](https://github.com/gpetretto))
 - Improve project validation and add project cross checks [\#484](https://github.com/Matgenix/jobflow-remote/pull/484) ([gpetretto](https://github.com/gpetretto))
 - Bump actions/upload-pages-artifact from 4 to 5 [\#471](https://github.com/Matgenix/jobflow-remote/pull/471) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Bump actions/deploy-pages from 4 to 5 [\#467](https://github.com/Matgenix/jobflow-remote/pull/467) ([dependabot[bot]](https://github.com/apps/dependabot))
