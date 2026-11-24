@@ -22,12 +22,21 @@ jobs:
       pull-requests: read
 
     steps:
+    - name: Generate release App token
+      id: app-token
+      uses: actions/create-github-app-token@v2
+      with:
+        app-id: ${{ vars.RELEASE_APP_ID }}
+        private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+
     - name: Checkout repository
       uses: actions/checkout@v7
       with:
         submodules: true
         fetch-depth: 0
         ref: ${{ env.PUBLISH_UPDATE_BRANCH }}
+        # Push with the App token so it can bypass the branch ruleset
+        token: ${{ steps.app-token.outputs.token }}
 
     - name: Set up Python 3.11
       uses: actions/setup-python@v7
@@ -61,14 +70,10 @@ jobs:
         git tag -af -F "${TAG_MSG}" ${GITHUB_REF#refs/tags/}
 
     - name: Update '${{ env.PUBLISH_UPDATE_BRANCH }}'
-      uses: CasperWA/push-protected@v2
-      with:
-        token: ${{ secrets.ORG_RELEASE_PAT_BOT }}
-        branch: ${{ env.PUBLISH_UPDATE_BRANCH }}
-        unprotect_reviews: true
-        pre_sleep: 15
-        force: true
-        tags: true
+      run: |
+        git push origin "HEAD:refs/heads/${PUBLISH_UPDATE_BRANCH}"
+        # The tag was moved to the new HEAD, so it must be force-pushed
+        git push --force origin "refs/tags/${GITHUB_REF#refs/tags/}"
 
     - name: Install docs dependencies
       run: |
