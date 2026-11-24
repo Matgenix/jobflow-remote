@@ -522,6 +522,7 @@ class FlowInfo(BaseModel):
     hosts: list[list[str]]
     flow_metadata: dict
     jobs_info: list[JobInfo] | None = None
+    jobstore: str | None = None
 
     @classmethod
     def from_query_dict(cls, d) -> "FlowInfo":
@@ -578,6 +579,9 @@ class FlowInfo(BaseModel):
             hosts=job_hosts,
             flow_metadata=d["metadata"],
             jobs_info=jobs_info or None,
+            # jobstore should always be present in new flows, but it did not always
+            # exist. Use get() for backward compatibility
+            jobstore=d.get("jobstore"),
         )
 
     @cached_property
