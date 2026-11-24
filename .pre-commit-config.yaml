@@ -46,3 +46,5 @@ repos:
     stages: [pre-commit, commit-msg]
     args: [--ignore-words-list, 'titel,statics,ba,nd,te']
     types_or: [python, rst, markdown]
+    # Generated from PR titles during the release, typos cannot be fixed there
+    exclude: ^CHANGELOG\.md$
