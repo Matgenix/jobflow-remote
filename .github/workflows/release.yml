@@ -61,12 +61,19 @@ jobs:
       run: |
         git config --global user.email "${GIT_USER_EMAIL}"
         git config --global user.name "${GIT_USER_NAME}"
-        git commit CHANGELOG.md -m "Release ${GITHUB_REF#refs/tags/}"
+        # Skip the commit if the CHANGELOG is unchanged (e.g. a re-created release)
+        if git diff --quiet CHANGELOG.md; then
+          echo "CHANGELOG.md unchanged, nothing to commit"
+        else
+          git commit CHANGELOG.md -m "Release ${GITHUB_REF#refs/tags/}"
+        fi
 
     - name: Move tag to new HEAD
       run: |
-        TAG_MSG=.github/utils/release_tag_msg.txt
-        sed -i "s|TAG_NAME|${GITHUB_REF#refs/tags/}|" "${TAG_MSG}"
+        # Write the message outside the repository: modifying a tracked file
+        # would make the tree dirty and give a local version (e.g. 1.0.2+d20261124)
+        TAG_MSG="${RUNNER_TEMP}/release_tag_msg.txt"
+        sed "s|TAG_NAME|${GITHUB_REF#refs/tags/}|" .github/utils/release_tag_msg.txt > "${TAG_MSG}"
         git tag -af -F "${TAG_MSG}" ${GITHUB_REF#refs/tags/}
 
     - name: Update '${{ env.PUBLISH_UPDATE_BRANCH }}'
