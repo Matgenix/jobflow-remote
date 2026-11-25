@@ -294,6 +294,11 @@ Resources:
             awslogs-group: {Ref: BatchLogGroup}
             awslogs-region: {Ref: AWS::Region}
             awslogs-stream-prefix: jfr-ec2-cpu
+      RetryStrategy:
+        Attempts: 3
+        EvaluateOnExit:
+          - {OnStatusReason: "Host EC2*", Action: RETRY}
+          - {OnStatusReason: "*", Action: EXIT}
 
   # Optional EC2 GPU queue: one GPU per job.
   GpuComputeEnvironment:
@@ -341,6 +346,11 @@ Resources:
             awslogs-group: {Ref: BatchLogGroup}
             awslogs-region: {Ref: AWS::Region}
             awslogs-stream-prefix: jfr-gpu
+      RetryStrategy:
+        Attempts: 3
+        EvaluateOnExit:
+          - {OnStatusReason: "Host EC2*", Action: RETRY}
+          - {OnStatusReason: "*", Action: EXIT}
 
   # CodeBuild project that builds an image from build/context.zip in the bucket.
   CodeBuildRole:

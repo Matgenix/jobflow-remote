@@ -545,8 +545,13 @@ Step 3. Choose the resources of each job
 
 Each job gets its own ``QCloudResources``. The main fields are ``vcpus``,
 ``memory`` (MiB), ``gpus``, ``time_limit`` (seconds, at least ``60``), and
-``max_retries`` (how many times AWS Batch reruns a failed attempt, for
-example after a Spot interruption).
+``max_retries``.
+
+The EC2 job definitions of the stack rerun a job up to two times when AWS
+stops its instance, for example when a Spot instance is reclaimed. Other
+failures, such as a timeout or an error in the job, are not rerun. Setting
+``max_retries`` replaces this rule for that job. AWS Batch then reruns every
+failure except a timeout, up to ``max_retries`` times.
 
 The three queues place jobs differently:
 
@@ -674,7 +679,7 @@ same time.
                    worker="aws_gpu",
                    project="aws_ht",
                    resources=QCloudResources(
-                       vcpus=4, memory=14000, gpus=1, max_retries=2, time_limit=1800
+                       vcpus=4, memory=14000, gpus=1, time_limit=1800
                    ),
                )
                EOF
