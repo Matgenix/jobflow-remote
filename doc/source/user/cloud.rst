@@ -164,7 +164,8 @@ and ``batch:TerminateJob``.
 The CloudFormation template below creates one stack with:
 
 * a VPC without a NAT Gateway
-* a private S3 bucket for job files
+* a private S3 bucket for job files, which deletes them after
+  ``RunFilesRetentionDays`` days
 * a private ECR repository for your container images
 * CloudWatch log groups
 * IAM roles for the containers and an IAM user for the ``Runner``
@@ -238,6 +239,9 @@ The main parameters of the template are:
    * - ``GpuMaxvCpus``
      - ``16``
      - Maximum vCPUs used at once by the GPU queue
+   * - ``RunFilesRetentionDays``
+     - ``30``
+     - Days after upload when the bucket deletes the job files
 
 Step 4. Create the Runner credentials
 -------------------------------------
@@ -402,8 +406,11 @@ the AWS Batch scheduler (``qtoolkit.io.api.AWSBatchIO``). ``storage_kwargs``
 are passed to the S3 storage (``jobflow_remote.remote.storage.S3Storage``).
 ``profile_name`` is the profile from Step 4.
 
-The job files stay in the S3 bucket until you delete them, for example with
-``jf flow delete --files``. The results go to your ``JobStore``, as on HPC.
+The results go to your ``JobStore``, as on HPC. The bucket of the stack
+deletes the job files ``RunFilesRetentionDays`` days (default ``30``) after
+they were uploaded. ``jf job files`` and ``jf job retry`` need these files, so
+use them within that time. ``jf flow delete --files`` deletes the files of a
+flow earlier.
 
 Step 6. Check the setup
 -----------------------

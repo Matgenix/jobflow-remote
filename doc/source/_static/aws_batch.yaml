@@ -41,6 +41,10 @@ Parameters:
   LogRetentionDays:
     Type: Number
     Default: 7
+  RunFilesRetentionDays:
+    Type: Number
+    Default: 30
+    Description: Days after which the job files under runs/ in the bucket are deleted.
 
 Conditions:
   HasEc2CpuQueue: {Fn::Equals: [{Ref: EnableEc2CpuQueue}, "true"]}
@@ -119,6 +123,12 @@ Resources:
   StagingBucket:
     Type: AWS::S3::Bucket
     Properties:
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteOldJobFiles
+            Status: Enabled
+            Prefix: runs/
+            ExpirationInDays: {Ref: RunFilesRetentionDays}
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
         BlockPublicPolicy: true
