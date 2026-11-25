@@ -1,0 +1,375 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  Self-contained AWS Batch (Fargate) + S3 + ECR + CodeBuild stack for
+  jobflow-remote CloudWorker.
+
+Parameters:
+  ContainerImage:
+    Type: String
+    Default: public.ecr.aws/docker/library/python:3.12-slim
+    Description: >-
+      Container image URI for AWS Batch Fargate jobs. Defaults to public
+      Python 3.12 slim for quickstart. Override with EcrImageUri after
+      building a custom image.
+  MaxvCpus:
+    Type: Number
+    Default: 8
+    MinValue: 1
+    Description: Maximum vCPUs for the managed Fargate compute environment.
+  DefaultVcpus:
+    Type: String
+    Default: "1"
+    AllowedValues: ["0.25", "0.5", "1", "2", "4", "8", "16"]
+    Description: Default vCPU allocation for the Fargate job definition.
+  DefaultMemoryMiB:
+    Type: String
+    Default: "2048"
+    Description: >-
+      Default memory in MiB for the Fargate job definition. Must form a
+      valid Fargate CPU/memory pair with DefaultVcpus.
+  LogRetentionDays:
+    Type: Number
+    Default: 7
+    AllowedValues: [1, 3, 5, 7, 14, 30, 60, 90]
+    Description: CloudWatch Logs retention period in days.
+
+Resources:
+  # Dedicated free public VPC (no NAT Gateway, $0/month) so the stack works
+  # in any region even if the account's default VPC was removed.
+  BatchVpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.42.0.0/16
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+
+  VpcGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref BatchVpc
+      InternetGatewayId: !Ref InternetGateway
+
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref BatchVpc
+
+  PublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: VpcGatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  PublicSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref BatchVpc
+      CidrBlock: 10.42.1.0/24
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      MapPublicIpOnLaunch: true
+
+  PublicSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref BatchVpc
+      CidrBlock: 10.42.2.0/24
+      AvailabilityZone: !Select [1, !GetAZs ""]
+      MapPublicIpOnLaunch: true
+
+  Subnet1RouteAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet1
+      RouteTableId: !Ref PublicRouteTable
+
+  Subnet2RouteAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet2
+      RouteTableId: !Ref PublicRouteTable
+
+  BatchSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Egress-only security group for jobflow-remote Fargate tasks
+      VpcId: !Ref BatchVpc
+      SecurityGroupEgress:
+        - IpProtocol: "-1"
+          CidrIp: 0.0.0.0/0
+
+  # Private S3 staging bucket, ECR repository, and CloudWatch log groups.
+  StagingBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+
+  EcrRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      EmptyOnDelete: true
+
+  BatchLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/batch/${AWS::StackName}"
+      RetentionInDays: !Ref LogRetentionDays
+
+  CodeBuildLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/codebuild/${AWS::StackName}-build"
+      RetentionInDays: !Ref LogRetentionDays
+
+  # IAM roles for Batch containers and scoped local Runner user.
+  BatchExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
+
+  BatchTaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: S3StagingAccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:ListBucket
+                  - s3:GetBucketLocation
+                Resource: !GetAtt StagingBucket.Arn
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                Resource: !Sub "${StagingBucket.Arn}/*"
+
+  RunnerUser:
+    Type: AWS::IAM::User
+    Properties:
+      Policies:
+        - PolicyName: JobflowRemoteRunnerAccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:ListBucket
+                  - s3:GetBucketLocation
+                Resource: !GetAtt StagingBucket.Arn
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:DeleteObject
+                Resource: !Sub "${StagingBucket.Arn}/*"
+              - Effect: Allow
+                Action:
+                  - batch:SubmitJob
+                  - batch:DescribeJobs
+                  - batch:ListJobs
+                  - batch:TerminateJob
+                  - batch:CancelJob
+                  - batch:TagResource
+                Resource: "*"
+                Condition:
+                  StringEquals:
+                    aws:RequestedRegion: !Ref AWS::Region
+
+  # AWS Batch Fargate compute environment, job queue, and job definition.
+  ComputeEnvironment:
+    Type: AWS::Batch::ComputeEnvironment
+    DependsOn:
+      - PublicRoute
+      - Subnet1RouteAssoc
+      - Subnet2RouteAssoc
+    Properties:
+      Type: MANAGED
+      State: ENABLED
+      ComputeResources:
+        Type: FARGATE
+        MaxvCpus: !Ref MaxvCpus
+        Subnets:
+          - !Ref PublicSubnet1
+          - !Ref PublicSubnet2
+        SecurityGroupIds:
+          - !Ref BatchSecurityGroup
+
+  JobQueue:
+    Type: AWS::Batch::JobQueue
+    Properties:
+      State: ENABLED
+      Priority: 1
+      ComputeEnvironmentOrder:
+        - Order: 1
+          ComputeEnvironment: !Ref ComputeEnvironment
+
+  JobDefinition:
+    Type: AWS::Batch::JobDefinition
+    Properties:
+      Type: container
+      PlatformCapabilities:
+        - FARGATE
+      ContainerProperties:
+        Image: !Ref ContainerImage
+        ExecutionRoleArn: !GetAtt BatchExecutionRole.Arn
+        JobRoleArn: !GetAtt BatchTaskRole.Arn
+        FargatePlatformConfiguration:
+          PlatformVersion: LATEST
+        NetworkConfiguration:
+          AssignPublicIp: ENABLED
+        ResourceRequirements:
+          - Type: VCPU
+            Value: !Ref DefaultVcpus
+          - Type: MEMORY
+            Value: !Ref DefaultMemoryMiB
+        LogConfiguration:
+          LogDriver: awslogs
+          Options:
+            awslogs-group: !Ref BatchLogGroup
+            awslogs-region: !Ref AWS::Region
+            awslogs-stream-prefix: jfr
+        Command:
+          - sh
+          - -c
+          - echo default
+
+  # Optional CodeBuild project with inline buildspec for building custom
+  # linux/amd64 container images without installing Docker locally.
+  CodeBuildRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codebuild.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: CodeBuildImagePush
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ecr:GetAuthorizationToken
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - ecr:BatchCheckLayerAvailability
+                  - ecr:CompleteLayerUpload
+                  - ecr:InitiateLayerUpload
+                  - ecr:PutImage
+                  - ecr:UploadLayerPart
+                Resource: !GetAtt EcrRepository.Arn
+              - Effect: Allow
+                Action:
+                  - s3:GetBucketLocation
+                  - s3:GetBucketAcl
+                Resource: !GetAtt StagingBucket.Arn
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:GetObjectVersion
+                Resource: !Sub "${StagingBucket.Arn}/build/*"
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource:
+                  - !Sub "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${CodeBuildLogGroup}"
+                  - !Sub "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${CodeBuildLogGroup}:*"
+
+  CodeBuildProject:
+    Type: AWS::CodeBuild::Project
+    DependsOn: CodeBuildLogGroup
+    Properties:
+      ServiceRole: !GetAtt CodeBuildRole.Arn
+      Artifacts:
+        Type: NO_ARTIFACTS
+      LogsConfig:
+        CloudWatchLogs:
+          Status: ENABLED
+          GroupName: !Ref CodeBuildLogGroup
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_MEDIUM
+        Image: aws/codebuild/standard:7.0
+        PrivilegedMode: true
+        EnvironmentVariables:
+          - Name: ECR_REGISTRY
+            Value: !Sub "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com"
+          - Name: IMAGE_URI
+            Value: !Sub "${EcrRepository.RepositoryUri}:latest"
+      Source:
+        Type: S3
+        Location: !Sub "${StagingBucket}/build/context.zip"
+        BuildSpec: |
+          version: 0.2
+          phases:
+            pre_build:
+              commands:
+                - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $ECR_REGISTRY
+            build:
+              commands:
+                - docker build --platform linux/amd64 -t $IMAGE_URI .
+            post_build:
+              commands:
+                - docker push $IMAGE_URI
+
+Outputs:
+  Region:
+    Description: AWS region of the stack
+    Value: !Ref AWS::Region
+  S3BucketName:
+    Description: Private S3 bucket for jobflow-remote staging files
+    Value: !Ref StagingBucket
+  JobQueueArn:
+    Description: AWS Batch job queue ARN (use as CloudWorker.job_queue)
+    Value: !Ref JobQueue
+  JobDefinitionArn:
+    Description: AWS Batch job definition ARN (use as CloudWorker.job_definition)
+    Value: !Ref JobDefinition
+  EcrImageUri:
+    Description: Target ECR image URI (:latest) for custom worker images
+    Value: !Sub "${EcrRepository.RepositoryUri}:latest"
+  CodeBuildProjectName:
+    Description: CodeBuild project name for building custom images without local Docker
+    Value: !Ref CodeBuildProject
+  LogGroupName:
+    Description: CloudWatch log group for Batch container output
+    Value: !Ref BatchLogGroup
+  RunnerUserName:
+    Description: Scoped IAM user for local Runner credentials
+    Value: !Ref RunnerUser
