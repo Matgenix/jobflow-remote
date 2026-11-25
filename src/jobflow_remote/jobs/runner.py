@@ -1013,9 +1013,11 @@ class Runner:
                     logger.warning(err_msg)
 
             # download the queue files first, so if an error is triggered
-            # afterwards they can be inserted in the DB
-            for fn in ("queue.out", "queue.err"):
-                download_file(fn, mandatory=False)
+            # afterwards they can be inserted in the DB. Cloud workers stream
+            # stdout/stderr to cloud logs instead of queue.out/queue.err files.
+            if not worker.is_cloud:
+                for fn in ("queue.out", "queue.err"):
+                    download_file(fn, mandatory=False)
 
             # only the output file is mandatory. If the others are missing
             # it will be dealt with by the complete. The output file may contain
