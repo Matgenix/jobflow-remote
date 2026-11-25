@@ -2,12 +2,20 @@ from collections import defaultdict
 from datetime import datetime, timezone
 from enum import Enum
 from functools import cached_property
-from typing import TYPE_CHECKING, Any, TypeAlias
+from typing import TYPE_CHECKING, Any, TypeAlias, TypeGuard
 
 from jobflow import Flow, Job
 from monty.json import MontyDecoder, jsanitize
 from pydantic import BaseModel, Field, field_validator
 from qtoolkit.core.data_objects import QResources, QState
+
+from jobflow_remote.config.base import ExecutionConfig
+from jobflow_remote.jobs.state import (
+    BatchState,
+    DeprecatedStateError,
+    FlowState,
+    JobState,
+)
 
 if TYPE_CHECKING:
     from qtoolkit.core.data_objects import QCloudResources
@@ -22,13 +30,13 @@ else:
         QCloudResources = None
         ResourcesType = QResources | dict | None
 
-from jobflow_remote.config.base import ExecutionConfig
-from jobflow_remote.jobs.state import (
-    BatchState,
-    DeprecatedStateError,
-    FlowState,
-    JobState,
-)
+
+def is_resource_obj(value: Any) -> "TypeGuard[QResources | QCloudResources]":
+    """Return True if ``value`` is a QResources or QCloudResources instance."""
+    return isinstance(value, QResources) or (
+        QCloudResources is not None and isinstance(value, QCloudResources)
+    )
+
 
 IN_FILENAME = "jfremote_in.json"
 OUT_FILENAME = "jfremote_out.json"
@@ -364,18 +372,15 @@ class JobDoc(BaseModel):
         )
         d["job"] = jsanitize(job, strict=True, allow_bson=True)
         # required since the resources are not serialized otherwise
-        if isinstance(self.resources, QResources) or (
-            QCloudResources is not None and isinstance(self.resources, QCloudResources)
-        ):
+        if is_resource_obj(self.resources):
             d["resources"] = self.resources.as_dict()
         return d
 
     @field_validator("resources", mode="wrap")
     @classmethod
     def resources_validator(cls, value: Any, handler: Any) -> Any:
-        if value is None or isinstance(value, QResources):
-            return value
-        if QCloudResources is not None and isinstance(value, QCloudResources):
+        # Preserve plain dicts instead of letting Pydantic coerce them to QResources/QCloudResources.
+        if value is None or is_resource_obj(value):
             return value
         if isinstance(value, dict):
             if value.get("@class") in ("QResources", "QCloudResources"):

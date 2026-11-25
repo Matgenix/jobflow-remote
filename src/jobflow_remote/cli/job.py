@@ -69,7 +69,6 @@ from jobflow_remote.cli.utils import (
     out_console,
     str_to_dict,
 )
-from jobflow_remote.config.base import CloudWorker
 from jobflow_remote.jobs.report import JobsReport
 from jobflow_remote.jobs.state import ERROR_STATES, RUNNING_STATES, JobState
 from jobflow_remote.remote.queue import ERR_FNAME, OUT_FNAME
@@ -1295,11 +1294,7 @@ def files_list(
     with loading_spinner(processing=False) as progress:
         progress.add_task(description="Retrieving information...", total=None)
         worker = cm.get_worker(job_info.worker)
-        backend = (
-            worker.get_storage()
-            if isinstance(worker, CloudWorker)
-            else worker.get_host()
-        )
+        backend = worker.get_transfer_backend()
 
         try:
             backend.connect()
@@ -1374,11 +1369,7 @@ def files_get(
     with loading_spinner(processing=False) as progress:
         task_id = progress.add_task(description="Retrieving files...", total=None)
         worker = cm.get_worker(job_info.worker)
-        backend = (
-            worker.get_storage()
-            if isinstance(worker, CloudWorker)
-            else worker.get_host()
-        )
+        backend = worker.get_transfer_backend()
 
         try:
             backend.connect()

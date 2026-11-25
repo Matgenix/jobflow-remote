@@ -234,22 +234,35 @@ class WorkerBase(BaseModel):
     )
     model_config = ConfigDict(extra="forbid")
 
-    @field_validator("scheduler_type")
     @classmethod
-    def check_scheduler_type(cls, scheduler_type: str | dict) -> str | dict:
-        """Validator to set the default of scheduler_type."""
-        if isinstance(scheduler_type, str) and scheduler_type not in scheduler_mapping:
-            raise ValueError(f"Unknown scheduler type {scheduler_type}")
+    def _validate_scheduler_type(
+        cls,
+        scheduler_type: str | dict,
+        mapping: dict,
+        expected_cls: Any,
+        label: str,
+    ) -> str | dict:
+        if isinstance(scheduler_type, str) and scheduler_type not in mapping:
+            raise ValueError(f"Unknown {label} type {scheduler_type}")
         if isinstance(scheduler_type, dict):
             try:
                 sched = MontyDecoder().process_decoded(scheduler_type)
             except Exception as exc:
                 raise ValueError(f"Invalid serialized MSONable object: {exc}") from exc
-            if not isinstance(sched, BaseSchedulerIO):
+            if not isinstance(sched, expected_cls):
                 raise ValueError(  # noqa: TRY004
-                    "The scheduler_type should either be a str or an as_dict of a subclass of BaseSchedulerIO"
+                    f"The scheduler_type should either be a str or an as_dict of a "
+                    f"subclass of {expected_cls.__name__}"
                 )
         return scheduler_type
+
+    @field_validator("scheduler_type")
+    @classmethod
+    def check_scheduler_type(cls, scheduler_type: str | dict) -> str | dict:
+        """Validator to check scheduler_type."""
+        return cls._validate_scheduler_type(
+            scheduler_type, scheduler_mapping, BaseSchedulerIO, "scheduler"
+        )
 
     @field_validator("work_dir")
     @classmethod
@@ -270,7 +283,7 @@ class WorkerBase(BaseModel):
 
     def get_scheduler_io(self) -> BaseSchedulerIO | BaseAPISchedulerIO:
         """
-        Get the BaseSchedulerIO from QToolKit depending on scheduler_type.
+        Get the scheduler IO from QToolKit depending on scheduler_type.
 
         Returns
         -------
@@ -285,6 +298,10 @@ class WorkerBase(BaseModel):
     @abc.abstractmethod
     def get_host(self) -> BaseHost:
         """Return the Host object used in the Worker."""
+
+    def get_transfer_backend(self) -> BaseHost | BaseCloudStorage:
+        """Return the file-transfer backend (host or cloud storage) for this worker."""
+        return self.get_host()
 
     @property
     @abc.abstractmethod
@@ -618,7 +635,16 @@ class SeparatedTransferWorker(BaseRemoteWorker):
 
 
 class CloudWorker(WorkerBase):
-    """Worker running jobs through a cloud batch API backed by cloud object storage."""
+    """Worker running jobs through a cloud batch API backed by cloud object storage.
+
+    ``execution_cmd`` defaults to ``jf -fe execution run-cloud`` and formats
+    ``{}`` with the cloud storage URI instead of a local filesystem path.
+    Host-only fields inherited from ``WorkerBase`` (``timeout_execute``,
+    ``scheduler_username``, and ``sanitize_command``) are ignored. When
+    ``scheduler_type`` is a serialized dict, worker connection fields
+    (``job_queue``, ``job_definition``, ``region_name``, ``profile_name``,
+    ``endpoint_url``) are not injected into it.
+    """
 
     type: Literal["cloud"] = Field(
         "cloud", description="The discriminator field to determine the worker type"
@@ -631,7 +657,7 @@ class CloudWorker(WorkerBase):
     )
     work_dir: Path = Field(
         Path("/jf_work"),
-        description="Logical root prefix inside the cloud storage bucket for job folders.",
+        description="Absolute POSIX path prefix (e.g. '/jf_work') appended under storage_prefix for job folders.",
     )
     storage_type: Literal["s3"] = Field(
         "s3", description="Cloud object storage backend type."
@@ -677,22 +703,12 @@ class CloudWorker(WorkerBase):
             raise ImportError(
                 "CloudWorker requires a qtoolkit release with qtoolkit.io.api support."
             )
-        if (
-            isinstance(scheduler_type, str)
-            and scheduler_type not in api_scheduler_mapping
-        ):
-            raise ValueError(f"Unknown cloud API scheduler type {scheduler_type}")
-        if isinstance(scheduler_type, dict):
-            try:
-                sched = MontyDecoder().process_decoded(scheduler_type)
-            except Exception as exc:
-                raise ValueError(f"Invalid serialized MSONable object: {exc}") from exc
-            if not isinstance(sched, BaseAPISchedulerIO):
-                raise ValueError(  # noqa: TRY004
-                    "The scheduler_type for CloudWorker must be a cloud scheduler name "
-                    "or an as_dict of a BaseAPISchedulerIO subclass."
-                )
-        return scheduler_type
+        return cls._validate_scheduler_type(
+            scheduler_type,
+            api_scheduler_mapping,
+            BaseAPISchedulerIO,
+            "cloud API scheduler",
+        )
 
     @model_validator(mode="after")
     def check_no_batch_mode(self) -> CloudWorker:
@@ -725,15 +741,16 @@ class CloudWorker(WorkerBase):
 
     def get_storage(self) -> BaseCloudStorage:
         """Return the cloud object storage backend for this worker."""
-        if self.storage_type == "s3":
-            return S3Storage(
-                bucket=self.bucket,
-                prefix=self.storage_prefix,
-                region_name=self.region_name,
-                profile_name=self.profile_name,
-                endpoint_url=self.storage_endpoint_url or self.endpoint_url,
-            )
-        raise ConfigError(f"Unsupported cloud storage type: {self.storage_type}")
+        return S3Storage(
+            bucket=self.bucket,
+            prefix=self.storage_prefix,
+            region_name=self.region_name,
+            profile_name=self.profile_name,
+            endpoint_url=self.storage_endpoint_url or self.endpoint_url,
+        )
+
+    def get_transfer_backend(self) -> BaseCloudStorage:
+        return self.get_storage()
 
     def get_host(self) -> BaseHost:
         raise NotImplementedError(

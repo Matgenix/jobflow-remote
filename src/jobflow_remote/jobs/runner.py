@@ -272,8 +272,6 @@ class Runner:
             if isinstance(worker, CloudWorker):
                 self.queue_managers[worker_name] = CloudQueueManager(
                     scheduler_io=worker.get_scheduler_io(),
-                    storage=self.get_storage(worker_name),
-                    container_work_dir=worker.container_work_dir,
                 )
             else:
                 scheduler_io = worker.get_scheduler_io()
@@ -851,8 +849,6 @@ class Runner:
             script_commands = [execution_cmd.format(remote_path)]
 
         queue_manager = self.get_queue_manager(worker_name)
-        qout_fpath = remote_path / OUT_FNAME
-        qerr_fpath = remote_path / ERR_FNAME
 
         exec_config = doc["exec_config"]
         if isinstance(exec_config, str):
@@ -871,7 +867,10 @@ class Runner:
             resources: dict = {}
 
             set_name_out(
-                resources, job_dict["name"], out_fpath=qout_fpath, err_fpath=qerr_fpath
+                resources,
+                job_dict["name"],
+                out_fpath=remote_path / OUT_FNAME,
+                err_fpath=remote_path / ERR_FNAME,
             )
             shell_manager = queue_manager.get_shell_manager()
             shell_manager.write_submission_script(
@@ -895,17 +894,13 @@ class Runner:
             }
         else:
             # decode in case it contains a QResources / QCloudResources.
-            resources = (
-                MontyDecoder().process_decoded(doc["resources"] or worker.resources)
-                or {}
+            # Preserve an explicit empty dict {} on the job doc instead of falling back.
+            raw_res = (
+                doc["resources"] if doc["resources"] is not None else worker.resources
             )
-            if not worker.is_cloud:
-                set_name_out(
-                    resources,
-                    job_dict["name"],
-                    out_fpath=qout_fpath,
-                    err_fpath=qerr_fpath,
-                )
+            resources = (
+                MontyDecoder().process_decoded(raw_res) if raw_res is not None else {}
+            )
 
             pre_run = worker.pre_run or ""
             if exec_config.pre_run:
@@ -914,20 +909,40 @@ class Runner:
             if exec_config.post_run:
                 post_run += "\n" + exec_config.post_run
 
-            submit_kwargs: dict = dict(
-                commands=script_commands,
-                pre_run=pre_run,
-                post_run=post_run,
-                options=resources,
-                export=exec_config.export,
-                modules=exec_config.modules,
-                work_dir=remote_path,
-                create_submit_dir=False,
-            )
-            if worker.is_cloud:
-                submit_kwargs["job_name"] = job_dict["name"]
+            if isinstance(queue_manager, CloudQueueManager):
+                submit_result = queue_manager.submit(
+                    commands=script_commands,
+                    pre_run=pre_run,
+                    post_run=post_run,
+                    options=resources,
+                    export=exec_config.export,
+                    modules=exec_config.modules,
+                    job_name=job_dict["name"],
+                )
+            else:
+                from qtoolkit.core.data_objects import QResources
 
-            submit_result = queue_manager.submit(**submit_kwargs)
+                if not isinstance(resources, dict | QResources):
+                    raise TypeError(
+                        f"Non-cloud worker '{worker_name}' does not support "
+                        f"{type(resources).__name__} resources. Use a dict or QResources."
+                    )
+                set_name_out(
+                    resources,
+                    job_dict["name"],
+                    out_fpath=remote_path / OUT_FNAME,
+                    err_fpath=remote_path / ERR_FNAME,
+                )
+                submit_result = queue_manager.submit(
+                    commands=script_commands,
+                    pre_run=pre_run,
+                    post_run=post_run,
+                    options=resources,
+                    export=exec_config.export,
+                    modules=exec_config.modules,
+                    work_dir=remote_path,
+                    create_submit_dir=False,
+                )
 
             if submit_result.status == SubmissionStatus.FAILED:
                 err_msg = f"submission failed. {submit_result!r}"

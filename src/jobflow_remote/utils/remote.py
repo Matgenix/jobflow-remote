@@ -40,7 +40,7 @@ class SharedHosts:
 
     _instance: SharedHosts = None
     _ref_count: int = 0
-    _hosts: ClassVar[dict[str, BaseHost]] = {}
+    _hosts: ClassVar[dict[str, BaseHost | BaseCloudStorage]] = {}
     _project: Project | None = None
 
     def __new__(cls, *args, **kwargs):
@@ -97,6 +97,18 @@ class SharedHosts:
         host.connect()
         self._hosts[worker] = host
         return host
+
+    def get_transfer(self, worker: str) -> BaseHost | BaseCloudStorage:
+        """Return the connected host or cloud storage backend for ``worker``."""
+        if worker not in self._project.workers:
+            raise ValueError(f"Worker {worker} not defined in {self._project.name}")
+        if worker in self._hosts:
+            return self._hosts[worker]
+
+        backend = self._project.workers[worker].get_transfer_backend()
+        backend.connect()
+        self._hosts[worker] = backend
+        return backend
 
     def close_hosts(self) -> None:
         """Close the connection to all the connected hosts"""

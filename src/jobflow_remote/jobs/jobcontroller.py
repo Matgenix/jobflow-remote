@@ -24,12 +24,7 @@ from monty.json import MontyDecoder
 from monty.serialization import loadfn
 from packaging.version import Version
 from packaging.version import parse as parse_version
-from qtoolkit.core.data_objects import CancelStatus, QResources
-
-try:
-    from qtoolkit.core.data_objects import QCloudResources
-except ImportError:  # pragma: no cover - older qtoolkit releases
-    QCloudResources = None
+from qtoolkit.core.data_objects import CancelStatus
 
 import jobflow_remote
 from jobflow_remote.config.base import (
@@ -55,6 +50,7 @@ from jobflow_remote.jobs.data import (
     get_initial_flow_doc_dict,
     get_initial_job_doc_dict,
     get_reset_job_base_dict,
+    is_resource_obj,
     projection_flow_info_jobs,
     projection_job_info,
 )
@@ -2403,7 +2399,7 @@ class JobController:
             The name of the exec_config to set or an explicit value of
             ExecutionConfig or dict.
         resources
-            The resources to be set, either as a dict or a QResources instance.
+            The resources to be set, as a dict, QResources, or QCloudResources instance.
         priority
             The priority of the Job.
         update
@@ -2465,6 +2461,7 @@ class JobController:
                 raise ValueError(f"worker {worker} is not present in the project")
             set_dict["worker"] = worker
 
+        use_pipeline = False
         if exec_config:
             if (
                 isinstance(exec_config, str)
@@ -2487,22 +2484,18 @@ class JobController:
                     }
                 }
                 set_dict["exec_config"] = cond
+                use_pipeline = True
 
             else:
                 set_dict["exec_config"] = exec_config
 
         if resources:
-            if isinstance(resources, QResources) or (
-                QCloudResources is not None and isinstance(resources, QCloudResources)
-            ):
+            if is_resource_obj(resources):
                 resources = resources.as_dict()
-                # if passing a QResources/QCloudResources it is pointless to update
-                # all the keywords will be overwritten and if the previous
-                # value was a generic dictionary the merged dictionary will fail
-                # almost surely lead to failures
-                update = False
-            if update:
+                set_dict["resources"] = resources
+            elif update:
                 set_dict["resources"] = {"$mergeObjects": ["$resources", resources]}
+                use_pipeline = True
             else:
                 set_dict["resources"] = resources
 
@@ -2525,7 +2518,7 @@ class JobController:
             raise_on_error=raise_on_error,
             values=set_dict,
             acceptable_states=acceptable_states,
-            use_pipeline=update,
+            use_pipeline=use_pipeline,
         )
 
     def get_flow_job_aggreg(
@@ -3024,34 +3017,20 @@ class JobController:
             The list of JobInfo whose files have been actually deleted.
         """
         deleted = []
-        cloud_storages = {}
-        try:
-            with SharedHosts(self.project) as shared_hosts:
-                for job_info in jobs_info:
-                    if isinstance(job_info, JobInfo):
-                        run_dir = job_info.run_dir
-                        worker = job_info.worker
-                    else:
-                        run_dir = job_info["run_dir"]
-                        worker = job_info["worker"]
-                    if run_dir:
-                        worker_cfg = shared_hosts._project.workers.get(worker)
-                        if isinstance(worker_cfg, CloudWorker):
-                            if worker not in cloud_storages:
-                                storage = worker_cfg.get_storage()
-                                storage.connect()
-                                cloud_storages[worker] = storage
-                            target = cloud_storages[worker]
-                        else:
-                            target = shared_hosts.get_host(worker)
-                        if safe_remove_job_files(
-                            host=target, run_dir=run_dir, raise_on_error=False
-                        ):
-                            deleted.append(job_info)
-        finally:
-            for storage in cloud_storages.values():
-                with contextlib.suppress(Exception):
-                    storage.close()
+        with SharedHosts(self.project) as shared_hosts:
+            for job_info in jobs_info:
+                if isinstance(job_info, JobInfo):
+                    run_dir = job_info.run_dir
+                    worker = job_info.worker
+                else:
+                    run_dir = job_info["run_dir"]
+                    worker = job_info["worker"]
+                if run_dir:
+                    target = shared_hosts.get_transfer(worker)
+                    if safe_remove_job_files(
+                        host=target, run_dir=run_dir, raise_on_error=False
+                    ):
+                        deleted.append(job_info)
         return deleted
 
     def unlock_flows(
@@ -3851,7 +3830,7 @@ class JobController:
         worker: str,
         response_type: DynamicResponseType,
         exec_config: ExecutionConfig | None = None,
-        resources: QResources | None = None,
+        resources: ResourcesType = None,
         priority: int = 0,
         stopped: bool = False,
     ) -> None:
@@ -4987,31 +4966,18 @@ class JobController:
             raise ValueError("The process id is not defined in the job document")
         worker = self.project.workers[job_doc["worker"]]
         if isinstance(worker, CloudWorker):
-            from jobflow_remote.remote.cloud_queue import CloudQueueManager
+            cancel_result = worker.get_scheduler_io().cancel(queue_process_id)
+        else:
+            with SharedHosts(self.project) as shared_hosts:
+                host = shared_hosts.get_host(job_doc["worker"])
+                queue_manager = QueueManager(worker.get_scheduler_io(), host)
+                cancel_result = queue_manager.cancel(queue_process_id)
 
-            cloud_qm = CloudQueueManager(
-                scheduler_io=worker.get_scheduler_io(),
-                storage=worker.get_storage(),
-                container_work_dir=worker.container_work_dir,
+        if cancel_result.status != CancelStatus.SUCCESSFUL:
+            raise RuntimeError(
+                f"Cancelling queue process {queue_process_id} failed. "
+                f"stdout: {cancel_result.stdout}. stderr: {cancel_result.stderr}"
             )
-            cancel_result = cloud_qm.cancel(queue_process_id)
-            if cancel_result.status != CancelStatus.SUCCESSFUL:
-                raise RuntimeError(
-                    f"Cancelling queue process {queue_process_id} failed. "
-                    f"stdout: {cancel_result.stdout}. stderr: {cancel_result.stderr}"
-                )
-            return
-
-        with SharedHosts(self.project) as shared_hosts:
-            host = shared_hosts.get_host(job_doc["worker"])
-
-            queue_manager = QueueManager(worker.get_scheduler_io(), host)
-            cancel_result = queue_manager.cancel(queue_process_id)
-            if cancel_result.status != CancelStatus.SUCCESSFUL:
-                raise RuntimeError(
-                    f"Cancelling queue process {queue_process_id} failed. "
-                    f"stdout: {cancel_result.stdout}. stderr: {cancel_result.stderr}"
-                )
 
     @staticmethod
     def _build_query_batch(

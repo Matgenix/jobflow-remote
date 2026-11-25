@@ -15,13 +15,7 @@ class StorageError(Exception):
 
 
 class BaseCloudStorage(MSONable, abc.ABC):
-    """Base class for cloud object storage used by cloud workers.
-
-    Provides file-transfer and directory-sync operations needed by
-    :class:`~jobflow_remote.jobs.runner.Runner` and
-    :class:`~jobflow_remote.remote.cloud_queue.CloudQueueManager` without
-    requiring an SSH host or remote shell.
-    """
+    """Base class for cloud object storage backends."""
 
     @abc.abstractmethod
     def put(self, src: str | Path | io.BytesIO, dst: str | Path) -> None:
@@ -57,7 +51,12 @@ class BaseCloudStorage(MSONable, abc.ABC):
         return True
 
     @abc.abstractmethod
-    def upload_dir(self, local_dir: str | Path, remote_dir: str | Path) -> None:
+    def upload_dir(
+        self,
+        local_dir: str | Path,
+        remote_dir: str | Path,
+        skip_files: set[str] | None = None,
+    ) -> None:
         """Recursively upload all files in ``local_dir`` to ``remote_dir``."""
 
     @abc.abstractmethod

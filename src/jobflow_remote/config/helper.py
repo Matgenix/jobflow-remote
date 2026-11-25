@@ -185,8 +185,6 @@ def check_worker(
     if isinstance(worker, CloudWorker):
         from monty.json import MontyDecoder
 
-        from jobflow_remote.remote.cloud_queue import CloudQueueManager
-
         storage = None
         try:
             storage = worker.get_storage()
@@ -194,17 +192,13 @@ def check_worker(
             if storage_error:
                 return storage_error, None
             scheduler_io = worker.get_scheduler_io()
-            cloud_qm = CloudQueueManager(
-                scheduler_io=scheduler_io,
-                storage=storage,
-                container_work_dir=worker.container_work_dir,
-            )
             if worker.resources:
                 res = MontyDecoder().process_decoded(worker.resources)
-                cloud_qm.prepare_options(res, job_name=None)
+                if not isinstance(res, dict):
+                    scheduler_io.check_convert_resources(res)
             queue = worker.job_queue or getattr(scheduler_io, "job_queue", None)
             if queue:
-                cloud_qm.get_jobs_list()
+                scheduler_io.get_jobs_list(queue=queue)
         except Exception:
             exc = traceback.format_exc()
             return f"Error while testing cloud worker:\n {exc}", None

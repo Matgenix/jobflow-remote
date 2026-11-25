@@ -35,7 +35,38 @@ def set_name_out(
         resources["qerr_path"] = err_fpath
 
 
-class QueueManager:
+class BaseQueueManager:
+    """Shared shell-command helpers for host-backed and cloud queue managers."""
+
+    def get_pre_run(self, pre_run: str | list[str] | None) -> str | None:
+        if isinstance(pre_run, list | tuple):
+            return "\n".join(pre_run)
+        return pre_run
+
+    def get_export(self, exports: dict | None) -> str | None:
+        if not exports:
+            return None
+        return "\n".join(f"export {k}={v}" for k, v in exports.items())
+
+    def get_modules(self, modules: list[str] | None) -> str | None:
+        if not modules:
+            return None
+        return "\n".join(f"module load {m}" for m in modules)
+
+    def get_run_commands(self, commands) -> str:
+        if isinstance(commands, str):
+            return commands
+        if isinstance(commands, list):
+            return "\n".join(commands)
+        raise ValueError("commands should be a str or a list of str.")
+
+    def get_post_run(self, post_run: str | list[str] | None) -> str | None:
+        if isinstance(post_run, list | tuple):
+            return "\n".join(post_run)
+        return post_run
+
+
+class QueueManager(BaseQueueManager):
     """Base class for job queues.
 
     Attributes
@@ -107,37 +138,6 @@ class QueueManager:
         if dir_path:
             return f"cd {dir_path}"
         return ""
-
-    def get_pre_run(self, pre_run: str | list[str] | None) -> str:
-        if isinstance(pre_run, list | tuple):
-            return "\n".join(pre_run)
-        return pre_run
-
-    def get_export(self, exports: dict | None) -> str | None:
-        if not exports:
-            return None
-        exports_str = []
-        for k, v in exports.items():
-            exports_str.append(f"export {k}={v}")
-        return "\n".join(exports_str)
-
-    def get_modules(self, modules: list[str] | None) -> str | None:
-        if not modules:
-            return None
-        modules_str = [f"module load {m}" for m in modules]
-        return "\n".join(modules_str)
-
-    def get_run_commands(self, commands) -> str:
-        if isinstance(commands, str):
-            return commands
-        if isinstance(commands, list):
-            return "\n".join(commands)
-        raise ValueError("commands should be a str or a list of str.")
-
-    def get_post_run(self, post_run: str | list[str] | None) -> str:
-        if isinstance(post_run, list | tuple):
-            return "\n".join(post_run)
-        return post_run
 
     def submit(
         self,

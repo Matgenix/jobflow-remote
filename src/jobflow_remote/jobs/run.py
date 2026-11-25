@@ -29,7 +29,7 @@ from jobflow_remote.jobs.data import (
     JobDoc,
 )
 from jobflow_remote.remote.data import get_job_path, get_store_file_paths
-from jobflow_remote.remote.storage.s3 import S3Storage, _normalize_posix_rel
+from jobflow_remote.remote.storage.s3 import S3Storage, parse_s3_uri
 from jobflow_remote.utils.log import initialize_remote_run_log
 
 if TYPE_CHECKING:
@@ -146,28 +146,26 @@ def run_remote_job(run_dir: str | Path = ".") -> None:
             JfrState().reset()
 
 
+_CLOUD_CRITICAL_PATTERNS = (
+    f"{OUT_FILENAME}*",
+    "remote_job_data.*",
+    "additional_store_*",
+)
+
+
 def run_cloud_job(
     storage_uri: str,
     local_dir: str | Path = "/tmp/jf_run",  # noqa: S108
     region_name: str | None = None,
     endpoint_url: str | None = None,
 ) -> None:
-    """Download a job's run directory from cloud storage, run it, and upload all outputs.
+    """Download a job's run directory from S3, execute it, and upload outputs back.
 
-    Designed to execute inside a cloud batch container with no direct MongoDB
-    access. Runs inside a fresh temporary subdirectory under ``local_dir``,
-    removes stale output files from any interrupted prior attempt, and uploads
-    mandatory jobflow-remote outputs before syncing remaining files in ``finally``.
+    Runs in a fresh temporary subdirectory under ``local_dir``, removes stale
+    output/store files from any prior attempt, and uploads critical jobflow-remote
+    files before uploading remaining files in ``finally``.
     """
-    if not storage_uri.startswith("s3://"):
-        raise ValueError(
-            f"Unsupported cloud storage URI '{storage_uri}'. Expected 's3://<bucket>/<prefix>'."
-        )
-    remainder = storage_uri[5:]
-    parts = remainder.split("/", 1)
-    bucket = parts[0].strip()
-    raw_prefix = parts[1] if len(parts) > 1 else ""
-    remote_prefix = _normalize_posix_rel(raw_prefix)
+    bucket, remote_prefix = parse_s3_uri(storage_uri)
     if not bucket or not remote_prefix:
         raise ValueError(
             f"Cloud storage URI must include both bucket and non-root key prefix: '{storage_uri}'."
@@ -184,11 +182,7 @@ def run_cloud_job(
         storage.download_dir(remote_prefix, scratch_path)
 
         # Clean stale JFR output/store files if an earlier cloud attempt failed mid-run.
-        for pattern in (
-            f"{OUT_FILENAME}*",
-            "remote_job_data.*",
-            "additional_store_*",
-        ):
+        for pattern in _CLOUD_CRITICAL_PATTERNS:
             for stale in scratch_path.glob(pattern):
                 if stale.is_file():
                     stale.unlink(missing_ok=True)
@@ -198,15 +192,15 @@ def run_cloud_job(
         finally:
             # Upload critical jobflow-remote files first so results/tracebacks are
             # preserved even if an auxiliary file upload fails later.
-            for pattern in (
-                f"{OUT_FILENAME}*",
-                "remote_job_data.*",
-                "additional_store_*",
-            ):
+            uploaded_critical: set[str] = set()
+            for pattern in _CLOUD_CRITICAL_PATTERNS:
                 for critical in scratch_path.glob(pattern):
                     if critical.is_file():
                         storage.put(critical, f"{remote_prefix}/{critical.name}")
-            storage.upload_dir(scratch_path, remote_prefix)
+                        uploaded_critical.add(critical.name)
+            storage.upload_dir(
+                scratch_path, remote_prefix, skip_files=uploaded_critical
+            )
 
 
 def ping(start_time, interval=600, filename=BATCH_INFO_FILENAME):
