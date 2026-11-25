@@ -78,23 +78,21 @@ the steps 3 and 4.
     the project configuration is changed the ``Runner`` needed the runner needs
     to be restarted.
 
-.. _runner stop_shutdown:
+.. _runner stop:
 
-Stop - Shutdown
----------------
+Stop
+----
 
 Executing the stop command::
 
     jf runner stop
 
-or the command::
-
-    jf runner shutdown
-
 relies on Supervisor to send a ``SIGTERM`` signal (a termination signal that allows
 the process to exit cleanly) to all the ``Runner`` processes. After this the
-Supervisor process will also be stopped. The two commands are equivalent and will result in
-a Runner in the ``shut_down`` state.
+Supervisor process will also be stopped, resulting in a Runner in the
+``shut_down`` state. This is the normal "not running" state: it is also the
+state of a project whose Runner has never been started. See :ref:`runner info`
+for the list of states.
 
 Unless the ``--wait`` option is specified, the completion of the command will not imply
 that all the ``Runner`` processes have been terminated.
@@ -105,9 +103,15 @@ that all the ``Runner`` processes have been terminated.
 
 .. note::
     In older versions of jobflow-remote the ``jf runner stop`` command used to stop
-    only the ``Runner`` processes, but leaving the Supervisor process active. Since version
-    1.0 this has been removed from the CLI to simplify the handling of the runner.
-    If needed, the option is still available through the python API.
+    only the ``Runner`` processes, but leaving the Supervisor process active, while
+    ``jf runner shutdown`` also stopped the Supervisor process. Since version
+    1.0 ``jf runner stop`` performs the full shutdown, and the option to stop only the
+    ``Runner`` processes has been removed from the CLI to simplify the handling of the
+    runner. If needed, it is still available through the python API.
+    As a consequence, ``jf runner stop`` and ``jf runner shutdown`` became identical.
+    To avoid confusion the ``shutdown`` command has been hidden from the CLI, but it
+    still works. The shutdown concept still exists in the daemon, e.g. in the
+    ``shut_down`` state of the Runner.
 
 Kill
 ----
@@ -125,6 +129,8 @@ command::
     working on a Job and/or on a Flow. See the :ref:`errors runner` section for
     how to handle these cases.
 
+.. _runner info:
+
 Information
 -----------
 
@@ -132,10 +138,19 @@ It is possible to get an overall state of the runner daemon executing::
 
     jf runner status
 
-This returns a custom global state defined in jobflow-remote. Typical
-values are ``shut_down``, ``stopped`` and ``running``. A ``partially_running``
-state means that some of the daemonized processes are active, while other
-are either not yet started or have been stopped.
+This returns a custom global state defined in jobflow-remote. The possible values are:
+
+* ``shut_down``: the Supervisor process is not running. This is the state after
+  ``jf runner stop`` and the state of a Runner that was never started.
+* ``shutting_down``: the Supervisor process is in the process of terminating.
+* ``stopped``: the Supervisor process is active, but none of the ``Runner``
+  processes are running. This is the state after ``jf runner kill``.
+* ``stopping``: the ``Runner`` processes are in the process of stopping.
+* ``starting``: the ``Runner`` processes are being started.
+* ``running``: all the ``Runner`` processes are active.
+* ``partially_running``: some of the ``Runner`` processes are active, while
+  others are either not yet started or have been stopped.
+
 To get more details about the single processes it is possible to run::
 
     jf runner info

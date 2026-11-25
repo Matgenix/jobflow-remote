@@ -444,7 +444,7 @@ def stop(
         typer.Option(
             "--all",
             "-a",
-            help=("Shutdown the runner for all the projects"),
+            help=("Stop the runner for all the projects"),
         ),
     ] = False,
     json_out: Annotated[
@@ -453,7 +453,7 @@ def stop(
             "--json",
             "-j",
             help=(
-                "if --all dump the list of shutdown runners in json format to a file at this path"
+                "if --all dump the list of stopped runners in json format to a file at this path"
             ),
         ),
     ] = None,
@@ -463,16 +463,17 @@ def stop(
             "--max-wait",
             "-m",
             help=(
-                "Maximum time in seconds to wait for the runner to shut down when --wait is set. "
+                "Maximum time in seconds to wait for the runner to stop when --wait is set. "
                 "0 means wait indefinitely."
             ),
         ),
     ] = 120,
 ) -> None:
     """
-    Shuts down the supervisord process.
+    Stop the Runner processes and the supervisord process.
     Note that the supervisord process will stop after all the runner processes have finished.
     """
+    # The hidden ``shutdown`` command is equivalent to this one.
     shutdown(wait=wait, all_projects=all_projects, json_out=json_out, max_wait=max_wait)
 
 
@@ -534,7 +535,12 @@ def kill(
     )
 
 
-@app_runner.command()
+# NOTE: ``shutdown`` is hidden from the CLI on purpose. Since ``stop`` also shuts
+# down the supervisord process, the two commands do exactly the same thing and
+# having both was confusing. The command is kept (hidden) for backward
+# compatibility. The shutdown concept still exists in the daemon
+# (``DaemonManager.shut_down``, ``DaemonStatus.SHUT_DOWN``).
+@app_runner.command(hidden=True)
 def shutdown(
     wait: Annotated[
         bool,
@@ -578,7 +584,10 @@ def shutdown(
 ) -> None:
     """
     Shuts down the supervisord process.
-    Note that the supervisord process will stop after all the runner processes have finished
+    Note that the supervisord process will stop after all the runner processes have finished.
+
+    This command is hidden and kept only for backward compatibility: it is
+    equivalent to "jf runner stop", which should be used instead.
     """
     _stop_runners(
         wait=wait,
