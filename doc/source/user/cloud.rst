@@ -754,8 +754,9 @@ minutes after the queues are empty.
 Inspecting and stopping jobs
 ============================
 
-Run the commands of this section in a terminal on your computer. In a new
-terminal, activate the environment first:
+Run the ``jf`` commands of this section in a terminal on your computer. Run
+the ``aws`` commands in CloudShell. In a new terminal on your computer,
+activate the environment first:
 
 .. tab-set::
     :sync-group: env
@@ -788,6 +789,20 @@ file in the current folder.
 
     jf -p aws_ht job files ls 1
     jf -p aws_ht job files get 1 jfremote_out.json
+
+A job stays ``SUBMITTED`` until its container starts. On the EC2 queues,
+the first job waits a few minutes while an instance starts and pulls the
+image. In CloudShell, see the AWS Batch state of the jobs in the EC2 CPU
+queue. For the other queues, replace ``Ec2CpuJobQueueArn`` with
+``CpuJobQueueArn`` or ``GpuJobQueueArn``.
+
+.. code-block:: bash
+
+    QUEUE=$(aws cloudformation describe-stacks --stack-name jfr-lab --query "Stacks[0].Outputs[?OutputKey=='Ec2CpuJobQueueArn'].OutputValue" --output text)
+    for s in RUNNABLE STARTING RUNNING SUCCEEDED FAILED; do aws batch list-jobs --job-queue "$QUEUE" --job-status "$s" --query 'jobSummaryList[].[jobName,status,statusReason]' --output text; done
+
+``RUNNABLE`` means the job waits for an instance. If a job stays
+``RUNNABLE`` for more than 15 minutes, check the quotas in Part 1, Step 2.
 
 Stop a queued or running job:
 
