@@ -391,7 +391,7 @@ locked, it is likely that the lock was not properly released.
 
 .. note::
 
-    Remember that when running ``jf runner stop`` or ``jf runner shutdown`` the runner will
+    Remember that when running ``jf runner stop`` the runner will
     not stop immediately, if it is in the middle of an operation. Check the Runner
     status with ``jf runner status`` or by inspecting the ``runner.log`` file in the
     ``~/.jfremote/PROJECT_NAME/log`` folder to determine if the Runner is active or not.
