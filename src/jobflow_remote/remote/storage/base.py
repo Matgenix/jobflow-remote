@@ -67,6 +67,13 @@ class BaseCloudStorage(MSONable, abc.ABC):
     def get_uri(self, path: str | Path) -> str:
         """Return the storage URI (e.g. ``s3://bucket/key``) for ``path``."""
 
+    def get_run_cloud_options(self) -> list[str]:
+        """Return the ``jf execution run-cloud`` options that open this storage in the container.
+
+        ``jf execution run-cloud`` currently supports only S3 storage.
+        """
+        return []
+
     @abc.abstractmethod
     def test(self) -> str | None:
         """Verify access to the underlying storage. Return ``None`` if OK, else an error message."""

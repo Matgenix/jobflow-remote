@@ -834,16 +834,12 @@ class Runner:
                     "-fe",
                     "execution",
                     "run-cloud",
-                    shlex.quote(storage_uri),
+                    storage_uri,
                     "--work-dir",
-                    shlex.quote(job_work_dir),
+                    job_work_dir,
+                    *storage.get_run_cloud_options(),
                 ]
-                if worker.region_name:
-                    cmd_parts.extend(["--region", shlex.quote(worker.region_name)])
-                endpoint = worker.storage_endpoint_url or worker.endpoint_url
-                if endpoint:
-                    cmd_parts.extend(["--endpoint-url", shlex.quote(endpoint)])
-                script_commands = [" ".join(cmd_parts)]
+                script_commands = [shlex.join(cmd_parts)]
         else:
             execution_cmd = worker.execution_cmd or "jf -fe execution run {}"
             script_commands = [execution_cmd.format(remote_path)]

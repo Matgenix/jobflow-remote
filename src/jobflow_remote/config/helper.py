@@ -196,7 +196,7 @@ def check_worker(
                 res = MontyDecoder().process_decoded(worker.resources)
                 if not isinstance(res, dict):
                     scheduler_io.check_convert_resources(res)
-            queue = worker.job_queue or getattr(scheduler_io, "job_queue", None)
+            queue = getattr(scheduler_io, "job_queue", None)
             if queue:
                 scheduler_io.get_jobs_list(queue=queue)
         except Exception:
