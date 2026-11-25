@@ -52,28 +52,12 @@ class JfrState:
 CURRENT_JOBDOC: JfrState = JfrState()
 
 
-def _resolve_store_paths(store: JobStore, base_dir: Path) -> None:
-    """Resolve relative file-store paths to absolute paths under ``base_dir``."""
-    sub_stores = [store.docs_store, *store.additional_stores.values()]
-    for sub in sub_stores:
-        paths = getattr(sub, "paths", None)
-        if isinstance(paths, list):
-            sub.paths = [
-                str((base_dir / p).resolve()) if not Path(p).is_absolute() else p
-                for p in paths
-            ]
-        path = getattr(sub, "path", None)
-        if isinstance(path, str | Path) and not Path(path).is_absolute():
-            sub.path = str((base_dir / path).resolve())
-
-
 def run_remote_job(run_dir: str | Path = ".") -> None:
     """Run the job."""
     initialize_remote_run_log()
 
     start_time = datetime.datetime.now(timezone.utc)
-    run_dir_abs = Path(run_dir).resolve()
-    with cd(run_dir_abs):
+    with cd(run_dir):
         error = None
         try:
             dumpfn({"start_time": start_time}, OUT_FILENAME)
@@ -81,7 +65,6 @@ def run_remote_job(run_dir: str | Path = ".") -> None:
 
             job: Job = in_data["job"]
             store = in_data["store"]
-            _resolve_store_paths(store, run_dir_abs)
             job_doc_dict = in_data.get("job_doc", None)
             if isinstance(job.function, dict):
                 raise RuntimeError(  # noqa: TRY004,TRY301
@@ -98,8 +81,6 @@ def run_remote_job(run_dir: str | Path = ".") -> None:
             try:
                 response = job.run(store=store)
             finally:
-                # Restore cwd in case the job called os.chdir() without restoring it.
-                os.chdir(run_dir_abs)
                 # some jobs may have compressed the jfremote and store files while being
                 # executed, try to decompress them if that is the case and files need to be
                 # decompressed.
@@ -186,6 +167,14 @@ def run_cloud_job(
             for stale in scratch_path.glob(pattern):
                 if stale.is_file():
                     stale.unlink(missing_ok=True)
+
+        # Upload an output file with only the start time before the job runs.
+        # If the container is killed (time limit, out of memory, Spot reclaim),
+        # the upload in ``finally`` never happens. The Runner then still finds
+        # this file and marks the job as FAILED, as it does for HPC workers.
+        out_file = scratch_path / OUT_FILENAME
+        dumpfn({"start_time": datetime.datetime.now(timezone.utc)}, out_file)
+        storage.put(out_file, f"{remote_prefix}/{OUT_FILENAME}")
 
         try:
             run_remote_job(scratch_path)

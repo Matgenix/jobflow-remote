@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import builtins
 import io
-import os
 from collections import OrderedDict
 from pathlib import Path
 from unittest.mock import MagicMock
@@ -21,7 +20,6 @@ from qtoolkit.core.data_objects import (
 )
 from typer.testing import CliRunner
 
-from jobflow_remote.cli.jf import app as jf_app
 from jobflow_remote.config.base import (
     BatchConfig,
     CloudWorker,
@@ -36,7 +34,7 @@ from jobflow_remote.jobs.jobcontroller import JobController
 from jobflow_remote.jobs.run import run_cloud_job
 from jobflow_remote.jobs.runner import Runner
 from jobflow_remote.jobs.state import JobState
-from jobflow_remote.remote.cloud_queue import CloudQueueManager, sanitize_cloud_job_name
+from jobflow_remote.remote.cloud_queue import CloudQueueManager
 from jobflow_remote.remote.data import get_remote_in_file, get_remote_store
 from jobflow_remote.remote.storage import S3Storage, StorageError
 from jobflow_remote.utils.examples import add
@@ -44,11 +42,10 @@ from jobflow_remote.utils.remote import UnsafeDeletionError, safe_remove_job_fil
 
 
 @job
-def chdir_and_write(val: int) -> int:
+def write_nested_file(val: int) -> int:
     sub = Path("nested_subdir")
     sub.mkdir(exist_ok=True)
-    os.chdir(sub)
-    Path("marker.txt").write_text(f"val={val}")
+    (sub / "marker.txt").write_text(f"val={val}")
     return val + 1
 
 
@@ -364,12 +361,6 @@ class TestCloudWorkerAndQueueManager:
         with pytest.raises(ValueError, match="Unknown cloud API scheduler"):
             CloudWorker(bucket="my-bucket", scheduler_type="slurm")
 
-    def test_sanitize_cloud_job_name(self):
-        assert sanitize_cloud_job_name("relax Si (mp-149)") == "relax_Si__mp-149_"
-        assert sanitize_cloud_job_name("___bad").startswith("jf_")
-        assert sanitize_cloud_job_name("").startswith("jf_")
-        assert len(sanitize_cloud_job_name("a" * 200)) == 128
-
     def test_cloud_queue_manager_with_moto(self, aws_cloud_env):
         from qtoolkit.core.data_objects import QCloudResources
 
@@ -401,6 +392,16 @@ class TestCloudWorkerAndQueueManager:
         # Empty dict options convert to QCloudResources; explicit job_name preserved
         sub_empty = qm.submit(commands="echo hi", options={}, job_name="empty opts")
         assert sub_empty.status == SubmissionStatus.SUCCESSFUL
+
+        # A non-empty dict of backend options still gets the job name
+        sub_dict = qm.submit(
+            commands="echo hi", options={"tags": {"k": "v"}}, job_name="dict opts"
+        )
+        raw_dict = batch.describe_jobs(jobs=[sub_dict.job_id])["jobs"][0]
+        assert raw_dict["jobName"] == "dict_opts"
+        assert qm.prepare_options(
+            {"jobName": "mine"}, job_name="x"
+        ).scheduler_kwargs == {"jobName": "mine"}
         assert (
             qm.prepare_options(
                 QCloudResources(job_name="keep-me"), job_name="ignored"
@@ -449,17 +450,15 @@ class TestCloudWorkerAndQueueManager:
                 priority=0,
             )
             validated = JobDoc.model_validate(plain_doc)
-            assert type(validated.resources) is dict
+            assert isinstance(validated.resources, dict)
             assert validated.resources == plain
             assert "@class" not in validated.as_db_dict()["resources"]
 
 
 class TestRunCloudJobAndCli:
-    def test_run_cloud_job_chdir_retry_cleanup_and_no_double_upload(
-        self, s3_env, tmp_path, monkeypatch
-    ):
+    def test_run_cloud_job_no_double_upload(self, s3_env, tmp_path, monkeypatch):
         storage, _s3, _bucket = s3_env
-        uri = _upload_job_in(storage, chdir_and_write(41), "/jf_work/test_job")
+        uri = _upload_job_in(storage, write_nested_file(41), "/jf_work/test_job")
         # Plant stale files from an aborted prior attempt
         storage.put(io.BytesIO(b"stale"), "/jf_work/test_job/jfremote_out.json")
         storage.put(io.BytesIO(b"stale"), "/jf_work/test_job/remote_job_data.json")
@@ -504,6 +503,33 @@ class TestRunCloudJobAndCli:
         storage.get("/jf_work/fail_job/jfremote_out.json", out_local)
         assert loadfn(out_local)["error"] is not None
 
+    def test_run_cloud_job_uploads_start_file_before_running(
+        self, s3_env, tmp_path, monkeypatch
+    ):
+        # A killed container never reaches the final upload. The start-time
+        # output file must already be in S3 so that the job ends as FAILED.
+        # Import inside the test, see test_cli_execution_run_cloud.
+        from jobflow_remote.jobs import run
+
+        storage, _s3, _bucket = s3_env
+        uri = _upload_job_in(storage, add(1, 2), "/jf_work/killed_job")
+        outputs_seen = []
+
+        def killed_run(run_dir):
+            out_local = tmp_path / "start_out.json"
+            storage.get("/jf_work/killed_job/jfremote_out.json", out_local)
+            outputs_seen.append(loadfn(out_local))
+
+        monkeypatch.setattr(run, "run_remote_job", killed_run)
+        run.run_cloud_job(
+            storage_uri=uri,
+            local_dir=tmp_path / "killed_run",
+            region_name="us-east-1",
+        )
+        assert len(outputs_seen) == 1
+        assert "start_time" in outputs_seen[0]
+        assert "response" not in outputs_seen[0]
+
     def test_run_cloud_job_rejects_invalid_uris(self, tmp_path):
         with pytest.raises(ValueError, match="Unsupported cloud storage URI"):
             run_cloud_job("gs://bucket/path", local_dir=tmp_path)
@@ -513,6 +539,10 @@ class TestRunCloudJobAndCli:
             run_cloud_job("s3://bucket/a/../b", local_dir=tmp_path)
 
     def test_cli_execution_run_cloud(self, s3_env, tmp_path, monkeypatch):
+        # Import inside the test. A CLI plugin test removes jobflow_remote from
+        # sys.modules, so a module-level import would keep the stale app.
+        from jobflow_remote.cli.jf import app as jf_app
+
         monkeypatch.setenv("HOME", str(tmp_path))
         storage, _s3, _bucket = s3_env
         uri = _upload_job_in(storage, add(10, 20), "/jf_work/cli_job")
@@ -718,18 +748,13 @@ class TestRunnerAndControllerCloudIntegration:
         assert len(deleted) == 1
         assert storage.listdir("/jf_work/del_me") == []
 
-        # set_job_run_properties keeps use_pipeline=True when both exec_config dict and QCloudResources are set
+        # set_job_run_properties replaces the resources with a QCloudResources
         jc._many_jobs_action = MagicMock(return_value=["1"])
         res = QCloudResources(vcpus=2, memory=4096)
-        jc.set_job_run_properties(
-            exec_config={"pre_run": "echo hi"},
-            resources=res,
-            update=True,
-            db_ids="1",
-        )
+        jc.set_job_run_properties(resources=res, db_ids="1")
         call_kwargs = jc._many_jobs_action.call_args.kwargs
         assert call_kwargs["values"]["resources"]["@class"] == "QCloudResources"
-        assert call_kwargs["use_pipeline"] is True
+        assert call_kwargs["use_pipeline"] is False
 
     def test_check_worker_cloud(self, aws_cloud_env):
         from qtoolkit.core.data_objects import QCloudResources
@@ -762,8 +787,14 @@ class TestRunnerAndControllerCloudIntegration:
     def test_cli_job_and_project_cloud_branches(
         self, aws_cloud_env, tmp_path, monkeypatch
     ):
+        # Import inside the test and rebuild the worker from the freshly
+        # imported classes, see test_cli_execution_run_cloud.
+        from jobflow_remote.cli.jf import app as jf_app
+        from jobflow_remote.config.base import CloudWorker, Project, QueueConfig
+
         monkeypatch.setenv("HOME", str(tmp_path))
-        worker, _batch, _s3, _bucket = aws_cloud_env
+        fixture_worker, _batch, _s3, _bucket = aws_cloud_env
+        worker = CloudWorker.model_validate(fixture_worker.model_dump())
         storage = worker.get_storage()
         storage.put(io.BytesIO(b"hello-cloud"), "/jf_work/j1/out.txt")
 

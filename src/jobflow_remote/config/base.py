@@ -637,6 +637,12 @@ class SeparatedTransferWorker(BaseRemoteWorker):
 class CloudWorker(WorkerBase):
     """Worker running jobs through a cloud batch API backed by cloud object storage.
 
+    The only supported backends are AWS Batch (``scheduler_type: aws_batch``)
+    and S3 (``storage_type: s3``). ``job_queue`` and ``job_definition`` are AWS
+    Batch settings. ``region_name``, ``profile_name``, and ``endpoint_url`` are
+    used by both the scheduler and the storage. ``storage_endpoint_url``
+    replaces ``endpoint_url`` for the storage when it is set.
+
     ``execution_cmd`` defaults to ``jf -fe execution run-cloud`` and formats
     ``{}`` with the cloud storage URI instead of a local filesystem path.
     Host-only fields inherited from ``WorkerBase`` (``timeout_execute``,
