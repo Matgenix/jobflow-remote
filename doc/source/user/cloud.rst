@@ -585,11 +585,14 @@ Step 4. Submit the flows
 ------------------------
 
 The example below runs the ``atomate2`` force-field phonon workflow with
-MACE-OMAT-0 and ``pheasy``. The force calculations run on the GPU queue. The
-``pheasy`` fit (``generate_frequencies_eigenvectors``) and the
-``structure_to_primitive`` step run on the EC2 CPU queue with 1 vCPU each.
-For a campaign, call ``submit_flow`` once per structure. The EC2 CPU queue
-then runs the fits of many structures at the same time.
+MACE-OMAT-0 and ``pheasy``. The ``pheasy`` fit
+(``generate_frequencies_eigenvectors``) and the ``structure_to_primitive``
+step run on the EC2 CPU queue with 1 vCPU each. The force calculations run on
+the GPU queue. If your GPU quota is ``0``, use the **Without GPU queue** tab
+in item 2. The force calculations then also run on the EC2 CPU queue. The
+image from Step 1 runs on CPUs too. For a campaign, call ``submit_flow`` once
+per structure. The EC2 CPU queue then runs the fits of many structures at the
+same time.
 
 1. On your computer, install ``atomate2`` in the environment from Part 1,
    Step 1. You need it to build the flows.
@@ -615,63 +618,128 @@ then runs the fits of many structures at the same time.
 
 2. On your computer, create the submission script:
 
-   .. code-block:: bash
+   .. tab-set::
+       :sync-group: gpu
 
-       cat > submit_phonons.py <<'EOF'
-       from atomate2.forcefields.flows.pheasy import PhononMaker
-       from atomate2.forcefields.jobs import ForceFieldRelaxMaker, ForceFieldStaticMaker
-       from pymatgen.core import Lattice, Structure
-       from qtoolkit.core.data_objects import QCloudResources
+       .. tab-item:: With GPU queue
+           :sync: gpu
 
-       from jobflow_remote import set_run_config, submit_flow
+           .. code-block:: bash
 
-       a = 5.4687
-       si_prim = Structure(
-           Lattice([[0, a / 2, a / 2], [a / 2, 0, a / 2], [a / 2, a / 2, 0]]),
-           ["Si", "Si"],
-           [[0, 0, 0], [0.25, 0.25, 0.25]],
-       )
+               cat > submit_phonons.py <<'EOF'
+               from atomate2.forcefields.flows.pheasy import PhononMaker
+               from atomate2.forcefields.jobs import ForceFieldRelaxMaker, ForceFieldStaticMaker
+               from pymatgen.core import Lattice, Structure
+               from qtoolkit.core.data_objects import QCloudResources
 
-       mace_kwargs = {"model": "medium-omat-0", "device": "cuda"}
-       maker = PhononMaker(
-           min_length=8.0,
-           symprec=1e-3,
-           use_symmetrized_structure="primitive",
-           bulk_relax_maker=ForceFieldRelaxMaker(
-               force_field_name="MACE-MP-0",
-               calculator_kwargs=mace_kwargs,
-               relax_kwargs={"fmax": 1e-4},
-           ),
-           static_energy_maker=ForceFieldStaticMaker(
-               force_field_name="MACE-MP-0",
-               calculator_kwargs=mace_kwargs,
-           ),
-           phonon_displacement_maker=ForceFieldStaticMaker(
-               force_field_name="MACE-MP-0",
-               calculator_kwargs=mace_kwargs,
-           ),
-           create_thermal_displacements=False,
-       )
-       flow = maker.make(si_prim)
+               from jobflow_remote import set_run_config, submit_flow
 
-       cpu_resources = QCloudResources(vcpus=1, memory=1800, time_limit=1800)
-       for name in ("structure_to_primitive", "generate_frequencies_eigenvectors"):
-           set_run_config(
-               flow, name_filter=name, worker="aws_cpu_ec2", resources=cpu_resources
-           )
+               a = 5.4687
+               si_prim = Structure(
+                   Lattice([[0, a / 2, a / 2], [a / 2, 0, a / 2], [a / 2, a / 2, 0]]),
+                   ["Si", "Si"],
+                   [[0, 0, 0], [0.25, 0.25, 0.25]],
+               )
 
-       submit_flow(
-           flow,
-           worker="aws_gpu",
-           project="aws_ht",
-           resources=QCloudResources(
-               vcpus=4, memory=14000, gpus=1, max_retries=2, time_limit=1800
-           ),
-       )
-       EOF
+               mace_kwargs = {"model": "medium-omat-0", "device": "cuda"}
+               maker = PhononMaker(
+                   min_length=8.0,
+                   symprec=1e-3,
+                   use_symmetrized_structure="primitive",
+                   bulk_relax_maker=ForceFieldRelaxMaker(
+                       force_field_name="MACE-MP-0",
+                       calculator_kwargs=mace_kwargs,
+                       relax_kwargs={"fmax": 1e-4},
+                   ),
+                   static_energy_maker=ForceFieldStaticMaker(
+                       force_field_name="MACE-MP-0",
+                       calculator_kwargs=mace_kwargs,
+                   ),
+                   phonon_displacement_maker=ForceFieldStaticMaker(
+                       force_field_name="MACE-MP-0",
+                       calculator_kwargs=mace_kwargs,
+                   ),
+                   create_thermal_displacements=False,
+               )
+               flow = maker.make(si_prim)
 
-   Keep ``run_phonon_displacements`` on ``aws_gpu``, because the force jobs it
-   creates run on the same worker as this step.
+               cpu_resources = QCloudResources(vcpus=1, memory=1800, time_limit=1800)
+               for name in ("structure_to_primitive", "generate_frequencies_eigenvectors"):
+                   set_run_config(
+                       flow, name_filter=name, worker="aws_cpu_ec2", resources=cpu_resources
+                   )
+
+               submit_flow(
+                   flow,
+                   worker="aws_gpu",
+                   project="aws_ht",
+                   resources=QCloudResources(
+                       vcpus=4, memory=14000, gpus=1, max_retries=2, time_limit=1800
+                   ),
+               )
+               EOF
+
+           Keep ``run_phonon_displacements`` on ``aws_gpu``, because the force
+           jobs it creates run on the same worker as this step.
+
+       .. tab-item:: Without GPU queue
+           :sync: cpu
+
+           .. code-block:: bash
+
+               cat > submit_phonons.py <<'EOF'
+               from atomate2.forcefields.flows.pheasy import PhononMaker
+               from atomate2.forcefields.jobs import ForceFieldRelaxMaker, ForceFieldStaticMaker
+               from pymatgen.core import Lattice, Structure
+               from qtoolkit.core.data_objects import QCloudResources
+
+               from jobflow_remote import set_run_config, submit_flow
+
+               a = 5.4687
+               si_prim = Structure(
+                   Lattice([[0, a / 2, a / 2], [a / 2, 0, a / 2], [a / 2, a / 2, 0]]),
+                   ["Si", "Si"],
+                   [[0, 0, 0], [0.25, 0.25, 0.25]],
+               )
+
+               mace_kwargs = {"model": "medium-omat-0", "device": "cpu"}
+               maker = PhononMaker(
+                   min_length=8.0,
+                   symprec=1e-3,
+                   use_symmetrized_structure="primitive",
+                   bulk_relax_maker=ForceFieldRelaxMaker(
+                       force_field_name="MACE-MP-0",
+                       calculator_kwargs=mace_kwargs,
+                       relax_kwargs={"fmax": 1e-4},
+                   ),
+                   static_energy_maker=ForceFieldStaticMaker(
+                       force_field_name="MACE-MP-0",
+                       calculator_kwargs=mace_kwargs,
+                   ),
+                   phonon_displacement_maker=ForceFieldStaticMaker(
+                       force_field_name="MACE-MP-0",
+                       calculator_kwargs=mace_kwargs,
+                   ),
+                   create_thermal_displacements=False,
+               )
+               flow = maker.make(si_prim)
+
+               cpu_resources = QCloudResources(vcpus=1, memory=1800, time_limit=1800)
+               for name in ("structure_to_primitive", "generate_frequencies_eigenvectors"):
+                   set_run_config(
+                       flow, name_filter=name, worker="aws_cpu_ec2", resources=cpu_resources
+                   )
+
+               submit_flow(
+                   flow,
+                   worker="aws_cpu_ec2",
+                   project="aws_ht",
+                   resources=QCloudResources(vcpus=2, memory=3600, time_limit=3600),
+               )
+               EOF
+
+           All jobs run on ``aws_cpu_ec2``. The force calculations get 2
+           vCPUs each.
 
 3. On your computer, submit the flow and start the ``Runner`` as a daemon:
 
@@ -686,18 +754,54 @@ minutes after the queues are empty.
 Inspecting and stopping jobs
 ============================
 
-On your computer, list or download the files of a job from S3:
+Run the commands of this section in a terminal on your computer. In a new
+terminal, activate the environment first:
+
+.. tab-set::
+    :sync-group: env
+
+    .. tab-item:: conda
+        :sync: conda
+
+        .. code-block:: bash
+
+            conda activate jfr
+
+    .. tab-item:: uv
+        :sync: uv
+
+        .. code-block:: bash
+
+            source ~/.venvs/jfr/bin/activate
+
+List the flows and the jobs:
+
+.. code-block:: bash
+
+    jf -p aws_ht flow list
+    jf -p aws_ht job list
+
+List or download the files of a job from S3. The second command saves the
+file in the current folder.
 
 .. code-block:: bash
 
     jf -p aws_ht job files ls 1
     jf -p aws_ht job files get 1 jfremote_out.json
 
-On your computer, stop a queued or running job:
+Stop a queued or running job:
 
 .. code-block:: bash
 
     jf -p aws_ht job stop <job_id>
+
+Delete a flow and its jobs. Use the flow id from ``jf -p aws_ht flow list``.
+The command also cancels the AWS Batch jobs of the flow that are still queued
+or running.
+
+.. code-block:: bash
+
+    jf -p aws_ht flow delete -fid <flow_id>
 
 The containers write stdout and stderr to CloudWatch Logs, not to
 ``queue.out`` and ``queue.err``. For this reason ``jf job queue-out`` does not
