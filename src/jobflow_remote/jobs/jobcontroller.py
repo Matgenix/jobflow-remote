@@ -26,8 +26,18 @@ from packaging.version import Version
 from packaging.version import parse as parse_version
 from qtoolkit.core.data_objects import CancelStatus, QResources
 
+try:
+    from qtoolkit.core.data_objects import QCloudResources
+except ImportError:  # pragma: no cover - older qtoolkit releases
+    QCloudResources = None
+
 import jobflow_remote
-from jobflow_remote.config.base import ConfigError, ExecutionConfig, Project
+from jobflow_remote.config.base import (
+    CloudWorker,
+    ConfigError,
+    ExecutionConfig,
+    Project,
+)
 from jobflow_remote.config.manager import ConfigManager
 from jobflow_remote.jobs.batch import RemoteBatchManager
 from jobflow_remote.jobs.data import (
@@ -40,6 +50,7 @@ from jobflow_remote.jobs.data import (
     JobDoc,
     JobInfo,
     RemoteError,
+    ResourcesType,
     get_initial_batch_doc_dict,
     get_initial_flow_doc_dict,
     get_initial_job_doc_dict,
@@ -2365,7 +2376,7 @@ class JobController:
         self,
         worker: str | None = None,
         exec_config: str | ExecutionConfig | dict | None = None,
-        resources: dict | QResources | None = None,
+        resources: ResourcesType = None,
         priority: int | None = None,
         update: bool = True,
         job_ids: tuple[str, int] | list[tuple[str, int]] | None = None,
@@ -2481,9 +2492,11 @@ class JobController:
                 set_dict["exec_config"] = exec_config
 
         if resources:
-            if isinstance(resources, QResources):
+            if isinstance(resources, QResources) or (
+                QCloudResources is not None and isinstance(resources, QCloudResources)
+            ):
                 resources = resources.as_dict()
-                # if passing a QResources it is pointless to update
+                # if passing a QResources/QCloudResources it is pointless to update
                 # all the keywords will be overwritten and if the previous
                 # value was a generic dictionary the merged dictionary will fail
                 # almost surely lead to failures
@@ -3011,20 +3024,34 @@ class JobController:
             The list of JobInfo whose files have been actually deleted.
         """
         deleted = []
-        with SharedHosts(self.project) as shared_hosts:
-            for job_info in jobs_info:
-                if isinstance(job_info, JobInfo):
-                    run_dir = job_info.run_dir
-                    worker = job_info.worker
-                else:
-                    run_dir = job_info["run_dir"]
-                    worker = job_info["worker"]
-                if run_dir:
-                    host = shared_hosts.get_host(worker)
-                    if safe_remove_job_files(
-                        host=host, run_dir=run_dir, raise_on_error=False
-                    ):
-                        deleted.append(job_info)
+        cloud_storages = {}
+        try:
+            with SharedHosts(self.project) as shared_hosts:
+                for job_info in jobs_info:
+                    if isinstance(job_info, JobInfo):
+                        run_dir = job_info.run_dir
+                        worker = job_info.worker
+                    else:
+                        run_dir = job_info["run_dir"]
+                        worker = job_info["worker"]
+                    if run_dir:
+                        worker_cfg = shared_hosts._project.workers.get(worker)
+                        if isinstance(worker_cfg, CloudWorker):
+                            if worker not in cloud_storages:
+                                storage = worker_cfg.get_storage()
+                                storage.connect()
+                                cloud_storages[worker] = storage
+                            target = cloud_storages[worker]
+                        else:
+                            target = shared_hosts.get_host(worker)
+                        if safe_remove_job_files(
+                            host=target, run_dir=run_dir, raise_on_error=False
+                        ):
+                            deleted.append(job_info)
+        finally:
+            for storage in cloud_storages.values():
+                with contextlib.suppress(Exception):
+                    storage.close()
         return deleted
 
     def unlock_flows(
@@ -3749,7 +3776,7 @@ class JobController:
         worker: str,
         allow_external_references: bool = False,
         exec_config: ExecutionConfig | None = None,
-        resources: dict | QResources | None = None,
+        resources: ResourcesType = None,
         priority: int = 0,
         jobstore: str | None = None,
     ) -> list[str]:
@@ -4958,8 +4985,24 @@ class JobController:
         queue_process_id = job_doc["remote"]["process_id"]
         if not queue_process_id:
             raise ValueError("The process id is not defined in the job document")
+        worker = self.project.workers[job_doc["worker"]]
+        if isinstance(worker, CloudWorker):
+            from jobflow_remote.remote.cloud_queue import CloudQueueManager
+
+            cloud_qm = CloudQueueManager(
+                scheduler_io=worker.get_scheduler_io(),
+                storage=worker.get_storage(),
+                container_work_dir=worker.container_work_dir,
+            )
+            cancel_result = cloud_qm.cancel(queue_process_id)
+            if cancel_result.status != CancelStatus.SUCCESSFUL:
+                raise RuntimeError(
+                    f"Cancelling queue process {queue_process_id} failed. "
+                    f"stdout: {cancel_result.stdout}. stderr: {cancel_result.stderr}"
+                )
+            return
+
         with SharedHosts(self.project) as shared_hosts:
-            worker = self.project.workers[job_doc["worker"]]
             host = shared_hosts.get_host(job_doc["worker"])
 
             queue_manager = QueueManager(worker.get_scheduler_io(), host)

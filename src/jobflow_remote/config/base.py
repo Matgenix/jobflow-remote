@@ -21,7 +21,15 @@ from pydantic import (
 )
 from qtoolkit.io import BaseSchedulerIO, scheduler_mapping
 
+try:
+    from qtoolkit.io.api import api_scheduler_mapping
+    from qtoolkit.io.api.base import BaseAPISchedulerIO
+except ImportError:  # pragma: no cover - older qtoolkit releases
+    BaseAPISchedulerIO = None
+    api_scheduler_mapping = {}
+
 from jobflow_remote.remote.host import BaseHost, LocalHost, RemoteHost
+from jobflow_remote.remote.storage import BaseCloudStorage, S3Storage
 from jobflow_remote.utils.data import store_from_dict
 
 DEFAULT_JOBSTORE = {"docs_store": {"type": "MemoryStore"}}
@@ -260,7 +268,7 @@ class WorkerBase(BaseModel):
             )
         return v
 
-    def get_scheduler_io(self) -> BaseSchedulerIO:
+    def get_scheduler_io(self) -> BaseSchedulerIO | BaseAPISchedulerIO:
         """
         Get the BaseSchedulerIO from QToolKit depending on scheduler_type.
 
@@ -293,6 +301,10 @@ class WorkerBase(BaseModel):
     @property
     def is_local(self) -> bool:
         return self.type == "local"
+
+    @property
+    def is_cloud(self) -> bool:
+        return self.type == "cloud"
 
     @property
     def is_batch(self) -> bool:
@@ -605,8 +617,144 @@ class SeparatedTransferWorker(BaseRemoteWorker):
         )
 
 
+class CloudWorker(WorkerBase):
+    """Worker running jobs through a cloud batch API backed by cloud object storage."""
+
+    type: Literal["cloud"] = Field(
+        "cloud", description="The discriminator field to determine the worker type"
+    )
+    scheduler_type: str | dict = Field(
+        "aws_batch",
+        validate_default=True,
+        description="Cloud API scheduler name (from qtoolkit.io.api.api_scheduler_mapping) "
+        "or serialized BaseAPISchedulerIO dict.",
+    )
+    work_dir: Path = Field(
+        Path("/jf_work"),
+        description="Logical root prefix inside the cloud storage bucket for job folders.",
+    )
+    storage_type: Literal["s3"] = Field(
+        "s3", description="Cloud object storage backend type."
+    )
+    bucket: str = Field(description="Cloud object storage bucket name.")
+    storage_prefix: str = Field(
+        "", description="Optional key prefix inside the storage bucket."
+    )
+    region_name: str | None = Field(None, description="Cloud region name.")
+    profile_name: str | None = Field(
+        None, description="Local cloud credentials profile name."
+    )
+    endpoint_url: str | None = Field(
+        None, description="Optional custom API endpoint URL for scheduler and storage."
+    )
+    storage_endpoint_url: str | None = Field(
+        None,
+        description="Optional custom endpoint URL specifically for object storage.",
+    )
+    job_queue: str | None = Field(
+        None, description="Default cloud batch job queue name or ARN."
+    )
+    job_definition: str | None = Field(
+        None, description="Default cloud batch job definition name or ARN."
+    )
+    container_work_dir: str = Field(
+        "/tmp/jf_run",  # noqa: S108
+        description="Local scratch directory inside the container where run_dir is synced.",
+    )
+
+    @field_validator("bucket")
+    @classmethod
+    def check_bucket(cls, bucket: str) -> str:
+        bucket = bucket.strip()
+        if not bucket:
+            raise ValueError("CloudWorker bucket must be a non-empty string.")
+        return bucket
+
+    @field_validator("scheduler_type")
+    @classmethod
+    def check_scheduler_type(cls, scheduler_type: str | dict) -> str | dict:
+        if BaseAPISchedulerIO is None:
+            raise ImportError(
+                "CloudWorker requires a qtoolkit release with qtoolkit.io.api support."
+            )
+        if (
+            isinstance(scheduler_type, str)
+            and scheduler_type not in api_scheduler_mapping
+        ):
+            raise ValueError(f"Unknown cloud API scheduler type {scheduler_type}")
+        if isinstance(scheduler_type, dict):
+            try:
+                sched = MontyDecoder().process_decoded(scheduler_type)
+            except Exception as exc:
+                raise ValueError(f"Invalid serialized MSONable object: {exc}") from exc
+            if not isinstance(sched, BaseAPISchedulerIO):
+                raise ValueError(  # noqa: TRY004
+                    "The scheduler_type for CloudWorker must be a cloud scheduler name "
+                    "or an as_dict of a BaseAPISchedulerIO subclass."
+                )
+        return scheduler_type
+
+    @model_validator(mode="after")
+    def check_no_batch_mode(self) -> CloudWorker:
+        if self.batch is not None:
+            raise ValueError(
+                "jobflow-remote batch mode is not supported on CloudWorker."
+            )
+        return self
+
+    def get_scheduler_io(self) -> BaseAPISchedulerIO:
+        """Return the QToolKit BaseAPISchedulerIO instance for this cloud worker."""
+        if BaseAPISchedulerIO is None:
+            raise ImportError(
+                "CloudWorker requires a qtoolkit release with qtoolkit.io.api support."
+            )
+        if isinstance(self.scheduler_type, str):
+            if self.scheduler_type not in api_scheduler_mapping:
+                raise ConfigError(
+                    f"Unknown cloud API scheduler type {self.scheduler_type}"
+                )
+            sched_cls = api_scheduler_mapping[self.scheduler_type]
+            return sched_cls(
+                job_queue=self.job_queue,
+                job_definition=self.job_definition,
+                region_name=self.region_name,
+                profile_name=self.profile_name,
+                endpoint_url=self.endpoint_url,
+            )
+        return MontyDecoder().process_decoded(self.scheduler_type)
+
+    def get_storage(self) -> BaseCloudStorage:
+        """Return the cloud object storage backend for this worker."""
+        if self.storage_type == "s3":
+            return S3Storage(
+                bucket=self.bucket,
+                prefix=self.storage_prefix,
+                region_name=self.region_name,
+                profile_name=self.profile_name,
+                endpoint_url=self.storage_endpoint_url or self.endpoint_url,
+            )
+        raise ConfigError(f"Unsupported cloud storage type: {self.storage_type}")
+
+    def get_host(self) -> BaseHost:
+        raise NotImplementedError(
+            "CloudWorker uses cloud object storage (get_storage), not a BaseHost."
+        )
+
+    @property
+    def cli_info(self) -> dict:
+        return dict(
+            scheduler_type=self.scheduler_type,
+            storage_type=self.storage_type,
+            bucket=self.bucket,
+            region_name=self.region_name,
+            job_queue=self.job_queue,
+            work_dir=self.work_dir,
+        )
+
+
 WorkerConfig = Annotated[
-    LocalWorker | RemoteWorker | SeparatedTransferWorker, Field(discriminator="type")
+    LocalWorker | RemoteWorker | SeparatedTransferWorker | CloudWorker,
+    Field(discriminator="type"),
 ]
 
 

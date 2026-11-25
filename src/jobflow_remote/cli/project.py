@@ -31,6 +31,7 @@ from jobflow_remote.cli.utils import (
     print_success_msg,
 )
 from jobflow_remote.config import ConfigError, ConfigManager, Project
+from jobflow_remote.config.base import BaseRemoteWorker
 from jobflow_remote.config.helper import (
     check_jobstore,
     check_projects_conflicts,
@@ -270,7 +271,10 @@ def check(
         for worker_name in workers_to_test:
             progress.update(task_id, description=f"Checking worker {worker_name}")
             worker_to_test = project.workers[worker_name]
-            if worker_to_test.get_host().interactive_login:
+            if (
+                isinstance(worker_to_test, BaseRemoteWorker)
+                and worker_to_test.interactive_login
+            ):
                 with hide_progress(progress):
                     err, worker_warn = check_worker(worker_to_test, full_check=full)
             else:

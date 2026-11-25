@@ -5,11 +5,13 @@ import glob
 import logging
 import os
 import subprocess
+import tempfile
 import threading
 import time
 import traceback
 from datetime import timezone
 from multiprocessing import Manager, Process
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from jobflow import JobStore, initialize_logger
@@ -27,11 +29,10 @@ from jobflow_remote.jobs.data import (
     JobDoc,
 )
 from jobflow_remote.remote.data import get_job_path, get_store_file_paths
+from jobflow_remote.remote.storage.s3 import S3Storage, _normalize_posix_rel
 from jobflow_remote.utils.log import initialize_remote_run_log
 
 if TYPE_CHECKING:
-    from pathlib import Path
-
     from jobflow.core.job import Job
 
 logger = logging.getLogger(__name__)
@@ -51,12 +52,28 @@ class JfrState:
 CURRENT_JOBDOC: JfrState = JfrState()
 
 
+def _resolve_store_paths(store: JobStore, base_dir: Path) -> None:
+    """Resolve relative file-store paths to absolute paths under ``base_dir``."""
+    sub_stores = [store.docs_store, *store.additional_stores.values()]
+    for sub in sub_stores:
+        paths = getattr(sub, "paths", None)
+        if isinstance(paths, list):
+            sub.paths = [
+                str((base_dir / p).resolve()) if not Path(p).is_absolute() else p
+                for p in paths
+            ]
+        path = getattr(sub, "path", None)
+        if isinstance(path, str | Path) and not Path(path).is_absolute():
+            sub.path = str((base_dir / path).resolve())
+
+
 def run_remote_job(run_dir: str | Path = ".") -> None:
     """Run the job."""
     initialize_remote_run_log()
 
     start_time = datetime.datetime.now(timezone.utc)
-    with cd(run_dir):
+    run_dir_abs = Path(run_dir).resolve()
+    with cd(run_dir_abs):
         error = None
         try:
             dumpfn({"start_time": start_time}, OUT_FILENAME)
@@ -64,6 +81,7 @@ def run_remote_job(run_dir: str | Path = ".") -> None:
 
             job: Job = in_data["job"]
             store = in_data["store"]
+            _resolve_store_paths(store, run_dir_abs)
             job_doc_dict = in_data.get("job_doc", None)
             if isinstance(job.function, dict):
                 raise RuntimeError(  # noqa: TRY004,TRY301
@@ -80,6 +98,8 @@ def run_remote_job(run_dir: str | Path = ".") -> None:
             try:
                 response = job.run(store=store)
             finally:
+                # Restore cwd in case the job called os.chdir() without restoring it.
+                os.chdir(run_dir_abs)
                 # some jobs may have compressed the jfremote and store files while being
                 # executed, try to decompress them if that is the case and files need to be
                 # decompressed.
@@ -124,6 +144,69 @@ def run_remote_job(run_dir: str | Path = ".") -> None:
             dumpfn(output, OUT_FILENAME)
         finally:
             JfrState().reset()
+
+
+def run_cloud_job(
+    storage_uri: str,
+    local_dir: str | Path = "/tmp/jf_run",  # noqa: S108
+    region_name: str | None = None,
+    endpoint_url: str | None = None,
+) -> None:
+    """Download a job's run directory from cloud storage, run it, and upload all outputs.
+
+    Designed to execute inside a cloud batch container with no direct MongoDB
+    access. Runs inside a fresh temporary subdirectory under ``local_dir``,
+    removes stale output files from any interrupted prior attempt, and uploads
+    mandatory jobflow-remote outputs before syncing remaining files in ``finally``.
+    """
+    if not storage_uri.startswith("s3://"):
+        raise ValueError(
+            f"Unsupported cloud storage URI '{storage_uri}'. Expected 's3://<bucket>/<prefix>'."
+        )
+    remainder = storage_uri[5:]
+    parts = remainder.split("/", 1)
+    bucket = parts[0].strip()
+    raw_prefix = parts[1] if len(parts) > 1 else ""
+    remote_prefix = _normalize_posix_rel(raw_prefix)
+    if not bucket or not remote_prefix:
+        raise ValueError(
+            f"Cloud storage URI must include both bucket and non-root key prefix: '{storage_uri}'."
+        )
+
+    storage = S3Storage(
+        bucket=bucket,
+        region_name=region_name,
+        endpoint_url=endpoint_url,
+    )
+    os.makedirs(local_dir, exist_ok=True)
+    with tempfile.TemporaryDirectory(dir=local_dir, prefix="run_") as scratch_dir:
+        scratch_path = Path(scratch_dir)
+        storage.download_dir(remote_prefix, scratch_path)
+
+        # Clean stale JFR output/store files if an earlier cloud attempt failed mid-run.
+        for pattern in (
+            f"{OUT_FILENAME}*",
+            "remote_job_data.*",
+            "additional_store_*",
+        ):
+            for stale in scratch_path.glob(pattern):
+                if stale.is_file():
+                    stale.unlink(missing_ok=True)
+
+        try:
+            run_remote_job(scratch_path)
+        finally:
+            # Upload critical jobflow-remote files first so results/tracebacks are
+            # preserved even if an auxiliary file upload fails later.
+            for pattern in (
+                f"{OUT_FILENAME}*",
+                "remote_job_data.*",
+                "additional_store_*",
+            ):
+                for critical in scratch_path.glob(pattern):
+                    if critical.is_file():
+                        storage.put(critical, f"{remote_prefix}/{critical.name}")
+            storage.upload_dir(scratch_path, remote_prefix)
 
 
 def ping(start_time, interval=600, filename=BATCH_INFO_FILENAME):

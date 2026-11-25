@@ -10,6 +10,7 @@ if TYPE_CHECKING:
 
     from jobflow_remote.config.base import Project
     from jobflow_remote.remote.host.base import BaseHost
+    from jobflow_remote.remote.storage.base import BaseCloudStorage
 
 logger = logging.getLogger(__name__)
 
@@ -134,7 +135,9 @@ class UnsafeDeletionError(Exception):
 
 
 def safe_remove_job_files(
-    host: BaseHost, run_dir: str | Path | None, raise_on_error: bool = False
+    host: BaseHost | BaseCloudStorage,
+    run_dir: str | Path | None,
+    raise_on_error: bool = False,
 ) -> bool:
     if not run_dir:
         return False

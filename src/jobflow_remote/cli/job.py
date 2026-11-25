@@ -69,6 +69,7 @@ from jobflow_remote.cli.utils import (
     out_console,
     str_to_dict,
 )
+from jobflow_remote.config.base import CloudWorker
 from jobflow_remote.jobs.report import JobsReport
 from jobflow_remote.jobs.state import ERROR_STATES, RUNNING_STATES, JobState
 from jobflow_remote.remote.queue import ERR_FNAME, OUT_FNAME
@@ -780,6 +781,13 @@ def queue_out(
     if not remote_dir:
         exit_with_warning_msg("The remote folder has not been created yet")
 
+    worker = cm.get_worker(job_info.worker)
+    if worker.is_cloud:
+        exit_with_error_msg(
+            "Cloud workers stream stdout/stderr to cloud logs (for example, CloudWatch Logs) "
+            "instead of queue.out/queue.err files."
+        )
+
     out_path = Path(remote_dir, OUT_FNAME)
     err_path = Path(remote_dir, ERR_FNAME)
     out = None
@@ -788,7 +796,6 @@ def queue_out(
     err_error = None
     with loading_spinner(processing=False) as progress:
         progress.add_task(description="Retrieving files...", total=None)
-        worker = cm.get_worker(job_info.worker)
         host = worker.get_host()
 
         try:
@@ -903,6 +910,10 @@ def todir(
     if not job_data.run_dir:
         exit_with_error_msg("The selected Job does not have a run_dir defined yet")
     worker = cm.get_worker(job_data.worker)
+    if worker.is_cloud:
+        exit_with_error_msg(
+            f"Worker {job_data.worker} is a cloud worker and does not support interactive shell access."
+        )
     host = worker.get_host()
     out_console.print(
         f"Connecting to worker {job_data.worker} and moving to {job_data.run_dir}"
@@ -1284,19 +1295,23 @@ def files_list(
     with loading_spinner(processing=False) as progress:
         progress.add_task(description="Retrieving information...", total=None)
         worker = cm.get_worker(job_info.worker)
-        host = worker.get_host()
+        backend = (
+            worker.get_storage()
+            if isinstance(worker, CloudWorker)
+            else worker.get_host()
+        )
 
         try:
-            host.connect()
+            backend.connect()
             try:
-                remote_files = host.listdir(remote_dir)
+                remote_files = backend.listdir(remote_dir)
             except Exception as e:
                 raise RuntimeError(
                     f"Error while fetching the list of files from {remote_dir!s}: {getattr(e, 'message', str(e))}"
                 ) from e
         finally:
             try:
-                host.close()
+                backend.close()
             except Exception:
                 pass
 
@@ -1359,10 +1374,14 @@ def files_get(
     with loading_spinner(processing=False) as progress:
         task_id = progress.add_task(description="Retrieving files...", total=None)
         worker = cm.get_worker(job_info.worker)
-        host = worker.get_host()
+        backend = (
+            worker.get_storage()
+            if isinstance(worker, CloudWorker)
+            else worker.get_host()
+        )
 
         try:
-            host.connect()
+            backend.connect()
         except Exception as exc:
             raise RuntimeError(
                 f"Error while connecting to worker {job_info.worker}: {getattr(exc, 'message', str(exc))}"
@@ -1372,14 +1391,16 @@ def files_get(
         try:
             for file_name in filenames:
                 progress.update(task_id, description=f"Retrieving {file_name}")
-                host.get(str(Path(remote_dir) / file_name), str(save_path / file_name))
+                backend.get(
+                    str(Path(remote_dir) / file_name), str(save_path / file_name)
+                )
         except Exception as exc:
             raise RuntimeError(
                 f"Error while fetching file {file_name} from {remote_dir!s}: {getattr(exc, 'message', str(exc))}"
             ) from exc
         finally:
             try:
-                host.close()
+                backend.close()
             except Exception:
                 pass
 

@@ -10,7 +10,8 @@ from jobflow_remote.remote.data import check_additional_stores
 
 if TYPE_CHECKING:
     import jobflow
-    from qtoolkit.core.data_objects import QResources
+
+    from jobflow_remote.jobs.data import ResourcesType
 
 
 def submit_flow(
@@ -18,7 +19,7 @@ def submit_flow(
     worker: str | None = None,
     project: str | None = None,
     exec_config: str | ExecutionConfig | None = None,
-    resources: dict | QResources | None = None,
+    resources: ResourcesType = None,
     priority: int = 0,
     allow_external_references: bool = False,
     jobstore: str | None = None,

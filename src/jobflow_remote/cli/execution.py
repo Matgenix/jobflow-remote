@@ -4,7 +4,7 @@ import typer
 
 from jobflow_remote.cli.jf import app
 from jobflow_remote.cli.jfr_typer import JFRTyper
-from jobflow_remote.jobs.run import run_batch_jobs, run_remote_job
+from jobflow_remote.jobs.run import run_batch_jobs, run_cloud_job, run_remote_job
 
 app_execution = JFRTyper(
     name="execution",
@@ -26,6 +26,45 @@ def run(
 ) -> None:
     """Run the Job in the selected folder based on the job files."""
     run_remote_job(run_dir)
+
+
+@app_execution.command(name="run-cloud")
+def run_cloud(
+    storage_uri: Annotated[
+        str,
+        typer.Argument(
+            help="Cloud storage URI of the job run directory (e.g. s3://bucket/prefix)",
+        ),
+    ],
+    work_dir: Annotated[
+        str,
+        typer.Option(
+            "--work-dir",
+            help="Local scratch directory inside the container",
+        ),
+    ] = "/tmp/jf_run",  # noqa: S108
+    region_name: Annotated[
+        str | None,
+        typer.Option(
+            "--region",
+            help="Cloud region name",
+        ),
+    ] = None,
+    endpoint_url: Annotated[
+        str | None,
+        typer.Option(
+            "--endpoint-url",
+            help="Optional custom storage endpoint URL",
+        ),
+    ] = None,
+) -> None:
+    """Sync a job folder from cloud storage, run it, and upload outputs back."""
+    run_cloud_job(
+        storage_uri=storage_uri,
+        local_dir=work_dir,
+        region_name=region_name,
+        endpoint_url=endpoint_url,
+    )
 
 
 @app_execution.command()

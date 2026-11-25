@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from jobflow_remote.config.base import (
+    CloudWorker,
     ExecutionConfig,
     LocalWorker,
     Project,
@@ -181,6 +182,37 @@ def check_worker(
     worker: WorkerBase, full_check: bool = False
 ) -> tuple[str | None, str | None]:
     """Check that a connection to the configured worker can be made."""
+    if isinstance(worker, CloudWorker):
+        from monty.json import MontyDecoder
+
+        from jobflow_remote.remote.cloud_queue import CloudQueueManager
+
+        storage = None
+        try:
+            storage = worker.get_storage()
+            storage_error = storage.test()
+            if storage_error:
+                return storage_error, None
+            scheduler_io = worker.get_scheduler_io()
+            cloud_qm = CloudQueueManager(
+                scheduler_io=scheduler_io,
+                storage=storage,
+                container_work_dir=worker.container_work_dir,
+            )
+            if worker.resources:
+                res = MontyDecoder().process_decoded(worker.resources)
+                cloud_qm.prepare_options(res, job_name=None)
+            queue = worker.job_queue or getattr(scheduler_io, "job_queue", None)
+            if queue:
+                cloud_qm.get_jobs_list()
+        except Exception:
+            exc = traceback.format_exc()
+            return f"Error while testing cloud worker:\n {exc}", None
+        finally:
+            if storage is not None:
+                storage.close()
+        return None, None
+
     host = worker.get_host()
     worker_warn = None
     try:

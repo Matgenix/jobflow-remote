@@ -8,9 +8,9 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
     from jobflow import Flow, Job, JobStore
-    from qtoolkit.core.data_objects import QResources
 
     from jobflow_remote.config.base import ExecutionConfig
+    from jobflow_remote.jobs.data import ResourcesType
 
 
 def set_run_config(
@@ -18,7 +18,7 @@ def set_run_config(
     name_filter: str = None,
     function_filter: Callable = None,
     exec_config: str | ExecutionConfig | None = None,
-    resources: dict | QResources | None = None,
+    resources: ResourcesType = None,
     priority: int | None = None,
     worker: str | None = None,
     dynamic: bool = True,
