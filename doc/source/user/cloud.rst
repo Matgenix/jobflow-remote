@@ -1069,15 +1069,34 @@ or running.
 
     jf -p aws_ht flow delete -fid <flow_id>
 
-The containers write stdout and stderr to CloudWatch Logs, not to
-``queue.out`` and ``queue.err``. For this reason ``jf job queue-out`` does not
-work for cloud workers. ``jf job todir`` does not work either, because there
-is no shell access to the container. In CloudShell, read the logs of the last
-30 minutes:
+Download the whole folder of a job from S3 into the folder ``job_<db_id>``
+on your computer:
 
 .. code-block:: bash
 
-    aws logs tail /aws/batch/jfr-lab --since 30m
+    python - <<'EOF'
+    from jobflow_remote import JobController
+
+    db_id = "<db_id>"
+    jc = JobController.from_project_name("aws_ht")
+    info = jc.get_job_info(db_id=db_id)
+    storage = jc.project.workers[info.worker].get_storage()
+    storage.download_dir(info.run_dir, f"job_{db_id}")
+    EOF
+
+The containers write stdout and stderr to CloudWatch Logs, not to
+``queue.out`` and ``queue.err``. For this reason ``jf job queue-out`` does not
+work for cloud workers. ``jf job todir`` does not work either, because there
+is no shell access to the container. Find the AWS Batch job id of a job in
+``remote.process_id`` of ``jf -p aws_ht job info <db_id>``. Then, in
+CloudShell, show its state and the logs of all its attempts. AWS Batch keeps
+this information for 7 days after the job ends.
+
+.. code-block:: bash
+
+    BATCH_JOB=<process_id>
+    aws batch describe-jobs --jobs "$BATCH_JOB" --query 'jobs[0].[status,statusReason]' --output text
+    for S in $(aws batch describe-jobs --jobs "$BATCH_JOB" --query 'jobs[0].[attempts[].container.logStreamName, container.logStreamName][]' --output text | tr '\t' '\n' | grep -v None | sort -u); do aws logs tail /aws/batch/jfr-lab --log-stream-names "$S" --since 7d; done
 
 .. _cloud_cleanup:
 
