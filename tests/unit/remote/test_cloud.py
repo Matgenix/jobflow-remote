@@ -158,11 +158,16 @@ def aws_cloud_env(monkeypatch):
         )
 
         worker = CloudWorker(
-            bucket=bucket,
-            storage_prefix="runs",
-            region_name="us-east-1",
-            job_queue=queue_name,
-            job_definition=jd_name,
+            scheduler_kwargs={
+                "job_queue": queue_name,
+                "job_definition": jd_name,
+                "region_name": "us-east-1",
+            },
+            storage_kwargs={
+                "bucket": bucket,
+                "prefix": "runs",
+                "region_name": "us-east-1",
+            },
         )
         yield worker, batch, s3, bucket
 
@@ -313,25 +318,38 @@ class TestCloudWorkerAndQueueManager:
         from qtoolkit.io.slurm import SlurmIO
 
         worker = CloudWorker(
-            bucket="my-bucket",
-            region_name="us-east-2",
-            job_queue="q1",
-            job_definition="jd1",
-            endpoint_url="http://batch.local",
-            storage_endpoint_url="http://minio.local",
+            scheduler_kwargs={
+                "job_queue": "q1",
+                "job_definition": "jd1",
+                "region_name": "us-east-2",
+                "endpoint_url": "http://batch.local",
+            },
+            storage_kwargs={
+                "bucket": "my-bucket",
+                "prefix": "runs",
+                "region_name": "us-east-2",
+                "endpoint_url": "http://minio.local",
+            },
         )
         assert worker.is_cloud is True
         assert worker.is_local is False
         assert worker.is_batch is False
-        assert worker.cli_info["bucket"] == "my-bucket"
+        assert worker.cli_info["storage_uri"] == "s3://my-bucket/runs/jf_work"
+        assert worker.get_scheduler_io().endpoint_url == "http://batch.local"
         assert worker.get_storage().endpoint_url == "http://minio.local"
+        assert worker.get_storage().get_run_cloud_options() == [
+            "--region",
+            "us-east-2",
+            "--endpoint-url",
+            "http://minio.local",
+        ]
         assert isinstance(worker.get_transfer_backend(), S3Storage)
         with pytest.raises(NotImplementedError):
             worker.get_host()
 
         # Serialized BaseAPISchedulerIO dict accepted; BaseSchedulerIO dict rejected
         dict_worker = CloudWorker(
-            bucket="my-bucket",
+            storage_kwargs={"bucket": "my-bucket"},
             scheduler_type=AWSBatchIO(job_queue="q2", job_definition="jd2").as_dict(),
         )
         assert isinstance(dict_worker.get_scheduler_io(), AWSBatchIO)
@@ -341,25 +359,34 @@ class TestCloudWorkerAndQueueManager:
             {
                 "name": "p",
                 "queue": {},
-                "workers": {"cw": {"type": "cloud", "bucket": "my-bucket"}},
+                "workers": {
+                    "cw": {"type": "cloud", "storage_kwargs": {"bucket": "my-bucket"}}
+                },
             }
         )
         assert isinstance(proj.workers["cw"], CloudWorker)
 
         with pytest.raises(ValueError, match="BaseAPISchedulerIO"):
-            CloudWorker(bucket="my-bucket", scheduler_type=SlurmIO().as_dict())
+            CloudWorker(
+                storage_kwargs={"bucket": "my-bucket"},
+                scheduler_type=SlurmIO().as_dict(),
+            )
         with pytest.raises(ValueError, match="non-empty"):
-            CloudWorker(bucket="   ")
+            CloudWorker(storage_kwargs={"bucket": "   "})
+        with pytest.raises(
+            ValueError, match="Invalid scheduler_kwargs or storage_kwargs"
+        ):
+            CloudWorker(storage_kwargs={"bucket": "my-bucket", "job_queue": "q1"})
         with pytest.raises(ValueError, match="batch mode is not supported"):
             CloudWorker(
-                bucket="my-bucket",
+                storage_kwargs={"bucket": "my-bucket"},
                 batch=BatchConfig(
                     jobs_handle_dir=Path("/scratch/h"),
                     work_dir=Path("/scratch/w"),
                 ),
             )
         with pytest.raises(ValueError, match="Unknown cloud API scheduler"):
-            CloudWorker(bucket="my-bucket", scheduler_type="slurm")
+            CloudWorker(storage_kwargs={"bucket": "my-bucket"}, scheduler_type="slurm")
 
     def test_cloud_queue_manager_with_moto(self, aws_cloud_env):
         from qtoolkit.core.data_objects import QCloudResources
@@ -764,11 +791,17 @@ class TestRunnerAndControllerCloudIntegration:
         assert err is None
         assert warn is None
 
-        # Invalid storage_prefix caught
-        err_prefix, _ = check_worker(
-            worker.model_copy(update={"storage_prefix": "a/../b"})
+        # A worker without a default job queue (queue set per job) also passes
+        no_queue_kwargs = dict(worker.scheduler_kwargs)
+        no_queue_kwargs.pop("job_queue")
+        err_no_queue, _ = check_worker(
+            worker.model_copy(update={"scheduler_kwargs": no_queue_kwargs})
         )
-        assert err_prefix is not None
+        assert err_no_queue is None
+
+        # Invalid storage prefix caught
+        with pytest.raises(ValueError, match=r"\.\."):
+            CloudWorker(storage_kwargs={"bucket": "my-bucket", "prefix": "a/../b"})
 
         # Non-cloud QResources caught
         err_res, _ = check_worker(

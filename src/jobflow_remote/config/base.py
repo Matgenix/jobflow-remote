@@ -29,7 +29,7 @@ except ImportError:  # pragma: no cover - older qtoolkit releases
     api_scheduler_mapping = {}
 
 from jobflow_remote.remote.host import BaseHost, LocalHost, RemoteHost
-from jobflow_remote.remote.storage import BaseCloudStorage, S3Storage
+from jobflow_remote.remote.storage import BaseCloudStorage, cloud_storage_mapping
 from jobflow_remote.utils.data import store_from_dict
 
 DEFAULT_JOBSTORE = {"docs_store": {"type": "MemoryStore"}}
@@ -637,19 +637,18 @@ class SeparatedTransferWorker(BaseRemoteWorker):
 class CloudWorker(WorkerBase):
     """Worker running jobs through a cloud batch API backed by cloud object storage.
 
-    The only supported backends are AWS Batch (``scheduler_type: aws_batch``)
-    and S3 (``storage_type: s3``). ``job_queue`` and ``job_definition`` are AWS
-    Batch settings. ``region_name``, ``profile_name``, and ``endpoint_url`` are
-    used by both the scheduler and the storage. ``storage_endpoint_url``
-    replaces ``endpoint_url`` for the storage when it is set.
+    ``scheduler_kwargs`` are passed to the qtoolkit scheduler class selected by
+    ``scheduler_type``, and ``storage_kwargs`` are passed to the storage class
+    selected by ``storage_type``. For AWS Batch and S3, see the arguments of
+    :class:`~qtoolkit.io.api.aws_batch.AWSBatchIO` and
+    :class:`~jobflow_remote.remote.storage.s3.S3Storage`. When
+    ``scheduler_type`` is a serialized scheduler dict, ``scheduler_kwargs`` is
+    not used.
 
     ``execution_cmd`` defaults to ``jf -fe execution run-cloud`` and formats
     ``{}`` with the cloud storage URI instead of a local filesystem path.
     Host-only fields inherited from ``WorkerBase`` (``timeout_execute``,
-    ``scheduler_username``, and ``sanitize_command``) are ignored. When
-    ``scheduler_type`` is a serialized dict, worker connection fields
-    (``job_queue``, ``job_definition``, ``region_name``, ``profile_name``,
-    ``endpoint_url``) are not injected into it.
+    ``scheduler_username``, and ``sanitize_command``) are ignored.
     """
 
     type: Literal["cloud"] = Field(
@@ -661,46 +660,26 @@ class CloudWorker(WorkerBase):
         description="Cloud API scheduler name (from qtoolkit.io.api.api_scheduler_mapping) "
         "or serialized BaseAPISchedulerIO dict.",
     )
+    scheduler_kwargs: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Keyword arguments for the cloud API scheduler class "
+        "(for AWS Batch: job_queue, job_definition, region_name, profile_name).",
+    )
     work_dir: Path = Field(
         Path("/jf_work"),
-        description="Absolute POSIX path prefix (e.g. '/jf_work') appended under storage_prefix for job folders.",
+        description="Absolute POSIX path (e.g. '/jf_work') of the job folders inside the storage.",
     )
     storage_type: Literal["s3"] = Field(
         "s3", description="Cloud object storage backend type."
     )
-    bucket: str = Field(description="Cloud object storage bucket name.")
-    storage_prefix: str = Field(
-        "", description="Optional key prefix inside the storage bucket."
-    )
-    region_name: str | None = Field(None, description="Cloud region name.")
-    profile_name: str | None = Field(
-        None, description="Local cloud credentials profile name."
-    )
-    endpoint_url: str | None = Field(
-        None, description="Optional custom API endpoint URL for scheduler and storage."
-    )
-    storage_endpoint_url: str | None = Field(
-        None,
-        description="Optional custom endpoint URL specifically for object storage.",
-    )
-    job_queue: str | None = Field(
-        None, description="Default cloud batch job queue name or ARN."
-    )
-    job_definition: str | None = Field(
-        None, description="Default cloud batch job definition name or ARN."
+    storage_kwargs: dict[str, Any] = Field(
+        description="Keyword arguments for the cloud storage class "
+        "(for S3: bucket, prefix, region_name, profile_name, endpoint_url).",
     )
     container_work_dir: str = Field(
         "/tmp/jf_run",  # noqa: S108
         description="Local scratch directory inside the container where run_dir is synced.",
     )
-
-    @field_validator("bucket")
-    @classmethod
-    def check_bucket(cls, bucket: str) -> str:
-        bucket = bucket.strip()
-        if not bucket:
-            raise ValueError("CloudWorker bucket must be a non-empty string.")
-        return bucket
 
     @field_validator("scheduler_type")
     @classmethod
@@ -724,6 +703,19 @@ class CloudWorker(WorkerBase):
             )
         return self
 
+    @model_validator(mode="after")
+    def check_kwargs(self) -> CloudWorker:
+        # Building the scheduler and storage objects checks their keyword
+        # arguments. It does not connect to the cloud.
+        try:
+            self.get_scheduler_io()
+            self.get_storage()
+        except TypeError as exc:
+            raise ValueError(
+                f"Invalid scheduler_kwargs or storage_kwargs: {exc}"
+            ) from exc
+        return self
+
     def get_scheduler_io(self) -> BaseAPISchedulerIO:
         """Return the QToolKit BaseAPISchedulerIO instance for this cloud worker."""
         if BaseAPISchedulerIO is None:
@@ -736,24 +728,13 @@ class CloudWorker(WorkerBase):
                     f"Unknown cloud API scheduler type {self.scheduler_type}"
                 )
             sched_cls = api_scheduler_mapping[self.scheduler_type]
-            return sched_cls(
-                job_queue=self.job_queue,
-                job_definition=self.job_definition,
-                region_name=self.region_name,
-                profile_name=self.profile_name,
-                endpoint_url=self.endpoint_url,
-            )
+            return sched_cls(**self.scheduler_kwargs)
         return MontyDecoder().process_decoded(self.scheduler_type)
 
     def get_storage(self) -> BaseCloudStorage:
         """Return the cloud object storage backend for this worker."""
-        return S3Storage(
-            bucket=self.bucket,
-            prefix=self.storage_prefix,
-            region_name=self.region_name,
-            profile_name=self.profile_name,
-            endpoint_url=self.storage_endpoint_url or self.endpoint_url,
-        )
+        storage_cls = cloud_storage_mapping[self.storage_type]
+        return storage_cls(**self.storage_kwargs)
 
     def get_transfer_backend(self) -> BaseCloudStorage:
         return self.get_storage()
@@ -768,10 +749,7 @@ class CloudWorker(WorkerBase):
         return dict(
             scheduler_type=self.scheduler_type,
             storage_type=self.storage_type,
-            bucket=self.bucket,
-            region_name=self.region_name,
-            job_queue=self.job_queue,
-            work_dir=self.work_dir,
+            storage_uri=self.get_storage().get_uri(self.work_dir),
         )
 
 

@@ -130,6 +130,14 @@ class S3Storage(BaseCloudStorage):
             return f"s3://{self.bucket}/{key}"
         return f"s3://{self.bucket}"
 
+    def get_run_cloud_options(self) -> list[str]:
+        options = []
+        if self.region_name:
+            options += ["--region", self.region_name]
+        if self.endpoint_url:
+            options += ["--endpoint-url", self.endpoint_url]
+        return options
+
     def connect(self) -> None:
         self._get_client_and_errors()
 
