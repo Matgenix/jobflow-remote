@@ -493,14 +493,12 @@ need Docker.
        BUILD_ID=$(aws codebuild start-build --project-name "$CB_PROJ" \
          --environment-variables-override "name=IMAGE_TAG,value=${IMAGE_TAG},type=PLAINTEXT" \
          --query 'build.id' --output text)
-       while [ "$(aws codebuild batch-get-builds --ids "$BUILD_ID" \
-         --query 'builds[0].buildStatus' --output text)" = "IN_PROGRESS" ]; do
-         sleep 10
-       done
-       aws codebuild batch-get-builds --ids "$BUILD_ID" --query 'builds[0].buildStatus' --output text
+       STATUS=IN_PROGRESS
+       while [ "$STATUS" = IN_PROGRESS ]; do sleep 20; STATUS=$(aws codebuild batch-get-builds --ids "$BUILD_ID" --query 'builds[0].buildStatus' --output text); echo "$STATUS"; done
 
-   The last command prints ``SUCCEEDED`` when the image is in ECR. If it
-   prints ``FAILED``, type ``CodeBuild`` in the search box of the AWS Console
+   The loop prints the build status every 20 seconds. The build takes 15 to
+   20 minutes. The last line is ``SUCCEEDED`` when the image is in ECR. If it
+   is ``FAILED``, type ``CodeBuild`` in the search box of the AWS Console
    and open the build to read its log.
 
 Step 2. Point the job definitions at the image
