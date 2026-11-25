@@ -1,37 +1,63 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Description: >-
-  Self-contained AWS Batch (Fargate) + S3 + ECR + CodeBuild stack for
-  jobflow-remote CloudWorker.
+  One-time AWS Batch (Fargate CPU + optional EC2 GPU Spot/On-Demand), S3, ECR,
+  and CodeBuild stack for jobflow-remote CloudWorker.
 
 Parameters:
   ContainerImage:
     Type: String
     Default: public.ecr.aws/docker/library/python:3.12-slim
     Description: >-
-      Container image URI for AWS Batch Fargate jobs. Defaults to public
-      Python 3.12 slim for quickstart. Override with EcrImageUri after
-      building a custom image.
-  MaxvCpus:
+      Container image URI for the CPU Fargate job definition. Defaults to
+      public Python 3.12 slim for quickstart checks. Override with an ECR
+      image URI for production campaigns.
+  CpuMaxvCpus:
     Type: Number
     Default: 8
     MinValue: 1
-    Description: Maximum vCPUs for the managed Fargate compute environment.
-  DefaultVcpus:
+    Description: Maximum vCPUs for the managed Fargate CPU compute environment.
+  EnableGpuQueue:
     Type: String
-    Default: "1"
-    AllowedValues: ["0.25", "0.5", "1", "2", "4", "8", "16"]
-    Description: Default vCPU allocation for the Fargate job definition.
-  DefaultMemoryMiB:
-    Type: String
-    Default: "2048"
+    Default: "false"
+    AllowedValues: ["true", "false"]
     Description: >-
-      Default memory in MiB for the Fargate job definition. Must form a
-      valid Fargate CPU/memory pair with DefaultVcpus.
+      Set to true to also provision an EC2 GPU compute environment (scales to
+      0 instances when idle), GPU job queue, and GPU job definition. Requires
+      non-zero EC2 G/VT vCPU quota in this region.
+  GpuAllocationType:
+    Type: String
+    Default: SPOT
+    AllowedValues: [SPOT, EC2]
+    Description: >-
+      EC2 capacity model for the GPU compute environment (SPOT for lower cost
+      with retries, or EC2 for On-Demand).
+  GpuInstanceTypes:
+    Type: CommaDelimitedList
+    Default: g4dn,g5,g6
+    Description: >-
+      Allowed EC2 GPU instance families for the GPU compute environment.
+  GpuMaxvCpus:
+    Type: Number
+    Default: 16
+    MinValue: 4
+    Description: >-
+      Maximum vCPUs for the EC2 GPU compute environment (4 vCPUs equals one
+      g4dn.xlarge or g5.xlarge node).
+  GpuContainerImage:
+    Type: String
+    Default: public.ecr.aws/docker/library/python:3.12-slim
+    Description: >-
+      Container image URI for the EC2 GPU job definition. Override with your
+      CUDA-enabled ECR image URI before running GPU jobs.
   LogRetentionDays:
     Type: Number
     Default: 7
     AllowedValues: [1, 3, 5, 7, 14, 30, 60, 90]
     Description: CloudWatch Logs retention period in days.
+
+Conditions:
+  HasGpuQueue: !Equals [!Ref EnableGpuQueue, "true"]
+  IsGpuSpot: !And [!Condition HasGpuQueue, !Equals [!Ref GpuAllocationType, "SPOT"]]
 
 Resources:
   # Dedicated free public VPC (no NAT Gateway, $0/month) so the stack works
@@ -96,7 +122,7 @@ Resources:
   BatchSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: Egress-only security group for jobflow-remote Fargate tasks
+      GroupDescription: Egress-only security group for jobflow-remote Batch tasks
       VpcId: !Ref BatchVpc
       SecurityGroupEgress:
         - IpProtocol: "-1"
@@ -133,7 +159,7 @@ Resources:
       LogGroupName: !Sub "/aws/codebuild/${AWS::StackName}-build"
       RetentionInDays: !Ref LogRetentionDays
 
-  # IAM roles for Batch containers and scoped local Runner user.
+  # IAM roles for Batch containers, optional EC2 GPU nodes, and local Runner.
   BatchExecutionRole:
     Type: AWS::IAM::Role
     Properties:
@@ -173,6 +199,41 @@ Resources:
                   - s3:PutObject
                 Resource: !Sub "${StagingBucket.Arn}/*"
 
+  EcsInstanceRole:
+    Type: AWS::IAM::Role
+    Condition: HasGpuQueue
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/service-role/AmazonEC2ContainerServiceforEC2Role"
+
+  EcsInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Condition: HasGpuQueue
+    Properties:
+      Roles:
+        - !Ref EcsInstanceRole
+
+  SpotFleetRole:
+    Type: AWS::IAM::Role
+    Condition: IsGpuSpot
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: spotfleet.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/service-role/AmazonEC2SpotFleetTaggingRole"
+
   RunnerUser:
     Type: AWS::IAM::User
     Properties:
@@ -205,7 +266,7 @@ Resources:
                   StringEquals:
                     aws:RequestedRegion: !Ref AWS::Region
 
-  # AWS Batch Fargate compute environment, job queue, and job definition.
+  # CPU queue: managed serverless Fargate.
   ComputeEnvironment:
     Type: AWS::Batch::ComputeEnvironment
     DependsOn:
@@ -217,7 +278,7 @@ Resources:
       State: ENABLED
       ComputeResources:
         Type: FARGATE
-        MaxvCpus: !Ref MaxvCpus
+        MaxvCpus: !Ref CpuMaxvCpus
         Subnets:
           - !Ref PublicSubnet1
           - !Ref PublicSubnet2
@@ -249,22 +310,94 @@ Resources:
           AssignPublicIp: ENABLED
         ResourceRequirements:
           - Type: VCPU
-            Value: !Ref DefaultVcpus
+            Value: "1"
           - Type: MEMORY
-            Value: !Ref DefaultMemoryMiB
+            Value: "2048"
         LogConfiguration:
           LogDriver: awslogs
           Options:
             awslogs-group: !Ref BatchLogGroup
             awslogs-region: !Ref AWS::Region
-            awslogs-stream-prefix: jfr
+            awslogs-stream-prefix: jfr-cpu
         Command:
           - sh
           - -c
           - echo default
 
-  # Optional CodeBuild project with inline buildspec for building custom
-  # linux/amd64 container images without installing Docker locally.
+  # Optional GPU queue: managed EC2 (Spot or On-Demand), scales to 0 when idle.
+  GpuComputeEnvironment:
+    Type: AWS::Batch::ComputeEnvironment
+    Condition: HasGpuQueue
+    DependsOn:
+      - PublicRoute
+      - Subnet1RouteAssoc
+      - Subnet2RouteAssoc
+      - EcsInstanceProfile
+    Properties:
+      Type: MANAGED
+      State: ENABLED
+      ComputeResources:
+        Type: !Ref GpuAllocationType
+        AllocationStrategy: !If
+          - IsGpuSpot
+          - SPOT_PRICE_CAPACITY_OPTIMIZED
+          - BEST_FIT_PROGRESSIVE
+        SpotIamFleetRole: !If
+          - IsGpuSpot
+          - !GetAtt SpotFleetRole.Arn
+          - !Ref AWS::NoValue
+        Ec2Configuration:
+          - ImageType: ECS_AL2023_NVIDIA
+        MinvCpus: 0
+        MaxvCpus: !Ref GpuMaxvCpus
+        InstanceTypes: !Ref GpuInstanceTypes
+        InstanceRole: !GetAtt EcsInstanceProfile.Arn
+        Subnets:
+          - !Ref PublicSubnet1
+          - !Ref PublicSubnet2
+        SecurityGroupIds:
+          - !Ref BatchSecurityGroup
+
+  GpuJobQueue:
+    Type: AWS::Batch::JobQueue
+    Condition: HasGpuQueue
+    Properties:
+      State: ENABLED
+      Priority: 1
+      ComputeEnvironmentOrder:
+        - Order: 1
+          ComputeEnvironment: !Ref GpuComputeEnvironment
+
+  GpuJobDefinition:
+    Type: AWS::Batch::JobDefinition
+    Condition: HasGpuQueue
+    Properties:
+      Type: container
+      PlatformCapabilities:
+        - EC2
+      ContainerProperties:
+        Image: !Ref GpuContainerImage
+        JobRoleArn: !GetAtt BatchTaskRole.Arn
+        ResourceRequirements:
+          - Type: VCPU
+            Value: "4"
+          - Type: MEMORY
+            Value: "14000"
+          - Type: GPU
+            Value: "1"
+        LogConfiguration:
+          LogDriver: awslogs
+          Options:
+            awslogs-group: !Ref BatchLogGroup
+            awslogs-region: !Ref AWS::Region
+            awslogs-stream-prefix: jfr-gpu
+        Command:
+          - sh
+          - -c
+          - echo default
+
+  # Reusable CodeBuild project with inline buildspec. Pass IMAGE_TAG overrides
+  # to build multiple campaign images into the same ECR repository.
   CodeBuildRole:
     Type: AWS::IAM::Role
     Properties:
@@ -330,8 +463,10 @@ Resources:
         EnvironmentVariables:
           - Name: ECR_REGISTRY
             Value: !Sub "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com"
-          - Name: IMAGE_URI
-            Value: !Sub "${EcrRepository.RepositoryUri}:latest"
+          - Name: ECR_REPO_URI
+            Value: !GetAtt EcrRepository.RepositoryUri
+          - Name: IMAGE_TAG
+            Value: latest
       Source:
         Type: S3
         Location: !Sub "${StagingBucket}/build/context.zip"
@@ -343,10 +478,10 @@ Resources:
                 - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $ECR_REGISTRY
             build:
               commands:
-                - docker build --platform linux/amd64 -t $IMAGE_URI .
+                - docker build --platform linux/amd64 -t "${ECR_REPO_URI}:${IMAGE_TAG}" .
             post_build:
               commands:
-                - docker push $IMAGE_URI
+                - docker push "${ECR_REPO_URI}:${IMAGE_TAG}"
 
 Outputs:
   Region:
@@ -355,17 +490,25 @@ Outputs:
   S3BucketName:
     Description: Private S3 bucket for jobflow-remote staging files
     Value: !Ref StagingBucket
-  JobQueueArn:
-    Description: AWS Batch job queue ARN (use as CloudWorker.job_queue)
+  CpuJobQueueArn:
+    Description: AWS Batch CPU job queue ARN (CloudWorker.job_queue)
     Value: !Ref JobQueue
-  JobDefinitionArn:
-    Description: AWS Batch job definition ARN (use as CloudWorker.job_definition)
+  CpuJobDefinitionArn:
+    Description: AWS Batch CPU job definition ARN (CloudWorker.job_definition)
     Value: !Ref JobDefinition
-  EcrImageUri:
-    Description: Target ECR image URI (:latest) for custom worker images
-    Value: !Sub "${EcrRepository.RepositoryUri}:latest"
+  GpuJobQueueArn:
+    Condition: HasGpuQueue
+    Description: AWS Batch EC2 GPU job queue ARN (CloudWorker.job_queue)
+    Value: !Ref GpuJobQueue
+  GpuJobDefinitionArn:
+    Condition: HasGpuQueue
+    Description: AWS Batch EC2 GPU job definition ARN (CloudWorker.job_definition)
+    Value: !Ref GpuJobDefinition
+  EcrRepositoryUri:
+    Description: Private ECR repository URI (append :<tag> for campaign images)
+    Value: !GetAtt EcrRepository.RepositoryUri
   CodeBuildProjectName:
-    Description: CodeBuild project name for building custom images without local Docker
+    Description: CodeBuild project name for building campaign images without local Docker
     Value: !Ref CodeBuildProject
   LogGroupName:
     Description: CloudWatch log group for Batch container output
