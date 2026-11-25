@@ -123,40 +123,57 @@ for testing.
 Step 2. Check your EC2 quotas
 -----------------------------
 
-Skip this step if you only use the Fargate CPU queue.
-
 AWS accounts on the Free plan can start only Free Tier instance types, so
-jobs on the EC2 queues stay ``RUNNABLE``. If your account is on the Free plan,
-upgrade it in the AWS Console at
-https://console.aws.amazon.com/billing/home#/freetier/upgrade. The remaining
+jobs stay ``RUNNABLE``. If your account is on the Free plan, upgrade it in the
+AWS Console at https://console.aws.amazon.com/billing/home#/freetier/upgrade.
+The remaining
 credits are kept. If the upgrade asks for a spend limit, leave the optional
 cost controls unchecked. Close to the limit, they block new instances or pause
 running ones, which stops AWS Batch jobs.
 
-In CloudShell, run:
+In CloudShell, show the vCPU quotas that the queues use:
 
 .. code-block:: bash
 
-    for code in L-1216C47A L-3819A6DF L-DB2E81BA; do
+    for code in L-34B43A08 L-1216C47A L-3819A6DF L-DB2E81BA; do
       aws service-quotas get-service-quota --service-code ec2 --quota-code "$code" \
         --query 'Quota.{Name:QuotaName,Value:Value}' --output table
     done
 
 The quotas count vCPUs:
 
-* ``L-1216C47A`` is for On-Demand standard instances, which the EC2 CPU queue
-  uses. New accounts often start at ``5``. Raise it to the value of
-  ``Ec2CpuMaxvCpus`` (default ``64``) to run that many 1-vCPU jobs at once.
+* ``L-34B43A08`` is for Spot standard instances, which the CPU queue uses by
+  default (``CpuAllocationType=SPOT``).
+* ``L-1216C47A`` is for On-Demand standard instances
+  (``CpuAllocationType=EC2``).
 * ``L-3819A6DF`` is for Spot GPU instances, which the GPU queue uses by
   default (``GpuAllocationType=SPOT``). It must be at least ``4`` for one
-  ``g4dn.xlarge`` or ``g5.xlarge`` instance.
+  ``g4dn.xlarge``, ``g5.xlarge``, or ``g6.xlarge`` instance.
 * ``L-DB2E81BA`` is for On-Demand GPU instances (``GpuAllocationType=EC2``).
 
-New accounts often start the GPU quotas at ``0``. To raise a quota, type
-``Service Quotas`` in the search box at the top of the AWS Console, open
-**Amazon Elastic Compute Cloud (Amazon EC2)**, search for the quota code, and
-click **Request increase at account level**. Wait for approval before you
-enable the GPU queue.
+Step 3 sets the maximum vCPUs of each queue to its quota. A job with
+``vcpus=1`` uses 1 vCPU of the quota, so a quota of ``64`` runs up to 64 such
+jobs at once.
+
+New accounts often start with small quotas and with GPU quotas of ``0``. In
+CloudShell, ask for 64 vCPUs of Spot standard instances and 4 vCPUs of Spot
+GPU instances:
+
+.. code-block:: bash
+
+    aws service-quotas request-service-quota-increase --service-code ec2 --quota-code L-34B43A08 --desired-value 64
+    aws service-quotas request-service-quota-increase --service-code ec2 --quota-code L-3819A6DF --desired-value 4
+
+Check the requests later in CloudShell:
+
+.. code-block:: bash
+
+    aws service-quotas list-requested-service-quota-change-history --service-code ec2 --query 'RequestedQuotas[].[QuotaCode,DesiredValue,Status]' --output table
+
+Skip a request if the quota is already at least that value. If a request
+for the same quota is still open, the command for that quota fails with
+``ResourceAlreadyExistsException``. AWS answers within a few days. Wait for
+``APPROVED`` before you add the GPU queue in Step 3.
 
 Step 3. Deploy the AWS stack
 ----------------------------
@@ -177,14 +194,18 @@ The CloudFormation template below creates one stack with:
 * a private ECR repository for your container images
 * CloudWatch log groups
 * IAM roles for the containers and an IAM user for the ``Runner``
-* a Fargate CPU queue
-* an optional EC2 CPU queue and an optional EC2 GPU queue, both scaling to
+* a CPU queue and an optional GPU queue on EC2 instances, both scaling to
   ``0`` instances when idle
 * a CodeBuild project that builds container images
 
 When no jobs run, you pay only for the data kept in S3, ECR, and CloudWatch
-Logs. While jobs run, you also pay for the Fargate tasks and EC2 instances,
-and for the public IPv4 address of each.
+Logs. While jobs run, you also pay for the EC2 instances and for the public
+IPv4 address of each. The instances carry the tag ``Project=jfr-lab``. To see
+their cost in Cost Explorer, activate this tag under **Billing and Cost
+Management**, **Cost allocation tags**, after the first job ran. The tag
+appears there up to 24 hours after its first use, and the activation takes up
+to 24 hours more. To include earlier costs, choose **Backfill tags** on the
+same page.
 
 1. In CloudShell, create the template file ``aws_batch.yaml``:
 
@@ -203,17 +224,43 @@ and for the public IPv4 address of each.
        aws iam create-service-linked-role --aws-service-name ecs.amazonaws.com 2>/dev/null || true
        aws iam create-service-linked-role --aws-service-name spot.amazonaws.com 2>/dev/null || true
 
+       CPU_QUOTA=$(aws service-quotas get-service-quota --service-code ec2 \
+         --quota-code L-34B43A08 --query 'Quota.Value' --output text)
        aws cloudformation deploy \
          --template-file aws_batch.yaml \
          --stack-name jfr-lab \
          --capabilities CAPABILITY_IAM \
-         --parameter-overrides EnableEc2CpuQueue=true EnableGpuQueue=true
+         --parameter-overrides CpuMaxvCpus="${CPU_QUOTA%.*}"
 
-   Remove ``EnableGpuQueue=true`` if your Spot GPU quota is still ``0``.
-   Remove ``EnableEc2CpuQueue=true`` if you do not need the EC2 CPU queue.
-   Leave out the whole ``--parameter-overrides`` line to deploy only the
-   Fargate CPU queue. You can enable a queue later by running the same command
-   with that parameter. The deployment takes a few minutes.
+   The deployment takes a few minutes. The CPU queue then uses up to your
+   Spot standard quota of vCPUs. ``echo $CPU_QUOTA`` must show at least ``2``,
+   the vCPUs of a ``c7i.large``. If it shows less, wait until the request
+   from Step 2 is ``APPROVED``. Run this block again after every approved
+   increase, so that the queue can use it. For On-Demand instances, use the
+   quota code ``L-1216C47A`` and add ``CpuAllocationType=EC2`` to
+   ``--parameter-overrides``.
+
+3. In CloudShell, add the GPU queue once your Spot GPU quota is at least
+   ``4``. Parameters you do not pass keep their current values.
+
+   .. code-block:: bash
+
+       GPU_QUOTA=$(aws service-quotas get-service-quota --service-code ec2 \
+         --quota-code L-3819A6DF --query 'Quota.Value' --output text)
+       aws cloudformation deploy \
+         --template-file aws_batch.yaml \
+         --stack-name jfr-lab \
+         --capabilities CAPABILITY_IAM \
+         --parameter-overrides EnableGpuQueue=true GpuMaxvCpus="${GPU_QUOTA%.*}"
+
+   For On-Demand GPU instances, use the quota code ``L-DB2E81BA`` and add
+   ``GpuAllocationType=EC2``. Then run Step 5 again, so that the project file
+   gets the ``aws_gpu`` worker. If the ``Runner`` is running, restart it on
+   your computer with ``jf -p aws_ht runner restart``, so that it reads the
+   new worker.
+
+Update the stack only when no jobs are running. A change of the instance
+settings replaces the instances of a queue.
 
 The main parameters of the template are:
 
@@ -223,21 +270,18 @@ The main parameters of the template are:
    * - Parameter
      - Default
      - Meaning
+   * - ``CpuAllocationType``
+     - ``SPOT``
+     - ``SPOT`` or ``EC2`` (On-Demand) instances for the CPU queue
+   * - ``CpuInstanceTypes``
+     - ``c7i,c6i,c7a,m7i``
+     - EC2 instance families for the CPU queue
    * - ``CpuMaxvCpus``
-     - ``8``
-     - Maximum vCPUs used at once by the Fargate CPU queue
-   * - ``EnableEc2CpuQueue``
-     - ``false``
-     - Create the EC2 CPU queue
-   * - ``Ec2CpuInstanceTypes``
-     - ``c7i``
-     - EC2 instance families for the EC2 CPU queue
-   * - ``Ec2CpuMaxvCpus``
-     - ``64``
-     - Maximum vCPUs used at once by the EC2 CPU queue
+     - ``16``
+     - Maximum vCPUs used at once by the CPU queue
    * - ``EnableGpuQueue``
      - ``false``
-     - Create the EC2 GPU queue
+     - Create the GPU queue
    * - ``GpuAllocationType``
      - ``SPOT``
      - ``SPOT`` or ``EC2`` (On-Demand) instances for the GPU queue
@@ -245,7 +289,7 @@ The main parameters of the template are:
      - ``g4dn,g5,g6``
      - EC2 instance families for the GPU queue
    * - ``GpuMaxvCpus``
-     - ``16``
+     - ``4``
      - Maximum vCPUs used at once by the GPU queue
    * - ``RunFilesRetentionDays``
      - ``30``
@@ -331,7 +375,10 @@ Step 5. Create the project file
 
    .. code-block:: bash
 
-       env -u AWS_DEFAULT_REGION AWS_PROFILE=jfr-lab python - <<'EOF'
+       MONGO_HOST=127.0.0.1
+       MONGO_PORT=27017
+       env -u AWS_DEFAULT_REGION AWS_PROFILE=jfr-lab MONGO_HOST="$MONGO_HOST" MONGO_PORT="$MONGO_PORT" python - <<'EOF'
+       import os
        from pathlib import Path
 
        import boto3
@@ -339,33 +386,35 @@ Step 5. Create the project file
        stack = boto3.client("cloudformation").describe_stacks(StackName="jfr-lab")
        out = {o["OutputKey"]: o["OutputValue"] for o in stack["Stacks"][0]["Outputs"]}
 
-       text = """name: aws_ht
+       host = os.environ["MONGO_HOST"]
+       port = os.environ["MONGO_PORT"]
+       text = f"""name: aws_ht
        queue:
          store:
            type: MongoStore
-           host: 127.0.0.1
-           port: 27017
+           host: {host}
+           port: {port}
            database: jfr_aws_queue
            collection_name: jobs
        jobstore:
          docs_store:
            type: MongoStore
-           host: 127.0.0.1
-           port: 27017
+           host: {host}
+           port: {port}
            database: jfr_aws_outputs
            collection_name: outputs
          additional_stores:
            data:
              type: GridFSStore
-             host: 127.0.0.1
-             port: 27017
+             host: {host}
+             port: {port}
              database: jfr_aws_outputs
              collection_name: data
        workers:
        """
        region = out["Region"]
        bucket = out["S3BucketName"]
-       for worker, queue in [("aws_cpu", "Cpu"), ("aws_cpu_ec2", "Ec2Cpu"), ("aws_gpu", "Gpu")]:
+       for worker, queue in [("aws_cpu", "Cpu"), ("aws_gpu", "Gpu")]:
            if queue + "JobQueueArn" not in out:
                continue
            job_queue = out[queue + "JobQueueArn"]
@@ -398,18 +447,16 @@ Step 5. Create the project file
    .. code-block:: bash
 
        cat ~/.jfremote/aws_ht.yaml
-       python -c "import pymongo; print(pymongo.MongoClient('mongodb://127.0.0.1:27017', serverSelectionTimeoutMS=3000).admin.command('ping'))"
+       python -c "import pymongo; print(pymongo.MongoClient('mongodb://$MONGO_HOST:$MONGO_PORT', serverSelectionTimeoutMS=3000).admin.command('ping'))"
 
    The second command prints ``{'ok': 1.0}``. If it fails, start MongoDB. If
-   your MongoDB runs on another host or port, open the file with
-   ``vi ~/.jfremote/aws_ht.yaml`` and change ``host`` and ``port`` in the
-   ``queue`` and ``jobstore`` sections.
+   your MongoDB runs on another host or port, change ``MONGO_HOST`` and
+   ``MONGO_PORT`` in the first two lines of item 1 and run both items again.
 
 If you skipped Steps 3 and 4, write the file yourself in the same format,
 with the values of your own queues, job definitions, and bucket.
 
-The workers are ``aws_cpu`` (Fargate CPU queue), ``aws_cpu_ec2`` (EC2 CPU
-queue), and ``aws_gpu`` (EC2 GPU queue). ``scheduler_kwargs`` are passed to
+The workers are ``aws_cpu`` (CPU queue) and ``aws_gpu`` (GPU queue). ``scheduler_kwargs`` are passed to
 the AWS Batch scheduler (``qtoolkit.io.api.AWSBatchIO``). ``storage_kwargs``
 are passed to the S3 storage (``jobflow_remote.remote.storage.S3Storage``).
 ``profile_name`` is the profile from Step 4.
@@ -433,7 +480,7 @@ Step 6. Check the setup
        jf -p aws_ht admin reset
 
 2. On your computer, create a test script. It runs two small jobs on the
-   Fargate CPU queue. Its ``pre_run`` installs jobflow-remote in the default
+   CPU queue. Its ``pre_run`` installs jobflow-remote in the default
    Python image of the stack when the job starts, so you do not need to build
    an image for this test.
 
@@ -456,7 +503,7 @@ Step 6. Check the setup
            exec_config=ExecutionConfig(
                pre_run='pip install -q --no-cache-dir "jobflow-remote[aws]"'
            ),
-           resources=QCloudResources(vcpus=1, memory=2048, time_limit=300),
+           resources=QCloudResources(vcpus=1, memory=1800, time_limit=600),
        )
        EOF
 
@@ -491,8 +538,9 @@ Step 6. Check the setup
                jf -p aws_ht job list
                jf -p aws_ht job output 2
 
-   After a few minutes both jobs are ``COMPLETED`` and the second command
-   prints ``6``. Stop the ``Runner`` with ``Ctrl+C`` in the first terminal.
+   The first job waits 5 to 10 minutes while AWS starts an instance and the job
+   installs jobflow-remote. After about 15 minutes both jobs are
+   ``COMPLETED`` and the second command prints ``6``. Stop the ``Runner`` with ``Ctrl+C`` in the first terminal.
 
 Part 2: Running a campaign
 ==========================
@@ -583,8 +631,8 @@ file.
 
 To use several images on the same queues, register one job definition per
 image. Copy a job definition of the stack and change only the image. The copy
-then keeps the job role and the log settings, and for Fargate also the
-execution role and the public IP setting. Without the job role of the stack,
+then keeps the job role, the log settings, and the retry rule. Without the
+job role of the stack,
 the container cannot read or write the S3 bucket. Then point one worker per
 image at its job definition. You can also override the job definition for
 single jobs with
@@ -602,13 +650,13 @@ Each job gets its own ``QCloudResources``. The main fields are ``vcpus``,
 ``memory`` (MiB), ``gpus``, ``time_limit`` (seconds, at least ``60``), and
 ``max_retries``.
 
-The EC2 job definitions of the stack rerun a job up to two times when AWS
+The job definitions of the stack rerun a job up to two times when AWS
 stops its instance, for example when a Spot instance is reclaimed. Other
 failures, such as a timeout or an error in the job, are not rerun. Setting
 ``max_retries`` replaces this rule for that job. AWS Batch then reruns every
 failure except a timeout, up to ``max_retries`` times.
 
-The three queues place jobs differently:
+The two queues place jobs differently:
 
 .. list-table::
    :header-rows: 1
@@ -616,24 +664,20 @@ The three queues place jobs differently:
    * - Worker
      - Where a job runs
      - Typical use
-   * - ``aws_cpu`` (Fargate)
-     - Its own Fargate task. ``vcpus`` and ``memory`` must be one of the
-       `Fargate combinations <https://docs.aws.amazon.com/batch/latest/APIReference/API_ResourceRequirement.html>`_.
-     - Small numbers of CPU jobs, quick tests
-   * - ``aws_cpu_ec2`` (EC2 CPU)
+   * - ``aws_cpu`` (CPU)
      - An EC2 instance that can be shared with other jobs. AWS Batch runs
        several jobs on one instance when its free vCPUs and memory allow.
        The instance keeps the image cached between jobs.
      - Many small CPU jobs, for example ``pheasy`` fits with 1 vCPU each
-   * - ``aws_gpu`` (EC2 GPU)
+   * - ``aws_gpu`` (GPU)
      - An EC2 GPU instance. A job with ``gpus=1`` gets one whole GPU.
      - MLIP force calculations
 
-On the EC2 queues, jobs cannot use all of the instance memory. The operating
-system and the ECS agent use part of it. Ask for a little less than the full
-memory per vCPU so that jobs fill the instance. ``c7i`` instances have 2 GiB
-per vCPU, so the EC2 CPU job definition of the stack uses ``memory=1800`` with
-``vcpus=1``.
+Jobs cannot use all of the instance memory. The operating system and the ECS
+agent use part of it. Ask for a little less than the full memory per vCPU so
+that jobs fill the instance. ``c7i``, ``c6i``, and ``c7a`` instances have
+2 GiB per vCPU, so the CPU job definition of the stack uses ``memory=1800``
+with ``vcpus=1``.
 
 Use ``submit_flow(..., resources=...)`` to set the resources of all jobs in a
 flow. Use ``set_run_config`` to give jobs with a given name another worker or
@@ -647,11 +691,11 @@ Step 4. Submit the flows
 The example below runs the ``atomate2`` force-field phonon workflow with
 MACE-OMAT-0 and ``pheasy``. The ``pheasy`` fit
 (``generate_frequencies_eigenvectors``) and the ``structure_to_primitive``
-step run on the EC2 CPU queue with 1 vCPU each. The force calculations run on
+step run on the CPU queue with 1 vCPU each. The force calculations run on
 the GPU queue. If your GPU quota is ``0``, use the **Without GPU queue** tab
-in item 2. The force calculations then also run on the EC2 CPU queue. The
+in item 2. The force calculations then also run on the CPU queue. The
 image from Step 1 runs on CPUs too. For a campaign, call ``submit_flow`` once
-per structure. The EC2 CPU queue then runs the fits of many structures at the
+per structure. The CPU queue then runs the fits of many structures at the
 same time.
 
 1. On your computer, install ``atomate2`` in the environment from Part 1,
@@ -726,7 +770,7 @@ same time.
                cpu_resources = QCloudResources(vcpus=1, memory=1800, time_limit=1800)
                for name in ("structure_to_primitive", "generate_frequencies_eigenvectors"):
                    set_run_config(
-                       flow, name_filter=name, worker="aws_cpu_ec2", resources=cpu_resources
+                       flow, name_filter=name, worker="aws_cpu", resources=cpu_resources
                    )
 
                submit_flow(
@@ -787,18 +831,18 @@ same time.
                cpu_resources = QCloudResources(vcpus=1, memory=1800, time_limit=1800)
                for name in ("structure_to_primitive", "generate_frequencies_eigenvectors"):
                    set_run_config(
-                       flow, name_filter=name, worker="aws_cpu_ec2", resources=cpu_resources
+                       flow, name_filter=name, worker="aws_cpu", resources=cpu_resources
                    )
 
                submit_flow(
                    flow,
-                   worker="aws_cpu_ec2",
+                   worker="aws_cpu",
                    project="aws_ht",
                    resources=QCloudResources(vcpus=2, memory=3600, time_limit=3600),
                )
                EOF
 
-           All jobs run on ``aws_cpu_ec2``. The force calculations get 2
+           All jobs run on ``aws_cpu``. The force calculations get 2
            vCPUs each.
 
 3. On your computer, submit the flow and start the ``Runner`` as a daemon:
@@ -850,19 +894,18 @@ file in the current folder.
     jf -p aws_ht job files ls 1
     jf -p aws_ht job files get 1 jfremote_out.json
 
-A job stays ``SUBMITTED`` until its container starts. On the EC2 queues,
-the first job waits a few minutes while an instance starts and pulls the
-image. In CloudShell, see the AWS Batch state of the jobs in the EC2 CPU
-queue. For the other queues, replace ``Ec2CpuJobQueueArn`` with
-``CpuJobQueueArn`` or ``GpuJobQueueArn``.
+A job stays ``SUBMITTED`` until its container starts. The first job on a
+new instance waits a few minutes while the instance starts and pulls the
+image. In CloudShell, see the AWS Batch state of the jobs in the CPU queue.
+For the GPU queue, replace ``CpuJobQueueArn`` with ``GpuJobQueueArn``.
 
 .. code-block:: bash
 
-    QUEUE=$(aws cloudformation describe-stacks --stack-name jfr-lab --query "Stacks[0].Outputs[?OutputKey=='Ec2CpuJobQueueArn'].OutputValue" --output text)
+    QUEUE=$(aws cloudformation describe-stacks --stack-name jfr-lab --query "Stacks[0].Outputs[?OutputKey=='CpuJobQueueArn'].OutputValue" --output text)
     for s in RUNNABLE STARTING RUNNING SUCCEEDED FAILED; do aws batch list-jobs --job-queue "$QUEUE" --job-status "$s" --query 'jobSummaryList[].[jobName,status,statusReason]' --output text; done
 
-``RUNNABLE`` means the job waits for an instance. On the EC2 queues, if a job
-stays ``RUNNABLE`` for more than 15 minutes, read in CloudShell why AWS could
+``RUNNABLE`` means the job waits for an instance. If a job stays
+``RUNNABLE`` for more than 15 minutes, read in CloudShell why AWS could
 not start an instance:
 
 .. code-block:: bash
@@ -912,11 +955,17 @@ is no shell access to the container. In CloudShell, read the logs of the last
 Deleting the AWS stack
 ======================
 
-1. On your computer, stop the ``Runner``:
+1. On your computer, stop the jobs that are still queued or running, then
+   stop the ``Runner``. A job that still runs would write new files to the
+   bucket after it was emptied, and the stack could not be deleted.
 
    .. code-block:: bash
 
+       jf -p aws_ht job stop -s SUBMITTED -s RUNNING
        jf -p aws_ht runner stop
+       jf -p aws_ht runner status
+
+   Run the last command again until it shows that the ``Runner`` is shut down.
 
 2. In CloudShell, empty the S3 bucket, delete the access keys of the
    ``Runner`` user, and delete the stack. CloudFormation then deletes all

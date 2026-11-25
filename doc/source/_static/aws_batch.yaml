@@ -5,25 +5,21 @@ Parameters:
   ContainerImage:
     Type: String
     Default: public.ecr.aws/docker/library/python:3.12-slim
-    Description: Image of the Fargate and EC2 CPU job definitions.
+    Description: Image of the CPU job definition.
   GpuContainerImage:
     Type: String
     Default: public.ecr.aws/docker/library/python:3.12-slim
     Description: Image of the EC2 GPU job definition.
+  CpuAllocationType:
+    Type: String
+    Default: SPOT
+    AllowedValues: [SPOT, EC2]
+  CpuInstanceTypes:
+    Type: CommaDelimitedList
+    Default: c7i,c6i,c7a,m7i
   CpuMaxvCpus:
     Type: Number
-    Default: 8
-    Description: Maximum vCPUs of the Fargate CPU queue.
-  EnableEc2CpuQueue:
-    Type: String
-    Default: "false"
-    AllowedValues: ["true", "false"]
-  Ec2CpuInstanceTypes:
-    Type: CommaDelimitedList
-    Default: c7i
-  Ec2CpuMaxvCpus:
-    Type: Number
-    Default: 64
+    Default: 16
   EnableGpuQueue:
     Type: String
     Default: "false"
@@ -37,7 +33,7 @@ Parameters:
     Default: g4dn,g5,g6
   GpuMaxvCpus:
     Type: Number
-    Default: 16
+    Default: 4
   LogRetentionDays:
     Type: Number
     Default: 7
@@ -47,9 +43,8 @@ Parameters:
     Description: Days after which the job files under runs/ in the bucket are deleted.
 
 Conditions:
-  HasEc2CpuQueue: {Fn::Equals: [{Ref: EnableEc2CpuQueue}, "true"]}
   HasGpuQueue: {Fn::Equals: [{Ref: EnableGpuQueue}, "true"]}
-  HasEc2Queue: {Fn::Or: [{Condition: HasEc2CpuQueue}, {Condition: HasGpuQueue}]}
+  IsCpuSpot: {Fn::Equals: [{Ref: CpuAllocationType}, "SPOT"]}
   IsGpuSpot: {Fn::Equals: [{Ref: GpuAllocationType}, "SPOT"]}
 
 Resources:
@@ -153,16 +148,6 @@ Resources:
       RetentionInDays: {Ref: LogRetentionDays}
 
   # IAM: roles for the containers and EC2 instances, and a user for the Runner.
-  BatchExecutionRole:
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          - {Effect: Allow, Principal: {Service: ecs-tasks.amazonaws.com}, Action: sts:AssumeRole}
-      ManagedPolicyArns:
-        - {Fn::Sub: "arn:${AWS::Partition}:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"}
-
   BatchTaskRole:
     Type: AWS::IAM::Role
     Properties:
@@ -184,7 +169,6 @@ Resources:
 
   EcsInstanceRole:
     Type: AWS::IAM::Role
-    Condition: HasEc2Queue
     Properties:
       AssumeRolePolicyDocument:
         Version: "2012-10-17"
@@ -195,7 +179,6 @@ Resources:
 
   EcsInstanceProfile:
     Type: AWS::IAM::InstanceProfile
-    Condition: HasEc2Queue
     Properties:
       Roles: [{Ref: EcsInstanceRole}]
 
@@ -221,74 +204,57 @@ Resources:
                 Action: cloudformation:DescribeStacks
                 Resource: {Ref: AWS::StackId}
 
-  # Fargate CPU queue: one Fargate task per job.
-  ComputeEnvironment:
+  # Instances pull each image once and reuse the cached copy for later jobs.
+  EcsLaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateData:
+        UserData:
+          Fn::Base64: |
+            MIME-Version: 1.0
+            Content-Type: multipart/mixed; boundary="==BOUNDARY=="
+
+            --==BOUNDARY==
+            Content-Type: text/x-shellscript; charset="us-ascii"
+
+            #!/bin/bash
+            echo "ECS_IMAGE_PULL_BEHAVIOR=prefer-cached" >> /etc/ecs/ecs.config
+
+            --==BOUNDARY==--
+
+  # CPU queue: several jobs can share one instance.
+  CpuComputeEnvironment:
     Type: AWS::Batch::ComputeEnvironment
     DependsOn: [PublicRoute, Subnet1RouteAssoc, Subnet2RouteAssoc]
     Properties:
       Type: MANAGED
+      # Update the instances in place instead of deleting the compute environment.
+      ReplaceComputeEnvironment: false
       ComputeResources:
-        Type: FARGATE
-        MaxvCpus: {Ref: CpuMaxvCpus}
-        Subnets: [{Ref: PublicSubnet1}, {Ref: PublicSubnet2}]
-        SecurityGroupIds: [{Ref: BatchSecurityGroup}]
-
-  JobQueue:
-    Type: AWS::Batch::JobQueue
-    Properties:
-      Priority: 1
-      ComputeEnvironmentOrder:
-        - {Order: 1, ComputeEnvironment: {Ref: ComputeEnvironment}}
-
-  JobDefinition:
-    Type: AWS::Batch::JobDefinition
-    Properties:
-      Type: container
-      PlatformCapabilities: [FARGATE]
-      ContainerProperties:
-        Image: {Ref: ContainerImage}
-        ExecutionRoleArn: {Fn::GetAtt: [BatchExecutionRole, Arn]}
-        JobRoleArn: {Fn::GetAtt: [BatchTaskRole, Arn]}
-        NetworkConfiguration: {AssignPublicIp: ENABLED}
-        ResourceRequirements:
-          - {Type: VCPU, Value: "1"}
-          - {Type: MEMORY, Value: "2048"}
-        LogConfiguration:
-          LogDriver: awslogs
-          Options:
-            awslogs-group: {Ref: BatchLogGroup}
-            awslogs-region: {Ref: AWS::Region}
-            awslogs-stream-prefix: jfr-cpu
-
-  # Optional EC2 CPU queue: several jobs can share one instance.
-  Ec2CpuComputeEnvironment:
-    Type: AWS::Batch::ComputeEnvironment
-    Condition: HasEc2CpuQueue
-    DependsOn: [PublicRoute, Subnet1RouteAssoc, Subnet2RouteAssoc]
-    Properties:
-      Type: MANAGED
-      ComputeResources:
-        Type: EC2
-        AllocationStrategy: BEST_FIT_PROGRESSIVE
+        Type: {Ref: CpuAllocationType}
+        AllocationStrategy:
+          Fn::If: [IsCpuSpot, SPOT_PRICE_CAPACITY_OPTIMIZED, BEST_FIT_PROGRESSIVE]
         Ec2Configuration: [{ImageType: ECS_AL2023}]
+        LaunchTemplate:
+          LaunchTemplateId: {Ref: EcsLaunchTemplate}
+          Version: {Fn::GetAtt: [EcsLaunchTemplate, LatestVersionNumber]}
         MinvCpus: 0
-        MaxvCpus: {Ref: Ec2CpuMaxvCpus}
-        InstanceTypes: {Ref: Ec2CpuInstanceTypes}
+        MaxvCpus: {Ref: CpuMaxvCpus}
+        InstanceTypes: {Ref: CpuInstanceTypes}
         InstanceRole: {Fn::GetAtt: [EcsInstanceProfile, Arn]}
         Subnets: [{Ref: PublicSubnet1}, {Ref: PublicSubnet2}]
         SecurityGroupIds: [{Ref: BatchSecurityGroup}]
+        Tags: {Project: {Ref: AWS::StackName}}
 
-  Ec2CpuJobQueue:
+  CpuJobQueue:
     Type: AWS::Batch::JobQueue
-    Condition: HasEc2CpuQueue
     Properties:
       Priority: 1
       ComputeEnvironmentOrder:
-        - {Order: 1, ComputeEnvironment: {Ref: Ec2CpuComputeEnvironment}}
+        - {Order: 1, ComputeEnvironment: {Ref: CpuComputeEnvironment}}
 
-  Ec2CpuJobDefinition:
+  CpuJobDefinition:
     Type: AWS::Batch::JobDefinition
-    Condition: HasEc2CpuQueue
     Properties:
       Type: container
       PlatformCapabilities: [EC2]
@@ -303,7 +269,7 @@ Resources:
           Options:
             awslogs-group: {Ref: BatchLogGroup}
             awslogs-region: {Ref: AWS::Region}
-            awslogs-stream-prefix: jfr-ec2-cpu
+            awslogs-stream-prefix: jfr-cpu
       RetryStrategy:
         Attempts: 3
         EvaluateOnExit:
@@ -317,17 +283,22 @@ Resources:
     DependsOn: [PublicRoute, Subnet1RouteAssoc, Subnet2RouteAssoc]
     Properties:
       Type: MANAGED
+      ReplaceComputeEnvironment: false
       ComputeResources:
         Type: {Ref: GpuAllocationType}
         AllocationStrategy:
           Fn::If: [IsGpuSpot, SPOT_PRICE_CAPACITY_OPTIMIZED, BEST_FIT_PROGRESSIVE]
         Ec2Configuration: [{ImageType: ECS_AL2023_NVIDIA}]
+        LaunchTemplate:
+          LaunchTemplateId: {Ref: EcsLaunchTemplate}
+          Version: {Fn::GetAtt: [EcsLaunchTemplate, LatestVersionNumber]}
         MinvCpus: 0
         MaxvCpus: {Ref: GpuMaxvCpus}
         InstanceTypes: {Ref: GpuInstanceTypes}
         InstanceRole: {Fn::GetAtt: [EcsInstanceProfile, Arn]}
         Subnets: [{Ref: PublicSubnet1}, {Ref: PublicSubnet2}]
         SecurityGroupIds: [{Ref: BatchSecurityGroup}]
+        Tags: {Project: {Ref: AWS::StackName}}
 
   GpuJobQueue:
     Type: AWS::Batch::JobQueue
@@ -429,15 +400,9 @@ Outputs:
   S3BucketName:
     Value: {Ref: StagingBucket}
   CpuJobQueueArn:
-    Value: {Ref: JobQueue}
+    Value: {Ref: CpuJobQueue}
   CpuJobDefinitionArn:
-    Value: {Ref: JobDefinition}
-  Ec2CpuJobQueueArn:
-    Condition: HasEc2CpuQueue
-    Value: {Ref: Ec2CpuJobQueue}
-  Ec2CpuJobDefinitionArn:
-    Condition: HasEc2CpuQueue
-    Value: {Ref: Ec2CpuJobDefinition}
+    Value: {Ref: CpuJobDefinition}
   GpuJobQueueArn:
     Condition: HasGpuQueue
     Value: {Ref: GpuJobQueue}
