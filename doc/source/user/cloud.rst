@@ -744,14 +744,22 @@ Step 4. Submit the flows
 ------------------------
 
 The example below runs the ``atomate2`` force-field phonon workflow with
-MACE-OMAT-0 and ``pheasy``. The ``pheasy`` fit
-(``generate_frequencies_eigenvectors``) and the ``structure_to_primitive``
-step run on the CPU queue with 1 vCPU each. The force calculations run on
-the GPU queue. If your GPU quota is ``0``, use the **Without GPU queue** tab
-in item 2. The force calculations then also run on the CPU queue. The
-image from Step 1 runs on CPUs too. For a campaign, call ``submit_flow`` once
-per structure. The CPU queue then runs the fits of many structures at the
-same time.
+MACE-OMAT-0 and ``pheasy``. ``force_field_name="MACE-MP-0"`` selects the MACE
+calculator, and the ``model`` key selects MACE-OMAT-0. The task documents
+still record ``MLFF.MACE_MP_0`` as the force field name. ``default_dtype`` is
+``float64`` so that the small force differences between displaced supercells
+stay accurate. It is slower than ``float32``, most of all on GPUs. With
+``socket=True``, one job computes the forces of all displaced supercells of a
+structure and loads the model once. The ``pheasy`` fit
+(``generate_frequencies_eigenvectors``) and the short setup steps run on the
+CPU queue with 1 vCPU each. The force calculations run on the GPU queue. If your GPU quota is ``0``, use the
+**Without GPU queue** tab in item 2. The force calculations then also run on
+the CPU queue. For a campaign, call ``submit_flow`` once per structure. The
+CPU queue then runs the fits of many structures at the same time.
+
+``OMP_NUM_THREADS`` in the resources sets the number of threads of each job to
+its vCPUs. Without it, PyTorch in each job starts one thread per core of the
+instance, and the jobs that share an instance slow each other down.
 
 1. On your computer, install ``atomate2`` in the environment from Part 1,
    Step 1. You need it to build the flows.
@@ -800,7 +808,7 @@ same time.
                    [[0, 0, 0], [0.25, 0.25, 0.25]],
                )
 
-               mace_kwargs = {"model": "medium-omat-0", "device": "cuda"}
+               mace_kwargs = {"model": "medium-omat-0", "device": "cuda", "default_dtype": "float64"}
                maker = PhononMaker(
                    min_length=8.0,
                    symprec=1e-3,
@@ -819,11 +827,19 @@ same time.
                        calculator_kwargs=mace_kwargs,
                    ),
                    create_thermal_displacements=False,
+                   socket=True,
                )
                flow = maker.make(si_prim)
 
-               cpu_resources = QCloudResources(vcpus=1, memory=1800, time_limit=1800)
-               for name in ("structure_to_primitive", "generate_frequencies_eigenvectors"):
+               cpu_resources = QCloudResources(
+                   vcpus=1, memory=1800, time_limit=1800, environment={"OMP_NUM_THREADS": "1"}
+               )
+               for name in (
+                   "structure_to_primitive",
+                   "get_supercell_size",
+                   "generate_phonon_displacements",
+                   "generate_frequencies_eigenvectors",
+               ):
                    set_run_config(
                        flow, name_filter=name, worker="aws_cpu", resources=cpu_resources
                    )
@@ -833,13 +849,17 @@ same time.
                    worker="aws_gpu",
                    project="aws_ht",
                    resources=QCloudResources(
-                       vcpus=4, memory=14000, gpus=1, time_limit=1800
+                       vcpus=4,
+                       memory=14000,
+                       gpus=1,
+                       time_limit=1800,
+                       environment={"OMP_NUM_THREADS": "4"},
                    ),
                )
                EOF
 
            Keep ``run_phonon_displacements`` on ``aws_gpu``, because the force
-           jobs it creates run on the same worker as this step.
+           job it creates runs on the same worker as this step.
 
        .. tab-item:: Without GPU queue
            :sync: cpu
@@ -861,7 +881,7 @@ same time.
                    [[0, 0, 0], [0.25, 0.25, 0.25]],
                )
 
-               mace_kwargs = {"model": "medium-omat-0", "device": "cpu"}
+               mace_kwargs = {"model": "medium-omat-0", "device": "cpu", "default_dtype": "float64"}
                maker = PhononMaker(
                    min_length=8.0,
                    symprec=1e-3,
@@ -880,11 +900,19 @@ same time.
                        calculator_kwargs=mace_kwargs,
                    ),
                    create_thermal_displacements=False,
+                   socket=True,
                )
                flow = maker.make(si_prim)
 
-               cpu_resources = QCloudResources(vcpus=1, memory=1800, time_limit=1800)
-               for name in ("structure_to_primitive", "generate_frequencies_eigenvectors"):
+               cpu_resources = QCloudResources(
+                   vcpus=1, memory=1800, time_limit=1800, environment={"OMP_NUM_THREADS": "1"}
+               )
+               for name in (
+                   "structure_to_primitive",
+                   "get_supercell_size",
+                   "generate_phonon_displacements",
+                   "generate_frequencies_eigenvectors",
+               ):
                    set_run_config(
                        flow, name_filter=name, worker="aws_cpu", resources=cpu_resources
                    )
@@ -893,12 +921,14 @@ same time.
                    flow,
                    worker="aws_cpu",
                    project="aws_ht",
-                   resources=QCloudResources(vcpus=2, memory=3600, time_limit=3600),
+                   resources=QCloudResources(
+                       vcpus=2, memory=3600, time_limit=3600, environment={"OMP_NUM_THREADS": "2"}
+                   ),
                )
                EOF
 
-           All jobs run on ``aws_cpu``. The force calculations get 2
-           vCPUs each.
+           All jobs run on ``aws_cpu``. The relax, the static, and the
+           force job of the displaced supercells get 2 vCPUs each.
 
 3. On your computer, submit the flow and start the ``Runner`` as a daemon:
 
