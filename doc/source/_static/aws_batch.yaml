@@ -382,6 +382,7 @@ Resources:
         EnvironmentVariables:
           - {Name: ECR_REPO_URI, Value: {Fn::GetAtt: [EcrRepository, RepositoryUri]}}
           - {Name: IMAGE_TAG, Value: latest}
+          - {Name: TORCH_INDEX, Value: "https://download.pytorch.org/whl/cpu"}
       Source:
         Type: S3
         Location: {Fn::Sub: "${StagingBucket}/build/context.zip"}
@@ -391,7 +392,7 @@ Resources:
             build:
               commands:
                 - aws ecr get-login-password | docker login --username AWS --password-stdin "${ECR_REPO_URI%%/*}"
-                - docker build --platform linux/amd64 -t "${ECR_REPO_URI}:${IMAGE_TAG}" .
+                - docker build --platform linux/amd64 --build-arg TORCH_INDEX="${TORCH_INDEX}" -t "${ECR_REPO_URI}:${IMAGE_TAG}" .
                 - docker push "${ECR_REPO_URI}:${IMAGE_TAG}"
 
 Outputs:

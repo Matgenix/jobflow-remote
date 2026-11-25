@@ -551,19 +551,27 @@ Step 1. Build a container image
 -------------------------------
 
 Every Python function that a job runs must be importable in the container
-image. Build one image per software stack and give each image its own tag
-(for example ``mace-gpu-v1``). All images go into the ECR repository of the
-stack. The CodeBuild project of the stack builds the image, so you do not
-need Docker.
+image. Build one image per software stack. The CodeBuild project of the stack
+builds the image and pushes it to the ECR repository of the stack, so you do
+not need Docker.
 
-1. In CloudShell, create the ``Dockerfile``. This example installs CUDA
-   PyTorch, MACE, ``atomate2``, and ``pheasy`` for force-field phonon
-   calculations.
+The same ``Dockerfile`` builds a CPU image and a GPU image. Only the PyTorch
+wheels differ. The CPU queue uses the CPU image, which is several GB smaller
+than the GPU image. Give every build a new tag, for example ``mace-cpu-v2``
+after a change. The instances keep using their cached copy of a tag they have
+pulled before.
+
+1. In CloudShell, create the ``Dockerfile``. This example installs PyTorch,
+   MACE, ``atomate2``, and ``pheasy`` for force-field phonon calculations. It
+   also downloads the MACE-OMAT-0 model during the build, so jobs do not
+   download it.
 
    .. code-block:: bash
 
        cat > Dockerfile <<'EOF'
        FROM public.ecr.aws/docker/library/python:3.12-slim
+
+       ARG TORCH_INDEX=https://download.pytorch.org/whl/cpu
 
        ENV PIP_NO_CACHE_DIR=1 \
            PYTHONDONTWRITEBYTECODE=1 \
@@ -571,35 +579,66 @@ need Docker.
 
        RUN apt-get update && apt-get install -y --no-install-recommends git gcc g++ && rm -rf /var/lib/apt/lists/*
        RUN pip install --upgrade pip && \
-           pip install --index-url https://download.pytorch.org/whl/cu124 torch && \
+           pip install --index-url "$TORCH_INDEX" torch && \
            pip install "numpy<=2.2" "mace-torch>=0.3.16" "jobflow-remote[aws]" \
              "atomate2[pheasy,ase]" "f90nml>=1.3.1" "h5py>=3.6.0" "numba>=0.58.1" \
              "scikit-learn>=1.0.2" "spglib>=1.16.3" && \
            pip install --no-deps "pheasy @ git+https://gitlab.com/hpsahasrabuddhe/pheasy.git@9f24162a4ed0f0ab8911d382fd2617944aade55d"
+       RUN python -c "from mace.calculators import mace_mp; mace_mp(model='medium-omat-0', device='cpu')"
 
        WORKDIR /tmp/jf_run
        EOF
 
-2. In CloudShell, build the image and push it to ECR:
+2. In CloudShell, build the image and push it to ECR. Build the CPU image
+   first. Build the GPU image only if you use the GPU queue.
 
-   .. code-block:: bash
+   .. tab-set::
 
-       IMAGE_TAG="mace-gpu-v1"
-       BUCKET=$(aws cloudformation describe-stacks --stack-name jfr-lab \
-         --query "Stacks[0].Outputs[?OutputKey=='S3BucketName'].OutputValue" --output text)
-       CB_PROJ=$(aws cloudformation describe-stacks --stack-name jfr-lab \
-         --query "Stacks[0].Outputs[?OutputKey=='CodeBuildProjectName'].OutputValue" --output text)
+       .. tab-item:: CPU image
 
-       zip -q context.zip Dockerfile
-       aws s3 cp context.zip "s3://${BUCKET}/build/context.zip"
+           .. code-block:: bash
 
-       BUILD_ID=$(aws codebuild start-build --project-name "$CB_PROJ" \
-         --environment-variables-override "name=IMAGE_TAG,value=${IMAGE_TAG},type=PLAINTEXT" \
-         --query 'build.id' --output text)
-       STATUS=IN_PROGRESS
-       while [ "$STATUS" = IN_PROGRESS ]; do sleep 20; STATUS=$(aws codebuild batch-get-builds --ids "$BUILD_ID" --query 'builds[0].buildStatus' --output text); echo "$STATUS"; done
+               IMAGE_TAG="mace-cpu-v1"
+               TORCH_INDEX="https://download.pytorch.org/whl/cpu"
+               BUCKET=$(aws cloudformation describe-stacks --stack-name jfr-lab \
+                 --query "Stacks[0].Outputs[?OutputKey=='S3BucketName'].OutputValue" --output text)
+               CB_PROJ=$(aws cloudformation describe-stacks --stack-name jfr-lab \
+                 --query "Stacks[0].Outputs[?OutputKey=='CodeBuildProjectName'].OutputValue" --output text)
 
-   The loop prints the build status every 20 seconds. The build takes 15 to
+               zip -q context.zip Dockerfile
+               aws s3 cp context.zip "s3://${BUCKET}/build/context.zip"
+
+               BUILD_ID=$(aws codebuild start-build --project-name "$CB_PROJ" \
+                 --environment-variables-override \
+                   "name=IMAGE_TAG,value=${IMAGE_TAG},type=PLAINTEXT" \
+                   "name=TORCH_INDEX,value=${TORCH_INDEX},type=PLAINTEXT" \
+                 --query 'build.id' --output text)
+               STATUS=IN_PROGRESS
+               while [ "$STATUS" = IN_PROGRESS ]; do sleep 20; STATUS=$(aws codebuild batch-get-builds --ids "$BUILD_ID" --query 'builds[0].buildStatus' --output text); echo "$STATUS"; done
+
+       .. tab-item:: GPU image
+
+           .. code-block:: bash
+
+               IMAGE_TAG="mace-gpu-v1"
+               TORCH_INDEX="https://download.pytorch.org/whl/cu124"
+               BUCKET=$(aws cloudformation describe-stacks --stack-name jfr-lab \
+                 --query "Stacks[0].Outputs[?OutputKey=='S3BucketName'].OutputValue" --output text)
+               CB_PROJ=$(aws cloudformation describe-stacks --stack-name jfr-lab \
+                 --query "Stacks[0].Outputs[?OutputKey=='CodeBuildProjectName'].OutputValue" --output text)
+
+               zip -q context.zip Dockerfile
+               aws s3 cp context.zip "s3://${BUCKET}/build/context.zip"
+
+               BUILD_ID=$(aws codebuild start-build --project-name "$CB_PROJ" \
+                 --environment-variables-override \
+                   "name=IMAGE_TAG,value=${IMAGE_TAG},type=PLAINTEXT" \
+                   "name=TORCH_INDEX,value=${TORCH_INDEX},type=PLAINTEXT" \
+                 --query 'build.id' --output text)
+               STATUS=IN_PROGRESS
+               while [ "$STATUS" = IN_PROGRESS ]; do sleep 20; STATUS=$(aws codebuild batch-get-builds --ids "$BUILD_ID" --query 'builds[0].buildStatus' --output text); echo "$STATUS"; done
+
+   The loop prints the build status every 20 seconds. The build takes 10 to
    20 minutes. The last line is ``SUCCEEDED`` when the image is in ECR. If it
    is ``FAILED``, type ``CodeBuild`` in the search box of the AWS Console
    and open the build to read its log.
@@ -611,23 +650,39 @@ In CloudShell, in the folder with ``aws_batch.yaml`` from Part 1, Step 3,
 update the stack so that the job definitions use the new image. Parameters
 you do not pass keep their current values.
 
-.. code-block:: bash
+.. tab-set::
 
-    ECR_REPO_URI=$(aws cloudformation describe-stacks --stack-name jfr-lab \
-      --query "Stacks[0].Outputs[?OutputKey=='EcrRepositoryUri'].OutputValue" --output text)
-    IMAGE_TAG="mace-gpu-v1"  # the tag you built in Step 1
+    .. tab-item:: CPU image
 
-    aws cloudformation deploy \
-      --template-file aws_batch.yaml \
-      --stack-name jfr-lab \
-      --capabilities CAPABILITY_IAM \
-      --parameter-overrides \
-        ContainerImage="${ECR_REPO_URI}:${IMAGE_TAG}" \
-        GpuContainerImage="${ECR_REPO_URI}:${IMAGE_TAG}"
+        .. code-block:: bash
 
-The update creates a new revision of each job definition. The workers in
-``aws_ht.yaml`` use the latest revision, so you do not need to change the
-file.
+            ECR_REPO_URI=$(aws cloudformation describe-stacks --stack-name jfr-lab \
+              --query "Stacks[0].Outputs[?OutputKey=='EcrRepositoryUri'].OutputValue" --output text)
+            aws cloudformation deploy \
+              --template-file aws_batch.yaml \
+              --stack-name jfr-lab \
+              --capabilities CAPABILITY_IAM \
+              --parameter-overrides ContainerImage="${ECR_REPO_URI}:mace-cpu-v1"
+
+    .. tab-item:: CPU and GPU images
+
+        .. code-block:: bash
+
+            ECR_REPO_URI=$(aws cloudformation describe-stacks --stack-name jfr-lab \
+              --query "Stacks[0].Outputs[?OutputKey=='EcrRepositoryUri'].OutputValue" --output text)
+            aws cloudformation deploy \
+              --template-file aws_batch.yaml \
+              --stack-name jfr-lab \
+              --capabilities CAPABILITY_IAM \
+              --parameter-overrides \
+                ContainerImage="${ECR_REPO_URI}:mace-cpu-v1" \
+                GpuContainerImage="${ECR_REPO_URI}:mace-gpu-v1"
+
+Change the tags if you built other ones in Step 1.
+
+The update creates a new revision of each job definition whose image changed.
+The workers in ``aws_ht.yaml`` use the latest revision, so you do not need to
+change the file.
 
 To use several images on the same queues, register one job definition per
 image. Copy a job definition of the stack and change only the image. The copy
