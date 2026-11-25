@@ -37,7 +37,7 @@ from jobflow_remote.jobs.state import JobState
 from jobflow_remote.remote.cloud_queue import CloudQueueManager
 from jobflow_remote.remote.data import get_remote_in_file, get_remote_store
 from jobflow_remote.remote.storage import S3Storage, StorageError
-from jobflow_remote.utils.examples import add
+from jobflow_remote.utils.examples import add, read_file, write_file
 from jobflow_remote.utils.remote import UnsafeDeletionError, safe_remove_job_files
 
 
@@ -577,6 +577,22 @@ class TestRunCloudJobAndCli:
         ).read_text() == "killed attempt"
         assert not (run_dir / "OUTCAR").exists()
         assert storage.exists("/jf_work/retry_job/previous_attempt_3/OUTCAR")
+
+    def test_run_cloud_job_reads_folder_of_earlier_job(self, s3_env, tmp_path):
+        # With kept folders on a shared file system, a job can read the folder
+        # of an earlier job, as atomate2 does through prev_dir.
+        storage, _s3, _bucket = s3_env
+        shared = tmp_path / "shared"
+        uri = _upload_job_in(storage, write_file("hello"), "/jf_work/first")
+        run_cloud_job(storage_uri=uri, local_dir=shared, region_name="us-east-1")
+
+        first_dir = shared / "proj" / "jf_work" / "first"
+        uri = _upload_job_in(storage, read_file(str(first_dir)), "/jf_work/second")
+        run_cloud_job(storage_uri=uri, local_dir=shared, region_name="us-east-1")
+
+        data_local = tmp_path / "second_data.json"
+        storage.get("/jf_work/second/remote_job_data.json", data_local)
+        assert loadfn(data_local)[0].output == "hello"
 
     def test_run_cloud_job_rejects_invalid_uris(self, tmp_path):
         with pytest.raises(ValueError, match="Unsupported cloud storage URI"):
