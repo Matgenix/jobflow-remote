@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import copy
-import re
 from typing import TYPE_CHECKING, Any
 
 from jobflow_remote.remote.queue import BaseQueueManager
@@ -16,14 +15,6 @@ if TYPE_CHECKING:
 
     from qtoolkit.core.data_objects import CancelResult, QJob, QState, SubmissionResult
     from qtoolkit.io.api.base import BaseAPISchedulerIO
-
-
-def sanitize_cloud_job_name(name: str, max_len: int = 128) -> str:
-    """Sanitize and truncate a job name for cloud schedulers (starts alphanumeric; only ``A-Za-z0-9_-``)."""
-    cleaned = re.sub(r"[^A-Za-z0-9_-]", "_", name.strip())
-    if not cleaned or not cleaned[0].isalnum():
-        cleaned = f"jf_{cleaned}"
-    return cleaned[:max_len]
 
 
 class CloudQueueManager(BaseQueueManager):
@@ -61,7 +52,15 @@ class CloudQueueManager(BaseQueueManager):
         options: dict | Any | None = None,
         job_name: str | None = None,
     ) -> Any:
-        """Copy ``options`` (``dict``, ``QCloudResources``, or ``None``) and set ``job_name`` if missing."""
+        """Return a ``QCloudResources`` copy of ``options`` with a job name.
+
+        ``None`` or an empty dict becomes an empty ``QCloudResources``. A
+        non-empty dict holds backend-specific options and is stored in
+        ``scheduler_kwargs``. ``job_name`` is set unless ``options`` is a
+        ``QCloudResources`` that already has one. A job name inside the dict
+        still wins, because the backend applies ``scheduler_kwargs`` last.
+        Each qtoolkit backend makes the name valid for its own cloud service.
+        """
         if QCloudResources is None:
             raise ImportError(
                 "CloudQueueManager requires a newer qtoolkit release with QCloudResources."
@@ -70,20 +69,15 @@ class CloudQueueManager(BaseQueueManager):
         prepared_options: Any
         if options is None or (isinstance(options, dict) and not options):
             prepared_options = QCloudResources()
-        elif isinstance(options, QCloudResources | dict):
+        elif isinstance(options, dict):
+            prepared_options = QCloudResources(scheduler_kwargs=copy.deepcopy(options))
+        elif isinstance(options, QCloudResources):
             prepared_options = copy.deepcopy(options)
         else:
             raise TypeError("options must be a dict, QCloudResources, or None.")
 
-        if job_name:
-            safe_name = sanitize_cloud_job_name(job_name)
-            if isinstance(prepared_options, QCloudResources):
-                if not prepared_options.job_name:
-                    prepared_options.job_name = safe_name
-            elif isinstance(prepared_options, dict) and not prepared_options.get(
-                "jobName"
-            ):
-                prepared_options["jobName"] = safe_name
+        if job_name and not prepared_options.job_name:
+            prepared_options.job_name = job_name
 
         return prepared_options
 

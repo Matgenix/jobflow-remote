@@ -63,6 +63,7 @@ from jobflow_remote.jobs.state import (
     FlowState,
     JobState,
 )
+from jobflow_remote.remote.cloud_queue import CloudQueueManager
 from jobflow_remote.remote.data import (
     get_local_data_path,
     get_remote_store,
@@ -2461,7 +2462,6 @@ class JobController:
                 raise ValueError(f"worker {worker} is not present in the project")
             set_dict["worker"] = worker
 
-        use_pipeline = False
         if exec_config:
             if (
                 isinstance(exec_config, str)
@@ -2484,7 +2484,6 @@ class JobController:
                     }
                 }
                 set_dict["exec_config"] = cond
-                use_pipeline = True
 
             else:
                 set_dict["exec_config"] = exec_config
@@ -2492,10 +2491,13 @@ class JobController:
         if resources:
             if is_resource_obj(resources):
                 resources = resources.as_dict()
-                set_dict["resources"] = resources
-            elif update:
+                # if passing a QResources it is pointless to update
+                # all the keywords will be overwritten and if the previous
+                # value was a generic dictionary the merged dictionary will fail
+                # almost surely lead to failures
+                update = False
+            if update:
                 set_dict["resources"] = {"$mergeObjects": ["$resources", resources]}
-                use_pipeline = True
             else:
                 set_dict["resources"] = resources
 
@@ -2518,7 +2520,7 @@ class JobController:
             raise_on_error=raise_on_error,
             values=set_dict,
             acceptable_states=acceptable_states,
-            use_pipeline=use_pipeline,
+            use_pipeline=update,
         )
 
     def get_flow_job_aggreg(
@@ -4966,7 +4968,8 @@ class JobController:
             raise ValueError("The process id is not defined in the job document")
         worker = self.project.workers[job_doc["worker"]]
         if isinstance(worker, CloudWorker):
-            cancel_result = worker.get_scheduler_io().cancel(queue_process_id)
+            cloud_queue_manager = CloudQueueManager(worker.get_scheduler_io())
+            cancel_result = cloud_queue_manager.cancel(queue_process_id)
         else:
             with SharedHosts(self.project) as shared_hosts:
                 host = shared_hosts.get_host(job_doc["worker"])
