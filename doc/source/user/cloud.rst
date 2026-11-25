@@ -251,21 +251,62 @@ Step 4. Create the Runner credentials
          --query "Stacks[0].Outputs[?OutputKey=='RunnerUserName'].OutputValue" --output text)
        aws iam create-access-key --user-name "$RUNNER_USER" \
          --query 'AccessKey.[AccessKeyId,SecretAccessKey]' --output text
+       aws cloudformation describe-stacks --stack-name jfr-lab \
+         --query "Stacks[0].Outputs[?OutputKey=='Region'].OutputValue" --output text
 
-   It prints the access key ID and the secret access key. The secret key is
-   shown only once.
+   It prints the access key ID and the secret access key, then the region of
+   the stack. The secret key is shown only once.
 
-2. On your computer, save the key in the profile ``jfr-lab`` of
-   ``~/.aws/credentials``. The commands ask for the two values from the
-   previous step. The secret key is not shown while you type or paste it.
+2. On your computer, save the key and the region in the profile ``jfr-lab``.
+   The commands ask for the three values from the previous step. The secret
+   key is not shown while you type or paste it. The profile also makes the
+   ``Runner`` retry AWS requests that fail for a short time. If the profile
+   exists already, it is replaced.
 
    .. code-block:: bash
 
-       mkdir -p ~/.aws
+       {
        printf "AccessKeyId: "; read -r AK
        printf "SecretAccessKey: "; read -rs SK; echo
-       printf "\n[jfr-lab]\naws_access_key_id = %s\naws_secret_access_key = %s\n" "$AK" "$SK" >> ~/.aws/credentials
-       chmod 600 ~/.aws/credentials
+       printf "Region: "; read -r REGION
+       AK="$AK" SK="$SK" REGION="$REGION" python - <<'EOF'
+       import os
+       from pathlib import Path
+
+
+       def set_section(path, header, lines):
+           """Write a section of an AWS file and drop an older one with the same header."""
+           old = path.read_text().splitlines() if path.exists() else []
+           kept, skip = [], False
+           for line in old:
+               if line.lstrip().startswith("["):
+                   skip = line.strip() == header
+               if not skip:
+                   kept.append(line)
+           text = "\n".join(kept).strip()
+           section = "\n".join([header, *lines])
+           path.write_text(f"{text}\n\n{section}\n" if text else f"{section}\n")
+           path.chmod(0o600)
+
+
+       aws = Path.home() / ".aws"
+       aws.mkdir(exist_ok=True)
+       set_section(
+           aws / "credentials",
+           "[jfr-lab]",
+           [
+               f"aws_access_key_id = {os.environ['AK']}",
+               f"aws_secret_access_key = {os.environ['SK']}",
+           ],
+       )
+       set_section(
+           aws / "config",
+           "[profile jfr-lab]",
+           [f"region = {os.environ['REGION']}", "retry_mode = adaptive", "max_attempts = 10"],
+       )
+       print("Saved the profile jfr-lab in ~/.aws/credentials and ~/.aws/config")
+       EOF
+       }
 
 .. _cloud_configure_worker:
 
@@ -273,13 +314,12 @@ Step 5. Create the project file
 -------------------------------
 
 1. On your computer, run the block below. It reads the outputs of the stack
-   with the ``Runner`` credentials from Step 4. It then writes
-   ``~/.jfremote/aws_ht.yaml`` with one worker per queue you created. If your
-   stack is not in ``us-east-2``, change the region in the first line.
+   with the ``Runner`` profile from Step 4. It then writes
+   ``~/.jfremote/aws_ht.yaml`` with one worker per queue you created.
 
    .. code-block:: bash
 
-       AWS_DEFAULT_REGION=us-east-2 AWS_PROFILE=jfr-lab python - <<'EOF'
+       env -u AWS_DEFAULT_REGION AWS_PROFILE=jfr-lab python - <<'EOF'
        from pathlib import Path
 
        import boto3
@@ -809,6 +849,14 @@ queue. For the other queues, replace ``Ec2CpuJobQueueArn`` with
 ``RUNNABLE`` means the job waits for an instance. If a job stays
 ``RUNNABLE`` for more than 15 minutes, check the quotas in Part 1, Step 2.
 
+A job goes to ``REMOTE_ERROR`` when an action of the ``Runner`` on AWS fails
+several times in a row, for example while AWS Batch or S3 does not answer.
+Run the failed action again with the job's DB id:
+
+.. code-block:: bash
+
+    jf -p aws_ht job retry <db_id>
+
 Stop a queued or running job:
 
 .. code-block:: bash
@@ -862,5 +910,23 @@ Deleting the AWS stack
        aws cloudformation delete-stack --stack-name jfr-lab && \
        aws cloudformation wait stack-delete-complete --stack-name jfr-lab
 
-3. On your computer, open ``~/.aws/credentials`` (for example with
-   ``vi ~/.aws/credentials``) and delete the ``[jfr-lab]`` section.
+3. On your computer, remove the profile ``jfr-lab`` from ``~/.aws/credentials``
+   and ``~/.aws/config``:
+
+   .. code-block:: bash
+
+       python - <<'EOF'
+       from pathlib import Path
+
+       for name, header in [("credentials", "[jfr-lab]"), ("config", "[profile jfr-lab]")]:
+           path = Path.home() / ".aws" / name
+           if not path.exists():
+               continue
+           kept, skip = [], False
+           for line in path.read_text().splitlines():
+               if line.lstrip().startswith("["):
+                   skip = line.strip() == header
+               if not skip:
+                   kept.append(line)
+           path.write_text("\n".join(kept).strip() + "\n")
+       EOF
