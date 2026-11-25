@@ -825,10 +825,6 @@ class Runner:
             if worker.execution_cmd:
                 script_commands = [worker.execution_cmd.format(storage_uri)]
             else:
-                job_work_dir = (
-                    f"{worker.container_work_dir.rstrip('/')}/"
-                    f"{doc['uuid']}_{doc['index']}"
-                )
                 cmd_parts = [
                     "jf",
                     "-fe",
@@ -836,7 +832,7 @@ class Runner:
                     "run-cloud",
                     storage_uri,
                     "--work-dir",
-                    job_work_dir,
+                    worker.container_work_dir,
                     *storage.get_run_cloud_options(),
                 ]
                 script_commands = [shlex.join(cmd_parts)]

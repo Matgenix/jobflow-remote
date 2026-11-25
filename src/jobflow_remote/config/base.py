@@ -678,7 +678,10 @@ class CloudWorker(WorkerBase):
     )
     container_work_dir: str = Field(
         "/tmp/jf_run",  # noqa: S108
-        description="Local scratch directory inside the container where run_dir is synced.",
+        description="Folder inside the container under which the job folders are created, "
+        "with the same paths as in the storage. The job folders are kept after the jobs. "
+        "Use a file system mounted in all containers (e.g. EFS) so that jobs can read "
+        "the folders of earlier jobs, as with prev_dir. Not used if execution_cmd is set.",
     )
 
     @field_validator("scheduler_type")

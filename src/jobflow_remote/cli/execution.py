@@ -40,7 +40,8 @@ def run_cloud(
         str,
         typer.Option(
             "--work-dir",
-            help="Local scratch directory inside the container",
+            help="Folder inside the container under which the job folder is created, "
+            "with the same path as in the storage. The job folder is kept after the job.",
         ),
     ] = "/tmp/jf_run",  # noqa: S108
     region_name: Annotated[

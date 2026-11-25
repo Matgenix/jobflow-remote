@@ -1,3 +1,4 @@
+from pathlib import Path
 from random import randint
 from typing import NoReturn
 
@@ -23,6 +24,19 @@ def sleep(s):
 
     time.sleep(s)
     return s
+
+
+@job
+def write_file(content: str, filename: str = "shared.txt") -> str:
+    """A Job writing a file in its own folder and returning the folder path."""
+    Path(filename).write_text(content)
+    return str(Path.cwd())
+
+
+@job
+def read_file(folder: str, filename: str = "shared.txt") -> str:
+    """A Job reading a file from another folder, for example that of an earlier Job."""
+    return (Path(folder) / filename).read_text()
 
 
 @job

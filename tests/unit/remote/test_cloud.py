@@ -37,7 +37,7 @@ from jobflow_remote.jobs.state import JobState
 from jobflow_remote.remote.cloud_queue import CloudQueueManager
 from jobflow_remote.remote.data import get_remote_in_file, get_remote_store
 from jobflow_remote.remote.storage import S3Storage, StorageError
-from jobflow_remote.utils.examples import add
+from jobflow_remote.utils.examples import add, read_file, write_file
 from jobflow_remote.utils.remote import UnsafeDeletionError, safe_remove_job_files
 
 
@@ -557,6 +557,43 @@ class TestRunCloudJobAndCli:
         assert "start_time" in outputs_seen[0]
         assert "response" not in outputs_seen[0]
 
+    def test_run_cloud_job_keeps_folder_and_previous_attempt(self, s3_env, tmp_path):
+        # The job folder is kept after the job. Files of an earlier attempt are
+        # moved to the next previous_attempt_<n> and uploaded with the new attempt.
+        storage, _s3, _bucket = s3_env
+        uri = _upload_job_in(storage, add(1, 2), "/jf_work/retry_job")
+        run_dir = tmp_path / "container" / "proj" / "jf_work" / "retry_job"
+        run_dir.mkdir(parents=True)
+        (run_dir / "OUTCAR").write_text("killed attempt")
+        (run_dir / "previous_attempt_2").mkdir()
+
+        run_cloud_job(
+            storage_uri=uri, local_dir=tmp_path / "container", region_name="us-east-1"
+        )
+
+        assert (run_dir / "jfremote_out.json").is_file()
+        assert (
+            run_dir / "previous_attempt_3" / "OUTCAR"
+        ).read_text() == "killed attempt"
+        assert not (run_dir / "OUTCAR").exists()
+        assert storage.exists("/jf_work/retry_job/previous_attempt_3/OUTCAR")
+
+    def test_run_cloud_job_reads_folder_of_earlier_job(self, s3_env, tmp_path):
+        # With kept folders on a shared file system, a job can read the folder
+        # of an earlier job, as atomate2 does through prev_dir.
+        storage, _s3, _bucket = s3_env
+        shared = tmp_path / "shared"
+        uri = _upload_job_in(storage, write_file("hello"), "/jf_work/first")
+        run_cloud_job(storage_uri=uri, local_dir=shared, region_name="us-east-1")
+
+        first_dir = shared / "proj" / "jf_work" / "first"
+        uri = _upload_job_in(storage, read_file(str(first_dir)), "/jf_work/second")
+        run_cloud_job(storage_uri=uri, local_dir=shared, region_name="us-east-1")
+
+        data_local = tmp_path / "second_data.json"
+        storage.get("/jf_work/second/remote_job_data.json", data_local)
+        assert loadfn(data_local)[0].output == "hello"
+
     def test_run_cloud_job_rejects_invalid_uris(self, tmp_path):
         with pytest.raises(ValueError, match="Unsupported cloud storage URI"):
             run_cloud_job("gs://bucket/path", local_dir=tmp_path)
@@ -672,7 +709,7 @@ class TestRunnerAndControllerCloudIntegration:
         cmd_str = raw["container"]["command"][-1]
         expected_uri = storage.get_uri(doc["run_dir"])
         assert expected_uri in cmd_str
-        assert f"{worker.container_work_dir}/{jf_job.uuid}_1" in cmd_str
+        assert f"--work-dir {worker.container_work_dir}" in cmd_str
         assert "--region us-east-1" in cmd_str
 
         # Non-cloud worker rejects QCloudResources with clear TypeError
