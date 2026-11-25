@@ -107,9 +107,12 @@ First it should be specified the ``type``. At the moment the possible worker typ
   needed for the ``Runner`` to reach the queueing system.
 * ``remote``: a worker on a different machine than the ``Runner``, requiring an SSH
   connection to reach it.
+* ``cloud``: a worker running jobs through a cloud batch API (such as AWS Batch)
+  backed by cloud object storage (such as Amazon S3) instead of SSH. See
+  :ref:`cloud` for setup instructions.
 
-Since the ``Runner`` needs to constantly interact with the workers, for the latter
-type all the credentials to connect automatically should be provided. The best option
+Since the ``Runner`` needs to constantly interact with the workers, for ``remote``
+workers all the credentials to connect automatically should be provided. The best option
 would be to set up a passwordless connection and define it in the ``~/.ssh/config``
 file.
 
@@ -122,8 +125,10 @@ values are:
 * ``slurm``, ``pbs``, ...: the name of a queueing system. The job will be submitted
   to the queue with the selected resources.
 
-Another mandatory argument is ``work_dir``, indicating the full path for a folder
-on the worker machine where the Jobs will be actually executed.
+For ``local`` and ``remote`` workers, ``work_dir`` is mandatory and gives the full path
+to the folder on the worker machine where Jobs are executed. For ``cloud`` workers,
+``work_dir`` is optional (default ``/jf_work``) and sets the key prefix inside cloud
+object storage.
 
 It is possible to optionally select default values for keywords like ``pre_run``
 and ``resources``, that can be overridden for individual Jobs. Note that these

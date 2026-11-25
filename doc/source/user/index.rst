@@ -20,6 +20,7 @@ details are found in :ref:`reference`.
    states
    runner
    advancedoptions
+   cloud
    backup
    cli
    gui
