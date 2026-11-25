@@ -557,6 +557,27 @@ class TestRunCloudJobAndCli:
         assert "start_time" in outputs_seen[0]
         assert "response" not in outputs_seen[0]
 
+    def test_run_cloud_job_keeps_folder_and_previous_attempt(self, s3_env, tmp_path):
+        # The job folder is kept after the job. Files of an earlier attempt are
+        # moved to the next previous_attempt_<n> and uploaded with the new attempt.
+        storage, _s3, _bucket = s3_env
+        uri = _upload_job_in(storage, add(1, 2), "/jf_work/retry_job")
+        run_dir = tmp_path / "container" / "proj" / "jf_work" / "retry_job"
+        run_dir.mkdir(parents=True)
+        (run_dir / "OUTCAR").write_text("killed attempt")
+        (run_dir / "previous_attempt_2").mkdir()
+
+        run_cloud_job(
+            storage_uri=uri, local_dir=tmp_path / "container", region_name="us-east-1"
+        )
+
+        assert (run_dir / "jfremote_out.json").is_file()
+        assert (
+            run_dir / "previous_attempt_3" / "OUTCAR"
+        ).read_text() == "killed attempt"
+        assert not (run_dir / "OUTCAR").exists()
+        assert storage.exists("/jf_work/retry_job/previous_attempt_3/OUTCAR")
+
     def test_run_cloud_job_rejects_invalid_uris(self, tmp_path):
         with pytest.raises(ValueError, match="Unsupported cloud storage URI"):
             run_cloud_job("gs://bucket/path", local_dir=tmp_path)
@@ -672,7 +693,7 @@ class TestRunnerAndControllerCloudIntegration:
         cmd_str = raw["container"]["command"][-1]
         expected_uri = storage.get_uri(doc["run_dir"])
         assert expected_uri in cmd_str
-        assert f"{worker.container_work_dir}/{jf_job.uuid}_1" in cmd_str
+        assert f"--work-dir {worker.container_work_dir}" in cmd_str
         assert "--region us-east-1" in cmd_str
 
         # Non-cloud worker rejects QCloudResources with clear TypeError
