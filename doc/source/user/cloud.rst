@@ -389,6 +389,10 @@ Step 5. Create the project file
        host = os.environ["MONGO_HOST"]
        port = os.environ["MONGO_PORT"]
        text = f"""name: aws_ht
+       runner:
+         delay_checkout: 10
+         delay_check_run_status: 10
+         delay_advance_status: 10
        queue:
          store:
            type: MongoStore
@@ -456,10 +460,16 @@ Step 5. Create the project file
 If you skipped Steps 3 and 4, write the file yourself in the same format,
 with the values of your own queues, job definitions, and bucket.
 
-The workers are ``aws_cpu`` (CPU queue) and ``aws_gpu`` (GPU queue). ``scheduler_kwargs`` are passed to
-the AWS Batch scheduler (``qtoolkit.io.api.AWSBatchIO``). ``storage_kwargs``
-are passed to the S3 storage (``jobflow_remote.remote.storage.S3Storage``).
-``profile_name`` is the profile from Step 4.
+The ``runner`` section makes the ``Runner`` check the database and AWS Batch
+every 10 s instead of every 30 s, as in the example of the Runner options in
+:ref:`projectconf`. Each job of a flow then waits less for the next step of
+the ``Runner``.
+
+The workers are ``aws_cpu`` (CPU queue) and ``aws_gpu`` (GPU queue).
+``scheduler_kwargs`` are passed to the AWS Batch scheduler
+(``qtoolkit.io.api.AWSBatchIO``). ``storage_kwargs`` are passed to the S3
+storage (``jobflow_remote.remote.storage.S3Storage``). ``profile_name`` is the
+profile from Step 4.
 
 The results go to your ``JobStore``, as on HPC. The bucket of the stack
 deletes the job files ``RunFilesRetentionDays`` days (default ``30``) after
