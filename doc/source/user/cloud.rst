@@ -309,6 +309,9 @@ The main parameters of the template are:
      - ``0``
      - Days after upload when the bucket deletes the job files. ``0`` keeps
        them.
+   * - ``DefaultTimeLimit``
+     - ``172800``
+     - Time limit in seconds (48 hours) of a job that sets no ``time_limit``
 
 Step 4. Create the Runner credentials
 -------------------------------------
@@ -740,7 +743,9 @@ Step 3. Choose the resources of each job
 
 Each job gets its own ``QCloudResources``. The main fields are ``vcpus``,
 ``memory`` (MiB), ``gpus``, ``time_limit`` (seconds, at least ``60``), and
-``max_retries``.
+``max_retries``. ``time_limit`` works like the walltime of a Slurm job. AWS
+Batch stops the job when it is reached. A job without ``time_limit`` gets
+``DefaultTimeLimit`` of the stack (48 hours).
 
 The job definitions of the stack rerun a job up to two times when AWS
 stops its instance, for example when a Spot instance is reclaimed. Other
@@ -1038,7 +1043,9 @@ The list covers every Auto Scaling group in the region, including the ones
 that AWS Batch creates for the queues. A message about the vCPU limit means
 that the quota is too low. A message that the instance type is not eligible
 for Free Tier means that the account is on the Free plan. Both are explained
-in Part 1, Step 2.
+in Part 1, Step 2. If a job asks for more vCPUs or memory than any instance
+of the queue has, the queue cancels it after 30 minutes in ``RUNNABLE``, and
+the job fails.
 
 A job goes to ``REMOTE_ERROR`` when an action of the ``Runner`` on AWS fails
 several times in a row, for example while AWS Batch or S3 does not answer.

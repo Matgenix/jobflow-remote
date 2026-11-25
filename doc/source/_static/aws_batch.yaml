@@ -42,6 +42,11 @@ Parameters:
     Default: 0
     MinValue: 0
     Description: Days after which the job files under runs/ in the bucket are deleted. 0 keeps them.
+  DefaultTimeLimit:
+    Type: Number
+    Default: 172800
+    MinValue: 60
+    Description: Time limit in seconds of a job that sets no time_limit (default 48 hours).
 
 Conditions:
   HasGpuQueue: {Fn::Equals: [{Ref: EnableGpuQueue}, "true"]}
@@ -293,6 +298,10 @@ Resources:
       Priority: 1
       ComputeEnvironmentOrder:
         - {Order: 1, ComputeEnvironment: {Ref: CpuComputeEnvironment}}
+      JobStateTimeLimitActions:
+        # Cancel jobs that no instance of the queue can ever run.
+        - {Action: CANCEL, MaxTimeSeconds: 1800, State: RUNNABLE, Reason: "MISCONFIGURATION:JOB_RESOURCE_REQUIREMENT"}
+        - {Action: CANCEL, MaxTimeSeconds: 1800, State: RUNNABLE, Reason: "MISCONFIGURATION:COMPUTE_ENVIRONMENT_MAX_RESOURCE"}
 
   CpuJobDefinition:
     Type: AWS::Batch::JobDefinition
@@ -300,6 +309,7 @@ Resources:
     Properties:
       Type: container
       PlatformCapabilities: [EC2]
+      Timeout: {AttemptDurationSeconds: {Ref: DefaultTimeLimit}}
       ContainerProperties:
         Image: {Ref: ContainerImage}
         JobRoleArn: {Fn::GetAtt: [BatchTaskRole, Arn]}
@@ -356,6 +366,10 @@ Resources:
       Priority: 1
       ComputeEnvironmentOrder:
         - {Order: 1, ComputeEnvironment: {Ref: GpuComputeEnvironment}}
+      JobStateTimeLimitActions:
+        # Cancel jobs that no instance of the queue can ever run.
+        - {Action: CANCEL, MaxTimeSeconds: 1800, State: RUNNABLE, Reason: "MISCONFIGURATION:JOB_RESOURCE_REQUIREMENT"}
+        - {Action: CANCEL, MaxTimeSeconds: 1800, State: RUNNABLE, Reason: "MISCONFIGURATION:COMPUTE_ENVIRONMENT_MAX_RESOURCE"}
 
   GpuJobDefinition:
     Type: AWS::Batch::JobDefinition
@@ -364,6 +378,7 @@ Resources:
     Properties:
       Type: container
       PlatformCapabilities: [EC2]
+      Timeout: {AttemptDurationSeconds: {Ref: DefaultTimeLimit}}
       ContainerProperties:
         Image: {Ref: GpuContainerImage}
         JobRoleArn: {Fn::GetAtt: [BatchTaskRole, Arn]}
