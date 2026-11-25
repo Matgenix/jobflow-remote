@@ -4,127 +4,114 @@
 Running on Cloud (AWS)
 ======================
 
-A ``cloud`` worker runs jobflow-remote jobs on a cloud batch service (currently
-AWS Batch) using cloud object storage (Amazon S3) instead of SSH and a shared
-cluster filesystem.
+A ``cloud`` worker runs jobflow-remote jobs on AWS Batch. Job files move
+through an Amazon S3 bucket. No SSH connection and no shared filesystem are
+needed.
 
-How a cloud worker runs
-=======================
+How a cloud worker runs a job
+=============================
 
-Cloud workers follow the same execution model as remote SLURM workers, with S3
-replacing the cluster scratch directory and SSH:
+1. The ``Runner`` uploads ``jfremote_in.json`` to the S3 bucket and submits an
+   AWS Batch job.
+2. The AWS Batch job starts a container that runs
+   ``jf -fe execution run-cloud``. This command downloads the job folder from
+   S3, runs the job, and uploads ``jfremote_out.json`` and the job store files
+   back to S3.
+3. When AWS Batch reports the job as finished, the ``Runner`` downloads the
+   results from S3 and stores them in your ``JobStore``.
 
-1. The local or shared ``Runner`` uploads ``jfremote_in.json`` to your S3
-   bucket and submits a container job through the AWS Batch API.
-2. Inside the container, ``jf -fe execution run-cloud`` downloads the job
-   folder from S3, executes the job locally, and uploads ``jfremote_out.json``
-   and the job store JSON files back to S3.
-3. After the job finishes, the ``Runner`` downloads the results from S3 and
-   inserts them into your permanent ``JobStore`` (for example, ``MongoStore``
-   with ``GridFSStore`` or ``S3Store``).
-
-Compute containers never need network access to your MongoDB database.
+The container never connects to your MongoDB database.
 
 .. warning::
 
-    Each job runs in its own container, in a temporary folder that is deleted
-    when the job ends. A job therefore cannot read files from the run folder
-    of an earlier job. Flows that pass ``prev_dir`` between jobs, such as the
-    ``atomate2`` VASP relax and static chains, do not work on cloud workers.
-    Flows that pass data only through job outputs, such as the force-field
-    phonon workflow in :ref:`cloud_gpu_workflow`, work as on HPC.
+    * Each job runs in its own container, in a temporary folder that is
+      deleted when the job ends. A job cannot read files from the run folder
+      of an earlier job. Flows that pass ``prev_dir`` between jobs, such as
+      the ``atomate2`` VASP relax and static chains, do not work on cloud
+      workers. Flows that pass data only through job outputs, such as the
+      force-field phonon workflow in :ref:`cloud_submit`, work as on HPC.
+    * Each jobflow job runs as one AWS Batch job. A GPU job gets a whole GPU.
+      Several jobs cannot share one GPU yet.
 
-Just like an HPC cluster where administrators configure SLURM queues once and
-researchers reuse them across projects, cloud work splits cleanly into two
-parts:
+The setup has two parts. Part 1 is done once per lab or AWS account. Part 2
+is repeated for each campaign.
 
-* **Part 1 (one-time setup per lab or account):** Provision your AWS Batch
-  queues (CPU and optional GPU), S3 staging bucket, IAM roles, and
-  ``jobflow-remote`` project file once.
-* **Part 2 (day-to-day high-throughput campaigns):** Reuse those permanent
-  queues across as many workflows and software stacks as you want. You only
-  push a new container image when your scientific code changes, then submit
-  flows in Python.
+Part 1: One-time setup
+======================
 
-Part 1: One-time AWS setup (per lab or account)
-===============================================
+Step 1. Install jobflow-remote
+------------------------------
 
-1.1 Install locally and choose your MongoDB
--------------------------------------------
-
-On each machine where you submit flows (and on the host running the
-``Runner``), install jobflow-remote with the ``aws`` extra:
+On every machine where you submit flows or run the ``Runner``, install
+jobflow-remote with the ``aws`` extra:
 
 .. code-block:: bash
 
     pip install "jobflow-remote[aws]"
 
-You also need a reachable MongoDB instance for the queue store and
-``JobStore``. For single-user testing, a local MongoDB on ``127.0.0.1:27017``
-works. For a shared lab setup, use a managed MongoDB service (such as MongoDB
-Atlas) and run ``jf runner`` on one small always-on VM or container so
-individual researchers only submit flows and query results from their laptops.
+You also need a MongoDB database for the queue and the ``JobStore``, as for
+any jobflow-remote project. A local MongoDB on ``127.0.0.1:27017`` is enough
+for testing.
 
-.. tip::
+Step 2. Check your EC2 quotas (EC2 queues only)
+-----------------------------------------------
 
-    **Already have AWS Batch queues and S3 set up?** Skip Sections 1.2 and 1.3
-    and jump straight to :ref:`cloud_configure_worker`. Make sure two IAM
-    requirements are met:
+Skip this step if you only use the Fargate CPU queue.
 
-    1. Your Batch container task role (``jobRoleArn``) allows
-       ``s3:ListBucket`` and ``s3:GetBucketLocation`` on the bucket, plus
-       ``s3:GetObject`` and ``s3:PutObject`` on its objects.
-    2. Your local AWS credentials allow those S3 actions plus
-       ``s3:DeleteObject``, and the AWS Batch actions ``batch:SubmitJob``,
-       ``batch:DescribeJobs``, ``batch:ListJobs``, ``batch:TerminateJob``,
-       ``batch:CancelJob``, and ``batch:TagResource``.
+Sign in to the `AWS Management Console <https://console.aws.amazon.com/>`_.
+Choose your region (for example ``us-east-2``) in the region menu at the top
+right. Then open **CloudShell** (the ``>_`` icon in the top bar) and run:
 
-1.2 Deploy the AWS Batch stack once
------------------------------------
+.. code-block:: bash
 
-Deploy our ready-made CloudFormation template
-(:download:`aws_batch.yaml </_static/aws_batch.yaml>`) once from **AWS
-CloudShell** (no local AWS CLI or Docker required). One stack creates a
-dedicated public VPC without a NAT Gateway, a private S3 staging bucket, a
-private ECR repository, CloudWatch log groups, scoped IAM roles and a Runner
-user, a serverless Fargate CPU queue, an optional EC2 GPU queue (Spot or
-On-Demand, scaling to ``0`` nodes when idle), and a reusable CodeBuild project
-for building campaign images. When no jobs run, you pay only for the data
-kept in S3, ECR, and CloudWatch Logs. While jobs run, AWS also bills the
-public IPv4 address of each Fargate job and GPU node.
+    for code in L-1216C47A L-3819A6DF L-DB2E81BA; do
+      aws service-quotas get-service-quota --service-code ec2 --quota-code "$code" \
+        --query 'Quota.{Name:QuotaName,Value:Value}' --output table
+    done
 
-1. Sign in to the `AWS Management Console <https://console.aws.amazon.com/>`_.
-2. In the **top-right region dropdown**, choose your region (for example,
-   **US East (Ohio)** (``us-east-2``)).
-3. Click the **CloudShell** terminal icon (``>_``) in the **top-right
-   navigation bar** (or type ``CloudShell`` in the top search bar).
+The quotas count vCPUs:
 
-.. note::
+* ``L-1216C47A`` is for On-Demand standard instances, which the EC2 CPU queue
+  uses. New accounts often start at ``5``. Raise it to the value of
+  ``Ec2CpuMaxvCpus`` (default ``64``) to run that many 1-vCPU jobs at once.
+* ``L-3819A6DF`` is for Spot GPU instances, which the GPU queue uses by
+  default (``GpuAllocationType=SPOT``). It must be at least ``4`` for one
+  ``g4dn.xlarge`` or ``g5.xlarge`` instance.
+* ``L-DB2E81BA`` is for On-Demand GPU instances (``GpuAllocationType=EC2``).
 
-    **EC2 GPU quota check:** New AWS accounts often start with ``0`` vCPUs for
-    EC2 ``G``/``VT`` GPU instances (``g4dn``, ``g5``, ``g6``). Check your quota
-    in CloudShell before enabling the GPU queue:
+New accounts often start the GPU quotas at ``0``. Request increases in
+**Service Quotas** and wait for approval before you enable the GPU queue.
 
-    .. code-block:: bash
+Step 3. Deploy the AWS stack
+----------------------------
 
-        aws service-quotas get-service-quota --service-code ec2 --quota-code L-DB2E81BA \
-          --query 'Quota.{Name:QuotaName,Value:Value}' --output table
-        aws service-quotas get-service-quota --service-code ec2 --quota-code L-3819A6DF \
-          --query 'Quota.{Name:QuotaName,Value:Value}' --output table
+If you already have your own AWS Batch queues and S3 bucket, you can skip
+Steps 3 and 4. The container role (``jobRoleArn`` of the job definition)
+then needs ``s3:ListBucket`` and ``s3:GetBucketLocation`` on the bucket, and
+``s3:GetObject`` and ``s3:PutObject`` on its objects. The credentials of the
+``Runner`` need the same S3 actions plus ``s3:DeleteObject``, and the AWS
+Batch actions ``batch:SubmitJob``, ``batch:DescribeJobs``, ``batch:ListJobs``,
+and ``batch:TerminateJob``.
 
-    The first quota (``L-DB2E81BA``) is for On-Demand GPU instances and the
-    second (``L-3819A6DF``) is for Spot GPU instances. Check the one that
-    matches ``GpuAllocationType``. That is ``L-3819A6DF`` for ``SPOT`` (the
-    default) and ``L-DB2E81BA`` for ``EC2``. If it is ``0``, request an
-    increase in **Service Quotas** (for example, ``4`` vCPUs for one
-    ``g4dn.xlarge`` or ``g5.xlarge`` GPU node) before running GPU jobs, or
-    deploy CPU-only first and enable ``EnableGpuQueue=true`` later on the
-    same stack.
+The CloudFormation template
+:download:`aws_batch.yaml </_static/aws_batch.yaml>` creates everything that
+jobflow-remote needs in one stack:
 
-Run in **CloudShell** to deploy the stack (takes about 1 to 2 minutes) and
-print your permanent queue and bucket outputs. Set ``EnableGpuQueue=true`` for
-both CPU and EC2 Spot GPU queues (or omit ``--parameter-overrides`` for
-CPU-only):
+* a VPC without a NAT Gateway
+* a private S3 bucket for job files
+* a private ECR repository for your container images
+* CloudWatch log groups
+* IAM roles for the containers and an IAM user for the ``Runner``
+* a Fargate CPU queue
+* an optional EC2 CPU queue and an optional EC2 GPU queue, both scaling to
+  ``0`` instances when idle
+* a CodeBuild project that builds container images without local Docker
+
+When no jobs run, you pay only for the data kept in S3, ECR, and CloudWatch
+Logs. While jobs run, you also pay for the Fargate tasks and EC2 instances,
+and for the public IPv4 address of each.
+
+Run in CloudShell:
 
 .. code-block:: bash
 
@@ -137,15 +124,54 @@ CPU-only):
       --template-file aws_batch.yaml \
       --stack-name jfr-lab \
       --capabilities CAPABILITY_IAM \
-      --parameter-overrides EnableGpuQueue=true GpuAllocationType=SPOT GpuMaxvCpus=16
+      --parameter-overrides EnableEc2CpuQueue=true EnableGpuQueue=true
 
     aws cloudformation describe-stacks --stack-name jfr-lab \
       --query 'Stacks[0].Outputs[*].[OutputKey,OutputValue]' --output table
 
-1.3 Create Runner credentials once
-----------------------------------
+The deployment takes a few minutes. The last command prints the stack
+outputs (bucket name, queue ARNs, and job definition ARNs). You need them in
+Step 5. Remove ``EnableGpuQueue=true`` if your Spot GPU quota is still ``0``.
+Remove ``EnableEc2CpuQueue=true`` if you do not need the EC2 CPU queue. Leave
+out ``--parameter-overrides`` to deploy only the Fargate CPU queue. You can
+enable a queue later by running the same command with that parameter. The
+main parameters are:
 
-In **CloudShell**, create an access key for the stack's scoped Runner IAM user:
+.. list-table::
+   :header-rows: 1
+
+   * - Parameter
+     - Default
+     - Meaning
+   * - ``CpuMaxvCpus``
+     - ``8``
+     - Maximum vCPUs used at once by the Fargate CPU queue
+   * - ``EnableEc2CpuQueue``
+     - ``false``
+     - Create the EC2 CPU queue
+   * - ``Ec2CpuInstanceTypes``
+     - ``c7i``
+     - EC2 instance families for the EC2 CPU queue
+   * - ``Ec2CpuMaxvCpus``
+     - ``64``
+     - Maximum vCPUs used at once by the EC2 CPU queue
+   * - ``EnableGpuQueue``
+     - ``false``
+     - Create the EC2 GPU queue
+   * - ``GpuAllocationType``
+     - ``SPOT``
+     - ``SPOT`` or ``EC2`` (On-Demand) instances for the GPU queue
+   * - ``GpuInstanceTypes``
+     - ``g4dn,g5,g6``
+     - EC2 instance families for the GPU queue
+   * - ``GpuMaxvCpus``
+     - ``16``
+     - Maximum vCPUs used at once by the GPU queue
+
+Step 4. Create the Runner credentials
+-------------------------------------
+
+In CloudShell, create an access key for the ``Runner`` IAM user of the stack:
 
 .. code-block:: bash
 
@@ -153,12 +179,9 @@ In **CloudShell**, create an access key for the stack's scoped Runner IAM user:
       --query "Stacks[0].Outputs[?OutputKey=='RunnerUserName'].OutputValue" --output text)
     aws iam create-access-key --user-name "$RUNNER_USER"
 
-On **your local machine** (or shared Runner host), save the printed
-``AccessKeyId`` and ``SecretAccessKey`` in ``~/.aws/credentials``:
-
-.. code-block:: bash
-
-    mkdir -p ~/.aws
+On the machine that runs the ``Runner``, add the printed ``AccessKeyId`` and
+``SecretAccessKey`` to ``~/.aws/credentials`` and restrict the file
+permissions:
 
 .. code-block:: ini
 
@@ -172,19 +195,17 @@ On **your local machine** (or shared Runner host), save the printed
 
 .. _cloud_configure_worker:
 
-1.4 Configure your project file once
-------------------------------------
+Step 5. Write the project file
+------------------------------
 
-On **your local machine**, create ``~/.jfremote/aws_ht.yaml`` (or place it in
-``$JFREMOTE_PROJECTS_FOLDER``). Define both ``aws_cpu`` and ``aws_gpu``
-workers pointing to the same S3 bucket and MongoDB/S3 ``JobStore`` (omit
-``aws_gpu`` if you deployed CPU-only). ``profile_name`` is optional if you use
-default AWS credentials (``AWS_PROFILE``, ``[default]``, AWS SSO, or an IAM
-role):
+Create ``~/.jfremote/aws_ht.yaml`` and fill in the stack outputs from Step 3.
+The file below defines one worker per queue. Leave out the workers of queues
+you did not create.
 
-.. code-block:: bash
-
-    mkdir -p ~/.jfremote
+``scheduler_kwargs`` are passed to the AWS Batch scheduler
+(``qtoolkit.io.api.AWSBatchIO``). ``storage_kwargs`` are passed to the S3
+storage (``jobflow_remote.remote.storage.S3Storage``). ``profile_name`` is the
+section name in ``~/.aws/credentials`` from Step 4.
 
 .. code-block:: yaml
 
@@ -214,96 +235,136 @@ role):
       aws_cpu:
         type: cloud
         scheduler_type: aws_batch
+        scheduler_kwargs:
+          job_queue: <CpuJobQueueArn>
+          job_definition: <CpuJobDefinitionArn>
+          region_name: <Region>
+          profile_name: jfr-lab
         storage_type: s3
-        bucket: <S3BucketName>
-        storage_prefix: runs
-        region_name: <Region>
-        profile_name: jfr-lab
-        job_queue: <CpuJobQueueArn>
-        job_definition: <CpuJobDefinitionArn>
+        storage_kwargs:
+          bucket: <S3BucketName>
+          prefix: runs
+          region_name: <Region>
+          profile_name: jfr-lab
+      aws_cpu_ec2:
+        type: cloud
+        scheduler_type: aws_batch
+        scheduler_kwargs:
+          job_queue: <Ec2CpuJobQueueArn>
+          job_definition: <Ec2CpuJobDefinitionArn>
+          region_name: <Region>
+          profile_name: jfr-lab
+        storage_type: s3
+        storage_kwargs:
+          bucket: <S3BucketName>
+          prefix: runs
+          region_name: <Region>
+          profile_name: jfr-lab
       aws_gpu:
         type: cloud
         scheduler_type: aws_batch
+        scheduler_kwargs:
+          job_queue: <GpuJobQueueArn>
+          job_definition: <GpuJobDefinitionArn>
+          region_name: <Region>
+          profile_name: jfr-lab
         storage_type: s3
-        bucket: <S3BucketName>
-        storage_prefix: runs
-        region_name: <Region>
-        profile_name: jfr-lab
-        job_queue: <GpuJobQueueArn>
-        job_definition: <GpuJobDefinitionArn>
+        storage_kwargs:
+          bucket: <S3BucketName>
+          prefix: runs
+          region_name: <Region>
+          profile_name: jfr-lab
 
-.. note::
+The job files stay in the S3 bucket until you delete them, for example with
+``jf flow delete --files``. The results go to your ``JobStore``, as on HPC.
 
-    For large binary outputs in ``additional_stores.data``, you can use either
-    ``GridFSStore`` (MongoDB) or ``S3Store`` (from ``maggma.stores.aws``, for
-    permanent S3 storage), just like on an HPC cluster. The ``bucket`` field on
-    ``CloudWorker`` is only the staging area for job execution files.
+Step 6. Check the setup
+-----------------------
 
-Verify MongoDB, S3, and AWS Batch connectivity, then initialize the queue
-database:
+The first command checks that jobflow-remote can reach MongoDB, S3, and AWS
+Batch. The second command creates the queue database:
 
 .. code-block:: bash
 
     jf -p aws_ht project check --errors
     jf -p aws_ht admin reset
 
-.. dropdown:: Quick 2-minute sanity check (no Docker needed)
+To run a first test without building an image, add this line under
+``aws_cpu`` in ``aws_ht.yaml``. It installs jobflow-remote in the default
+Python image of the stack when the job starts:
 
-    Before building a scientific container image, you can test end-to-end
-    connectivity on the default ``public.ecr.aws/docker/library/python:3.12-slim``
-    image by temporarily adding
-    ``pre_run: pip install -q --no-cache-dir "jobflow-remote[aws]"`` under
-    ``aws_cpu`` and submitting two tiny jobs:
+.. code-block:: yaml
 
-    .. code-block:: python
+        pre_run: pip install -q --no-cache-dir "jobflow-remote[aws]"
 
-        from jobflow import Flow
-        from qtoolkit.core.data_objects import QCloudResources
+Then submit two small jobs:
 
-        from jobflow_remote import submit_flow
-        from jobflow_remote.utils.examples import add
+.. code-block:: python
 
-        job1 = add(1, 2)
-        job2 = add(job1.output, 3)
-        submit_flow(
-            Flow([job1, job2]),
-            worker="aws_cpu",
-            project="aws_ht",
-            resources=QCloudResources(vcpus=1, memory=2048, time_limit=300),
-        )
+    from jobflow import Flow
+    from qtoolkit.core.data_objects import QCloudResources
 
-    Run ``jf -p aws_ht runner run`` in one terminal, and check
-    ``jf -p aws_ht job list`` and ``jf -p aws_ht job output 2`` (should print
-    ``6``) in another. Remove the temporary ``pre_run`` line once you switch
-    to your production container image below.
+    from jobflow_remote import submit_flow
+    from jobflow_remote.utils.examples import add
 
-Part 2: Day-to-day high-throughput campaigns
-============================================
+    job1 = add(1, 2)
+    job2 = add(job1.output, 3)
+    submit_flow(
+        Flow([job1, job2]),
+        worker="aws_cpu",
+        project="aws_ht",
+        resources=QCloudResources(vcpus=1, memory=2048, time_limit=300),
+    )
 
-Once Part 1 is in place, you never touch VPCs, S3 buckets, IAM roles, or Batch
-compute environments again. Running a new campaign is just two steps: build a
-tagged image for your scientific stack (only when dependencies change), and
-submit flows in Python.
+Start the ``Runner`` with ``jf -p aws_ht runner run``. In a second terminal,
+``jf -p aws_ht job list`` shows both jobs as ``COMPLETED`` after a few
+minutes, and ``jf -p aws_ht job output 2`` prints ``6``. Remove the
+``pre_run`` line once you use your own image (Part 2).
+
+Part 2: Running a campaign
+==========================
 
 .. _cloud_build_image:
 
-2.1 Build a tagged container image for your campaign
-----------------------------------------------------
+Step 1. Build a container image
+-------------------------------
 
-Every Python function executed by a ``Job`` must be importable inside its
-container image. Use versioned tags (such as ``mace-gpu-v1`` or ``mace-gpu-v2``)
-inside your single shared ECR repository so multiple campaigns coexist cleanly.
+Every Python function that a job runs must be importable in the container
+image. Build one image per software stack and give each image its own tag
+(for example ``mace-gpu-v1``). All images go into the ECR repository of the
+stack.
 
-Below is an example CUDA-enabled ``Dockerfile`` for GPU ``atomate2`` +
-MACE-OMAT-0 + ``pheasy`` phonon campaigns (with CUDA PyTorch, ``mace-torch``,
-and ``pheasy`` installed from git as documented in ``atomate2``):
+The example ``Dockerfile`` below installs CUDA PyTorch, MACE, ``atomate2``,
+and ``pheasy`` for force-field phonon calculations:
+
+.. code-block:: docker
+
+    FROM public.ecr.aws/docker/library/python:3.12-slim
+
+    ENV PIP_NO_CACHE_DIR=1 \
+        PYTHONDONTWRITEBYTECODE=1 \
+        PYTHONUNBUFFERED=1
+
+    RUN apt-get update && apt-get install -y --no-install-recommends git gcc g++ && rm -rf /var/lib/apt/lists/*
+    RUN pip install --upgrade pip && \
+        pip install --index-url https://download.pytorch.org/whl/cu124 torch && \
+        pip install "numpy<=2.2" "mace-torch>=0.3.16" "jobflow-remote[aws]" \
+          "atomate2[pheasy,ase]" "f90nml>=1.3.1" "h5py>=3.6.0" "numba>=0.58.1" \
+          "scikit-learn>=1.0.2" "spglib>=1.16.3" && \
+        pip install --no-deps "pheasy @ git+https://gitlab.com/hpsahasrabuddhe/pheasy.git@9f24162a4ed0f0ab8911d382fd2617944aade55d"
+
+    WORKDIR /tmp/jf_run
+
+Build it with CodeBuild (no local Docker needed) or with Docker on your
+machine.
 
 .. tab-set::
 
-    .. tab-item:: AWS CodeBuild (no local Docker)
+    .. tab-item:: AWS CodeBuild
 
-        Run in **CloudShell** (in the same AWS region selected in Part 1). Set
-        ``IMAGE_TAG`` to any version tag for your campaign:
+        In CloudShell, in the region of the stack, save the ``Dockerfile``
+        above as ``/tmp/Dockerfile`` (for example with
+        ``nano /tmp/Dockerfile``). Then run:
 
         .. code-block:: bash
 
@@ -312,24 +373,6 @@ and ``pheasy`` installed from git as documented in ``atomate2``):
               --query "Stacks[0].Outputs[?OutputKey=='S3BucketName'].OutputValue" --output text)
             CB_PROJ=$(aws cloudformation describe-stacks --stack-name jfr-lab \
               --query "Stacks[0].Outputs[?OutputKey=='CodeBuildProjectName'].OutputValue" --output text)
-
-            cat > /tmp/Dockerfile <<'EOF'
-            FROM public.ecr.aws/docker/library/python:3.12-slim
-
-            ENV PIP_NO_CACHE_DIR=1 \
-                PYTHONDONTWRITEBYTECODE=1 \
-                PYTHONUNBUFFERED=1
-
-            RUN apt-get update && apt-get install -y --no-install-recommends git gcc g++ && rm -rf /var/lib/apt/lists/*
-            RUN pip install --upgrade pip && \
-                pip install --index-url https://download.pytorch.org/whl/cu124 torch && \
-                pip install "numpy<=2.2" "mace-torch>=0.3.16" "jobflow-remote[aws]" \
-                  "atomate2[pheasy,ase]" "f90nml>=1.3.1" "h5py>=3.6.0" "numba>=0.58.1" \
-                  "scikit-learn>=1.0.2" "spglib>=1.16.3" && \
-                pip install --no-deps "pheasy @ git+https://gitlab.com/hpsahasrabuddhe/pheasy.git@9f24162a4ed0f0ab8911d382fd2617944aade55d"
-
-            WORKDIR /tmp/jf_run
-            EOF
 
             (cd /tmp && zip -q context.zip Dockerfile)
             aws s3 cp /tmp/context.zip "s3://${BUCKET}/build/context.zip"
@@ -343,16 +386,15 @@ and ``pheasy`` installed from git as documented in ``atomate2``):
             done
             aws codebuild batch-get-builds --ids "$BUILD_ID" --query 'builds[0].buildStatus' --output text
 
-        Confirm the printed build status is ``SUCCEEDED`` (you can also view
-        build logs by searching for **CodeBuild** in the top AWS Console search
-        bar and opening **Build projects**).
+        The last command prints ``SUCCEEDED`` when the image is in ECR. The
+        build logs are in the CodeBuild page of the AWS Console.
 
     .. tab-item:: Local Docker
 
-        Run on **your local machine** inside an empty folder containing your
-        ``Dockerfile``. This requires Docker and local AWS CLI credentials with
-        ECR push permissions (not the scoped ``[jfr-lab]`` Runner profile).
-        Replace ``<Region>`` and ``<EcrRepositoryUri>`` from Part 1:
+        Save the ``Dockerfile`` above in an empty folder on your machine and
+        run the commands below in that folder. You need Docker and AWS
+        credentials that can push to ECR. The ``jfr-lab``
+        Runner credentials from Part 1 cannot push images.
 
         .. code-block:: bash
 
@@ -365,46 +407,100 @@ and ``pheasy`` installed from git as documented in ``atomate2``):
               docker login --username AWS --password-stdin "$ECR_REGISTRY"
             docker buildx build --platform linux/amd64 -t "${ECR_REPO_URI}:${IMAGE_TAG}" --push .
 
-Point the stack's CPU and GPU job definitions at the new image in
-**CloudShell** (or pass a lighter CPU image for ``ContainerImage``), update
-both ``job_definition`` fields in ``~/.jfremote/aws_ht.yaml``, and restart the
-``Runner`` (``jf -p aws_ht runner restart`` if running as a daemon):
+Step 2. Point the job definitions at the image
+----------------------------------------------
+
+Update the stack in CloudShell so that the job definitions use the new image.
+Parameters you do not pass keep their current values:
 
 .. code-block:: bash
 
     [ -f aws_batch.yaml ] || curl -fsSLO https://raw.githubusercontent.com/Matgenix/jobflow-remote/develop/doc/source/_static/aws_batch.yaml
     ECR_REPO_URI=$(aws cloudformation describe-stacks --stack-name jfr-lab \
       --query "Stacks[0].Outputs[?OutputKey=='EcrRepositoryUri'].OutputValue" --output text)
-    IMAGE_TAG="mace-gpu-v1"  # the tag you built in Section 2.1
+    IMAGE_TAG="mace-gpu-v1"  # the tag you built in Step 1
 
     aws cloudformation deploy \
       --template-file aws_batch.yaml \
       --stack-name jfr-lab \
       --capabilities CAPABILITY_IAM \
       --parameter-overrides \
-        EnableGpuQueue=true \
-        GpuAllocationType=SPOT \
-        GpuMaxvCpus=16 \
         ContainerImage="${ECR_REPO_URI}:${IMAGE_TAG}" \
         GpuContainerImage="${ECR_REPO_URI}:${IMAGE_TAG}"
 
     aws cloudformation describe-stacks --stack-name jfr-lab \
-      --query "Stacks[0].Outputs[?OutputKey=='CpuJobDefinitionArn' || OutputKey=='GpuJobDefinitionArn'].[OutputKey,OutputValue]" --output table
+      --query 'Stacks[0].Outputs[*].[OutputKey,OutputValue]' --output table
 
-.. _cloud_gpu_workflow:
+Each update creates a new revision of the job definitions. Copy the new
+``CpuJobDefinitionArn``, ``Ec2CpuJobDefinitionArn``, and
+``GpuJobDefinitionArn`` values into ``job_definition`` of the matching workers
+in ``aws_ht.yaml``. Then restart the ``Runner`` (``jf -p aws_ht runner
+restart`` if it runs as a daemon).
 
-2.2 Run GPU high-throughput workflows with hybrid CPU/GPU routing
------------------------------------------------------------------
+To use several images on the same queues, register one job definition per
+image. Copy a job definition of the stack and change only the image. The copy
+then keeps the job role and the log settings, and for Fargate also the
+execution role and the public IP setting. Without the job role of the stack,
+the container cannot read or write the S3 bucket. Then point one worker per
+image at its job definition. You can also override the job definition for
+single jobs with
+``QCloudResources(..., scheduler_kwargs={"jobDefinition": "<arn>"})``. The
+``scheduler_kwargs`` of ``QCloudResources`` are fields of the AWS Batch
+``SubmitJob`` request. They are different from the ``scheduler_kwargs`` of
+the worker in ``aws_ht.yaml``.
 
-On **your local machine** (with ``atomate2[pheasy]`` installed to construct
-flows), submit your flows.
+.. _cloud_resources:
 
-The example below sends the flow to ``aws_gpu`` (with ``gpus=1`` and
-``max_retries=2`` so EC2 Spot interruptions retry automatically) and moves
-the ``structure_to_primitive`` step, which needs no GPU, to ``aws_cpu``. Add
-one ``set_run_config`` call per job name to move other steps the same way.
-Keep ``run_phonon_displacements`` on ``aws_gpu``, because the force jobs it
-creates run on the same worker as this step.
+Step 3. Choose the resources of each job
+----------------------------------------
+
+Each job gets its own ``QCloudResources``. The main fields are ``vcpus``,
+``memory`` (MiB), ``gpus``, ``time_limit`` (seconds, at least ``60``), and
+``max_retries`` (how many times AWS Batch reruns a failed attempt, for
+example after a Spot interruption).
+
+The three queues place jobs differently:
+
+.. list-table::
+   :header-rows: 1
+
+   * - Worker
+     - Where a job runs
+     - Typical use
+   * - ``aws_cpu`` (Fargate)
+     - Its own Fargate task. ``vcpus`` and ``memory`` must be one of the
+       `Fargate combinations <https://docs.aws.amazon.com/batch/latest/APIReference/API_ResourceRequirement.html>`_.
+     - Small numbers of CPU jobs, quick tests
+   * - ``aws_cpu_ec2`` (EC2 CPU)
+     - An EC2 instance that can be shared with other jobs. AWS Batch runs
+       several jobs on one instance when its free vCPUs and memory allow.
+       The instance keeps the image cached between jobs.
+     - Many small CPU jobs, for example ``pheasy`` fits with 1 vCPU each
+   * - ``aws_gpu`` (EC2 GPU)
+     - An EC2 GPU instance. A job with ``gpus=1`` gets one whole GPU.
+     - MLIP force calculations
+
+On the EC2 queues, jobs cannot use all of the instance memory. The operating
+system and the ECS agent use part of it. Ask for a little less than the full
+memory per vCPU so that jobs fill the instance. ``c7i`` instances have 2 GiB
+per vCPU, so the EC2 CPU job definition of the stack uses ``memory=1800`` with
+``vcpus=1``.
+
+Use ``submit_flow(..., resources=...)`` to set the resources of all jobs in a
+flow. Use ``set_run_config`` to give jobs with a given name another worker or
+other resources. The example in :ref:`cloud_submit` uses both.
+
+.. _cloud_submit:
+
+Step 4. Submit the flows
+------------------------
+
+The example below runs the ``atomate2`` force-field phonon workflow with
+MACE-OMAT-0 and ``pheasy``. The force calculations run on the GPU queue. The
+``pheasy`` fit (``generate_frequencies_eigenvectors``) and the
+``structure_to_primitive`` step run on the EC2 CPU queue with 1 vCPU each.
+For a campaign, call ``submit_flow`` once per structure. The EC2 CPU queue
+then packs the fits of many structures onto the same instances.
 
 .. code-block:: python
 
@@ -442,76 +538,50 @@ creates run on the same worker as this step.
         ),
         create_thermal_displacements=False,
     )
-
     flow = maker.make(si_prim)
 
-    # Run this step on the CPU queue (or on a LocalWorker).
-    set_run_config(
-        flow,
-        name_filter="structure_to_primitive",
-        worker="aws_cpu",
-        resources=QCloudResources(vcpus=1, memory=2048, time_limit=300),
-    )
+    cpu_resources = QCloudResources(vcpus=1, memory=1800, time_limit=1800)
+    for name in ("structure_to_primitive", "generate_frequencies_eigenvectors"):
+        set_run_config(
+            flow, name_filter=name, worker="aws_cpu_ec2", resources=cpu_resources
+        )
 
     submit_flow(
         flow,
         worker="aws_gpu",
         project="aws_ht",
         resources=QCloudResources(
-            vcpus=4,
-            memory=14000,
-            gpus=1,
-            max_retries=2,
-            time_limit=1800,
+            vcpus=4, memory=14000, gpus=1, max_retries=2, time_limit=1800
         ),
     )
 
-Start the ``Runner`` (foreground with ``jf -p aws_ht runner run``, or as a
-daemon with ``jf -p aws_ht runner start``). AWS Batch automatically scales EC2
-GPU nodes up to ``GpuMaxvCpus`` to run queued jobs in parallel, caches your
-container image on warm EC2 nodes between consecutive jobs, and scales back to
-``0`` nodes when the queue empties.
+Keep ``run_phonon_displacements`` on ``aws_gpu``, because the force jobs it
+creates run on the same worker as this step.
 
-2.3 Reusing the same queues across multiple campaigns
------------------------------------------------------
+Start the ``Runner`` with ``jf -p aws_ht runner run``, or as a daemon with
+``jf -p aws_ht runner start``. AWS Batch starts EC2 instances when jobs are
+queued and terminates them a few minutes after the queues are empty.
 
-To run several campaigns with different software stacks on the same
-permanent queues without redeploying CloudFormation:
+Inspecting and stopping jobs
+============================
 
-1. Push each stack to your shared ECR repository under its own tag (for
-   example, ``mace-gpu-v1``, ``mace-gpu-v2``).
-2. Register one AWS Batch job definition per software stack (or define one
-   ``CloudWorker`` per stack in ``aws_ht.yaml`` pointing to the same
-   ``job_queue`` with a different ``job_definition``). Copy the stack's job
-   definition and change only the image, so the new one keeps the stack's
-   job role, execution role, public IP, and log settings. Without the
-   stack's job role, the container cannot read or write the S3 bucket.
-3. You can also override the job definition on a single submission with
-   ``QCloudResources(..., scheduler_kwargs={"jobDefinition": "<arn-or-name>"})``.
-
-Inspecting files, logs, and canceling jobs
-==========================================
-
-Standard job file commands work on cloud workers from your local machine:
+List or download the files of a job from S3:
 
 .. code-block:: bash
 
-    # List or download files from a job's S3 run folder
     jf -p aws_ht job files ls 1
     jf -p aws_ht job files get 1 jfremote_out.json
 
-To cancel an active (queued or running) AWS Batch job, run:
+Stop a queued or running job:
 
 .. code-block:: bash
 
     jf -p aws_ht job stop <job_id>
 
-``jf job queue-out`` and ``jf job todir`` are not supported for cloud workers
-because containers have no interactive SSH shell and stream stdout/stderr to
-CloudWatch Logs instead of ``queue.out`` and ``queue.err``. To read container
-logs, search for **CloudWatch** in the top AWS Console search bar, open
-**Logs -> Log groups**, and select ``/aws/batch/jfr-lab``, or run in
-**CloudShell** (in the same AWS region selected in Part 1):
+The containers write stdout and stderr to CloudWatch Logs, not to
+``queue.out`` and ``queue.err``. For this reason ``jf job queue-out`` does not
+work for cloud workers. ``jf job todir`` does not work either, because there
+is no shell access to the container. Read the logs in CloudShell:
 
 .. code-block:: bash
 
@@ -519,15 +589,12 @@ logs, search for **CloudWatch** in the top AWS Console search bar, open
 
 .. _cloud_cleanup:
 
-Tearing down all AWS resources
-==============================
+Deleting the AWS stack
+======================
 
-When you want to remove the entire lab stack, open **CloudShell** in the same
-AWS region selected in Part 1, empty the S3 bucket, delete the Runner IAM
-access key, and delete the CloudFormation stack. CloudFormation deletes all
-queues, compute environments, job definitions, CodeBuild project, ECR
-repository, S3 bucket, log groups, IAM roles, IAM user, and VPC in the right
-order:
+To remove everything, run the commands below in CloudShell. They empty the S3
+bucket, delete the access keys of the ``Runner`` user, and delete the stack.
+CloudFormation then deletes all other resources of the stack.
 
 .. code-block:: bash
 
@@ -543,5 +610,4 @@ order:
     aws cloudformation delete-stack --stack-name jfr-lab && \
     aws cloudformation wait stack-delete-complete --stack-name jfr-lab
 
-Finally, remove the ``[jfr-lab]`` section from ``~/.aws/credentials`` on your
-local machine.
+Finally, remove the ``[jfr-lab]`` section from ``~/.aws/credentials``.

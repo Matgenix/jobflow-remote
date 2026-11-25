@@ -1,21 +1,38 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Description: >-
-  One-time AWS Batch (Fargate CPU + optional EC2 GPU Spot/On-Demand), S3, ECR,
-  and CodeBuild stack for jobflow-remote CloudWorker.
+  One-time AWS Batch (Fargate CPU, optional EC2 CPU, and optional EC2 GPU),
+  S3, ECR, and CodeBuild stack for jobflow-remote CloudWorker.
 
 Parameters:
   ContainerImage:
     Type: String
     Default: public.ecr.aws/docker/library/python:3.12-slim
     Description: >-
-      Container image URI for the CPU Fargate job definition. Defaults to
-      public Python 3.12 slim for quickstart checks. Override with an ECR
+      Container image URI for the Fargate and EC2 CPU job definitions. Defaults
+      to public Python 3.12 slim for quickstart checks. Override with an ECR
       image URI for production campaigns.
   CpuMaxvCpus:
     Type: Number
     Default: 8
     MinValue: 1
     Description: Maximum vCPUs for the managed Fargate CPU compute environment.
+  EnableEc2CpuQueue:
+    Type: String
+    Default: "false"
+    AllowedValues: ["true", "false"]
+    Description: >-
+      Set to true to also provision an EC2 CPU compute environment (scales to
+      0 instances when idle), job queue, and job definition. AWS Batch places
+      several jobs on one EC2 instance when its vCPUs and memory allow.
+  Ec2CpuInstanceTypes:
+    Type: CommaDelimitedList
+    Default: c7i
+    Description: Allowed EC2 instance families for the EC2 CPU compute environment.
+  Ec2CpuMaxvCpus:
+    Type: Number
+    Default: 64
+    MinValue: 2
+    Description: Maximum vCPUs for the EC2 CPU compute environment.
   EnableGpuQueue:
     Type: String
     Default: "false"
@@ -56,8 +73,14 @@ Parameters:
     Description: CloudWatch Logs retention period in days.
 
 Conditions:
+  HasEc2CpuQueue:
+    Fn::Equals: [{Ref: EnableEc2CpuQueue}, "true"]
   HasGpuQueue:
     Fn::Equals: [{Ref: EnableGpuQueue}, "true"]
+  HasEc2Queue:
+    Fn::Or:
+      - Condition: HasEc2CpuQueue
+      - Condition: HasGpuQueue
   IsGpuSpot:
     Fn::And:
       - Condition: HasGpuQueue
@@ -66,7 +89,7 @@ Conditions:
 Resources:
   # Dedicated public VPC without a NAT Gateway, so the VPC itself has no
   # hourly cost. AWS bills the public IPv4 address of each running Fargate
-  # task and GPU node. The VPC makes the stack work in any region even if the
+  # task and EC2 instance. The VPC makes the stack work in any region even if the
   # default VPC was removed.
   BatchVpc:
     Type: AWS::EC2::VPC
@@ -165,7 +188,7 @@ Resources:
       LogGroupName: {Fn::Sub: "/aws/codebuild/${AWS::StackName}-build"}
       RetentionInDays: {Ref: LogRetentionDays}
 
-  # IAM roles for Batch containers, optional EC2 GPU nodes, and local Runner.
+  # IAM roles for Batch containers, optional EC2 instances, and local Runner.
   BatchExecutionRole:
     Type: AWS::IAM::Role
     Properties:
@@ -207,7 +230,7 @@ Resources:
 
   EcsInstanceRole:
     Type: AWS::IAM::Role
-    Condition: HasGpuQueue
+    Condition: HasEc2Queue
     Properties:
       AssumeRolePolicyDocument:
         Version: "2012-10-17"
@@ -221,7 +244,7 @@ Resources:
 
   EcsInstanceProfile:
     Type: AWS::IAM::InstanceProfile
-    Condition: HasGpuQueue
+    Condition: HasEc2Queue
     Properties:
       Roles:
         - {Ref: EcsInstanceRole}
@@ -325,6 +348,68 @@ Resources:
             awslogs-group: {Ref: BatchLogGroup}
             awslogs-region: {Ref: AWS::Region}
             awslogs-stream-prefix: jfr-cpu
+        Command:
+          - sh
+          - -c
+          - echo default
+
+  # Optional EC2 CPU queue: managed On-Demand EC2, scales to 0 when idle.
+  Ec2CpuComputeEnvironment:
+    Type: AWS::Batch::ComputeEnvironment
+    Condition: HasEc2CpuQueue
+    DependsOn:
+      - PublicRoute
+      - Subnet1RouteAssoc
+      - Subnet2RouteAssoc
+    Properties:
+      Type: MANAGED
+      State: ENABLED
+      ComputeResources:
+        Type: EC2
+        AllocationStrategy: BEST_FIT_PROGRESSIVE
+        Ec2Configuration:
+          - ImageType: ECS_AL2023
+        MinvCpus: 0
+        MaxvCpus: {Ref: Ec2CpuMaxvCpus}
+        InstanceTypes: {Ref: Ec2CpuInstanceTypes}
+        InstanceRole: {Fn::GetAtt: [EcsInstanceProfile, Arn]}
+        Subnets:
+          - {Ref: PublicSubnet1}
+          - {Ref: PublicSubnet2}
+        SecurityGroupIds:
+          - {Ref: BatchSecurityGroup}
+
+  Ec2CpuJobQueue:
+    Type: AWS::Batch::JobQueue
+    Condition: HasEc2CpuQueue
+    Properties:
+      State: ENABLED
+      Priority: 1
+      ComputeEnvironmentOrder:
+        - Order: 1
+          ComputeEnvironment: {Ref: Ec2CpuComputeEnvironment}
+
+  Ec2CpuJobDefinition:
+    Type: AWS::Batch::JobDefinition
+    Condition: HasEc2CpuQueue
+    Properties:
+      Type: container
+      PlatformCapabilities:
+        - EC2
+      ContainerProperties:
+        Image: {Ref: ContainerImage}
+        JobRoleArn: {Fn::GetAtt: [BatchTaskRole, Arn]}
+        ResourceRequirements:
+          - Type: VCPU
+            Value: "1"
+          - Type: MEMORY
+            Value: "1800"
+        LogConfiguration:
+          LogDriver: awslogs
+          Options:
+            awslogs-group: {Ref: BatchLogGroup}
+            awslogs-region: {Ref: AWS::Region}
+            awslogs-stream-prefix: jfr-ec2-cpu
         Command:
           - sh
           - -c
@@ -499,18 +584,26 @@ Outputs:
     Description: Private S3 bucket for jobflow-remote staging files
     Value: {Ref: StagingBucket}
   CpuJobQueueArn:
-    Description: AWS Batch CPU job queue ARN (CloudWorker.job_queue)
+    Description: AWS Batch Fargate CPU job queue ARN (scheduler_kwargs.job_queue)
     Value: {Ref: JobQueue}
   CpuJobDefinitionArn:
-    Description: AWS Batch CPU job definition ARN (CloudWorker.job_definition)
+    Description: AWS Batch Fargate CPU job definition ARN (scheduler_kwargs.job_definition)
     Value: {Ref: JobDefinition}
+  Ec2CpuJobQueueArn:
+    Condition: HasEc2CpuQueue
+    Description: AWS Batch EC2 CPU job queue ARN (scheduler_kwargs.job_queue)
+    Value: {Ref: Ec2CpuJobQueue}
+  Ec2CpuJobDefinitionArn:
+    Condition: HasEc2CpuQueue
+    Description: AWS Batch EC2 CPU job definition ARN (scheduler_kwargs.job_definition)
+    Value: {Ref: Ec2CpuJobDefinition}
   GpuJobQueueArn:
     Condition: HasGpuQueue
-    Description: AWS Batch EC2 GPU job queue ARN (CloudWorker.job_queue)
+    Description: AWS Batch EC2 GPU job queue ARN (scheduler_kwargs.job_queue)
     Value: {Ref: GpuJobQueue}
   GpuJobDefinitionArn:
     Condition: HasGpuQueue
-    Description: AWS Batch EC2 GPU job definition ARN (CloudWorker.job_definition)
+    Description: AWS Batch EC2 GPU job definition ARN (scheduler_kwargs.job_definition)
     Value: {Ref: GpuJobDefinition}
   EcrRepositoryUri:
     Description: Private ECR repository URI (append :<tag> for campaign images)

@@ -127,8 +127,8 @@ values are:
 
 For ``local`` and ``remote`` workers, ``work_dir`` is mandatory and gives the full path
 to the folder on the worker machine where Jobs are executed. For ``cloud`` workers,
-``work_dir`` is optional (default ``/jf_work``) and sets the key prefix inside cloud
-object storage.
+``work_dir`` is optional (default ``/jf_work``) and sets the folder for job files
+inside the cloud storage bucket.
 
 It is possible to optionally select default values for keywords like ``pre_run``
 and ``resources``, that can be overridden for individual Jobs. Note that these
