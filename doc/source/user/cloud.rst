@@ -125,6 +125,14 @@ Step 2. Check your EC2 quotas
 
 Skip this step if you only use the Fargate CPU queue.
 
+AWS accounts on the Free plan can start only Free Tier instance types, so
+jobs on the EC2 queues stay ``RUNNABLE``. If your account is on the Free plan,
+upgrade it in the AWS Console at
+https://console.aws.amazon.com/billing/home#/freetier/upgrade. The remaining
+credits are kept. If the upgrade asks for a spend limit, leave the optional
+cost controls unchecked. Close to the limit, they block new instances or pause
+running ones, which stops AWS Batch jobs.
+
 In CloudShell, run:
 
 .. code-block:: bash
@@ -853,8 +861,19 @@ queue. For the other queues, replace ``Ec2CpuJobQueueArn`` with
     QUEUE=$(aws cloudformation describe-stacks --stack-name jfr-lab --query "Stacks[0].Outputs[?OutputKey=='Ec2CpuJobQueueArn'].OutputValue" --output text)
     for s in RUNNABLE STARTING RUNNING SUCCEEDED FAILED; do aws batch list-jobs --job-queue "$QUEUE" --job-status "$s" --query 'jobSummaryList[].[jobName,status,statusReason]' --output text; done
 
-``RUNNABLE`` means the job waits for an instance. If a job stays
-``RUNNABLE`` for more than 15 minutes, check the quotas in Part 1, Step 2.
+``RUNNABLE`` means the job waits for an instance. On the EC2 queues, if a job
+stays ``RUNNABLE`` for more than 15 minutes, read in CloudShell why AWS could
+not start an instance:
+
+.. code-block:: bash
+
+    aws autoscaling describe-scaling-activities --max-items 5 --query 'Activities[].[StartTime,AutoScalingGroupName,StatusCode,StatusMessage]' --output table
+
+The list covers every Auto Scaling group in the region, including the ones
+that AWS Batch creates for the queues. A message about the vCPU limit means
+that the quota is too low. A message that the instance type is not eligible
+for Free Tier means that the account is on the Free plan. Both are explained
+in Part 1, Step 2.
 
 A job goes to ``REMOTE_ERROR`` when an action of the ``Runner`` on AWS fails
 several times in a row, for example while AWS Batch or S3 does not answer.
