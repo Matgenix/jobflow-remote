@@ -25,6 +25,15 @@ replacing the cluster scratch directory and SSH:
 
 Compute containers never need network access to your MongoDB database.
 
+.. warning::
+
+    Each job runs in its own container, in a temporary folder that is deleted
+    when the job ends. A job therefore cannot read files from the run folder
+    of an earlier job. Flows that pass ``prev_dir`` between jobs, such as the
+    ``atomate2`` VASP relax and static chains, do not work on cloud workers.
+    Flows that pass data only through job outputs, such as the force-field
+    phonon workflow in :ref:`cloud_gpu_workflow`, work as on HPC.
+
 Just like an HPC cluster where administrators configure SLURM queues once and
 researchers reuse them across projects, cloud work splits cleanly into two
 parts:
@@ -76,11 +85,13 @@ individual researchers only submit flows and query results from their laptops.
 Deploy our ready-made CloudFormation template
 (:download:`aws_batch.yaml </_static/aws_batch.yaml>`) once from **AWS
 CloudShell** (no local AWS CLI or Docker required). One stack creates a
-dedicated free public VPC, a private S3 staging bucket, a private ECR
-repository, CloudWatch log groups, scoped IAM roles and a Runner user, a
-serverless Fargate CPU queue, an optional EC2 GPU queue (Spot or On-Demand,
-scaling to ``0`` nodes when idle so idle cost is zero), and a reusable
-CodeBuild project for building campaign images.
+dedicated public VPC without a NAT Gateway, a private S3 staging bucket, a
+private ECR repository, CloudWatch log groups, scoped IAM roles and a Runner
+user, a serverless Fargate CPU queue, an optional EC2 GPU queue (Spot or
+On-Demand, scaling to ``0`` nodes when idle), and a reusable CodeBuild project
+for building campaign images. When no jobs run, you pay only for the data
+kept in S3, ECR, and CloudWatch Logs. While jobs run, AWS also bills the
+public IPv4 address of each Fargate job and GPU node.
 
 1. Sign in to the `AWS Management Console <https://console.aws.amazon.com/>`_.
 2. In the **top-right region dropdown**, choose your region (for example,
@@ -101,10 +112,14 @@ CodeBuild project for building campaign images.
         aws service-quotas get-service-quota --service-code ec2 --quota-code L-3819A6DF \
           --query 'Quota.{Name:QuotaName,Value:Value}' --output table
 
-    If both values are ``0``, request a quota increase (for example, ``4``
-    vCPUs for one ``g4dn.xlarge`` or ``g5.xlarge`` GPU node) in **Service
-    Quotas** before running GPU jobs, or deploy CPU-only first and enable
-    ``EnableGpuQueue=true`` later on the same stack.
+    The first quota (``L-DB2E81BA``) is for On-Demand GPU instances and the
+    second (``L-3819A6DF``) is for Spot GPU instances. Check the one that
+    matches ``GpuAllocationType``. That is ``L-3819A6DF`` for ``SPOT`` (the
+    default) and ``L-DB2E81BA`` for ``EC2``. If it is ``0``, request an
+    increase in **Service Quotas** (for example, ``4`` vCPUs for one
+    ``g4dn.xlarge`` or ``g5.xlarge`` GPU node) before running GPU jobs, or
+    deploy CPU-only first and enable ``EnableGpuQueue=true`` later on the
+    same stack.
 
 Run in **CloudShell** to deploy the stack (takes about 1 to 2 minutes) and
 print your permanent queue and bucket outputs. Set ``EnableGpuQueue=true`` for
@@ -276,7 +291,7 @@ submit flows in Python.
 ----------------------------------------------------
 
 Every Python function executed by a ``Job`` must be importable inside its
-container image. Use versioned tags (such as ``mace-gpu-v1`` or ``vasp-6.4.2``)
+container image. Use versioned tags (such as ``mace-gpu-v1`` or ``mace-gpu-v2``)
 inside your single shared ECR repository so multiple campaigns coexist cleanly.
 
 Below is an example CUDA-enabled ``Dockerfile`` for GPU ``atomate2`` +
@@ -360,6 +375,7 @@ both ``job_definition`` fields in ``~/.jfremote/aws_ht.yaml``, and restart the
     [ -f aws_batch.yaml ] || curl -fsSLO https://raw.githubusercontent.com/Matgenix/jobflow-remote/develop/doc/source/_static/aws_batch.yaml
     ECR_REPO_URI=$(aws cloudformation describe-stacks --stack-name jfr-lab \
       --query "Stacks[0].Outputs[?OutputKey=='EcrRepositoryUri'].OutputValue" --output text)
+    IMAGE_TAG="mace-gpu-v1"  # the tag you built in Section 2.1
 
     aws cloudformation deploy \
       --template-file aws_batch.yaml \
@@ -369,22 +385,26 @@ both ``job_definition`` fields in ``~/.jfremote/aws_ht.yaml``, and restart the
         EnableGpuQueue=true \
         GpuAllocationType=SPOT \
         GpuMaxvCpus=16 \
-        ContainerImage="${ECR_REPO_URI}:mace-gpu-v1" \
-        GpuContainerImage="${ECR_REPO_URI}:mace-gpu-v1"
+        ContainerImage="${ECR_REPO_URI}:${IMAGE_TAG}" \
+        GpuContainerImage="${ECR_REPO_URI}:${IMAGE_TAG}"
 
     aws cloudformation describe-stacks --stack-name jfr-lab \
       --query "Stacks[0].Outputs[?OutputKey=='CpuJobDefinitionArn' || OutputKey=='GpuJobDefinitionArn'].[OutputKey,OutputValue]" --output table
+
+.. _cloud_gpu_workflow:
 
 2.2 Run GPU high-throughput workflows with hybrid CPU/GPU routing
 -----------------------------------------------------------------
 
 On **your local machine** (with ``atomate2[pheasy]`` installed to construct
-flows), submit a batch of structures just like on SLURM.
+flows), submit your flows.
 
-Route GPU-intensive force-field jobs to ``aws_gpu`` (with ``gpus=1`` and
-``max_retries=2`` so EC2 Spot interruptions retry automatically), and route
-lightweight Python bookkeeping steps to ``aws_cpu`` (or a ``LocalWorker``) so
-they never occupy a GPU node:
+The example below sends the flow to ``aws_gpu`` (with ``gpus=1`` and
+``max_retries=2`` so EC2 Spot interruptions retry automatically) and moves
+the ``structure_to_primitive`` step, which needs no GPU, to ``aws_cpu``. Add
+one ``set_run_config`` call per job name to move other steps the same way.
+Keep ``run_phonon_displacements`` on ``aws_gpu``, because the force jobs it
+creates run on the same worker as this step.
 
 .. code-block:: python
 
@@ -425,7 +445,7 @@ they never occupy a GPU node:
 
     flow = maker.make(si_prim)
 
-    # Keep cheap Python steps off GPU nodes (or send them to a LocalWorker).
+    # Run this step on the CPU queue (or on a LocalWorker).
     set_run_config(
         flow,
         name_filter="structure_to_primitive",
@@ -455,15 +475,17 @@ container image on warm EC2 nodes between consecutive jobs, and scales back to
 2.3 Reusing the same queues across multiple campaigns
 -----------------------------------------------------
 
-To run several campaigns with different software stacks (for example, MACE,
-VASP, and ORCA) on the same permanent queues without redeploying
-CloudFormation:
+To run several campaigns with different software stacks on the same
+permanent queues without redeploying CloudFormation:
 
 1. Push each stack to your shared ECR repository under its own tag (for
-   example, ``mace-gpu-v1``, ``vasp-6.4.2``).
+   example, ``mace-gpu-v1``, ``mace-gpu-v2``).
 2. Register one AWS Batch job definition per software stack (or define one
    ``CloudWorker`` per stack in ``aws_ht.yaml`` pointing to the same
-   ``job_queue`` with a different ``job_definition``).
+   ``job_queue`` with a different ``job_definition``). Copy the stack's job
+   definition and change only the image, so the new one keeps the stack's
+   job role, execution role, public IP, and log settings. Without the
+   stack's job role, the container cannot read or write the S3 bucket.
 3. You can also override the job definition on a single submission with
    ``QCloudResources(..., scheduler_kwargs={"jobDefinition": "<arn-or-name>"})``.
 

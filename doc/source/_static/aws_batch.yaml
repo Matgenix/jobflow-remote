@@ -56,12 +56,18 @@ Parameters:
     Description: CloudWatch Logs retention period in days.
 
 Conditions:
-  HasGpuQueue: !Equals [!Ref EnableGpuQueue, "true"]
-  IsGpuSpot: !And [!Condition HasGpuQueue, !Equals [!Ref GpuAllocationType, "SPOT"]]
+  HasGpuQueue:
+    Fn::Equals: [{Ref: EnableGpuQueue}, "true"]
+  IsGpuSpot:
+    Fn::And:
+      - Condition: HasGpuQueue
+      - Fn::Equals: [{Ref: GpuAllocationType}, "SPOT"]
 
 Resources:
-  # Dedicated free public VPC (no NAT Gateway, $0/month) so the stack works
-  # in any region even if the account's default VPC was removed.
+  # Dedicated public VPC without a NAT Gateway, so the VPC itself has no
+  # hourly cost. AWS bills the public IPv4 address of each running Fargate
+  # task and GPU node. The VPC makes the stack work in any region even if the
+  # default VPC was removed.
   BatchVpc:
     Type: AWS::EC2::VPC
     Properties:
@@ -75,55 +81,55 @@ Resources:
   VpcGatewayAttachment:
     Type: AWS::EC2::VPCGatewayAttachment
     Properties:
-      VpcId: !Ref BatchVpc
-      InternetGatewayId: !Ref InternetGateway
+      VpcId: {Ref: BatchVpc}
+      InternetGatewayId: {Ref: InternetGateway}
 
   PublicRouteTable:
     Type: AWS::EC2::RouteTable
     Properties:
-      VpcId: !Ref BatchVpc
+      VpcId: {Ref: BatchVpc}
 
   PublicRoute:
     Type: AWS::EC2::Route
     DependsOn: VpcGatewayAttachment
     Properties:
-      RouteTableId: !Ref PublicRouteTable
+      RouteTableId: {Ref: PublicRouteTable}
       DestinationCidrBlock: 0.0.0.0/0
-      GatewayId: !Ref InternetGateway
+      GatewayId: {Ref: InternetGateway}
 
   PublicSubnet1:
     Type: AWS::EC2::Subnet
     Properties:
-      VpcId: !Ref BatchVpc
+      VpcId: {Ref: BatchVpc}
       CidrBlock: 10.42.1.0/24
-      AvailabilityZone: !Select [0, !GetAZs ""]
+      AvailabilityZone: {Fn::Select: [0, {Fn::GetAZs: ""}]}
       MapPublicIpOnLaunch: true
 
   PublicSubnet2:
     Type: AWS::EC2::Subnet
     Properties:
-      VpcId: !Ref BatchVpc
+      VpcId: {Ref: BatchVpc}
       CidrBlock: 10.42.2.0/24
-      AvailabilityZone: !Select [1, !GetAZs ""]
+      AvailabilityZone: {Fn::Select: [1, {Fn::GetAZs: ""}]}
       MapPublicIpOnLaunch: true
 
   Subnet1RouteAssoc:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
-      SubnetId: !Ref PublicSubnet1
-      RouteTableId: !Ref PublicRouteTable
+      SubnetId: {Ref: PublicSubnet1}
+      RouteTableId: {Ref: PublicRouteTable}
 
   Subnet2RouteAssoc:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
-      SubnetId: !Ref PublicSubnet2
-      RouteTableId: !Ref PublicRouteTable
+      SubnetId: {Ref: PublicSubnet2}
+      RouteTableId: {Ref: PublicRouteTable}
 
   BatchSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupDescription: Egress-only security group for jobflow-remote Batch tasks
-      VpcId: !Ref BatchVpc
+      VpcId: {Ref: BatchVpc}
       SecurityGroupEgress:
         - IpProtocol: "-1"
           CidrIp: 0.0.0.0/0
@@ -150,14 +156,14 @@ Resources:
   BatchLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
-      LogGroupName: !Sub "/aws/batch/${AWS::StackName}"
-      RetentionInDays: !Ref LogRetentionDays
+      LogGroupName: {Fn::Sub: "/aws/batch/${AWS::StackName}"}
+      RetentionInDays: {Ref: LogRetentionDays}
 
   CodeBuildLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
-      LogGroupName: !Sub "/aws/codebuild/${AWS::StackName}-build"
-      RetentionInDays: !Ref LogRetentionDays
+      LogGroupName: {Fn::Sub: "/aws/codebuild/${AWS::StackName}-build"}
+      RetentionInDays: {Ref: LogRetentionDays}
 
   # IAM roles for Batch containers, optional EC2 GPU nodes, and local Runner.
   BatchExecutionRole:
@@ -171,7 +177,7 @@ Resources:
               Service: ecs-tasks.amazonaws.com
             Action: sts:AssumeRole
       ManagedPolicyArns:
-        - !Sub "arn:${AWS::Partition}:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
+        - {Fn::Sub: "arn:${AWS::Partition}:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"}
 
   BatchTaskRole:
     Type: AWS::IAM::Role
@@ -192,12 +198,12 @@ Resources:
                 Action:
                   - s3:ListBucket
                   - s3:GetBucketLocation
-                Resource: !GetAtt StagingBucket.Arn
+                Resource: {Fn::GetAtt: [StagingBucket, Arn]}
               - Effect: Allow
                 Action:
                   - s3:GetObject
                   - s3:PutObject
-                Resource: !Sub "${StagingBucket.Arn}/*"
+                Resource: {Fn::Sub: "${StagingBucket.Arn}/*"}
 
   EcsInstanceRole:
     Type: AWS::IAM::Role
@@ -211,14 +217,14 @@ Resources:
               Service: ec2.amazonaws.com
             Action: sts:AssumeRole
       ManagedPolicyArns:
-        - !Sub "arn:${AWS::Partition}:iam::aws:policy/service-role/AmazonEC2ContainerServiceforEC2Role"
+        - {Fn::Sub: "arn:${AWS::Partition}:iam::aws:policy/service-role/AmazonEC2ContainerServiceforEC2Role"}
 
   EcsInstanceProfile:
     Type: AWS::IAM::InstanceProfile
     Condition: HasGpuQueue
     Properties:
       Roles:
-        - !Ref EcsInstanceRole
+        - {Ref: EcsInstanceRole}
 
   SpotFleetRole:
     Type: AWS::IAM::Role
@@ -232,7 +238,7 @@ Resources:
               Service: spotfleet.amazonaws.com
             Action: sts:AssumeRole
       ManagedPolicyArns:
-        - !Sub "arn:${AWS::Partition}:iam::aws:policy/service-role/AmazonEC2SpotFleetTaggingRole"
+        - {Fn::Sub: "arn:${AWS::Partition}:iam::aws:policy/service-role/AmazonEC2SpotFleetTaggingRole"}
 
   RunnerUser:
     Type: AWS::IAM::User
@@ -246,13 +252,13 @@ Resources:
                 Action:
                   - s3:ListBucket
                   - s3:GetBucketLocation
-                Resource: !GetAtt StagingBucket.Arn
+                Resource: {Fn::GetAtt: [StagingBucket, Arn]}
               - Effect: Allow
                 Action:
                   - s3:GetObject
                   - s3:PutObject
                   - s3:DeleteObject
-                Resource: !Sub "${StagingBucket.Arn}/*"
+                Resource: {Fn::Sub: "${StagingBucket.Arn}/*"}
               - Effect: Allow
                 Action:
                   - batch:SubmitJob
@@ -264,7 +270,7 @@ Resources:
                 Resource: "*"
                 Condition:
                   StringEquals:
-                    aws:RequestedRegion: !Ref AWS::Region
+                    aws:RequestedRegion: {Ref: AWS::Region}
 
   # CPU queue: managed serverless Fargate.
   ComputeEnvironment:
@@ -278,12 +284,12 @@ Resources:
       State: ENABLED
       ComputeResources:
         Type: FARGATE
-        MaxvCpus: !Ref CpuMaxvCpus
+        MaxvCpus: {Ref: CpuMaxvCpus}
         Subnets:
-          - !Ref PublicSubnet1
-          - !Ref PublicSubnet2
+          - {Ref: PublicSubnet1}
+          - {Ref: PublicSubnet2}
         SecurityGroupIds:
-          - !Ref BatchSecurityGroup
+          - {Ref: BatchSecurityGroup}
 
   JobQueue:
     Type: AWS::Batch::JobQueue
@@ -292,7 +298,7 @@ Resources:
       Priority: 1
       ComputeEnvironmentOrder:
         - Order: 1
-          ComputeEnvironment: !Ref ComputeEnvironment
+          ComputeEnvironment: {Ref: ComputeEnvironment}
 
   JobDefinition:
     Type: AWS::Batch::JobDefinition
@@ -301,9 +307,9 @@ Resources:
       PlatformCapabilities:
         - FARGATE
       ContainerProperties:
-        Image: !Ref ContainerImage
-        ExecutionRoleArn: !GetAtt BatchExecutionRole.Arn
-        JobRoleArn: !GetAtt BatchTaskRole.Arn
+        Image: {Ref: ContainerImage}
+        ExecutionRoleArn: {Fn::GetAtt: [BatchExecutionRole, Arn]}
+        JobRoleArn: {Fn::GetAtt: [BatchTaskRole, Arn]}
         FargatePlatformConfiguration:
           PlatformVersion: LATEST
         NetworkConfiguration:
@@ -316,8 +322,8 @@ Resources:
         LogConfiguration:
           LogDriver: awslogs
           Options:
-            awslogs-group: !Ref BatchLogGroup
-            awslogs-region: !Ref AWS::Region
+            awslogs-group: {Ref: BatchLogGroup}
+            awslogs-region: {Ref: AWS::Region}
             awslogs-stream-prefix: jfr-cpu
         Command:
           - sh
@@ -337,26 +343,28 @@ Resources:
       Type: MANAGED
       State: ENABLED
       ComputeResources:
-        Type: !Ref GpuAllocationType
-        AllocationStrategy: !If
-          - IsGpuSpot
-          - SPOT_PRICE_CAPACITY_OPTIMIZED
-          - BEST_FIT_PROGRESSIVE
-        SpotIamFleetRole: !If
-          - IsGpuSpot
-          - !GetAtt SpotFleetRole.Arn
-          - !Ref AWS::NoValue
+        Type: {Ref: GpuAllocationType}
+        AllocationStrategy:
+          Fn::If:
+            - IsGpuSpot
+            - SPOT_PRICE_CAPACITY_OPTIMIZED
+            - BEST_FIT_PROGRESSIVE
+        SpotIamFleetRole:
+          Fn::If:
+            - IsGpuSpot
+            - Fn::GetAtt: [SpotFleetRole, Arn]
+            - Ref: AWS::NoValue
         Ec2Configuration:
           - ImageType: ECS_AL2023_NVIDIA
         MinvCpus: 0
-        MaxvCpus: !Ref GpuMaxvCpus
-        InstanceTypes: !Ref GpuInstanceTypes
-        InstanceRole: !GetAtt EcsInstanceProfile.Arn
+        MaxvCpus: {Ref: GpuMaxvCpus}
+        InstanceTypes: {Ref: GpuInstanceTypes}
+        InstanceRole: {Fn::GetAtt: [EcsInstanceProfile, Arn]}
         Subnets:
-          - !Ref PublicSubnet1
-          - !Ref PublicSubnet2
+          - {Ref: PublicSubnet1}
+          - {Ref: PublicSubnet2}
         SecurityGroupIds:
-          - !Ref BatchSecurityGroup
+          - {Ref: BatchSecurityGroup}
 
   GpuJobQueue:
     Type: AWS::Batch::JobQueue
@@ -366,7 +374,7 @@ Resources:
       Priority: 1
       ComputeEnvironmentOrder:
         - Order: 1
-          ComputeEnvironment: !Ref GpuComputeEnvironment
+          ComputeEnvironment: {Ref: GpuComputeEnvironment}
 
   GpuJobDefinition:
     Type: AWS::Batch::JobDefinition
@@ -376,8 +384,8 @@ Resources:
       PlatformCapabilities:
         - EC2
       ContainerProperties:
-        Image: !Ref GpuContainerImage
-        JobRoleArn: !GetAtt BatchTaskRole.Arn
+        Image: {Ref: GpuContainerImage}
+        JobRoleArn: {Fn::GetAtt: [BatchTaskRole, Arn]}
         ResourceRequirements:
           - Type: VCPU
             Value: "4"
@@ -388,8 +396,8 @@ Resources:
         LogConfiguration:
           LogDriver: awslogs
           Options:
-            awslogs-group: !Ref BatchLogGroup
-            awslogs-region: !Ref AWS::Region
+            awslogs-group: {Ref: BatchLogGroup}
+            awslogs-region: {Ref: AWS::Region}
             awslogs-stream-prefix: jfr-gpu
         Command:
           - sh
@@ -424,37 +432,37 @@ Resources:
                   - ecr:InitiateLayerUpload
                   - ecr:PutImage
                   - ecr:UploadLayerPart
-                Resource: !GetAtt EcrRepository.Arn
+                Resource: {Fn::GetAtt: [EcrRepository, Arn]}
               - Effect: Allow
                 Action:
                   - s3:GetBucketLocation
                   - s3:GetBucketAcl
-                Resource: !GetAtt StagingBucket.Arn
+                Resource: {Fn::GetAtt: [StagingBucket, Arn]}
               - Effect: Allow
                 Action:
                   - s3:GetObject
                   - s3:GetObjectVersion
-                Resource: !Sub "${StagingBucket.Arn}/build/*"
+                Resource: {Fn::Sub: "${StagingBucket.Arn}/build/*"}
               - Effect: Allow
                 Action:
                   - logs:CreateLogGroup
                   - logs:CreateLogStream
                   - logs:PutLogEvents
                 Resource:
-                  - !Sub "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${CodeBuildLogGroup}"
-                  - !Sub "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${CodeBuildLogGroup}:*"
+                  - {Fn::Sub: "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${CodeBuildLogGroup}"}
+                  - {Fn::Sub: "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${CodeBuildLogGroup}:*"}
 
   CodeBuildProject:
     Type: AWS::CodeBuild::Project
     DependsOn: CodeBuildLogGroup
     Properties:
-      ServiceRole: !GetAtt CodeBuildRole.Arn
+      ServiceRole: {Fn::GetAtt: [CodeBuildRole, Arn]}
       Artifacts:
         Type: NO_ARTIFACTS
       LogsConfig:
         CloudWatchLogs:
           Status: ENABLED
-          GroupName: !Ref CodeBuildLogGroup
+          GroupName: {Ref: CodeBuildLogGroup}
       Environment:
         Type: LINUX_CONTAINER
         ComputeType: BUILD_GENERAL1_MEDIUM
@@ -462,14 +470,14 @@ Resources:
         PrivilegedMode: true
         EnvironmentVariables:
           - Name: ECR_REGISTRY
-            Value: !Sub "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com"
+            Value: {Fn::Sub: "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com"}
           - Name: ECR_REPO_URI
-            Value: !GetAtt EcrRepository.RepositoryUri
+            Value: {Fn::GetAtt: [EcrRepository, RepositoryUri]}
           - Name: IMAGE_TAG
             Value: latest
       Source:
         Type: S3
-        Location: !Sub "${StagingBucket}/build/context.zip"
+        Location: {Fn::Sub: "${StagingBucket}/build/context.zip"}
         BuildSpec: |
           version: 0.2
           phases:
@@ -486,33 +494,33 @@ Resources:
 Outputs:
   Region:
     Description: AWS region of the stack
-    Value: !Ref AWS::Region
+    Value: {Ref: AWS::Region}
   S3BucketName:
     Description: Private S3 bucket for jobflow-remote staging files
-    Value: !Ref StagingBucket
+    Value: {Ref: StagingBucket}
   CpuJobQueueArn:
     Description: AWS Batch CPU job queue ARN (CloudWorker.job_queue)
-    Value: !Ref JobQueue
+    Value: {Ref: JobQueue}
   CpuJobDefinitionArn:
     Description: AWS Batch CPU job definition ARN (CloudWorker.job_definition)
-    Value: !Ref JobDefinition
+    Value: {Ref: JobDefinition}
   GpuJobQueueArn:
     Condition: HasGpuQueue
     Description: AWS Batch EC2 GPU job queue ARN (CloudWorker.job_queue)
-    Value: !Ref GpuJobQueue
+    Value: {Ref: GpuJobQueue}
   GpuJobDefinitionArn:
     Condition: HasGpuQueue
     Description: AWS Batch EC2 GPU job definition ARN (CloudWorker.job_definition)
-    Value: !Ref GpuJobDefinition
+    Value: {Ref: GpuJobDefinition}
   EcrRepositoryUri:
     Description: Private ECR repository URI (append :<tag> for campaign images)
-    Value: !GetAtt EcrRepository.RepositoryUri
+    Value: {Fn::GetAtt: [EcrRepository, RepositoryUri]}
   CodeBuildProjectName:
     Description: CodeBuild project name for building campaign images without local Docker
-    Value: !Ref CodeBuildProject
+    Value: {Ref: CodeBuildProject}
   LogGroupName:
     Description: CloudWatch log group for Batch container output
-    Value: !Ref BatchLogGroup
+    Value: {Ref: BatchLogGroup}
   RunnerUserName:
     Description: Scoped IAM user for local Runner credentials
-    Value: !Ref RunnerUser
+    Value: {Ref: RunnerUser}
