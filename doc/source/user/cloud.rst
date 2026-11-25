@@ -14,9 +14,9 @@ How a cloud worker runs a job
 1. The ``Runner`` uploads ``jfremote_in.json`` to the S3 bucket and submits an
    AWS Batch job.
 2. The AWS Batch job starts a container that runs
-   ``jf -fe execution run-cloud``. This command downloads the job folder from
-   S3, runs the job, and uploads the job folder back to S3, including
-   ``jfremote_out.json`` and the job store files.
+   ``jf -fe execution run-cloud``. This command downloads the inputs from S3
+   into the job folder on a shared EFS file system, runs the job there, and
+   uploads the whole job folder back to S3 when the job ends.
 3. When AWS Batch reports the job as finished, the ``Runner`` downloads the
    results from S3 and stores them in your ``JobStore``.
 
@@ -24,12 +24,22 @@ The container never connects to your MongoDB database.
 
 .. warning::
 
-    * Each job runs in its own container, in a temporary folder that is
-      deleted when the job ends. A job cannot read files from the run folder
-      of an earlier job. Flows that pass ``prev_dir`` between jobs, such as
-      the ``atomate2`` VASP relax and static chains, do not work on cloud
-      workers. Flows that pass data only through job outputs, such as the
-      force-field phonon workflow in :ref:`cloud_submit`, work as on HPC.
+    * Each job runs in its own container. The job folders are on an EFS file
+      system that every container mounts at ``/mnt/jfr``. A job folder has the
+      same path there as in the S3 bucket, for example
+      ``/mnt/jfr/runs/jf_work/29/14/2b/<uuid>_1``. A job can read the folder
+      of an earlier job, so flows that pass ``prev_dir`` work as on the
+      scratch file system of an HPC center.
+    * When a job ends, its whole folder is copied to the S3 bucket. The bucket
+      keeps these copies, also after the stack is deleted, like a project file
+      system.
+    * If AWS stops a container before the job ends, for example when it runs
+      out of memory or reaches its time limit, the files stay on EFS but are
+      not copied to S3. A new attempt of the job (an AWS Batch retry after a
+      Spot reclaim, or ``jf job rerun``) moves them into
+      ``previous_attempt_<n>`` in the job folder and copies them to S3 with its
+      own files. Step 2 of :ref:`cloud_cleanup` copies all folders on EFS to
+      S3.
     * Each jobflow job runs as one AWS Batch job. A GPU job gets a whole GPU.
       Several jobs cannot share one GPU.
 
@@ -189,8 +199,9 @@ and ``batch:TerminateJob``.
 The CloudFormation template below creates one stack with:
 
 * a VPC without a NAT Gateway
-* a private S3 bucket for job files, which deletes them after
-  ``RunFilesRetentionDays`` days
+* a private S3 bucket that keeps a copy of every finished job folder
+* an EFS file system for the job folders, mounted at ``/mnt/jfr`` in every
+  container
 * a private ECR repository for your container images
 * CloudWatch log groups
 * IAM roles for the containers and an IAM user for the ``Runner``
@@ -198,8 +209,11 @@ The CloudFormation template below creates one stack with:
   ``0`` instances when idle
 * a CodeBuild project that builds container images
 
-When no jobs run, you pay only for the data kept in S3, ECR, and CloudWatch
-Logs. While jobs run, you also pay for the EC2 instances and for the public
+When no jobs run, you pay only for the data kept in S3, EFS, ECR, and
+CloudWatch Logs. S3 costs about 0.023 USD per GB and month. EFS costs about
+0.30 USD per GB and month, and about 0.016 USD for files not read or written
+for 30 days. EFS also charges about 0.06 USD per GB written and 0.03 USD per
+GB read. While jobs run, you also pay for the EC2 instances and for the public
 IPv4 address of each. The instances carry the tag ``Project=jfr-lab``. To see
 their cost in Cost Explorer, activate this tag under **Billing and Cost
 Management**, **Cost allocation tags**, after the first job ran. The tag
@@ -292,8 +306,9 @@ The main parameters of the template are:
      - ``4``
      - Maximum vCPUs used at once by the GPU queue
    * - ``RunFilesRetentionDays``
-     - ``30``
-     - Days after upload when the bucket deletes the job files
+     - ``0``
+     - Days after upload when the bucket deletes the job files. ``0`` keeps
+       them.
 
 Step 4. Create the Runner credentials
 -------------------------------------
@@ -432,6 +447,7 @@ Step 5. Create the project file
              job_definition: {job_definition}
              region_name: {region}
              profile_name: jfr-lab
+           container_work_dir: /mnt/jfr
            storage_type: s3
            storage_kwargs:
              bucket: {bucket}
@@ -471,11 +487,10 @@ The workers are ``aws_cpu`` (CPU queue) and ``aws_gpu`` (GPU queue).
 storage (``jobflow_remote.remote.storage.S3Storage``). ``profile_name`` is the
 profile from Step 4.
 
-The results go to your ``JobStore``, as on HPC. The bucket of the stack
-deletes the job files ``RunFilesRetentionDays`` days (default ``30``) after
-they were uploaded. ``jf job files`` and ``jf job retry`` need these files, so
-use them within that time. ``jf flow delete --files`` deletes the files of a
-flow earlier.
+The results go to your ``JobStore``, as on HPC. ``container_work_dir`` makes
+the jobs run in their folders on EFS. The bucket keeps a copy of every
+finished job folder. ``jf flow delete --files`` deletes the copies of a flow
+in the bucket. The folders on EFS stay until the stack is deleted.
 
 Step 6. Check the setup
 -----------------------
@@ -489,10 +504,12 @@ Step 6. Check the setup
        jf -p aws_ht project check --errors
        jf -p aws_ht admin reset
 
-2. On your computer, create a test script. It runs two small jobs on the
-   CPU queue. Its ``pre_run`` installs jobflow-remote in the default
-   Python image of the stack when the job starts, so you do not need to build
-   an image for this test.
+2. On your computer, create a test script. It submits two flows of two
+   small jobs to the CPU queue. In the second flow, the second job reads a
+   file from the folder of the first job, which checks the shared folders.
+   Its ``pre_run`` installs jobflow-remote in the default Python image of the
+   stack when the job starts, so you do not need to build an image for this
+   test.
 
    .. code-block:: bash
 
@@ -502,19 +519,25 @@ Step 6. Check the setup
 
        from jobflow_remote import submit_flow
        from jobflow_remote.config.base import ExecutionConfig
-       from jobflow_remote.utils.examples import add
+       from jobflow_remote.utils.examples import add, read_file, write_file
+
+       exec_config = ExecutionConfig(
+           pre_run='pip install -q --no-cache-dir "jobflow-remote[aws]"'
+       )
+       resources = QCloudResources(vcpus=1, memory=1800, time_limit=600)
 
        job1 = add(1, 2)
        job2 = add(job1.output, 3)
-       submit_flow(
-           Flow([job1, job2]),
-           worker="aws_cpu",
-           project="aws_ht",
-           exec_config=ExecutionConfig(
-               pre_run='pip install -q --no-cache-dir "jobflow-remote[aws]"'
-           ),
-           resources=QCloudResources(vcpus=1, memory=1800, time_limit=600),
-       )
+       job3 = write_file("shared folders work")
+       job4 = read_file(job3.output)
+       for flow in (Flow([job1, job2]), Flow([job3, job4])):
+           submit_flow(
+               flow,
+               worker="aws_cpu",
+               project="aws_ht",
+               exec_config=exec_config,
+               resources=resources,
+           )
        EOF
 
 3. On your computer, submit the flow and start the ``Runner``:
@@ -538,6 +561,7 @@ Step 6. Check the setup
                conda activate jfr
                jf -p aws_ht job list
                jf -p aws_ht job output 2
+               jf -p aws_ht job output 4
 
        .. tab-item:: uv
            :sync: uv
@@ -547,10 +571,13 @@ Step 6. Check the setup
                source ~/.venvs/jfr/bin/activate
                jf -p aws_ht job list
                jf -p aws_ht job output 2
+               jf -p aws_ht job output 4
 
-   The first job waits 5 to 10 minutes while AWS starts an instance and the job
-   installs jobflow-remote. After about 15 minutes both jobs are
-   ``COMPLETED`` and the second command prints ``6``. Stop the ``Runner`` with ``Ctrl+C`` in the first terminal.
+   The first jobs wait 5 to 10 minutes while AWS starts an instance and the
+   jobs install jobflow-remote. After about 15 minutes all four jobs are
+   ``COMPLETED``. ``job output 2`` prints ``6``, and ``job output 4`` prints
+   ``'shared folders work'``. Stop the ``Runner`` with ``Ctrl+C`` in the
+   first terminal.
 
 Part 2: Running a campaign
 ==========================
@@ -1050,9 +1077,11 @@ is no shell access to the container. In CloudShell, read the logs of the last
 Deleting the AWS stack
 ======================
 
+Deleting the stack deletes the EFS file system with all job folders on it.
+The S3 bucket and its copies of the job folders are kept.
+
 1. On your computer, stop the jobs that are still queued or running, then
-   stop the ``Runner``. A job that still runs would write new files to the
-   bucket after it was emptied, and the stack could not be deleted.
+   stop the ``Runner``.
 
    .. code-block:: bash
 
@@ -1062,17 +1091,32 @@ Deleting the AWS stack
 
    Run the last command again until it shows that the ``Runner`` is shut down.
 
-2. In CloudShell, empty the S3 bucket, delete the access keys of the
-   ``Runner`` user, and delete the stack. CloudFormation then deletes all
-   other resources of the stack.
+2. In CloudShell, copy every job folder on EFS to S3. This also copies the
+   folders of jobs whose container was stopped before the job ended. The
+   command runs one AWS Batch job on the CPU queue that installs
+   jobflow-remote if the image does not have it.
 
    .. code-block:: bash
 
-       BUCKET=$(aws cloudformation describe-stacks --stack-name jfr-lab \
-         --query "Stacks[0].Outputs[?OutputKey=='S3BucketName'].OutputValue" --output text) && \
+       OUT() { aws cloudformation describe-stacks --stack-name jfr-lab --query "Stacks[0].Outputs[?OutputKey=='$1'].OutputValue" --output text; }
+       CMD="from jobflow_remote.remote.storage import S3Storage; S3Storage(bucket='$(OUT S3BucketName)', prefix='runs', region_name='$(OUT Region)').upload_dir('/mnt/jfr/runs', '.')"
+       OVERRIDES=$(python3 -c 'import json, sys; print(json.dumps({"command": ["sh", "-c", "pip install -q --no-cache-dir \"jobflow-remote[aws]\" && python -c \"$0\"", sys.argv[1]]}))' "$CMD")
+       COPY_JOB=$(aws batch submit-job --job-name copy-job-folders --job-queue "$(OUT CpuJobQueueArn)" --job-definition "$(OUT CpuJobDefinitionArn)" --container-overrides "$OVERRIDES" --query jobId --output text)
+       STATUS=SUBMITTED
+       while [ "$STATUS" != SUCCEEDED ] && [ "$STATUS" != FAILED ]; do sleep 20; STATUS=$(aws batch describe-jobs --jobs "$COPY_JOB" --query 'jobs[0].status' --output text); echo "$STATUS"; done
+
+   The last line is ``SUCCEEDED`` when all folders are in S3.
+
+3. In CloudShell, delete the access keys of the ``Runner`` user and delete
+   the stack. CloudFormation deletes all resources of the stack except the
+   S3 bucket. The first command prints the name of the bucket. Note it.
+
+   .. code-block:: bash
+
+       aws cloudformation describe-stacks --stack-name jfr-lab \
+         --query "Stacks[0].Outputs[?OutputKey=='S3BucketName'].OutputValue" --output text
        RUNNER_USER=$(aws cloudformation describe-stacks --stack-name jfr-lab \
          --query "Stacks[0].Outputs[?OutputKey=='RunnerUserName'].OutputValue" --output text) && \
-       aws s3 rm "s3://${BUCKET}" --recursive && \
        for k in $(aws iam list-access-keys --user-name "$RUNNER_USER" \
          --query 'AccessKeyMetadata[].AccessKeyId' --output text); do
          aws iam delete-access-key --user-name "$RUNNER_USER" --access-key-id "$k"
@@ -1080,7 +1124,7 @@ Deleting the AWS stack
        aws cloudformation delete-stack --stack-name jfr-lab && \
        aws cloudformation wait stack-delete-complete --stack-name jfr-lab
 
-3. On your computer, remove the profile ``jfr-lab`` from ``~/.aws/credentials``
+4. On your computer, remove the profile ``jfr-lab`` from ``~/.aws/credentials``
    and ``~/.aws/config``:
 
    .. code-block:: bash
@@ -1100,3 +1144,10 @@ Deleting the AWS stack
                    kept.append(line)
            path.write_text("\n".join(kept).strip() + "\n")
        EOF
+
+The bucket stays and costs about 0.023 USD per GB and month. To delete it
+with all job folders in it, run in CloudShell with the name from step 3:
+
+.. code-block:: bash
+
+    aws s3 rb s3://<bucket> --force

@@ -39,11 +39,13 @@ Parameters:
     Default: 7
   RunFilesRetentionDays:
     Type: Number
-    Default: 30
-    Description: Days after which the job files under runs/ in the bucket are deleted.
+    Default: 0
+    MinValue: 0
+    Description: Days after which the job files under runs/ in the bucket are deleted. 0 keeps them.
 
 Conditions:
   HasGpuQueue: {Fn::Equals: [{Ref: EnableGpuQueue}, "true"]}
+  ExpireRunFiles: {Fn::Not: [{Fn::Equals: [{Ref: RunFilesRetentionDays}, "0"]}]}
   IsCpuSpot: {Fn::Equals: [{Ref: CpuAllocationType}, "SPOT"]}
   IsGpuSpot: {Fn::Equals: [{Ref: GpuAllocationType}, "SPOT"]}
 
@@ -115,15 +117,21 @@ Resources:
         - {IpProtocol: "-1", CidrIp: 0.0.0.0/0}
 
   # Storage: S3 bucket for job files, ECR repository for images, and logs.
+  # The bucket keeps the job files after the stack is deleted.
   StagingBucket:
     Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Properties:
       LifecycleConfiguration:
-        Rules:
-          - Id: DeleteOldJobFiles
-            Status: Enabled
-            Prefix: runs/
-            ExpirationInDays: {Ref: RunFilesRetentionDays}
+        Fn::If:
+          - ExpireRunFiles
+          - Rules:
+              - Id: DeleteOldJobFiles
+                Status: Enabled
+                Prefix: runs/
+                ExpirationInDays: {Ref: RunFilesRetentionDays}
+          - {Ref: AWS::NoValue}
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
         BlockPublicPolicy: true
@@ -134,6 +142,39 @@ Resources:
     Type: AWS::ECR::Repository
     Properties:
       EmptyOnDelete: true
+
+  # Shared file system mounted at /mnt/jfr in every container. Jobs run in their
+  # folders on it, so a job can read the folders of earlier jobs (prev_dir).
+  # Deleting the stack deletes it.
+  RunFileSystem:
+    Type: AWS::EFS::FileSystem
+    Properties:
+      Encrypted: true
+      ThroughputMode: elastic
+      LifecyclePolicies:
+        - TransitionToIA: AFTER_30_DAYS
+
+  EfsSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: NFS from the Batch instances
+      VpcId: {Ref: BatchVpc}
+      SecurityGroupIngress:
+        - {IpProtocol: tcp, FromPort: 2049, ToPort: 2049, SourceSecurityGroupId: {Ref: BatchSecurityGroup}}
+
+  MountTarget1:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId: {Ref: RunFileSystem}
+      SubnetId: {Ref: PublicSubnet1}
+      SecurityGroups: [{Ref: EfsSecurityGroup}]
+
+  MountTarget2:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId: {Ref: RunFileSystem}
+      SubnetId: {Ref: PublicSubnet2}
+      SecurityGroups: [{Ref: EfsSecurityGroup}]
 
   BatchLogGroup:
     Type: AWS::Logs::LogGroup
@@ -255,12 +296,20 @@ Resources:
 
   CpuJobDefinition:
     Type: AWS::Batch::JobDefinition
+    DependsOn: [MountTarget1, MountTarget2]
     Properties:
       Type: container
       PlatformCapabilities: [EC2]
       ContainerProperties:
         Image: {Ref: ContainerImage}
         JobRoleArn: {Fn::GetAtt: [BatchTaskRole, Arn]}
+        Volumes:
+          - Name: run-folders
+            EfsVolumeConfiguration:
+              FileSystemId: {Ref: RunFileSystem}
+              TransitEncryption: ENABLED
+        MountPoints:
+          - {SourceVolume: run-folders, ContainerPath: /mnt/jfr}
         ResourceRequirements:
           - {Type: VCPU, Value: "1"}
           - {Type: MEMORY, Value: "1800"}
@@ -311,12 +360,20 @@ Resources:
   GpuJobDefinition:
     Type: AWS::Batch::JobDefinition
     Condition: HasGpuQueue
+    DependsOn: [MountTarget1, MountTarget2]
     Properties:
       Type: container
       PlatformCapabilities: [EC2]
       ContainerProperties:
         Image: {Ref: GpuContainerImage}
         JobRoleArn: {Fn::GetAtt: [BatchTaskRole, Arn]}
+        Volumes:
+          - Name: run-folders
+            EfsVolumeConfiguration:
+              FileSystemId: {Ref: RunFileSystem}
+              TransitEncryption: ENABLED
+        MountPoints:
+          - {SourceVolume: run-folders, ContainerPath: /mnt/jfr}
         ResourceRequirements:
           - {Type: VCPU, Value: "4"}
           - {Type: MEMORY, Value: "14000"}
