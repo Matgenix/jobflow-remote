@@ -207,6 +207,9 @@ Resources:
                 Action: [batch:SubmitJob, batch:DescribeJobs, batch:ListJobs, batch:TerminateJob]
                 Resource: "*"
                 Condition: {StringEquals: {"aws:RequestedRegion": {Ref: AWS::Region}}}
+              - Effect: Allow
+                Action: cloudformation:DescribeStacks
+                Resource: {Ref: AWS::StackId}
 
   # Fargate CPU queue: one Fargate task per job.
   ComputeEnvironment:

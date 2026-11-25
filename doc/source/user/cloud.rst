@@ -253,26 +253,22 @@ Step 4. Create the Runner credentials
 Step 5. Create the project file
 -------------------------------
 
-1. In CloudShell, print the command that creates the project file. It fills
-   in the bucket, queues, and job definitions of your stack, and adds one
-   worker per queue you created.
+1. On your computer, run the block below. It reads the outputs of the stack
+   with the ``Runner`` credentials from Step 4. It then writes
+   ``~/.jfremote/aws_ht.yaml`` with one worker per queue you created. If your
+   stack is not in ``us-east-2``, change the region in the first line.
 
    .. code-block:: bash
 
-       OUTPUTS=$(aws cloudformation describe-stacks --stack-name jfr-lab --query 'Stacks[0].Outputs' --output json)
-       out() { echo "$OUTPUTS" | jq -r --arg k "$1" '.[] | select(.OutputKey == $k) | .OutputValue'; }
-       worker() {
-         [ -n "$(out "$2JobQueueArn")" ] || return 0
-         jd=$(out "$2JobDefinitionArn")
-         printf '  %s:\n    type: cloud\n    scheduler_type: aws_batch\n' "$1"
-         printf '    scheduler_kwargs:\n      job_queue: %s\n      job_definition: %s\n' "$(out "$2JobQueueArn")" "${jd%:*}"
-         printf '      region_name: %s\n      profile_name: jfr-lab\n' "$(out Region)"
-         printf '    storage_type: s3\n    storage_kwargs:\n      bucket: %s\n' "$(out S3BucketName)"
-         printf '      prefix: runs\n      region_name: %s\n      profile_name: jfr-lab\n' "$(out Region)"
-       }
-       echo "mkdir -p ~/.jfremote && cat > ~/.jfremote/aws_ht.yaml <<'EOF'"
-       cat <<'TEMPLATE'
-       name: aws_ht
+       AWS_DEFAULT_REGION=us-east-2 AWS_PROFILE=jfr-lab python - <<'EOF'
+       from pathlib import Path
+
+       import boto3
+
+       stack = boto3.client("cloudformation").describe_stacks(StackName="jfr-lab")
+       out = {o["OutputKey"]: o["OutputValue"] for o in stack["Stacks"][0]["Outputs"]}
+
+       text = """name: aws_ht
        queue:
          store:
            type: MongoStore
@@ -295,26 +291,57 @@ Step 5. Create the project file
              database: jfr_aws_outputs
              collection_name: data
        workers:
-       TEMPLATE
-       worker aws_cpu Cpu
-       worker aws_cpu_ec2 Ec2Cpu
-       worker aws_gpu Gpu
-       echo "EOF"
+       """
+       region = out["Region"]
+       bucket = out["S3BucketName"]
+       for worker, queue in [("aws_cpu", "Cpu"), ("aws_cpu_ec2", "Ec2Cpu"), ("aws_gpu", "Gpu")]:
+           if queue + "JobQueueArn" not in out:
+               continue
+           job_queue = out[queue + "JobQueueArn"]
+           # Without the revision number, AWS Batch uses the latest revision.
+           job_definition = out[queue + "JobDefinitionArn"].rsplit(":", 1)[0]
+           text += f"""  {worker}:
+           type: cloud
+           scheduler_type: aws_batch
+           scheduler_kwargs:
+             job_queue: {job_queue}
+             job_definition: {job_definition}
+             region_name: {region}
+             profile_name: jfr-lab
+           storage_type: s3
+           storage_kwargs:
+             bucket: {bucket}
+             prefix: runs
+             region_name: {region}
+             profile_name: jfr-lab
+       """
 
-2. Select all printed lines, from ``mkdir -p ~/.jfremote`` to the last
-   ``EOF``, and copy them. On your computer, paste them into the terminal and
-   press Enter. This creates ``~/.jfremote/aws_ht.yaml``.
+       path = Path.home() / ".jfremote" / "aws_ht.yaml"
+       path.parent.mkdir(exist_ok=True)
+       path.write_text(text)
+       print(f"Created {path}")
+       EOF
 
-3. If your MongoDB is not on ``127.0.0.1:27017``, open the file
-   (``vi ~/.jfremote/aws_ht.yaml``) and change the ``queue`` and ``jobstore``
-   settings.
+2. On your computer, look at the file and check that MongoDB is reachable:
+
+   .. code-block:: bash
+
+       cat ~/.jfremote/aws_ht.yaml
+       python -c "import pymongo; print(pymongo.MongoClient('mongodb://127.0.0.1:27017', serverSelectionTimeoutMS=3000).admin.command('ping'))"
+
+   The second command prints ``{'ok': 1.0}``. If it fails, start MongoDB. If
+   your MongoDB runs on another host or port, open the file with
+   ``vi ~/.jfremote/aws_ht.yaml`` and change ``host`` and ``port`` in the
+   ``queue`` and ``jobstore`` sections.
+
+If you skipped Steps 3 and 4, write the file yourself in the same format,
+with the values of your own queues, job definitions, and bucket.
 
 The workers are ``aws_cpu`` (Fargate CPU queue), ``aws_cpu_ec2`` (EC2 CPU
 queue), and ``aws_gpu`` (EC2 GPU queue). ``scheduler_kwargs`` are passed to
 the AWS Batch scheduler (``qtoolkit.io.api.AWSBatchIO``). ``storage_kwargs``
 are passed to the S3 storage (``jobflow_remote.remote.storage.S3Storage``).
-``profile_name`` is the profile from Step 4. ``job_definition`` has no
-revision number, so AWS Batch always uses the latest revision.
+``profile_name`` is the profile from Step 4.
 
 The job files stay in the S3 bucket until you delete them, for example with
 ``jf flow delete --files``. The results go to your ``JobStore``, as on HPC.
