@@ -15,8 +15,8 @@ How a cloud worker runs a job
    AWS Batch job.
 2. The AWS Batch job starts a container that runs
    ``jf -fe execution run-cloud``. This command downloads the job folder from
-   S3, runs the job, and uploads ``jfremote_out.json`` and the job store files
-   back to S3.
+   S3, runs the job, and uploads the job folder back to S3, including
+   ``jfremote_out.json`` and the job store files.
 3. When AWS Batch reports the job as finished, the ``Runner`` downloads the
    results from S3 and stores them in your ``JobStore``.
 
@@ -31,7 +31,7 @@ The container never connects to your MongoDB database.
       workers. Flows that pass data only through job outputs, such as the
       force-field phonon workflow in :ref:`cloud_submit`, work as on HPC.
     * Each jobflow job runs as one AWS Batch job. A GPU job gets a whole GPU.
-      Several jobs cannot share one GPU yet.
+      Several jobs cannot share one GPU.
 
 The setup has two parts. Part 1 is done once per lab or AWS account. Part 2
 is repeated for each campaign.
