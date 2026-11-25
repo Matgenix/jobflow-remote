@@ -92,7 +92,7 @@ the ``aws`` extra. Use conda or uv:
 
             conda create -n jfr python=3.12 -y
             conda activate jfr
-            pip install "jobflow-remote[aws]"
+            pip install "jobflow-remote[aws] @ git+https://github.com/hrushikesh-s/jobflow-remote.git@cloud-worker-docs" "qtoolkit[aws] @ git+https://github.com/hrushikesh-s/qtoolkit.git@aws-batch-api"
 
     .. tab-item:: uv
         :sync: uv
@@ -101,7 +101,7 @@ the ``aws`` extra. Use conda or uv:
 
             uv venv ~/.venvs/jfr --python 3.12
             source ~/.venvs/jfr/bin/activate
-            uv pip install "jobflow-remote[aws]"
+            uv pip install "jobflow-remote[aws] @ git+https://github.com/hrushikesh-s/jobflow-remote.git@cloud-worker-docs" "qtoolkit[aws] @ git+https://github.com/hrushikesh-s/qtoolkit.git@aws-batch-api"
 
 Every command on your computer from here on runs in this environment. When
 you open a new terminal on your computer, activate it first:
@@ -525,9 +525,12 @@ Step 6. Check the setup
        from jobflow_remote.utils.examples import add, read_file, write_file
 
        exec_config = ExecutionConfig(
-           pre_run='pip install -q --no-cache-dir "jobflow-remote[aws]"'
+           pre_run=(
+               "apt-get -qq update && apt-get -qq install -y git > /dev/null && "
+               'pip install -q --no-cache-dir "jobflow-remote[aws] @ git+https://github.com/hrushikesh-s/jobflow-remote.git@cloud-worker-docs" "qtoolkit[aws] @ git+https://github.com/hrushikesh-s/qtoolkit.git@aws-batch-api"'
+           )
        )
-       resources = QCloudResources(vcpus=1, memory=1800, time_limit=600)
+       resources = QCloudResources(vcpus=1, memory=1800, time_limit=900)
 
        job1 = add(1, 2)
        job2 = add(job1.output, 3)
@@ -620,7 +623,9 @@ pulled before.
        RUN apt-get update && apt-get install -y --no-install-recommends git gcc g++ && rm -rf /var/lib/apt/lists/*
        RUN pip install --upgrade pip && \
            pip install --index-url "$TORCH_INDEX" torch && \
-           pip install "numpy<=2.2" "mace-torch>=0.3.16" "jobflow-remote[aws]" \
+           pip install "numpy<=2.2" "mace-torch>=0.3.16" \
+             "jobflow-remote[aws] @ git+https://github.com/hrushikesh-s/jobflow-remote.git@cloud-worker-docs" \
+             "qtoolkit[aws] @ git+https://github.com/hrushikesh-s/qtoolkit.git@aws-batch-api" \
              "atomate2[pheasy,ase]" "f90nml>=1.3.1" "h5py>=3.6.0" "numba>=0.58.1" \
              "scikit-learn>=1.0.2" "spglib>=1.16.3" && \
            pip install --no-deps "pheasy @ git+https://gitlab.com/hpsahasrabuddhe/pheasy.git@9f24162a4ed0f0ab8911d382fd2617944aade55d"
@@ -1126,7 +1131,7 @@ The S3 bucket and its copies of the job folders are kept.
 
        OUT() { aws cloudformation describe-stacks --stack-name jfr-lab --query "Stacks[0].Outputs[?OutputKey=='$1'].OutputValue" --output text; }
        CMD="from jobflow_remote.remote.storage import S3Storage; S3Storage(bucket='$(OUT S3BucketName)', prefix='runs', region_name='$(OUT Region)').upload_dir('/mnt/jfr/runs', '.')"
-       OVERRIDES=$(python3 -c 'import json, sys; print(json.dumps({"command": ["sh", "-c", "pip install -q --no-cache-dir \"jobflow-remote[aws]\" && python -c \"$0\"", sys.argv[1]]}))' "$CMD")
+       OVERRIDES=$(python3 -c 'import json, sys; print(json.dumps({"command": ["sh", "-c", "apt-get -qq update && apt-get -qq install -y git > /dev/null && pip install -q --no-cache-dir \"jobflow-remote[aws] @ git+https://github.com/hrushikesh-s/jobflow-remote.git@cloud-worker-docs\" \"qtoolkit[aws] @ git+https://github.com/hrushikesh-s/qtoolkit.git@aws-batch-api\" && python -c \"$0\"", sys.argv[1]]}))' "$CMD")
        COPY_JOB=$(aws batch submit-job --job-name copy-job-folders --job-queue "$(OUT CpuJobQueueArn)" --job-definition "$(OUT CpuJobDefinitionArn)" --container-overrides "$OVERRIDES" --query jobId --output text)
        STATUS=SUBMITTED
        while [ "$STATUS" != SUCCEEDED ] && [ "$STATUS" != FAILED ]; do sleep 20; STATUS=$(aws batch describe-jobs --jobs "$COPY_JOB" --query 'jobs[0].status' --output text); echo "$STATUS"; done
