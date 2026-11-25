@@ -93,9 +93,28 @@ the ``aws`` extra. Use conda or uv:
             source ~/.venvs/jfr/bin/activate
             uv pip install "jobflow-remote[aws]"
 
-Activate this environment (``conda activate jfr`` or
-``source ~/.venvs/jfr/bin/activate``) in every terminal on your computer that
-you use in this guide.
+Every command on your computer from here on runs in this environment. When
+you open a new terminal on your computer, activate it first:
+
+.. tab-set::
+    :sync-group: env
+
+    .. tab-item:: conda
+        :sync: conda
+
+        .. code-block:: bash
+
+            conda activate jfr
+
+    .. tab-item:: uv
+        :sync: uv
+
+        .. code-block:: bash
+
+            source ~/.venvs/jfr/bin/activate
+
+If you gave the environment another name or path, use that instead of ``jfr``
+in these commands.
 
 You also need a MongoDB database for the queue and the ``JobStore``, as for
 any jobflow-remote project. A local MongoDB on ``127.0.0.1:27017`` is enough
@@ -393,13 +412,29 @@ Step 6. Check the setup
        python test_aws.py
        jf -p aws_ht runner run
 
-4. On your computer, open a second terminal, activate the environment, and
+4. On your computer, open a second terminal. Activate the environment and
    check the jobs:
 
-   .. code-block:: bash
+   .. tab-set::
+       :sync-group: env
 
-       jf -p aws_ht job list
-       jf -p aws_ht job output 2
+       .. tab-item:: conda
+           :sync: conda
+
+           .. code-block:: bash
+
+               conda activate jfr
+               jf -p aws_ht job list
+               jf -p aws_ht job output 2
+
+       .. tab-item:: uv
+           :sync: uv
+
+           .. code-block:: bash
+
+               source ~/.venvs/jfr/bin/activate
+               jf -p aws_ht job list
+               jf -p aws_ht job output 2
 
    After a few minutes both jobs are ``COMPLETED`` and the second command
    prints ``6``. Stop the ``Runner`` with ``Ctrl+C`` in the first terminal.
