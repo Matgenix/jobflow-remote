@@ -1164,9 +1164,12 @@ first. This guide does not cover it.
 
                sudo -iu ec2-user
 
-           The next items run in this shell. They say **on the instance**. Type
-           ``exit`` twice to close the shell. In every later shell on the instance,
-           run ``source ~/.venvs/jfr/bin/activate`` after ``sudo -iu ec2-user``.
+           The prompt is now ``[ec2-user@ip-... ~]$``. The next items run at this
+           prompt. They say **on the instance**. If the prompt is ``~ $``, you
+           are in CloudShell, for example because the session closed after 20
+           minutes without input. Then run this item again. Type ``exit`` twice
+           to close the shell. In every later shell on the instance, run
+           ``source ~/.venvs/jfr/bin/activate`` after ``sudo -iu ec2-user``.
 
         3. On the instance, wait until the setup of the instance is done and check
            that MongoDB runs:
@@ -1183,7 +1186,7 @@ first. This guide does not cover it.
            .. code-block:: bash
 
                curl -LsSf https://astral.sh/uv/install.sh | sh
-               source "$HOME/.local/bin/env"
+               export PATH="$HOME/.local/bin:$PATH"
 
            Then run the **uv** tab of Part 1, Step 1 on the instance.
 
