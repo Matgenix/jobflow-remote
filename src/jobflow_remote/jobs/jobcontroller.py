@@ -9,6 +9,7 @@ import warnings
 from collections import defaultdict
 from collections.abc import MutableMapping
 from contextlib import ExitStack
+from contextvars import ContextVar
 from datetime import datetime, timedelta, timezone
 from functools import cached_property
 from pathlib import Path
@@ -193,6 +194,50 @@ def _merge_custom_query(query: dict, custom_query: dict | None) -> dict:
         )
 
     return query | custom_query
+
+
+# The list collecting the failed cancellations of the processes in the queue,
+# when a collect_cancel_errors block is active in the current thread or task.
+_cancel_errors: ContextVar[list[tuple[str, Exception]] | None] = ContextVar(
+    "_cancel_errors", default=None
+)
+
+
+@contextlib.contextmanager
+def collect_cancel_errors() -> Generator[list[tuple[str, Exception]], None, None]:
+    """
+    Collect the failed cancellations of the processes in the queue.
+
+    The actions that stop, rerun or delete SUBMITTED and RUNNING Jobs try to
+    cancel their process in the queue of the worker. A failure to cancel only
+    logs a warning, and the action is performed anyway. Inside this context
+    manager each failure is also appended to the returned list, as a tuple
+    with the db_id of the Job and the exception raised, so that the caller
+    can report which processes may still be running.
+
+    The list is specific to the current thread (and asyncio task), so that
+    concurrent callers each get only their own failures. In nested blocks
+    the failures are collected only by the innermost one.
+
+    Returns
+    -------
+    list
+        The list of (db_id, exception) of the failed cancellations, filled
+        while the block runs.
+
+    Examples
+    --------
+    >>> with collect_cancel_errors() as cancel_errors:
+    ...     job_controller.stop_jobs(flow_ids=flow_uuid)
+    >>> for db_id, exc in cancel_errors:
+    ...     print(f"The process of Job {db_id} could not be cancelled: {exc}")
+    """
+    errors: list[tuple[str, Exception]] = []
+    token = _cancel_errors.set(errors)
+    try:
+        yield errors
+    finally:
+        _cancel_errors.reset(token)
 
 
 class JobController:
@@ -5479,14 +5524,15 @@ class JobController:
         BATCH_RUNNING states run inside a batch process that cannot be
         cancelled for a single Job: a warning is logged. Nothing is done for
         the other states. A failure to cancel is logged and not raised, so that
-        the calling action can proceed.
+        the calling action can proceed. Inside a `collect_cancel_errors` block
+        the failure is also added to its list.
 
         Parameters
         ----------
         job_doc
             The dict of the JobDoc. Requires the "uuid", "index" and "state"
-            values and, for the SUBMITTED and RUNNING states, "worker" and
-            "remote.process_id".
+            values and, for the SUBMITTED and RUNNING states, "db_id",
+            "worker" and "remote.process_id".
         context
             Text appended to the logged messages, e.g. to describe the action
             being performed.
@@ -5508,11 +5554,13 @@ class JobController:
             return False
         try:
             self._cancel_queue_process(job_doc)
-        except Exception:
+        except Exception as exc:
             logger.warning(
                 f"Failed cancelling the process for {job_desc}{context}",
                 exc_info=True,
             )
+            if (cancel_errors := _cancel_errors.get()) is not None:
+                cancel_errors.append((job_doc["db_id"], exc))
             return False
         return True
 

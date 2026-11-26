@@ -2480,6 +2480,69 @@ def test_stop_job_running(job_controller, runner) -> None:
     assert job_controller.get_flows_info(job_ids=job.uuid)[0].state == FlowState.STOPPED
 
 
+def test_collect_cancel_errors(job_controller) -> None:
+    """
+    A failed cancellation is collected with the db_id of the Job, and the
+    action is performed anyway.
+    """
+    from jobflow import Flow
+
+    from jobflow_remote import submit_flow
+    from jobflow_remote.jobs.jobcontroller import collect_cancel_errors
+    from jobflow_remote.jobs.state import JobState
+    from jobflow_remote.testing import add
+
+    j1 = add(1, 2)
+    j2 = add(j1.output, 3)
+    j3 = add(j1.output, 4)
+    flow = Flow([j1, j2, j3])
+    submit_flow(flow, worker="test_local_worker")
+    db_ids = {j.uuid: job_controller.get_job_info(job_id=j.uuid).db_id for j in flow}
+
+    def set_state(job, state=JobState.RUNNING) -> None:
+        # a RUNNING Job without a process id: its cancellation fails
+        assert job_controller.set_job_doc_properties(
+            {"state": state.value}, job_id=job.uuid
+        )
+
+    def state(job) -> JobState:
+        return job_controller.get_job_info(job_id=job.uuid).state
+
+    with collect_cancel_errors() as errors:
+        set_state(j2)
+        job_controller.stop_jobs(job_ids=[(j2.uuid, 1)])
+        assert state(j2) == JobState.USER_STOPPED
+
+        # rerun of a RUNNING Job
+        set_state(j2)
+        job_controller.rerun_job(job_id=j2.uuid)
+        assert state(j2) == JobState.READY
+
+        # forced rerun of the parent of a RUNNING Job
+        set_state(j1, JobState.COMPLETED)
+        set_state(j2)
+        job_controller.rerun_job(job_id=j1.uuid, force=True)
+        assert state(j2) == JobState.WAITING
+
+        set_state(j3)
+        job_controller.delete_job(job_id=j3.uuid)
+        assert job_controller.count_jobs(job_ids=[(j3.uuid, 1)]) == 0
+
+        set_state(j1)
+        assert job_controller.delete_flow(flow.uuid)
+
+    assert [db_id for db_id, _ in errors] == [
+        db_ids[j2.uuid],
+        db_ids[j2.uuid],
+        db_ids[j2.uuid],
+        db_ids[j3.uuid],
+        db_ids[j1.uuid],
+    ]
+    for _, exc in errors:
+        assert isinstance(exc, ValueError)
+        assert "process id is not defined" in str(exc)
+
+
 # the Jobs are independent, so that they can run at the same time
 @pytest.mark.filterwarnings("ignore:Some jobs are not connected")
 def test_many_jobs_action_shares_hosts(job_controller, runner, monkeypatch) -> None:
