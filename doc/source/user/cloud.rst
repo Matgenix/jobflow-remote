@@ -906,17 +906,26 @@ first. This guide does not cover it.
            Then run item 2 of Part 1, Step 4 on a Perlmutter login node.
 
         3. On a Perlmutter login node, create ``make_project.py`` with item 1 of
-           Part 1, Step 5. Then create the project file. The block asks for the
-           host, database, user, and password that NERSC gave you. The project
-           file keeps them and is readable only by you.
+           Part 1, Step 5. Then type the host, database, and user that NERSC
+           gave you into the boxes. The block below updates as you type. It asks
+           for the password of the database when it runs. The project file keeps
+           them and is readable only by you.
+
+           .. raw:: html
+
+               <div class="jfr-inputs">
+                 <label>MongoDB host <input data-jfr="mongo_host" size="24"></label>
+                 <label>Database <input data-jfr="mongo_db" size="12"></label>
+                 <label>User <input data-jfr="mongo_user" size="12"></label>
+               </div>
 
            .. code-block:: bash
 
                {
-               printf "MongoDB host: "; read -r MONGO_HOST
+               MONGO_HOST=<mongo_host>
                MONGO_PORT=27017
-               printf "MongoDB database: "; read -r MONGO_DB
-               printf "MongoDB user: "; read -r MONGO_USER
+               MONGO_DB=<mongo_db>
+               MONGO_USER=<mongo_user>
                printf "MongoDB password: "; read -rs MONGO_PASSWORD; echo
                export MONGO_PASSWORD
                env -u AWS_DEFAULT_REGION AWS_PROFILE=jfr-lab MONGO_HOST="$MONGO_HOST" MONGO_PORT="$MONGO_PORT" \
@@ -930,14 +939,19 @@ first. This guide does not cover it.
            with ``Ctrl+C`` when the four jobs are ``COMPLETED``.
 
         5. On a Perlmutter login node, run the ``Runner`` in the ``workflow`` QOS with
-           ``scrontab``. The block asks for your NERSC project, for example
-           ``m5411``. The entry starts the ``Runner`` if it is not running,
+           ``scrontab``. Type your NERSC project, for example ``m5411``, into
+           the box. The entry starts the ``Runner`` if it is not running,
            checking every 10 minutes.
+
+           .. raw:: html
+
+               <div class="jfr-inputs">
+                 <label>NERSC project <input data-jfr="nersc_project" size="10"></label>
+               </div>
 
            .. code-block:: bash
 
-               {
-               printf "NERSC project: "; read -r NERSC_PROJECT
+               NERSC_PROJECT=<nersc_project>
                cat > "$HOME/jfr_runner.sh" <<'EOF'
                #!/bin/bash
                module load conda
@@ -959,7 +973,6 @@ first. This guide does not cover it.
                scrontab -l
                scrontab "$HOME/jfr_runner.scron"
                scrontab -l
-               }
 
            ``scrontab FILE`` replaces all your ``scrontab`` entries. If the first
            ``scrontab -l`` shows other entries, add them to ``jfr_runner.scron``
@@ -1440,10 +1453,23 @@ List the flows and the jobs:
     jf -p aws_ht flow list
     jf -p aws_ht job list
 
-Each job has its own folder:
+Type the ids from these lists into the boxes below. The commands of this
+section update as you type, and the copy button copies them with your values.
 
-* While the job runs, the folder is on EFS under ``/mnt/jfr/runs/``. Only
-  the containers mount EFS.
+.. raw:: html
+
+    <div class="jfr-inputs">
+      <label>Flow id <input data-jfr="flow_id" size="38" placeholder="Flow id column of flow list"></label>
+      <label>DB id <input data-jfr="db_id" size="8" placeholder="DB id"></label>
+      <label>Job id <input data-jfr="job_id" size="38" placeholder="Job id column of job list"></label>
+      <label>Index <input data-jfr="index" size="4" value="1"></label>
+    </div>
+
+Job files
+---------
+
+* While a job runs, its folder is on EFS under ``/mnt/jfr/runs/``. Only the
+  containers mount EFS.
 * When the job ends, the whole folder is copied to S3 under
   ``s3://<bucket>/runs/``. Until then, S3 has only ``jfremote_in.json`` and
   ``jfremote_out.json`` of the job.
@@ -1452,21 +1478,16 @@ Each job has its own folder:
 * The bucket keeps the folders after the stack is deleted, unless you set
   ``RunFilesRetentionDays`` in Part 1, Step 3.
 
-List the jobs of a flow, their folders on EFS and in S3, and the files in
-S3. Run it where you submit the flows. It asks for the flow id from
-``jf -p aws_ht flow list``.
+List every job of the flow with its state, its folders on EFS and in S3, and
+the files in S3:
 
 .. code-block:: bash
 
-    {
-    printf "Flow id: "; read -r FLOW_ID
-    FLOW_ID="$FLOW_ID" python - <<'EOF'
-    import os
-
+    python - <<'EOF'
     from jobflow_remote import JobController
 
     jc = JobController.from_project_name("aws_ht")
-    jobs = jc.get_jobs_info(flow_ids=os.environ["FLOW_ID"])
+    jobs = jc.get_jobs_info(flow_ids="<flow_id>")
     for info in sorted(jobs, key=lambda info: int(info.db_id)):
         print(info.db_id, info.name, info.state.value)
         if not info.run_dir:
@@ -1479,18 +1500,49 @@ S3. Run it where you submit the flows. It asks for the flow id from
         for name in sorted(storage.listdir(info.run_dir)):
             print("   ", name)
     EOF
-    }
 
-List the files of one job in S3 and download its ``jfremote_out.json`` into
-the current folder. The block asks for the DB id of the job:
+List the files of the job with the DB id in S3, and download its
+``jfremote_out.json`` into the current folder:
 
 .. code-block:: bash
 
-    {
-    printf "DB id: "; read -r DB_ID
-    jf -p aws_ht job files ls "$DB_ID"
-    jf -p aws_ht job files get "$DB_ID" jfremote_out.json
-    }
+    jf -p aws_ht job files ls <db_id>
+    jf -p aws_ht job files get <db_id> jfremote_out.json
+
+On your computer, download the whole folder of the job with the Job id and
+Index into the current folder. This needs only the ``jfr-lab`` profile of
+Part 1, Step 4, so it works wherever the ``Runner`` runs:
+
+.. code-block:: bash
+
+    env -u AWS_DEFAULT_REGION python - <<'EOF'
+    from pathlib import PurePosixPath
+
+    import boto3
+
+    from jobflow_remote.remote.data import get_job_path
+    from jobflow_remote.remote.storage import S3Storage
+
+    run_dir = get_job_path("<job_id>", <index>, "/jf_work")
+    session = boto3.Session(profile_name="jfr-lab")
+    stack = session.client("cloudformation").describe_stacks(StackName="jfr-lab")
+    bucket = next(
+        o["OutputValue"]
+        for o in stack["Stacks"][0]["Outputs"]
+        if o["OutputKey"] == "S3BucketName"
+    )
+    name = PurePosixPath(run_dir).name
+    S3Storage(bucket=bucket, prefix="runs", profile_name="jfr-lab").download_dir(
+        run_dir, name
+    )
+    print("Downloaded to", name)
+    EOF
+
+Download the folders you need before step 3 of :ref:`cloud_cleanup`, which
+deletes the access keys of the ``jfr-lab`` profile.
+
+Jobs that wait
+--------------
 
 A job stays ``SUBMITTED`` until its container starts. The first job on a
 new instance waits a few minutes while the instance starts and pulls the
@@ -1518,98 +1570,91 @@ in Part 1, Step 2. If a job asks for more vCPUs or memory than any instance
 of the queue has, the queue cancels it after 30 minutes in ``RUNNABLE``, and
 the job fails.
 
+Retry, stop, and delete
+-----------------------
+
 A job goes to ``REMOTE_ERROR`` when an action of the ``Runner`` on AWS fails
 several times in a row, for example while AWS Batch or S3 does not answer.
-Run the failed action again. The block asks for the DB id of the job:
+Run the failed action of the job with the DB id again:
 
 .. code-block:: bash
 
-    printf "DB id: "; read -r DB_ID; jf -p aws_ht job retry "$DB_ID"
+    jf -p aws_ht job retry <db_id>
 
-Stop a queued or running job. The block asks for the DB id of the job:
-
-.. code-block:: bash
-
-    printf "DB id: "; read -r DB_ID; jf -p aws_ht job stop "$DB_ID"
-
-Delete a flow and its jobs. The command also cancels the AWS Batch jobs of
-the flow that are still queued or running. The block asks for the flow id
-from ``jf -p aws_ht flow list``:
+Stop the job with the DB id if it is queued or running:
 
 .. code-block:: bash
 
-    printf "Flow id: "; read -r FLOW_ID; jf -p aws_ht flow delete -fid "$FLOW_ID"
+    jf -p aws_ht job stop <db_id>
 
-Download the whole folder of a job from S3 to your computer:
+Delete the flow and its jobs. This also cancels the AWS Batch jobs of the
+flow that are still queued or running:
 
-1. Where you submit the flows, show the folder of the job:
+.. code-block:: bash
 
-   .. code-block:: bash
+    jf -p aws_ht flow delete -fid <flow_id>
 
-       printf "DB id: "; read -r DB_ID; jf -p aws_ht job files ls "$DB_ID"
-
-   The first line ends with the folder, for example
-   ``/jf_work/c7/97/bc/<uuid>_1``.
-
-2. On your computer, download this folder into the current folder. The block
-   asks for the folder. It needs only the ``jfr-lab`` profile of Part 1,
-   Step 4, so it works wherever the ``Runner`` runs.
-
-   .. code-block:: bash
-
-       {
-       printf "Folder: "; read -r RUN_DIR
-       env -u AWS_DEFAULT_REGION RUN_DIR="$RUN_DIR" python - <<'EOF'
-       import os
-       from pathlib import PurePosixPath
-
-       import boto3
-
-       from jobflow_remote.remote.storage import S3Storage
-
-       session = boto3.Session(profile_name="jfr-lab")
-       stack = session.client("cloudformation").describe_stacks(StackName="jfr-lab")
-       bucket = next(
-           o["OutputValue"]
-           for o in stack["Stacks"][0]["Outputs"]
-           if o["OutputKey"] == "S3BucketName"
-       )
-       name = PurePosixPath(os.environ["RUN_DIR"]).name
-       storage = S3Storage(bucket=bucket, prefix="runs", profile_name="jfr-lab")
-       storage.download_dir(os.environ["RUN_DIR"], name)
-       print("Downloaded to", name)
-       EOF
-       }
-
-Download the folders you need before step 3 of :ref:`cloud_cleanup`, which
-deletes the access keys of the ``jfr-lab`` profile.
+Logs
+----
 
 The containers write stdout and stderr to CloudWatch Logs, not to
 ``queue.out`` and ``queue.err``. For this reason ``jf job queue-out`` does not
 work for cloud workers. ``jf job todir`` does not work either, because there
-is no shell access to the container. Read the logs in two steps:
+is no shell access to the container.
 
-1. Where you submit the flows, print the AWS Batch job id of a job. The block
-   asks for the DB id of the job:
-
-   .. code-block:: bash
-
-       {
-       printf "DB id: "; read -r DB_ID
-       DB_ID="$DB_ID" python -c 'import os; from jobflow_remote import JobController; print(JobController.from_project_name("aws_ht").get_job_info(db_id=os.environ["DB_ID"]).remote.process_id)'
-       }
-
-2. In CloudShell, show the state of the job and the logs of all its attempts.
-   The block asks for the AWS Batch job id from item 1. AWS Batch keeps this
-   information for 7 days after the job ends.
+1. Where you submit the flows, print the AWS Batch job id of the job with the
+   DB id:
 
    .. code-block:: bash
 
-       {
-       printf "AWS Batch job id: "; read -r BATCH_JOB
-       aws batch describe-jobs --jobs "$BATCH_JOB" --query 'jobs[0].[status,statusReason]' --output text
-       for S in $(aws batch describe-jobs --jobs "$BATCH_JOB" --query 'jobs[0].[attempts[].container.logStreamName, container.logStreamName][]' --output text | tr '\t' '\n' | grep -v None | sort -u); do aws logs tail /aws/batch/jfr-lab --log-stream-names "$S" --since 7d; done
-       }
+       python -c 'from jobflow_remote import JobController; print(JobController.from_project_name("aws_ht").get_job_info(db_id="<db_id>").remote.process_id)'
+
+2. Type the AWS Batch job id here:
+
+   .. raw:: html
+
+       <div class="jfr-inputs">
+         <label>AWS Batch job id <input data-jfr="batch_job_id" size="38"></label>
+       </div>
+
+   Then, in CloudShell, show the state of the job and the logs of all its
+   attempts. AWS Batch keeps this information for 7 days after the job ends.
+
+   .. code-block:: bash
+
+       aws batch describe-jobs --jobs "<batch_job_id>" --query 'jobs[0].[status,statusReason]' --output text
+       for S in $(aws batch describe-jobs --jobs "<batch_job_id>" --query 'jobs[0].[attempts[].container.logStreamName, container.logStreamName][]' --output text | tr '\t' '\n' | grep -v None | sort -u); do aws logs tail /aws/batch/jfr-lab --log-stream-names "$S" --since 7d; done
+
+.. Boxes with data-jfr fill the placeholders <name> in the code blocks of
+   this page. Without JavaScript, the placeholders stay as they are.
+
+.. raw:: html
+
+    <style>
+      .jfr-inputs { display: flex; flex-wrap: wrap; gap: 0.5em 1.5em; margin: 0.5em 0 1em; }
+      .jfr-inputs input { font-family: monospace; margin-left: 0.3em; }
+    </style>
+    <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const inputs = document.querySelectorAll("input[data-jfr]");
+      const names = Array.from(inputs, (input) => input.dataset.jfr);
+      const pattern = new RegExp(`<(${names.join("|")})>`, "g");
+      const blocks = Array.from(document.querySelectorAll("div.highlight pre"))
+        .filter((pre) => pre.textContent.match(pattern));
+      blocks.forEach((pre) => { pre.dataset.jfrText = pre.textContent; });
+      const update = () => {
+        const values = {};
+        inputs.forEach((input) => {
+          if (input.value.trim()) values[input.dataset.jfr] = input.value.trim();
+        });
+        blocks.forEach((pre) => {
+          pre.textContent = pre.dataset.jfrText.replace(pattern, (m, name) => values[name] ?? m);
+        });
+      };
+      inputs.forEach((input) => input.addEventListener("input", update));
+      update();
+    });
+    </script>
 
 .. _cloud_cleanup:
 
@@ -1728,9 +1773,15 @@ The S3 bucket and its copies of the job folders are kept.
        EOF
 
 The bucket stays and costs about 0.023 USD per GB and month. To delete it
-with all job folders in it, run in CloudShell. The block asks for the name
-of the bucket from step 3:
+with all job folders in it, type the name of the bucket from step 3 into the
+box and run the block in CloudShell:
+
+.. raw:: html
+
+    <div class="jfr-inputs">
+      <label>Bucket <input data-jfr="bucket" size="40"></label>
+    </div>
 
 .. code-block:: bash
 
-    printf "Bucket: "; read -r BUCKET; aws s3 rb "s3://$BUCKET" --force
+    aws s3 rb s3://<bucket> --force
