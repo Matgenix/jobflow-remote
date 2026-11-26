@@ -1116,6 +1116,73 @@ def test_stop(job_controller, one_job, caplog) -> None:
     assert "cannot be cancelled from execution on the worker" in caplog.text
 
 
+@pytest.mark.parametrize(
+    "action", ["pause", "stop", "resume", "retry", "rerun", "rerun_force"]
+)
+def test_actions_accepted_states(job_controller, one_job, action) -> None:
+    """
+    A Job without children is accepted by each action exactly in the states
+    of the action's constant.
+    """
+    from jobflow_remote.jobs.state import (
+        PAUSABLE_STATES,
+        RERUNNABLE_STATES,
+        RERUNNABLE_STATES_FORCE,
+        RESUMABLE_STATES,
+        RETRYABLE_STATES,
+        STOPPABLE_STATES,
+        JobState,
+    )
+
+    actions = {
+        "pause": (job_controller.pause_job, {}, PAUSABLE_STATES),
+        "stop": (job_controller.stop_job, {}, STOPPABLE_STATES),
+        "resume": (job_controller.resume_job, {}, RESUMABLE_STATES),
+        "retry": (job_controller.retry_job, {}, RETRYABLE_STATES),
+        "rerun": (job_controller.rerun_job, {}, RERUNNABLE_STATES),
+        "rerun_force": (
+            job_controller.rerun_job,
+            {"force": True},
+            RERUNNABLE_STATES_FORCE,
+        ),
+    }
+    method, kwargs, expected_states = actions[action]
+    job = one_job.jobs[0]
+
+    accepted = set()
+    for state in JobState:
+        # a valid previous_state is required to retry a REMOTE_ERROR Job
+        assert job_controller.set_job_doc_properties(
+            {"state": state.value, "previous_state": JobState.CHECKED_OUT.value},
+            job_id=job.uuid,
+        )
+        try:
+            method(job_id=job.uuid, **kwargs)
+        except ValueError:
+            continue
+        accepted.add(state)
+
+    assert accepted == set(expected_states)
+
+
+def test_resume_flow_accepted_states(job_controller, one_job) -> None:
+    """A Flow is resumed exactly in the states of RESUMABLE_FLOW_STATES."""
+    from jobflow_remote.jobs.state import RESUMABLE_FLOW_STATES, FlowState
+
+    accepted = set()
+    for state in FlowState:
+        job_controller.flows.update_one(
+            {"uuid": one_job.uuid}, {"$set": {"state": state.value}}
+        )
+        try:
+            job_controller.resume_flow(flow_id=one_job.uuid)
+        except ValueError:
+            continue
+        accepted.add(state)
+
+    assert accepted == set(RESUMABLE_FLOW_STATES)
+
+
 def test_unlock_jobs(job_controller, one_job) -> None:
     j = one_job.jobs[0]
     # catch the warning coming from MongoLock
@@ -2395,3 +2462,46 @@ def test_stop_job_running(job_controller, runner) -> None:
     assert len(jobs_list) == 0
     assert job_controller.get_job_info(job_id=job.uuid).state == JobState.USER_STOPPED
     assert job_controller.get_flows_info(job_ids=job.uuid)[0].state == FlowState.STOPPED
+
+
+# the Jobs are independent, so that they can run at the same time
+@pytest.mark.filterwarnings("ignore:Some jobs are not connected")
+def test_many_jobs_action_shares_hosts(job_controller, runner, monkeypatch) -> None:
+    """Cancelling the processes of several Jobs connects to their worker once."""
+    from jobflow import Flow
+
+    from jobflow_remote import submit_flow
+    from jobflow_remote.jobs.state import JobState
+    from jobflow_remote.remote.host.local import LocalHost
+    from jobflow_remote.testing import add_sleep
+
+    jobs = [add_sleep(1, 30), add_sleep(2, 30)]
+    flow = Flow(jobs)
+    submit_flow(flow, worker="test_local_worker")
+    for j in jobs:
+        runner.run_one_job(
+            max_seconds=20, job_id=[j.uuid, j.index], target_state=JobState.RUNNING
+        )
+
+    qm = runner.get_queue_manager("test_local_worker")
+    jobs_info = [job_controller.get_job_info(job_id=j.uuid) for j in jobs]
+    process_ids = [ji.remote.process_id for ji in jobs_info]
+    assert {ji.state for ji in jobs_info} == {JobState.RUNNING}
+    assert len(qm.get_jobs_list(process_ids)) == 2
+
+    connect_calls = []
+    orig_connect = LocalHost.connect
+
+    def counting_connect(self) -> None:
+        connect_calls.append(self)
+        orig_connect(self)
+
+    with monkeypatch.context() as m:
+        m.setattr(LocalHost, "connect", counting_connect)
+        updated = job_controller.stop_jobs(flow_ids=[flow.uuid])
+
+    assert set(updated) == {ji.db_id for ji in jobs_info}
+    assert len(connect_calls) == 1
+    assert len(qm.get_jobs_list(process_ids)) == 0
+    for j in jobs:
+        assert job_controller.get_job_info(job_id=j.uuid).state == JobState.USER_STOPPED

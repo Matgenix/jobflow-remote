@@ -47,10 +47,17 @@ from jobflow_remote.jobs.data import (
     projection_job_info,
 )
 from jobflow_remote.jobs.state import (
+    BATCH_STATES,
+    CANCELLABLE_STATES,
     DELETABLE_STATES,
     PAUSABLE_STATES,
+    RERUNNABLE_STATES,
+    RERUNNABLE_STATES_FORCE,
     RESETTABLE_STATES,
-    RUNNING_STATES,
+    RESUMABLE_FLOW_STATES,
+    RESUMABLE_STATES,
+    RETRYABLE_STATES,
+    STOPPABLE_STATES,
     BatchState,
     FlowState,
     JobState,
@@ -955,6 +962,11 @@ class JobController:
         Used to provide a common interface between all the methods that
         should be applied on a list of jobs sequentially.
 
+        The connections to the hosts of the workers are shared among all the
+        Jobs, so that a worker is connected at most once, even if the action
+        needs to reach it for several Jobs (e.g. to cancel their processes in
+        the queue).
+
         Parameters
         ----------
         method
@@ -1021,19 +1033,24 @@ class JobController:
             )
 
         updated_ids = set()
-        for db_id in queried_dbs_ids:
-            try:
-                job_updated_ids = method(db_id=db_id, **method_kwargs)
-                if not isinstance(job_updated_ids, list | tuple):
-                    job_updated_ids = (
-                        [] if job_updated_ids is None else [job_updated_ids]
+        # Share the hosts among all the Jobs. No connection is opened unless
+        # the method needs one.
+        with SharedHosts(self.project):
+            for db_id in queried_dbs_ids:
+                try:
+                    job_updated_ids = method(db_id=db_id, **method_kwargs)
+                    if not isinstance(job_updated_ids, list | tuple):
+                        job_updated_ids = (
+                            [] if job_updated_ids is None else [job_updated_ids]
+                        )
+                    if job_updated_ids:
+                        updated_ids.update(job_updated_ids)
+                except Exception:
+                    if raise_on_error:
+                        raise
+                    logger.exception(
+                        f"Error while {action_description} for job {db_id}"
                     )
-                if job_updated_ids:
-                    updated_ids.update(job_updated_ids)
-            except Exception:
-                if raise_on_error:
-                    raise
-                logger.exception(f"Error while {action_description} for job {db_id}")
 
         return list(updated_ids)
 
@@ -1221,31 +1238,29 @@ class JobController:
                 raise ValueError(f"No Job document matching criteria {lock_filter}")
             job_state = JobState(job_doc_dict["state"])
 
-            if job_state in [JobState.READY]:
-                raise ValueError("The Job is in the READY state. No need to rerun.")
-            if job_state in [JobState.WAITING]:
-                raise ValueError("The Job is in the WAITING state. Cannot be rerun.")
+            rerunnable_states = RERUNNABLE_STATES_FORCE if force else RERUNNABLE_STATES
+            if job_state not in rerunnable_states:
+                if job_state == JobState.READY:
+                    raise ValueError("The Job is in the READY state. No need to rerun.")
+                if job_state == JobState.WAITING:
+                    raise ValueError(
+                        "The Job is in the WAITING state. Cannot be rerun."
+                    )
+                if job_state in BATCH_STATES:
+                    raise ValueError(
+                        "Rerunning a BATCH_SUBMITTED or BATCH_RUNNING can lead to multiple execution of the "
+                        "same job if the job has already started. If this is not the case or the job is not "
+                        "running anymore, use the 'force' option to bypass the check."
+                    )
+                raise ValueError(
+                    f"Job in state {job_doc_dict['state']} cannot be rerun. "
+                    "Use the 'force' option to override this check."
+                )
             if job_state in RESETTABLE_STATES:
                 # if in one of the resettable states no need to lock the flow or
                 # update children.
                 doc_update = self._reset_remote(job_doc_dict, delete_files=delete_files)
                 modified_jobs = []
-            elif (
-                job_state in [JobState.BATCH_SUBMITTED, JobState.BATCH_RUNNING]
-                and not force
-            ):
-                raise ValueError(
-                    "Rerunning a BATCH_SUBMITTED or BATCH_RUNNING can lead to multiple execution of the "
-                    "same job if the job has already started. If this is not the case or the job is not "
-                    "running anymore, use the 'force' option to bypass the check."
-                )
-            elif (
-                job_state not in [JobState.FAILED, JobState.REMOTE_ERROR] and not force
-            ):
-                raise ValueError(
-                    f"Job in state {job_doc_dict['state']} cannot be rerun. "
-                    "Use the 'force' option to override this check."
-                )
             else:
                 # full restart required
                 doc_update, modified_jobs = self._full_rerun(
@@ -1911,6 +1926,8 @@ class JobController:
                     )
                 raise ValueError(f"No Job matching criteria {lock_filter}")
             state = JobState(doc["state"])
+            if state not in RETRYABLE_STATES:
+                raise ValueError(f"Job in state {state.value} cannot be retried.")
             if state == JobState.REMOTE_ERROR:
                 previous_state = doc["previous_state"]
                 try:
@@ -1923,7 +1940,8 @@ class JobController:
                 set_dict["state"] = previous_state
 
                 lock.update_on_release = {"$set": set_dict}
-            elif state in RUNNING_STATES:
+            else:
+                # one of the running states
                 set_dict = {
                     "remote.step_attempts": 0,
                     "remote.retry_time_limit": None,
@@ -1932,8 +1950,6 @@ class JobController:
                     "remote.queue_err": None,
                 }
                 lock.update_on_release = {"$set": set_dict}
-            else:
-                raise ValueError(f"Job in state {state.value} cannot be retried.")
             return doc["db_id"]
 
     def pause_jobs(
@@ -2135,7 +2151,7 @@ class JobController:
         )
         flow_lock_kwargs = dict(projection=["uuid"])
         with self.lock_job_flow(
-            acceptable_states=[JobState.READY, *RUNNING_STATES],
+            acceptable_states=STOPPABLE_STATES,
             job_id=job_id,
             db_id=db_id,
             job_index=job_index,
@@ -2342,11 +2358,7 @@ class JobController:
         )
         flow_lock_kwargs = dict(projection=["uuid"])
         with self.lock_job_flow(
-            acceptable_states=[
-                JobState.PAUSED,
-                JobState.STOPPED,
-                JobState.USER_STOPPED,
-            ],
+            acceptable_states=RESUMABLE_STATES,
             job_id=job_id,
             db_id=db_id,
             job_index=job_index,
@@ -2455,7 +2467,7 @@ class JobController:
                     raise FlowLockedError.from_flow_doc(flow_lock.unavailable_document)
                 raise ValueError(f"No Flow document matching criteria {flow_filter}")
             flow_doc = FlowDoc.model_validate(flow_lock.locked_document)
-            if flow_doc.state not in [FlowState.STOPPED, FlowState.PAUSED]:
+            if flow_doc.state not in RESUMABLE_FLOW_STATES:
                 raise ValueError(
                     f"Cannot resume a Flow in state {flow_doc.state.value}"
                 )
@@ -2464,7 +2476,7 @@ class JobController:
             # locked. Still do not assume that at the end all the Jobs will not be stopped.
             jobs_filter = self._build_query_job(
                 flow_ids=[flow_doc.uuid],
-                states=[JobState.STOPPED, JobState.USER_STOPPED, JobState.PAUSED],
+                states=RESUMABLE_STATES,
                 job_ids=None,
                 db_ids=None,
                 locked=False,
@@ -2509,11 +2521,7 @@ class JobController:
                         )
                     # this should not happen, but handle the case to avoid inconsistencies
                     # no error is raised as the job should already be in the correct state
-                    if JobState(job_doc_dict["state"]) not in [
-                        JobState.STOPPED,
-                        JobState.USER_STOPPED,
-                        JobState.PAUSED,
-                    ]:
+                    if JobState(job_doc_dict["state"]) not in RESUMABLE_STATES:
                         continue
                     final_state = self._resume_job_locked(job_doc_dict)
                     job_lock.update_on_release = {"$set": {"state": final_state.value}}
@@ -5478,13 +5486,13 @@ class JobController:
         """
         job_state = JobState(job_doc["state"])
         job_desc = f"Job {job_doc['uuid']} {job_doc['index']}"
-        if job_state in (JobState.BATCH_SUBMITTED, JobState.BATCH_RUNNING):
+        if job_state in BATCH_STATES:
             logger.warning(
                 f"{job_desc} is in the {job_state.value} state, so it cannot be "
                 f"cancelled from execution on the worker{context}."
             )
             return False
-        if job_state not in (JobState.SUBMITTED, JobState.RUNNING):
+        if job_state not in CANCELLABLE_STATES:
             return False
         try:
             self._cancel_queue_process(job_doc)
@@ -6114,28 +6122,27 @@ class JobController:
         list
             List of db_ids of the deleted Jobs.
         """
-        # Open the SharedHosts so that hosts will be shared for all the Jobs
-        with SharedHosts(self.project):
-            return self._many_jobs_action(
-                method=self.delete_job,
-                action_description="deleting",
-                job_ids=job_ids,
-                db_ids=db_ids,
-                flow_ids=flow_ids,
-                states=states,
-                start_date=start_date,
-                end_date=end_date,
-                name=name,
-                metadata=metadata,
-                workers=workers,
-                custom_query=custom_query,
-                raise_on_error=raise_on_error,
-                wait=wait,
-                delete_output=delete_output,
-                delete_files=delete_files,
-                max_limit=max_limit,
-                cancel_processes=cancel_processes,
-            )
+        # _many_jobs_action shares the hosts among all the Jobs
+        return self._many_jobs_action(
+            method=self.delete_job,
+            action_description="deleting",
+            job_ids=job_ids,
+            db_ids=db_ids,
+            flow_ids=flow_ids,
+            states=states,
+            start_date=start_date,
+            end_date=end_date,
+            name=name,
+            metadata=metadata,
+            workers=workers,
+            custom_query=custom_query,
+            raise_on_error=raise_on_error,
+            wait=wait,
+            delete_output=delete_output,
+            delete_files=delete_files,
+            max_limit=max_limit,
+            cancel_processes=cancel_processes,
+        )
 
     def get_job_output(
         self,
