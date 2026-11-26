@@ -696,8 +696,10 @@ update the stack so that the job definitions use the new image. Parameters
 you do not pass keep their current values.
 
 .. tab-set::
+    :sync-group: queues
 
-    .. tab-item:: CPU image
+    .. tab-item:: CPU only
+        :sync: cpu
 
         .. code-block:: bash
 
@@ -709,7 +711,8 @@ you do not pass keep their current values.
               --capabilities CAPABILITY_IAM \
               --parameter-overrides ContainerImage="${ECR_REPO_URI}:mace-cpu-v1"
 
-    .. tab-item:: CPU and GPU images
+    .. tab-item:: CPU and GPU
+        :sync: gpu
 
         .. code-block:: bash
 
@@ -800,7 +803,7 @@ stay accurate. It is slower than ``float32``, most of all on GPUs. With
 structure and loads the model once. The ``pheasy`` fit
 (``generate_frequencies_eigenvectors``) and the short setup steps run on the
 CPU queue with 1 vCPU each. The force calculations run on the GPU queue. If your GPU quota is ``0``, use the
-**Without GPU queue** tab in item 2. The force calculations then also run on
+**CPU only** tab in item 2. The force calculations then also run on
 the CPU queue. For a campaign, call ``submit_flow`` once per structure. The
 CPU queue then runs the fits of many structures at the same time.
 
@@ -833,9 +836,78 @@ instance, and the jobs that share an instance slow each other down.
 2. On your computer, create the submission script:
 
    .. tab-set::
-       :sync-group: gpu
+       :sync-group: queues
 
-       .. tab-item:: With GPU queue
+       .. tab-item:: CPU only
+           :sync: cpu
+
+           .. code-block:: bash
+
+               cat > submit_phonons.py <<'EOF'
+               from atomate2.forcefields.flows.pheasy import PhononMaker
+               from atomate2.forcefields.jobs import ForceFieldRelaxMaker, ForceFieldStaticMaker
+               from pymatgen.core import Lattice, Structure
+               from qtoolkit.core.data_objects import QCloudResources
+
+               from jobflow_remote import set_run_config, submit_flow
+
+               a = 5.4687
+               si_prim = Structure(
+                   Lattice([[0, a / 2, a / 2], [a / 2, 0, a / 2], [a / 2, a / 2, 0]]),
+                   ["Si", "Si"],
+                   [[0, 0, 0], [0.25, 0.25, 0.25]],
+               )
+
+               mace_kwargs = {"model": "medium-omat-0", "device": "cpu", "default_dtype": "float64"}
+               maker = PhononMaker(
+                   min_length=8.0,
+                   symprec=1e-3,
+                   use_symmetrized_structure="primitive",
+                   bulk_relax_maker=ForceFieldRelaxMaker(
+                       force_field_name="MACE-MP-0",
+                       calculator_kwargs=mace_kwargs,
+                       relax_kwargs={"fmax": 1e-4},
+                   ),
+                   static_energy_maker=ForceFieldStaticMaker(
+                       force_field_name="MACE-MP-0",
+                       calculator_kwargs=mace_kwargs,
+                   ),
+                   phonon_displacement_maker=ForceFieldStaticMaker(
+                       force_field_name="MACE-MP-0",
+                       calculator_kwargs=mace_kwargs,
+                   ),
+                   create_thermal_displacements=False,
+                   socket=True,
+               )
+               flow = maker.make(si_prim)
+
+               cpu_resources = QCloudResources(
+                   vcpus=1, memory=1800, time_limit=1800, environment={"OMP_NUM_THREADS": "1"}
+               )
+               for name in (
+                   "structure_to_primitive",
+                   "get_supercell_size",
+                   "generate_phonon_displacements",
+                   "generate_frequencies_eigenvectors",
+               ):
+                   set_run_config(
+                       flow, name_filter=name, worker="aws_cpu", resources=cpu_resources
+                   )
+
+               submit_flow(
+                   flow,
+                   worker="aws_cpu",
+                   project="aws_ht",
+                   resources=QCloudResources(
+                       vcpus=2, memory=3600, time_limit=3600, environment={"OMP_NUM_THREADS": "2"}
+                   ),
+               )
+               EOF
+
+           All jobs run on ``aws_cpu``. The relax, the static, and the
+           force job of the displaced supercells get 2 vCPUs each.
+
+       .. tab-item:: CPU and GPU
            :sync: gpu
 
            .. code-block:: bash
@@ -907,75 +979,6 @@ instance, and the jobs that share an instance slow each other down.
 
            Keep ``run_phonon_displacements`` on ``aws_gpu``, because the force
            job it creates runs on the same worker as this step.
-
-       .. tab-item:: Without GPU queue
-           :sync: cpu
-
-           .. code-block:: bash
-
-               cat > submit_phonons.py <<'EOF'
-               from atomate2.forcefields.flows.pheasy import PhononMaker
-               from atomate2.forcefields.jobs import ForceFieldRelaxMaker, ForceFieldStaticMaker
-               from pymatgen.core import Lattice, Structure
-               from qtoolkit.core.data_objects import QCloudResources
-
-               from jobflow_remote import set_run_config, submit_flow
-
-               a = 5.4687
-               si_prim = Structure(
-                   Lattice([[0, a / 2, a / 2], [a / 2, 0, a / 2], [a / 2, a / 2, 0]]),
-                   ["Si", "Si"],
-                   [[0, 0, 0], [0.25, 0.25, 0.25]],
-               )
-
-               mace_kwargs = {"model": "medium-omat-0", "device": "cpu", "default_dtype": "float64"}
-               maker = PhononMaker(
-                   min_length=8.0,
-                   symprec=1e-3,
-                   use_symmetrized_structure="primitive",
-                   bulk_relax_maker=ForceFieldRelaxMaker(
-                       force_field_name="MACE-MP-0",
-                       calculator_kwargs=mace_kwargs,
-                       relax_kwargs={"fmax": 1e-4},
-                   ),
-                   static_energy_maker=ForceFieldStaticMaker(
-                       force_field_name="MACE-MP-0",
-                       calculator_kwargs=mace_kwargs,
-                   ),
-                   phonon_displacement_maker=ForceFieldStaticMaker(
-                       force_field_name="MACE-MP-0",
-                       calculator_kwargs=mace_kwargs,
-                   ),
-                   create_thermal_displacements=False,
-                   socket=True,
-               )
-               flow = maker.make(si_prim)
-
-               cpu_resources = QCloudResources(
-                   vcpus=1, memory=1800, time_limit=1800, environment={"OMP_NUM_THREADS": "1"}
-               )
-               for name in (
-                   "structure_to_primitive",
-                   "get_supercell_size",
-                   "generate_phonon_displacements",
-                   "generate_frequencies_eigenvectors",
-               ):
-                   set_run_config(
-                       flow, name_filter=name, worker="aws_cpu", resources=cpu_resources
-                   )
-
-               submit_flow(
-                   flow,
-                   worker="aws_cpu",
-                   project="aws_ht",
-                   resources=QCloudResources(
-                       vcpus=2, memory=3600, time_limit=3600, environment={"OMP_NUM_THREADS": "2"}
-                   ),
-               )
-               EOF
-
-           All jobs run on ``aws_cpu``. The relax, the static, and the
-           force job of the displaced supercells get 2 vCPUs each.
 
 3. On your computer, submit the flow and start the ``Runner`` as a daemon:
 
