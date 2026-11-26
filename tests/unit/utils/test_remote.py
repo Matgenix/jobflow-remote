@@ -1,3 +1,4 @@
+import re
 import socket
 
 import pytest
@@ -120,3 +121,102 @@ def test_get_host_connects_once(local_project, monkeypatch) -> None:
 
     assert host1 is host2
     assert calls == [host1]
+
+
+def test_shared_hosts_per_thread(tmp_path, monkeypatch) -> None:
+    """
+    Two threads can open SharedHosts for different projects at the same time:
+    each gets its own hosts and closes only its own.
+    """
+    import threading
+
+    from jobflow_remote.config.base import LocalWorker, Project
+    from jobflow_remote.remote.host.local import LocalHost
+    from jobflow_remote.utils.remote import SharedHosts
+
+    projects = [
+        Project(
+            name=f"test_shared_hosts_{i}",
+            base_dir=str(tmp_path / str(i)),
+            queue={},
+            workers={"w": LocalWorker(scheduler_type="shell", work_dir=str(tmp_path))},
+        )
+        for i in range(2)
+    ]
+
+    closed = []
+
+    def recording_close(self) -> bool:
+        closed.append((threading.current_thread().name, self))
+        return True
+
+    monkeypatch.setattr(LocalHost, "close", recording_close)
+
+    barrier = threading.Barrier(2, timeout=10)
+    results: dict[str, tuple] = {}
+    errors = []
+
+    def use_hosts(project) -> None:
+        try:
+            with SharedHosts(project) as shared_hosts:
+                host = shared_hosts.get_host("w")
+                # both threads are inside a context, for different projects
+                barrier.wait()
+                results[threading.current_thread().name] = (
+                    host,
+                    shared_hosts._project.name,
+                    dict(shared_hosts._hosts),
+                )
+                # do not leave the context before the other thread has checked
+                barrier.wait()
+        except BaseException as exc:
+            errors.append(exc)
+            barrier.abort()
+
+    threads = [
+        threading.Thread(target=use_hosts, args=(p,), name=f"t{i}")
+        for i, p in enumerate(projects)
+    ]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    assert not errors
+    host_0, project_0, hosts_0 = results["t0"]
+    host_1, project_1, hosts_1 = results["t1"]
+    assert host_0 is not host_1
+    assert (project_0, project_1) == (projects[0].name, projects[1].name)
+    assert hosts_0 == {"w": host_0}
+    assert hosts_1 == {"w": host_1}
+    # each thread closed only its own host
+    assert sorted(closed, key=lambda c: c[0]) == [("t0", host_0), ("t1", host_1)]
+
+
+def test_get_host_requires_context_in_same_thread(local_project) -> None:
+    import threading
+
+    from jobflow_remote.utils.remote import SharedHosts
+
+    match = r"inside a 'with SharedHosts\(\.\.\.\)' block opened in the same thread"
+
+    # no context open
+    with pytest.raises(RuntimeError, match=match):
+        SharedHosts(local_project).get_host("local_w")
+
+    # a context open in another thread
+    errors = []
+
+    def use_from_other_thread(shared_hosts) -> None:
+        try:
+            shared_hosts.get_host("local_w")
+        except RuntimeError as exc:
+            errors.append(exc)
+
+    with SharedHosts(local_project) as shared_hosts:
+        thread = threading.Thread(target=use_from_other_thread, args=(shared_hosts,))
+        thread.start()
+        thread.join()
+
+    assert len(errors) == 1
+    assert re.search(match, str(errors[0]))

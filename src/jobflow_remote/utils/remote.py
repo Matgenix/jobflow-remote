@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import socket
+import threading
 from typing import TYPE_CHECKING, ClassVar
 
 from paramiko.ssh_exception import (
@@ -22,6 +23,20 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+class _SharedHostsState(threading.local):
+    """
+    The state of SharedHosts, kept separately for each thread.
+
+    ``threading.local`` calls ``__init__`` the first time each thread accesses
+    the object, so every thread starts with no context open.
+    """
+
+    def __init__(self) -> None:
+        self.ref_count: int = 0
+        self.hosts: dict[str, BaseHost] = {}
+        self.project: Project | None = None
+
+
 class SharedHosts:
     """
     A singleton context manager to allow sharing the same host objects.
@@ -37,6 +52,14 @@ class SharedHosts:
     Opening a nested context for a different project raises an error, since
     sharing host connections across projects is not supported.
 
+    The state (the hosts, the project and the count of the open contexts) is
+    kept separately for each thread. Nested contexts in the same thread share
+    their hosts, while contexts opened in different threads are independent:
+    each thread has its own connections, can be bound to a different project,
+    and closes only its own hosts. For this reason ``get_host`` must be called
+    inside a context opened in the same thread: the object cannot be passed
+    to another thread to use the hosts of the first one.
+
     Examples
     --------
 
@@ -45,10 +68,8 @@ class SharedHosts:
     ...     # Use host as required
     """
 
-    _instance: SharedHosts = None
-    _ref_count: int = 0
-    _hosts: ClassVar[dict[str, BaseHost]] = {}
-    _project: Project | None = None
+    _instance: SharedHosts | None = None
+    _state: ClassVar[_SharedHostsState] = _SharedHostsState()
 
     def __new__(cls, *args, **kwargs):
         if cls._instance is None:
@@ -62,24 +83,35 @@ class SharedHosts:
         project
             The project configuration.
         """
-        cls = self.__class__
-        if cls._ref_count == 0:
-            # No context is currently active: this is (or precedes) the
-            # outermost context, so (re)bind to the requested project,
-            # discarding any project left over from a previous operation.
+        state = self._state
+        if state.ref_count == 0:
+            # No context is currently active in this thread: this is (or
+            # precedes) the outermost context, so (re)bind to the requested
+            # project, discarding any project left over from a previous operation.
             if project is None:
                 config_manager: ConfigManager = ConfigManager()
                 project = config_manager.get_project(None)
-            cls._project = project
-        elif project is not None and project.name != cls._project.name:
-            # A context is already open and bound to another project. Sharing
-            # host connections across projects is not supported, so refuse
-            # instead of silently using the wrong project's workers.
+            state.project = project
+        elif project is not None and project.name != state.project.name:
+            # A context is already open in this thread and bound to another
+            # project. Sharing host connections across projects is not
+            # supported, so refuse instead of silently using the wrong
+            # project's workers.
             raise ValueError(
-                f"SharedHosts is already active for project '{cls._project.name}' "
+                f"SharedHosts is already active for project '{state.project.name}' "
                 f"and cannot be used for a different project ('{project.name}') "
                 "at the same time."
             )
+
+    @property
+    def _hosts(self) -> dict[str, BaseHost]:
+        """The hosts shared in the current thread, by worker name."""
+        return self._state.hosts
+
+    @property
+    def _project(self) -> Project | None:
+        """The project bound in the current thread."""
+        return self._state.project
 
     def get_host(self, worker: str) -> BaseHost:
         """
@@ -97,10 +129,20 @@ class SharedHosts:
 
         Raises
         ------
+        RuntimeError
+            If called outside a context opened in the current thread.
         HostConnectionError
             If the connection to the host cannot be established. The original
             error is its ``__cause__``.
         """
+        if self._state.ref_count == 0:
+            # Outside a context the host would never be closed. In another
+            # thread than the one that opened the context, the state is not
+            # shared: the hosts of that thread are not available here.
+            raise RuntimeError(
+                "SharedHosts.get_host can only be called inside a "
+                "'with SharedHosts(...)' block opened in the same thread."
+            )
         if worker not in self._project.workers:
             raise ValueError(f"Worker {worker} not defined in {self._project.name}")
         if worker in self._hosts:
@@ -134,20 +176,21 @@ class SharedHosts:
                 self._hosts.pop(worker)
 
     def __enter__(self):
-        # Increment reference count
-        self.__class__._ref_count += 1
+        # Increment reference count of the current thread
+        self._state.ref_count += 1
 
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        # Decrement reference count
-        self.__class__._ref_count -= 1
+        # Decrement reference count of the current thread
+        state = self._state
+        state.ref_count -= 1
 
-        # Cleanup only when the last context exits
-        if self.__class__._ref_count == 0:
+        # Cleanup only when the last context of this thread exits
+        if state.ref_count == 0:
             self.close_hosts()
             # Release the project so the next operation rebinds a fresh one
-            self.__class__._project = None
+            state.project = None
 
 
 def _describe_connection_error(exc: Exception) -> str:
