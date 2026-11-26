@@ -906,17 +906,17 @@ first. This guide does not cover it.
            Then run item 2 of Part 1, Step 4 on a Perlmutter login node.
 
         3. On a Perlmutter login node, create ``make_project.py`` with item 1 of
-           Part 1, Step 5. Then create the project file. Replace the values in
-           ``<...>`` with those from NERSC. The block asks for the password of the
-           database. The project file keeps it and is readable only by you.
+           Part 1, Step 5. Then create the project file. The block asks for the
+           host, database, user, and password that NERSC gave you. The project
+           file keeps them and is readable only by you.
 
            .. code-block:: bash
 
                {
-               MONGO_HOST=<host>
+               printf "MongoDB host: "; read -r MONGO_HOST
                MONGO_PORT=27017
-               MONGO_DB=<database>
-               MONGO_USER=<user>
+               printf "MongoDB database: "; read -r MONGO_DB
+               printf "MongoDB user: "; read -r MONGO_USER
                printf "MongoDB password: "; read -rs MONGO_PASSWORD; echo
                export MONGO_PASSWORD
                env -u AWS_DEFAULT_REGION AWS_PROFILE=jfr-lab MONGO_HOST="$MONGO_HOST" MONGO_PORT="$MONGO_PORT" \
@@ -930,12 +930,14 @@ first. This guide does not cover it.
            with ``Ctrl+C`` when the four jobs are ``COMPLETED``.
 
         5. On a Perlmutter login node, run the ``Runner`` in the ``workflow`` QOS with
-           ``scrontab``. Replace ``<project>`` with your NERSC project. The entry
-           starts the ``Runner`` if it is not running, checking every 10 minutes.
+           ``scrontab``. The block asks for your NERSC project, for example
+           ``m5411``. The entry starts the ``Runner`` if it is not running,
+           checking every 10 minutes.
 
            .. code-block:: bash
 
-               NERSC_PROJECT=<project>
+               {
+               printf "NERSC project: "; read -r NERSC_PROJECT
                cat > "$HOME/jfr_runner.sh" <<'EOF'
                #!/bin/bash
                module load conda
@@ -957,6 +959,7 @@ first. This guide does not cover it.
                scrontab -l
                scrontab "$HOME/jfr_runner.scron"
                scrontab -l
+               }
 
            ``scrontab FILE`` replaces all your ``scrontab`` entries. If the first
            ``scrontab -l`` shows other entries, add them to ``jfr_runner.scron``
@@ -1450,12 +1453,14 @@ Each job has its own folder:
   ``RunFilesRetentionDays`` in Part 1, Step 3.
 
 List the jobs of a flow, their folders on EFS and in S3, and the files in
-S3. Run it where you submit the flows. Replace ``<flow_id>`` with the flow id
-from ``jf -p aws_ht flow list``.
+S3. Run it where you submit the flows. It asks for the flow id from
+``jf -p aws_ht flow list``.
 
 .. code-block:: bash
 
-    FLOW_ID=<flow_id> python - <<'EOF'
+    {
+    printf "Flow id: "; read -r FLOW_ID
+    FLOW_ID="$FLOW_ID" python - <<'EOF'
     import os
 
     from jobflow_remote import JobController
@@ -1474,14 +1479,18 @@ from ``jf -p aws_ht flow list``.
         for name in sorted(storage.listdir(info.run_dir)):
             print("   ", name)
     EOF
+    }
 
-List the files of one job in S3, or download one file into the current
-folder:
+List the files of one job in S3 and download its ``jfremote_out.json`` into
+the current folder. The block asks for the DB id of the job:
 
 .. code-block:: bash
 
-    jf -p aws_ht job files ls <db_id>
-    jf -p aws_ht job files get <db_id> jfremote_out.json
+    {
+    printf "DB id: "; read -r DB_ID
+    jf -p aws_ht job files ls "$DB_ID"
+    jf -p aws_ht job files get "$DB_ID" jfremote_out.json
+    }
 
 A job stays ``SUBMITTED`` until its container starts. The first job on a
 new instance waits a few minutes while the instance starts and pulls the
@@ -1511,25 +1520,25 @@ the job fails.
 
 A job goes to ``REMOTE_ERROR`` when an action of the ``Runner`` on AWS fails
 several times in a row, for example while AWS Batch or S3 does not answer.
-Run the failed action again with the job's DB id:
+Run the failed action again. The block asks for the DB id of the job:
 
 .. code-block:: bash
 
-    jf -p aws_ht job retry <db_id>
+    printf "DB id: "; read -r DB_ID; jf -p aws_ht job retry "$DB_ID"
 
-Stop a queued or running job:
-
-.. code-block:: bash
-
-    jf -p aws_ht job stop <job_id>
-
-Delete a flow and its jobs. Use the flow id from ``jf -p aws_ht flow list``.
-The command also cancels the AWS Batch jobs of the flow that are still queued
-or running.
+Stop a queued or running job. The block asks for the DB id of the job:
 
 .. code-block:: bash
 
-    jf -p aws_ht flow delete -fid <flow_id>
+    printf "DB id: "; read -r DB_ID; jf -p aws_ht job stop "$DB_ID"
+
+Delete a flow and its jobs. The command also cancels the AWS Batch jobs of
+the flow that are still queued or running. The block asks for the flow id
+from ``jf -p aws_ht flow list``:
+
+.. code-block:: bash
+
+    printf "Flow id: "; read -r FLOW_ID; jf -p aws_ht flow delete -fid "$FLOW_ID"
 
 Download the whole folder of a job from S3 to your computer:
 
@@ -1537,18 +1546,19 @@ Download the whole folder of a job from S3 to your computer:
 
    .. code-block:: bash
 
-       jf -p aws_ht job files ls <db_id>
+       printf "DB id: "; read -r DB_ID; jf -p aws_ht job files ls "$DB_ID"
 
    The first line ends with the folder, for example
    ``/jf_work/c7/97/bc/<uuid>_1``.
 
-2. On your computer, set ``RUN_DIR`` to this folder and download it into the
-   current folder. This needs only the ``jfr-lab`` profile of Part 1, Step 4,
-   so it works wherever the ``Runner`` runs.
+2. On your computer, download this folder into the current folder. The block
+   asks for the folder. It needs only the ``jfr-lab`` profile of Part 1,
+   Step 4, so it works wherever the ``Runner`` runs.
 
    .. code-block:: bash
 
-       RUN_DIR=<run_dir>
+       {
+       printf "Folder: "; read -r RUN_DIR
        env -u AWS_DEFAULT_REGION RUN_DIR="$RUN_DIR" python - <<'EOF'
        import os
        from pathlib import PurePosixPath
@@ -1569,6 +1579,7 @@ Download the whole folder of a job from S3 to your computer:
        storage.download_dir(os.environ["RUN_DIR"], name)
        print("Downloaded to", name)
        EOF
+       }
 
 Download the folders you need before step 3 of :ref:`cloud_cleanup`, which
 deletes the access keys of the ``jfr-lab`` profile.
@@ -1576,16 +1587,29 @@ deletes the access keys of the ``jfr-lab`` profile.
 The containers write stdout and stderr to CloudWatch Logs, not to
 ``queue.out`` and ``queue.err``. For this reason ``jf job queue-out`` does not
 work for cloud workers. ``jf job todir`` does not work either, because there
-is no shell access to the container. Find the AWS Batch job id of a job in
-``remote.process_id`` of ``jf -p aws_ht job info <db_id>``. Then, in
-CloudShell, show its state and the logs of all its attempts. AWS Batch keeps
-this information for 7 days after the job ends.
+is no shell access to the container. Read the logs in two steps:
 
-.. code-block:: bash
+1. Where you submit the flows, print the AWS Batch job id of a job. The block
+   asks for the DB id of the job:
 
-    BATCH_JOB=<process_id>
-    aws batch describe-jobs --jobs "$BATCH_JOB" --query 'jobs[0].[status,statusReason]' --output text
-    for S in $(aws batch describe-jobs --jobs "$BATCH_JOB" --query 'jobs[0].[attempts[].container.logStreamName, container.logStreamName][]' --output text | tr '\t' '\n' | grep -v None | sort -u); do aws logs tail /aws/batch/jfr-lab --log-stream-names "$S" --since 7d; done
+   .. code-block:: bash
+
+       {
+       printf "DB id: "; read -r DB_ID
+       DB_ID="$DB_ID" python -c 'import os; from jobflow_remote import JobController; print(JobController.from_project_name("aws_ht").get_job_info(db_id=os.environ["DB_ID"]).remote.process_id)'
+       }
+
+2. In CloudShell, show the state of the job and the logs of all its attempts.
+   The block asks for the AWS Batch job id from item 1. AWS Batch keeps this
+   information for 7 days after the job ends.
+
+   .. code-block:: bash
+
+       {
+       printf "AWS Batch job id: "; read -r BATCH_JOB
+       aws batch describe-jobs --jobs "$BATCH_JOB" --query 'jobs[0].[status,statusReason]' --output text
+       for S in $(aws batch describe-jobs --jobs "$BATCH_JOB" --query 'jobs[0].[attempts[].container.logStreamName, container.logStreamName][]' --output text | tr '\t' '\n' | grep -v None | sort -u); do aws logs tail /aws/batch/jfr-lab --log-stream-names "$S" --since 7d; done
+       }
 
 .. _cloud_cleanup:
 
@@ -1704,8 +1728,9 @@ The S3 bucket and its copies of the job folders are kept.
        EOF
 
 The bucket stays and costs about 0.023 USD per GB and month. To delete it
-with all job folders in it, run in CloudShell with the name from step 3:
+with all job folders in it, run in CloudShell. The block asks for the name
+of the bucket from step 3:
 
 .. code-block:: bash
 
-    aws s3 rb s3://<bucket> --force
+    printf "Bucket: "; read -r BUCKET; aws s3 rb "s3://$BUCKET" --force
