@@ -1165,6 +1165,21 @@ def test_actions_accepted_states(job_controller, one_job, action) -> None:
     assert accepted == set(expected_states)
 
 
+def test_missing_documents_raise_not_found(job_controller) -> None:
+    """The actions raise JobNotFoundError or FlowNotFoundError for missing ids."""
+    from jobflow_remote.utils.db import FlowNotFoundError, JobNotFoundError
+
+    # lock_job_flow, used by stop, pause, resume and delete
+    with pytest.raises(JobNotFoundError):
+        job_controller.stop_job(db_id="99999")
+    with pytest.raises(JobNotFoundError):
+        job_controller.rerun_job(db_id="99999")
+    with pytest.raises(JobNotFoundError):
+        job_controller.retry_job(db_id="99999")
+    with pytest.raises(FlowNotFoundError):
+        job_controller.resume_flow(flow_id="no-such-flow")
+
+
 def test_resume_flow_accepted_states(job_controller, one_job) -> None:
     """A Flow is resumed exactly in the states of RESUMABLE_FLOW_STATES."""
     from jobflow_remote.jobs.state import RESUMABLE_FLOW_STATES, FlowState
@@ -1274,7 +1289,7 @@ def test_set_job_run_properties(job_controller, one_job) -> None:
 
 def test_set_job_doc_properties(job_controller, one_job) -> None:
     from jobflow_remote.jobs.state import JobState
-    from jobflow_remote.utils.db import JobLockedError
+    from jobflow_remote.utils.db import JobLockedError, JobNotFoundError
 
     # error missing input
     with pytest.raises(
@@ -1295,7 +1310,7 @@ def test_set_job_doc_properties(job_controller, one_job) -> None:
         )
 
     # error missing job
-    with pytest.raises(ValueError, match="No Job matching criteria"):
+    with pytest.raises(JobNotFoundError, match="No Job matching criteria"):
         job_controller.set_job_doc_properties(
             values={"job.metadata.x": "y"},
             job_id="wrong_uuid",
@@ -2061,6 +2076,7 @@ def test_resume_flow(job_controller, runner):
 
 def test_flow_store(job_controller, two_flows_four_jobs, runner):
     from jobflow_remote.jobs.state import FlowState
+    from jobflow_remote.utils.db import FlowNotFoundError
 
     job_controller.set_flow_store("other_jobstore", flow_id=two_flows_four_jobs[0].uuid)
 
@@ -2078,7 +2094,7 @@ def test_flow_store(job_controller, two_flows_four_jobs, runner):
             "wrong_jobstore", flow_id=two_flows_four_jobs[0].uuid
         )
 
-    with pytest.raises(ValueError, match="No Flow document matching criteria"):
+    with pytest.raises(FlowNotFoundError, match="No Flow document matching criteria"):
         job_controller.set_flow_store("other_jobstore", flow_id="wrong_id")
 
     job_controller.set_flow_store("other_jobstore", flow_id=two_flows_four_jobs[1].uuid)
@@ -2089,7 +2105,7 @@ def test_flow_store(job_controller, two_flows_four_jobs, runner):
     job_controller.set_flow_store(None, flow_id=two_flows_four_jobs[1].uuid)
     assert job_controller.get_flow_store(flow_id=two_flows_four_jobs[1].uuid) is None
 
-    with pytest.raises(ValueError, match="No Flow matching id"):
+    with pytest.raises(FlowNotFoundError, match="No Flow matching id"):
         job_controller.get_flow_store(flow_id="wrong_id")
 
     runner.run_one_job(job_id=(two_flows_four_jobs[0][0].uuid, 1))

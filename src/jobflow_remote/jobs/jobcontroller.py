@@ -77,7 +77,9 @@ from jobflow_remote.utils.data import (
 )
 from jobflow_remote.utils.db import (
     FlowLockedError,
+    FlowNotFoundError,
     JobLockedError,
+    JobNotFoundError,
     LockedDocumentError,
     MissingDocumentError,
     MongoLock,
@@ -1235,7 +1237,9 @@ class JobController:
             if not job_doc_dict:
                 if job_lock.unavailable_document:
                     raise JobLockedError.from_job_doc(job_lock.unavailable_document)
-                raise ValueError(f"No Job document matching criteria {lock_filter}")
+                raise JobNotFoundError(
+                    f"No Job document matching criteria {lock_filter}"
+                )
             job_state = JobState(job_doc_dict["state"])
 
             rerunnable_states = RERUNNABLE_STATES_FORCE if force else RERUNNABLE_STATES
@@ -1333,7 +1337,9 @@ class JobController:
             if not flow_lock.locked_document:
                 if flow_lock.unavailable_document:
                     raise FlowLockedError.from_flow_doc(flow_lock.unavailable_document)
-                raise ValueError(f"No Flow document matching criteria {flow_filter}")
+                raise FlowNotFoundError(
+                    f"No Flow document matching criteria {flow_filter}"
+                )
 
             flow_doc = FlowDoc.model_validate(flow_lock.locked_document)
 
@@ -1624,7 +1630,7 @@ class JobController:
                     raise JobLockedError(
                         f"The Job matching criteria {lock_filter} is locked."
                     )
-                raise ValueError(f"No Job matching criteria {lock_filter}")
+                raise JobNotFoundError(f"No Job matching criteria {lock_filter}")
             if acceptable_states and JobState(doc["state"]) not in acceptable_states:
                 raise ValueError(
                     f"Job in state {doc['state']}. The action cannot be performed"
@@ -1924,7 +1930,7 @@ class JobController:
                     raise JobLockedError(
                         f"The Job matching criteria {lock_filter} is locked."
                     )
-                raise ValueError(f"No Job matching criteria {lock_filter}")
+                raise JobNotFoundError(f"No Job matching criteria {lock_filter}")
             state = JobState(doc["state"])
             if state not in RETRYABLE_STATES:
                 raise ValueError(f"Job in state {state.value} cannot be retried.")
@@ -2465,7 +2471,9 @@ class JobController:
             if not flow_lock.locked_document:
                 if flow_lock.unavailable_document:
                     raise FlowLockedError.from_flow_doc(flow_lock.unavailable_document)
-                raise ValueError(f"No Flow document matching criteria {flow_filter}")
+                raise FlowNotFoundError(
+                    f"No Flow document matching criteria {flow_filter}"
+                )
             flow_doc = FlowDoc.model_validate(flow_lock.locked_document)
             if flow_doc.state not in RESUMABLE_FLOW_STATES:
                 raise ValueError(
@@ -3074,7 +3082,7 @@ class JobController:
         """
         out = self.flows.find_one({"uuid": flow_id}, projection=["jobstore"])
         if not out:
-            raise ValueError(f"No Flow matching id {flow_id}")
+            raise FlowNotFoundError(f"No Flow matching id {flow_id}")
         return out.get("jobstore") or None
 
     def set_flow_store(
@@ -3114,7 +3122,9 @@ class JobController:
             if not flow_lock.locked_document:
                 if flow_lock.unavailable_document:
                     raise FlowLockedError.from_flow_doc(flow_lock.unavailable_document)
-                raise ValueError(f"No Flow document matching criteria {filter_query}")
+                raise FlowNotFoundError(
+                    f"No Flow document matching criteria {filter_query}"
+                )
             if FlowState(flow_lock.locked_document["state"]) != FlowState.READY:
                 raise RuntimeError("The JobStore can be set only for a READY Flow")
             flow_lock.update_on_release = {
@@ -5347,7 +5357,9 @@ class JobController:
             if not job_doc_dict:
                 if job_lock.unavailable_document:
                     raise JobLockedError.from_job_doc(job_lock.unavailable_document)
-                raise ValueError(f"No Job document matching criteria {lock_filter}")
+                raise JobNotFoundError(
+                    f"No Job document matching criteria {lock_filter}"
+                )
             job_state = JobState(job_doc_dict["state"])
             if acceptable_states and job_state not in acceptable_states:
                 raise ValueError(
@@ -5368,7 +5380,7 @@ class JobController:
                         raise FlowLockedError.from_flow_doc(
                             flow_lock.unavailable_document
                         )
-                    raise ValueError(
+                    raise FlowNotFoundError(
                         f"No Flow document matching criteria {flow_filter}"
                     )
 
@@ -6182,7 +6194,7 @@ class JobController:
                 db_id=db_id,
             )
             if not job_info:
-                raise ValueError(f"No Job with db_id {db_id}")
+                raise JobNotFoundError(f"No Job with db_id {db_id}")
             job_id = job_info.uuid
             job_index = job_info.index
 
@@ -6195,7 +6207,7 @@ class JobController:
                     job_index=job_index,
                 )
                 if not job_info:
-                    raise ValueError(
+                    raise JobNotFoundError(
                         "The Job is not present in the Queue DB, cannot "
                         "determine the store to fetch the output"
                     )

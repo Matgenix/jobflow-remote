@@ -495,6 +495,28 @@ class FlowLockedError(LockedDocumentError):
         return cls(msg)
 
 
+class JobNotFoundError(ValueError):
+    """
+    Exception to signal that a Job document required by an action is not in
+    the DB.
+
+    It is a subclass of ValueError, the exception raised for this case before
+    its introduction, so that existing handlers keep working. It is not a
+    subclass of MissingDocumentError, which the Runner handles.
+    """
+
+
+class FlowNotFoundError(ValueError):
+    """
+    Exception to signal that a Flow document required by an action is not in
+    the DB.
+
+    It is a subclass of ValueError, the exception raised for this case before
+    its introduction, so that existing handlers keep working. It is not a
+    subclass of MissingDocumentError, which the Runner handles.
+    """
+
+
 class MissingDocumentError(Exception):
     """Exception to signal that a document is missing from the DB"""
 
