@@ -28,7 +28,7 @@ from jobflow_remote.jobs.data import (
     JobDoc,
 )
 from jobflow_remote.remote.data import get_job_path, get_store_file_paths
-from jobflow_remote.remote.storage.s3 import S3Storage, parse_s3_uri
+from jobflow_remote.remote.storage import cloud_storage_mapping
 from jobflow_remote.utils.log import initialize_remote_run_log
 
 if TYPE_CHECKING:
@@ -126,7 +126,8 @@ def run_remote_job(run_dir: str | Path = ".") -> None:
             JfrState().reset()
 
 
-_CLOUD_CRITICAL_PATTERNS = (
+# Files that the Runner downloads after the job. They are uploaded first.
+_JFR_OUTPUT_PATTERNS = (
     f"{OUT_FILENAME}*",
     "remote_job_data.*",
     "additional_store_*",
@@ -136,9 +137,8 @@ _CLOUD_CRITICAL_PATTERNS = (
 def _move_previous_attempt(run_dir: Path) -> None:
     """Move the files of an earlier attempt into ``previous_attempt_<n>``.
 
-    An earlier attempt left files in the folder if AWS Batch retried the job or
-    the job was rerun. Moving them keeps them for debugging, and the new
-    attempt does not see them.
+    An earlier attempt left files in the folder if the cloud scheduler retried the job or
+    the job was rerun. They are kept for debugging.
     """
     old_files = [
         path
@@ -160,64 +160,52 @@ def _move_previous_attempt(run_dir: Path) -> None:
 
 def run_cloud_job(
     storage_uri: str,
-    local_dir: str | Path = "/tmp/jf_run",  # noqa: S108
-    region_name: str | None = None,
-    endpoint_url: str | None = None,
+    local_dir: str | Path,
+    storage_options: dict | None = None,
 ) -> None:
-    """Download a job's run directory from S3, execute it, and upload outputs back.
+    """Download the input of a job from cloud storage, run the job, and upload the folder.
 
-    The job runs in ``local_dir/<key>``, where ``<key>`` is the path of the job
-    folder in the storage, and the folder is kept after the job. If
-    ``local_dir`` is on a file system shared by all containers, later jobs can
-    read the folder, for example through ``prev_dir``. Files that an earlier
-    attempt left in the folder are moved to ``previous_attempt_<n>`` and
-    uploaded with this attempt. Files that an earlier attempt uploaded to the
-    storage are downloaded again, and stale jobflow-remote output files among
-    them are removed. In ``finally``, the jobflow-remote files are uploaded
-    first and then the rest of the folder.
+    The job runs in ``local_dir/<key>``, where ``<key>`` is the key of the job
+    folder in the storage. The folder is kept after the job, so later jobs can
+    read it if ``local_dir`` is on a file system shared by all containers.
+    ``storage_options`` are passed to the storage class.
     """
-    bucket, remote_prefix = parse_s3_uri(storage_uri)
-    if not bucket or not remote_prefix:
-        raise ValueError(
-            f"Cloud storage URI must include both bucket and non-root key prefix: '{storage_uri}'."
-        )
-
-    storage = S3Storage(
-        bucket=bucket,
-        region_name=region_name,
-        endpoint_url=endpoint_url,
+    scheme = storage_uri.split("://", 1)[0]
+    if scheme not in cloud_storage_mapping:
+        raise ValueError(f"Unknown storage scheme '{scheme}' in URI '{storage_uri}'.")
+    storage, key = cloud_storage_mapping[scheme].from_uri(
+        storage_uri, **(storage_options or {})
     )
-    scratch_path = Path(local_dir) / remote_prefix
-    scratch_path.mkdir(parents=True, exist_ok=True)
-    _move_previous_attempt(scratch_path)
-    storage.download_dir(remote_prefix, scratch_path)
+    if not key:
+        raise ValueError(f"The URI '{storage_uri}' has no job folder.")
 
-    # Clean stale JFR output/store files if an earlier cloud attempt failed mid-run.
-    for pattern in _CLOUD_CRITICAL_PATTERNS:
-        for stale in scratch_path.glob(pattern):
-            if stale.is_file():
-                stale.unlink(missing_ok=True)
+    run_dir = Path(local_dir) / key
+    run_dir.mkdir(parents=True, exist_ok=True)
+    _move_previous_attempt(run_dir)
+    # The Runner uploads only the input file. Other files in the storage are
+    # from an earlier attempt and are not needed.
+    storage.get(f"{key}/{IN_FILENAME}", run_dir / IN_FILENAME)
 
     # Upload an output file with only the start time before the job runs.
     # If the container is killed (time limit, out of memory, Spot reclaim),
     # the upload in ``finally`` never happens. The Runner then still finds
     # this file and marks the job as FAILED, as it does for HPC workers.
-    out_file = scratch_path / OUT_FILENAME
+    out_file = run_dir / OUT_FILENAME
     dumpfn({"start_time": datetime.datetime.now(timezone.utc)}, out_file)
-    storage.put(out_file, f"{remote_prefix}/{OUT_FILENAME}")
+    storage.put(out_file, f"{key}/{OUT_FILENAME}")
 
     try:
-        run_remote_job(scratch_path)
+        run_remote_job(run_dir)
     finally:
-        # Upload critical jobflow-remote files first so results/tracebacks are
-        # preserved even if an auxiliary file upload fails later.
-        uploaded_critical: set[str] = set()
-        for pattern in _CLOUD_CRITICAL_PATTERNS:
-            for critical in scratch_path.glob(pattern):
-                if critical.is_file():
-                    storage.put(critical, f"{remote_prefix}/{critical.name}")
-                    uploaded_critical.add(critical.name)
-        storage.upload_dir(scratch_path, remote_prefix, skip_files=uploaded_critical)
+        # Upload the outputs first, so the Runner gets them even if the
+        # upload of another file fails.
+        uploaded: set[str] = set()
+        for pattern in _JFR_OUTPUT_PATTERNS:
+            for output in run_dir.glob(pattern):
+                if output.is_file():
+                    storage.put(output, f"{key}/{output.name}")
+                    uploaded.add(output.name)
+        storage.upload_dir(run_dir, key, skip_files=uploaded)
 
 
 def ping(start_time, interval=600, filename=BATCH_INFO_FILENAME):

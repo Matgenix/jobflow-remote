@@ -1,24 +1,24 @@
 from __future__ import annotations
 
 import copy
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
+
+from qtoolkit.core.data_objects import QResources
 
 from jobflow_remote.remote.queue import BaseQueueManager
 
-try:
-    from qtoolkit.core.data_objects import QCloudResources
-except ImportError:  # pragma: no cover - older qtoolkit releases
-    QCloudResources = None
-
 if TYPE_CHECKING:
-    from collections.abc import Sequence
-
-    from qtoolkit.core.data_objects import CancelResult, QJob, QState, SubmissionResult
+    from qtoolkit.core.data_objects import (
+        BaseQResources,
+        CancelResult,
+        QJob,
+        SubmissionResult,
+    )
     from qtoolkit.io.api.base import BaseAPISchedulerIO
 
 
 class CloudQueueManager(BaseQueueManager):
-    """Queue manager delegating directly to a :class:`~qtoolkit.io.api.base.BaseAPISchedulerIO`."""
+    """Queue manager for cloud workers, built on a qtoolkit BaseAPISchedulerIO."""
 
     def __init__(self, scheduler_io: BaseAPISchedulerIO) -> None:
         self.scheduler_io = scheduler_io
@@ -31,7 +31,7 @@ class CloudQueueManager(BaseQueueManager):
         export: dict | None = None,
         modules: list[str] | None = None,
     ) -> list[str]:
-        """Build ordered shell command blocks for container execution."""
+        """Return the shell lines that run the job in the container."""
         lines: list[str] = []
         if pre_str := self.get_pre_run(pre_run):
             lines.append(pre_str)
@@ -41,7 +41,7 @@ class CloudQueueManager(BaseQueueManager):
             lines.append(modules_str)
         lines.append(self.get_run_commands(commands))
         if post_str := self.get_post_run(post_run):
-            # Preserve the main command's exit status across post_run cleanup.
+            # Exit with the status of the job, not of post_run.
             lines.append("_jf_rc=$?")
             lines.append(post_str)
             lines.append("exit $_jf_rc")
@@ -49,49 +49,45 @@ class CloudQueueManager(BaseQueueManager):
 
     def prepare_options(
         self,
-        options: dict | Any | None = None,
+        options: dict | BaseQResources | None = None,
         job_name: str | None = None,
-    ) -> Any:
-        """Return a ``QCloudResources`` copy of ``options`` with a job name.
+    ) -> BaseQResources:
+        """Return ``options`` as a new resources object of the scheduler IO.
 
-        ``None`` or an empty dict becomes an empty ``QCloudResources``. A
-        non-empty dict holds backend-specific options and is stored in
-        ``scheduler_kwargs``. ``job_name`` is set unless ``options`` is a
-        ``QCloudResources`` that already has one. A job name inside the dict
-        still wins, because the backend applies ``scheduler_kwargs`` last.
-        Each qtoolkit backend makes the name valid for its own cloud service.
+        A dict holds scheduler options and goes into ``scheduler_kwargs``. An
+        empty QResources, which is how a job stores ``resources={}``, means no
+        options. ``job_name`` is set if the options do not set it.
         """
-        if QCloudResources is None:
-            raise ImportError(
-                "CloudQueueManager requires a newer qtoolkit release with QCloudResources."
+        resources_cls = self.scheduler_io.supported_resources_cls
+        if options == QResources():
+            options = None
+        if options is None or isinstance(options, dict):
+            prepared = resources_cls[0](scheduler_kwargs=copy.deepcopy(options or {}))
+        elif isinstance(options, resources_cls):
+            prepared = copy.deepcopy(options)
+        else:
+            names = " or ".join(cls.__name__ for cls in resources_cls)
+            raise TypeError(
+                f"{type(self.scheduler_io).__name__} does not support "
+                f"{type(options).__name__} resources. Use {names} or a dict of "
+                "scheduler options."
             )
 
-        prepared_options: Any
-        if options is None or (isinstance(options, dict) and not options):
-            prepared_options = QCloudResources()
-        elif isinstance(options, dict):
-            prepared_options = QCloudResources(scheduler_kwargs=copy.deepcopy(options))
-        elif isinstance(options, QCloudResources):
-            prepared_options = copy.deepcopy(options)
-        else:
-            raise TypeError("options must be a dict, QCloudResources, or None.")
-
-        if job_name and not prepared_options.job_name:
-            prepared_options.job_name = job_name
-
-        return prepared_options
+        if job_name and not prepared.job_name:
+            prepared.job_name = job_name
+        return prepared
 
     def submit(
         self,
         commands: str | list[str],
-        options: dict | Any | None = None,
+        options: dict | BaseQResources | None = None,
         pre_run: str | list[str] | None = None,
         post_run: str | list[str] | None = None,
         export: dict | None = None,
         modules: list[str] | None = None,
         job_name: str | None = None,
     ) -> SubmissionResult:
-        """Submit a job directly through the cloud scheduler API."""
+        """Submit a job to the cloud scheduler."""
         cmd_lines = self.build_command_lines(
             commands=commands,
             pre_run=pre_run,
@@ -107,23 +103,13 @@ class CloudQueueManager(BaseQueueManager):
         job: QJob | int | str,
         reason: str | None = None,
     ) -> CancelResult:
-        """Cancel or terminate a job through the cloud scheduler API."""
+        """Cancel a job on the cloud scheduler."""
         return self.scheduler_io.cancel(job=job, reason=reason)
 
     def get_jobs_list(
         self,
-        jobs: Sequence[QJob | int | str] | None = None,
+        jobs: list[QJob | int | str] | None = None,
         user: str | None = None,
-        queue: str | None = None,
-        states: list[QState] | None = None,
     ) -> list[QJob]:
-        """Retrieve jobs from the cloud scheduler API."""
-        jobs_arg: Any = (
-            jobs if (jobs is None or isinstance(jobs, str | bytes)) else list(jobs)
-        )
-        return self.scheduler_io.get_jobs_list(
-            jobs=jobs_arg,
-            user=user,
-            queue=queue,
-            states=states,
-        )
+        """Return the jobs from the cloud scheduler."""
+        return self.scheduler_io.get_jobs_list(jobs=jobs, user=user)

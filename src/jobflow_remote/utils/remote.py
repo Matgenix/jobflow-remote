@@ -98,20 +98,20 @@ class SharedHosts:
         self._hosts[worker] = host
         return host
 
-    def get_transfer(self, worker: str) -> BaseHost | BaseCloudStorage:
-        """Return the connected host or cloud storage backend for ``worker``."""
+    def get_transfer_backend(self, worker: str) -> BaseHost | BaseCloudStorage:
+        """Return the shared host or cloud storage of ``worker``, connecting it if needed."""
         if worker not in self._project.workers:
             raise ValueError(f"Worker {worker} not defined in {self._project.name}")
-        if worker in self._hosts:
-            return self._hosts[worker]
-
-        backend = self._project.workers[worker].get_transfer_backend()
-        backend.connect()
-        self._hosts[worker] = backend
-        return backend
+        if not self._project.workers[worker].is_cloud:
+            return self.get_host(worker)
+        if worker not in self._hosts:
+            storage = self._project.workers[worker].get_transfer_backend()
+            storage.connect()
+            self._hosts[worker] = storage
+        return self._hosts[worker]
 
     def close_hosts(self) -> None:
-        """Close the connection to all the connected hosts"""
+        """Close the connection to all the shared hosts and cloud storages."""
         for worker in list(self._hosts):
             try:
                 self._hosts[worker].close()

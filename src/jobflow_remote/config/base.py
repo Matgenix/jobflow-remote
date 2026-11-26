@@ -4,7 +4,7 @@ import abc
 import logging
 import traceback
 from enum import Enum
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Annotated, Any, Literal
 
 from jobflow import JobStore
@@ -300,7 +300,7 @@ class WorkerBase(BaseModel):
         """Return the Host object used in the Worker."""
 
     def get_transfer_backend(self) -> BaseHost | BaseCloudStorage:
-        """Return the file-transfer backend (host or cloud storage) for this worker."""
+        """Return the host or cloud storage used to transfer the files of this worker."""
         return self.get_host()
 
     @property
@@ -635,7 +635,7 @@ class SeparatedTransferWorker(BaseRemoteWorker):
 
 
 class CloudWorker(WorkerBase):
-    """Worker running jobs through a cloud batch API backed by cloud object storage.
+    """Worker that runs jobs on a cloud scheduler and moves files through cloud storage.
 
     ``scheduler_kwargs`` are passed to the qtoolkit scheduler class selected by
     ``scheduler_type``, and ``storage_kwargs`` are passed to the storage class
@@ -645,10 +645,10 @@ class CloudWorker(WorkerBase):
     ``scheduler_type`` is a serialized scheduler dict, ``scheduler_kwargs`` is
     not used.
 
-    ``execution_cmd`` defaults to ``jf -fe execution run-cloud`` and formats
-    ``{}`` with the cloud storage URI instead of a local filesystem path.
-    Host-only fields inherited from ``WorkerBase`` (``timeout_execute``,
-    ``scheduler_username``, and ``sanitize_command``) are ignored.
+    If ``execution_cmd`` is not set, the job runs ``jf -fe execution run-cloud``.
+    A custom ``execution_cmd`` gets the storage URI in ``{}``. The fields
+    ``timeout_execute``, ``scheduler_username``, and ``sanitize_command`` of
+    ``WorkerBase`` are not used.
     """
 
     type: Literal["cloud"] = Field(
@@ -657,31 +657,34 @@ class CloudWorker(WorkerBase):
     scheduler_type: str | dict = Field(
         "aws_batch",
         validate_default=True,
-        description="Cloud API scheduler name (from qtoolkit.io.api.api_scheduler_mapping) "
-        "or serialized BaseAPISchedulerIO dict.",
+        description="Cloud scheduler type, a key of qtoolkit.io.api.api_scheduler_mapping, "
+        "or a serialized BaseAPISchedulerIO dict.",
     )
     scheduler_kwargs: dict[str, Any] = Field(
         default_factory=dict,
-        description="Keyword arguments for the cloud API scheduler class "
-        "(for AWS Batch: job_queue, job_definition, region_name, profile_name).",
+        description="Keyword arguments for the cloud scheduler class "
+        "(e.g. job_queue, job_definition and region_name for AWS Batch).",
     )
     work_dir: Path = Field(
         Path("/jf_work"),
-        description="Absolute POSIX path (e.g. '/jf_work') of the job folders inside the storage.",
+        description="Folder in the storage under which the job folders are created. "
+        "An absolute POSIX path, e.g. /jf_work.",
     )
-    storage_type: Literal["s3"] = Field(
-        "s3", description="Cloud object storage backend type."
+    storage_type: str = Field(
+        "s3",
+        description="Cloud storage type, a key of "
+        "jobflow_remote.remote.storage.cloud_storage_mapping.",
     )
     storage_kwargs: dict[str, Any] = Field(
         description="Keyword arguments for the cloud storage class "
-        "(for S3: bucket, prefix, region_name, profile_name, endpoint_url).",
+        "(e.g. bucket, prefix and region_name for S3).",
     )
     container_work_dir: str = Field(
         "/tmp/jf_run",  # noqa: S108
         description="Folder inside the container under which the job folders are created, "
         "with the same paths as in the storage. The job folders are kept after the jobs. "
         "Use a file system mounted in all containers (e.g. EFS) so that jobs can read "
-        "the folders of earlier jobs, as with prev_dir. Not used if execution_cmd is set.",
+        "the folders of earlier jobs. Not used if execution_cmd is set.",
     )
 
     @field_validator("scheduler_type")
@@ -689,14 +692,29 @@ class CloudWorker(WorkerBase):
     def check_scheduler_type(cls, scheduler_type: str | dict) -> str | dict:
         if BaseAPISchedulerIO is None:
             raise ImportError(
-                "CloudWorker requires a qtoolkit release with qtoolkit.io.api support."
+                "CloudWorker needs a qtoolkit version with qtoolkit.io.api. Upgrade qtoolkit."
             )
         return cls._validate_scheduler_type(
             scheduler_type,
             api_scheduler_mapping,
             BaseAPISchedulerIO,
-            "cloud API scheduler",
+            "cloud scheduler",
         )
+
+    @field_validator("work_dir", mode="before")
+    @classmethod
+    def check_work_dir(cls, v) -> Path:
+        # A folder in the storage, so it is a POSIX path also on Windows.
+        if not PurePosixPath(str(v)).is_absolute():
+            raise ValueError("`work_dir` must be an absolute POSIX path, e.g. /jf_work")
+        return Path(v)
+
+    @field_validator("storage_type")
+    @classmethod
+    def check_storage_type(cls, storage_type: str) -> str:
+        if storage_type not in cloud_storage_mapping:
+            raise ValueError(f"Unknown storage type {storage_type}")
+        return storage_type
 
     @model_validator(mode="after")
     def check_no_batch_mode(self) -> CloudWorker:
@@ -720,22 +738,16 @@ class CloudWorker(WorkerBase):
         return self
 
     def get_scheduler_io(self) -> BaseAPISchedulerIO:
-        """Return the QToolKit BaseAPISchedulerIO instance for this cloud worker."""
-        if BaseAPISchedulerIO is None:
-            raise ImportError(
-                "CloudWorker requires a qtoolkit release with qtoolkit.io.api support."
-            )
+        """Return the qtoolkit BaseAPISchedulerIO of this worker."""
         if isinstance(self.scheduler_type, str):
             if self.scheduler_type not in api_scheduler_mapping:
-                raise ConfigError(
-                    f"Unknown cloud API scheduler type {self.scheduler_type}"
-                )
+                raise ConfigError(f"Unknown cloud scheduler type {self.scheduler_type}")
             sched_cls = api_scheduler_mapping[self.scheduler_type]
             return sched_cls(**self.scheduler_kwargs)
         return MontyDecoder().process_decoded(self.scheduler_type)
 
     def get_storage(self) -> BaseCloudStorage:
-        """Return the cloud object storage backend for this worker."""
+        """Return the cloud storage of this worker."""
         storage_cls = cloud_storage_mapping[self.storage_type]
         return storage_cls(**self.storage_kwargs)
 
@@ -744,7 +756,7 @@ class CloudWorker(WorkerBase):
 
     def get_host(self) -> BaseHost:
         raise NotImplementedError(
-            "CloudWorker uses cloud object storage (get_storage), not a BaseHost."
+            "CloudWorker has no host. Use get_storage to access its files."
         )
 
     @property

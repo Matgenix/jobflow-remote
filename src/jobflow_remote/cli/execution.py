@@ -33,39 +33,36 @@ def run_cloud(
     storage_uri: Annotated[
         str,
         typer.Argument(
-            help="Cloud storage URI of the job run directory (e.g. s3://bucket/prefix)",
+            help="Cloud storage URI of the job folder (e.g. s3://bucket/jf_work/<job folder>)",
         ),
     ],
-    work_dir: Annotated[
+    local_dir: Annotated[
         str,
         typer.Option(
-            "--work-dir",
-            help="Folder inside the container under which the job folder is created, "
+            "--local-dir",
+            help="Folder in the container under which the job folder is created, "
             "with the same path as in the storage. The job folder is kept after the job.",
         ),
-    ] = "/tmp/jf_run",  # noqa: S108
-    region_name: Annotated[
-        str | None,
+    ],
+    storage_options: Annotated[
+        list[str] | None,
         typer.Option(
-            "--region",
-            help="Cloud region name",
-        ),
-    ] = None,
-    endpoint_url: Annotated[
-        str | None,
-        typer.Option(
-            "--endpoint-url",
-            help="Optional custom storage endpoint URL",
+            "--storage-option",
+            help="Option of the storage class as KEY=VALUE, e.g. region_name=us-east-2. "
+            "Can be repeated.",
         ),
     ] = None,
 ) -> None:
-    """Sync a job folder from cloud storage, run it, and upload outputs back."""
-    run_cloud_job(
-        storage_uri=storage_uri,
-        local_dir=work_dir,
-        region_name=region_name,
-        endpoint_url=endpoint_url,
-    )
+    """Download the input of a job from cloud storage, run the job, and upload the folder."""
+    options = {}
+    for option in storage_options or []:
+        key, sep, value = option.partition("=")
+        if not sep:
+            raise typer.BadParameter(
+                f"'{option}' is not KEY=VALUE.", param_hint="--storage-option"
+            )
+        options[key] = value
+    run_cloud_job(storage_uri=storage_uri, local_dir=local_dir, storage_options=options)
 
 
 @app_execution.command()
