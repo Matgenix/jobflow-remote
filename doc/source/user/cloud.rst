@@ -1453,16 +1453,14 @@ List the flows and the jobs:
     jf -p aws_ht flow list
     jf -p aws_ht job list
 
-Type the ids from these lists into the boxes below. The commands of this
-section update as you type, and the copy button copies them with your values.
+Type the DB id of a job from ``jf -p aws_ht job list`` into the box. The
+commands of this section update as you type, and the copy button copies them
+with your value.
 
 .. raw:: html
 
     <div class="jfr-inputs">
-      <label>Flow id <input data-jfr="flow_id" size="38" placeholder="Flow id column of flow list"></label>
-      <label>DB id <input data-jfr="db_id" size="8" placeholder="DB id"></label>
-      <label>Job id <input data-jfr="job_id" size="38" placeholder="Job id column of job list"></label>
-      <label>Index <input data-jfr="index" size="4" value="1"></label>
+      <label>DB id <input data-jfr="db_id" size="8"></label>
     </div>
 
 Job files
@@ -1478,8 +1476,8 @@ Job files
 * The bucket keeps the folders after the stack is deleted, unless you set
   ``RunFilesRetentionDays`` in Part 1, Step 3.
 
-List every job of the flow with its state, its folders on EFS and in S3, and
-the files in S3:
+List every job of the flow of this job, with its state, its folders on EFS
+and in S3, and the files in S3:
 
 .. code-block:: bash
 
@@ -1487,7 +1485,7 @@ the files in S3:
     from jobflow_remote import JobController
 
     jc = JobController.from_project_name("aws_ht")
-    jobs = jc.get_jobs_info(flow_ids="<flow_id>")
+    jobs = jc.get_jobs_info(flow_ids="<db_id>")
     for info in sorted(jobs, key=lambda info: int(info.db_id)):
         print(info.db_id, info.name, info.state.value)
         if not info.run_dir:
@@ -1501,42 +1499,111 @@ the files in S3:
             print("   ", name)
     EOF
 
-List the files of the job with the DB id in S3, and download its
-``jfremote_out.json`` into the current folder:
+List the files of the job in S3, and download its ``jfremote_out.json`` into
+the current folder:
 
 .. code-block:: bash
 
     jf -p aws_ht job files ls <db_id>
     jf -p aws_ht job files get <db_id> jfremote_out.json
 
-On your computer, download the whole folder of the job with the Job id and
-Index into the current folder. This needs only the ``jfr-lab`` profile of
-Part 1, Step 4, so it works wherever the ``Runner`` runs:
+Download the whole folder of the job into the current folder on your
+computer. The last line prints where it is.
 
-.. code-block:: bash
+.. tab-set::
+    :sync-group: runner
 
-    env -u AWS_DEFAULT_REGION python - <<'EOF'
-    from pathlib import PurePosixPath
+    .. tab-item:: Your computer
+        :sync: computer
 
-    import boto3
+        On your computer:
 
-    from jobflow_remote.remote.data import get_job_path
-    from jobflow_remote.remote.storage import S3Storage
+        .. code-block:: bash
 
-    run_dir = get_job_path("<job_id>", <index>, "/jf_work")
-    session = boto3.Session(profile_name="jfr-lab")
-    stack = session.client("cloudformation").describe_stacks(StackName="jfr-lab")
-    bucket = next(
-        o["OutputValue"]
-        for o in stack["Stacks"][0]["Outputs"]
-        if o["OutputKey"] == "S3BucketName"
-    )
-    name = PurePosixPath(run_dir).name
-    S3Storage(bucket=bucket, prefix="runs", profile_name="jfr-lab").download_dir(
-        run_dir, name
-    )
-    print("Downloaded to", name)
-    EOF
+            python - <<'EOF'
+            from pathlib import Path
+
+            from jobflow_remote import JobController
+
+            jc = JobController.from_project_name("aws_ht")
+            info = jc.get_job_info(db_id="<db_id>")
+            storage = jc.project.workers[info.worker].get_storage()
+            folder = Path(Path(info.run_dir).name)
+            storage.download_dir(info.run_dir, folder)
+            print("Downloaded to", folder.resolve())
+            EOF
+
+    .. tab-item:: EC2 instance
+        :sync: ec2
+
+        Your computer cannot reach the MongoDB on the instance, so it cannot
+        look up the DB id. Type the Job id and the Index of the job from
+        ``jf -p aws_ht job list`` on the instance instead. The Index is the
+        number in brackets after the Job id.
+
+        .. raw:: html
+
+            <div class="jfr-inputs">
+              <label>Job id <input data-jfr="job_id" size="38"></label>
+              <label>Index <input data-jfr="index" size="4" value="1"></label>
+            </div>
+
+        On your computer:
+
+        .. code-block:: bash
+
+            env -u AWS_DEFAULT_REGION python - <<'EOF'
+            from pathlib import Path
+
+            import boto3
+
+            from jobflow_remote.remote.data import get_job_path
+            from jobflow_remote.remote.storage import S3Storage
+
+            run_dir = get_job_path("<job_id>", <index>, "/jf_work")
+            stack = boto3.Session(profile_name="jfr-lab").client("cloudformation").describe_stacks(StackName="jfr-lab")
+            outputs = {o["OutputKey"]: o["OutputValue"] for o in stack["Stacks"][0]["Outputs"]}
+            storage = S3Storage(bucket=outputs["S3BucketName"], prefix="runs", profile_name="jfr-lab")
+            folder = Path(Path(run_dir).name)
+            storage.download_dir(run_dir, folder)
+            print("Downloaded to", folder.resolve())
+            EOF
+
+    .. tab-item:: NERSC Perlmutter
+        :sync: nersc
+
+        Your computer cannot reach the MongoDB at NERSC, so it cannot look up
+        the DB id. Type the Job id and the Index of the job from
+        ``jf -p aws_ht job list`` on Perlmutter instead. The Index is the
+        number in brackets after the Job id.
+
+        .. raw:: html
+
+            <div class="jfr-inputs">
+              <label>Job id <input data-jfr="job_id" size="38"></label>
+              <label>Index <input data-jfr="index" size="4" value="1"></label>
+            </div>
+
+        On your computer:
+
+        .. code-block:: bash
+
+            env -u AWS_DEFAULT_REGION python - <<'EOF'
+            from pathlib import Path
+
+            import boto3
+
+            from jobflow_remote.remote.data import get_job_path
+            from jobflow_remote.remote.storage import S3Storage
+
+            run_dir = get_job_path("<job_id>", <index>, "/jf_work")
+            stack = boto3.Session(profile_name="jfr-lab").client("cloudformation").describe_stacks(StackName="jfr-lab")
+            outputs = {o["OutputKey"]: o["OutputValue"] for o in stack["Stacks"][0]["Outputs"]}
+            storage = S3Storage(bucket=outputs["S3BucketName"], prefix="runs", profile_name="jfr-lab")
+            folder = Path(Path(run_dir).name)
+            storage.download_dir(run_dir, folder)
+            print("Downloaded to", folder.resolve())
+            EOF
 
 Download the folders you need before step 3 of :ref:`cloud_cleanup`, which
 deletes the access keys of the ``jfr-lab`` profile.
@@ -1575,24 +1642,24 @@ Retry, stop, and delete
 
 A job goes to ``REMOTE_ERROR`` when an action of the ``Runner`` on AWS fails
 several times in a row, for example while AWS Batch or S3 does not answer.
-Run the failed action of the job with the DB id again:
+Run the failed action of the job again:
 
 .. code-block:: bash
 
     jf -p aws_ht job retry <db_id>
 
-Stop the job with the DB id if it is queued or running:
+Stop the job if it is queued or running:
 
 .. code-block:: bash
 
     jf -p aws_ht job stop <db_id>
 
-Delete the flow and its jobs. This also cancels the AWS Batch jobs of the
-flow that are still queued or running:
+Delete the flow of the job, with all its jobs. This also cancels the AWS
+Batch jobs of the flow that are still queued or running:
 
 .. code-block:: bash
 
-    jf -p aws_ht flow delete -fid <flow_id>
+    jf -p aws_ht flow delete -did <db_id>
 
 Logs
 ----
@@ -1602,8 +1669,7 @@ The containers write stdout and stderr to CloudWatch Logs, not to
 work for cloud workers. ``jf job todir`` does not work either, because there
 is no shell access to the container.
 
-1. Where you submit the flows, print the AWS Batch job id of the job with the
-   DB id:
+1. Where you submit the flows, print the AWS Batch job id of the job:
 
    .. code-block:: bash
 
@@ -1651,7 +1717,13 @@ is no shell access to the container.
           pre.textContent = pre.dataset.jfrText.replace(pattern, (m, name) => values[name] ?? m);
         });
       };
-      inputs.forEach((input) => input.addEventListener("input", update));
+      inputs.forEach((input) => input.addEventListener("input", () => {
+        // Boxes with the same name, for example in different tabs, share their value.
+        inputs.forEach((other) => {
+          if (other.dataset.jfr === input.dataset.jfr) other.value = input.value;
+        });
+        update();
+      }));
       update();
     });
     </script>
