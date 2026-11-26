@@ -1507,15 +1507,9 @@ the current folder:
     jf -p aws_ht job files ls <db_id>
     jf -p aws_ht job files get <db_id> jfremote_out.json
 
-Download the whole folder of the job to your computer. It goes to your
-``Downloads`` folder. To save it somewhere else, type that folder into the box.
-The last line prints where the folder is.
-
-.. raw:: html
-
-    <div class="jfr-inputs">
-      <label>Download to <input data-jfr="download_dir" size="40" value="~/Downloads"></label>
-    </div>
+Download the whole folder of the job to your computer. The block first asks
+where to save it. Press Enter to save it in ``~/Downloads``, or paste another
+folder. The last line prints where the folder is.
 
 .. tab-set::
     :sync-group: runner
@@ -1527,7 +1521,10 @@ The last line prints where the folder is.
 
         .. code-block:: bash
 
-            python - <<'EOF'
+            {
+            printf "The folder goes to ~/Downloads. Press Enter to keep this, or paste another folder: "; read -r DEST
+            DEST="${DEST:-$HOME/Downloads}" python - <<'EOF'
+            import os
             from pathlib import Path
 
             from jobflow_remote import JobController
@@ -1535,10 +1532,11 @@ The last line prints where the folder is.
             jc = JobController.from_project_name("aws_ht")
             info = jc.get_job_info(db_id="<db_id>")
             storage = jc.project.workers[info.worker].get_storage()
-            folder = Path("<download_dir>").expanduser() / Path(info.run_dir).name
+            folder = Path(os.environ["DEST"]).expanduser() / Path(info.run_dir).name
             storage.download_dir(info.run_dir, folder)
             print("Downloaded to", folder.resolve())
             EOF
+            }
 
     .. tab-item:: EC2 instance
         :sync: ec2
@@ -1559,7 +1557,10 @@ The last line prints where the folder is.
 
         .. code-block:: bash
 
-            env -u AWS_DEFAULT_REGION python - <<'EOF'
+            {
+            printf "The folder goes to ~/Downloads. Press Enter to keep this, or paste another folder: "; read -r DEST
+            DEST="${DEST:-$HOME/Downloads}" env -u AWS_DEFAULT_REGION python - <<'EOF'
+            import os
             from pathlib import Path
 
             import boto3
@@ -1571,10 +1572,11 @@ The last line prints where the folder is.
             stack = boto3.Session(profile_name="jfr-lab").client("cloudformation").describe_stacks(StackName="jfr-lab")
             outputs = {o["OutputKey"]: o["OutputValue"] for o in stack["Stacks"][0]["Outputs"]}
             storage = S3Storage(bucket=outputs["S3BucketName"], prefix="runs", profile_name="jfr-lab")
-            folder = Path("<download_dir>").expanduser() / Path(run_dir).name
+            folder = Path(os.environ["DEST"]).expanduser() / Path(run_dir).name
             storage.download_dir(run_dir, folder)
             print("Downloaded to", folder.resolve())
             EOF
+            }
 
     .. tab-item:: NERSC Perlmutter
         :sync: nersc
@@ -1595,7 +1597,10 @@ The last line prints where the folder is.
 
         .. code-block:: bash
 
-            env -u AWS_DEFAULT_REGION python - <<'EOF'
+            {
+            printf "The folder goes to ~/Downloads. Press Enter to keep this, or paste another folder: "; read -r DEST
+            DEST="${DEST:-$HOME/Downloads}" env -u AWS_DEFAULT_REGION python - <<'EOF'
+            import os
             from pathlib import Path
 
             import boto3
@@ -1607,10 +1612,11 @@ The last line prints where the folder is.
             stack = boto3.Session(profile_name="jfr-lab").client("cloudformation").describe_stacks(StackName="jfr-lab")
             outputs = {o["OutputKey"]: o["OutputValue"] for o in stack["Stacks"][0]["Outputs"]}
             storage = S3Storage(bucket=outputs["S3BucketName"], prefix="runs", profile_name="jfr-lab")
-            folder = Path("<download_dir>").expanduser() / Path(run_dir).name
+            folder = Path(os.environ["DEST"]).expanduser() / Path(run_dir).name
             storage.download_dir(run_dir, folder)
             print("Downloaded to", folder.resolve())
             EOF
+            }
 
 Download the folders you need before step 3 of :ref:`cloud_cleanup`, which
 deletes the access keys of the ``jfr-lab`` profile.
