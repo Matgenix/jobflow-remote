@@ -1411,13 +1411,52 @@ List the flows and the jobs:
     jf -p aws_ht flow list
     jf -p aws_ht job list
 
-List or download the files of a job from S3. The second command saves the
-file in the current folder.
+Each job has its own folder. ``jf -p aws_ht job info <db_id>`` shows its
+path as ``run_dir``, for example ``/jf_work/29/14/2b/<uuid>_1``. The job runs
+in this folder on EFS, at ``/mnt/jfr/runs/jf_work/29/14/2b/<uuid>_1``. Only
+the containers mount EFS. When the job ends, the whole folder is copied to
+the S3 bucket, at ``s3://<bucket>/runs/jf_work/29/14/2b/<uuid>_1``. The
+bucket keeps it, also after the stack is deleted, unless you set
+``RunFilesRetentionDays`` in Part 1, Step 3. While a job runs, its
+folder in S3 has only ``jfremote_in.json`` and a ``jfremote_out.json`` with
+the start time. The other files are copied when the job ends. If AWS stops the
+container before the job ends, they stay on EFS (see the warning at the top of
+this guide).
+
+Where you submit the flows (your computer, the EC2 instance, or a Perlmutter
+login node), list the jobs of a flow with their state, their folders on EFS
+and in S3, and the files of each folder in S3. Use the flow id from
+``jf -p aws_ht flow list``.
 
 .. code-block:: bash
 
-    jf -p aws_ht job files ls 1
-    jf -p aws_ht job files get 1 jfremote_out.json
+    FLOW_ID=<flow_id> python - <<'EOF'
+    import os
+
+    from jobflow_remote import JobController
+
+    jc = JobController.from_project_name("aws_ht")
+    jobs = jc.get_jobs_info(flow_ids=os.environ["FLOW_ID"])
+    for info in sorted(jobs, key=lambda info: int(info.db_id)):
+        print(info.db_id, info.name, info.state.value)
+        if not info.run_dir:
+            continue
+        worker = jc.project.workers[info.worker]
+        storage = worker.get_storage()
+        uri = storage.get_uri(info.run_dir)
+        print("  EFS:", f"{worker.container_work_dir}/{uri.split('/', 3)[3]}")
+        print("  S3: ", uri)
+        for name in sorted(storage.listdir(info.run_dir)):
+            print("   ", name)
+    EOF
+
+List the files of one job in S3, or download one file into the current
+folder:
+
+.. code-block:: bash
+
+    jf -p aws_ht job files ls <db_id>
+    jf -p aws_ht job files get <db_id> jfremote_out.json
 
 A job stays ``SUBMITTED`` until its container starts. The first job on a
 new instance waits a few minutes while the instance starts and pulls the
@@ -1467,20 +1506,31 @@ or running.
 
     jf -p aws_ht flow delete -fid <flow_id>
 
-Download the whole folder of a job from S3 into the folder ``job_<db_id>``.
-Run it where you run the ``jf`` commands:
+Download the whole folder of a job from S3 to your computer. This works
+wherever the ``Runner`` runs, because it needs only the ``jfr-lab`` profile
+of Part 1, Step 4, not MongoDB. On your computer, set ``S3_URI`` to the S3
+path that the listing above prints for the job, for example the job
+``generate_frequencies_eigenvectors`` of a phonon flow. The folder is saved
+in the current folder, with the name of the job folder.
 
 .. code-block:: bash
 
-    python - <<'EOF'
-    from jobflow_remote import JobController
+    S3_URI=<s3_path>
+    env -u AWS_DEFAULT_REGION S3_URI="$S3_URI" python - <<'EOF'
+    import os
+    from pathlib import PurePosixPath
 
-    db_id = "<db_id>"
-    jc = JobController.from_project_name("aws_ht")
-    info = jc.get_job_info(db_id=db_id)
-    storage = jc.project.workers[info.worker].get_storage()
-    storage.download_dir(info.run_dir, f"job_{db_id}")
+    from jobflow_remote.remote.storage import S3Storage
+
+    bucket, key = os.environ["S3_URI"].removeprefix("s3://").split("/", 1)
+    S3Storage(bucket=bucket, profile_name="jfr-lab").download_dir(
+        key, PurePosixPath(key).name
+    )
+    print("Downloaded to", PurePosixPath(key).name)
     EOF
+
+Download the folders you need before step 3 of :ref:`cloud_cleanup`, which
+deletes the access keys of the ``jfr-lab`` profile.
 
 The containers write stdout and stderr to CloudWatch Logs, not to
 ``queue.out`` and ``queue.err``. For this reason ``jf job queue-out`` does not
