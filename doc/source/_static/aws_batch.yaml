@@ -38,7 +38,7 @@ Parameters:
     AllowedValues: [SPOT, EC2]
   GpuInstanceTypes:
     Type: CommaDelimitedList
-    Default: g4dn,g5,g6
+    Default: g5,g6
   GpuMaxvCpus:
     Type: Number
     Default: 4

@@ -161,7 +161,7 @@ The quotas count vCPUs:
   (``CpuAllocationType=EC2``).
 * ``L-3819A6DF`` is for Spot GPU instances, which the GPU queue uses by
   default (``GpuAllocationType=SPOT``). It must be at least ``4`` for one
-  ``g4dn.xlarge``, ``g5.xlarge``, or ``g6.xlarge`` instance.
+  ``g5.xlarge`` or ``g6.xlarge`` instance.
 * ``L-DB2E81BA`` is for On-Demand GPU instances (``GpuAllocationType=EC2``).
 
 Step 3 sets the maximum vCPUs of each queue to its quota. A job with
@@ -326,8 +326,8 @@ The main parameters of the template are:
      - ``SPOT``
      - ``SPOT`` or ``EC2`` (On-Demand) instances for the GPU queue
    * - ``GpuInstanceTypes``
-     - ``g4dn,g5,g6``
-     - EC2 instance families for the GPU queue
+     - ``g5,g6``
+     - EC2 instance families for the GPU queue. Both have 24 GB of GPU memory
    * - ``GpuMaxvCpus``
      - ``4``
      - Maximum vCPUs used at once by the GPU queue
@@ -1190,7 +1190,28 @@ Jobs cannot use all of the instance memory. The operating system and the ECS
 agent use part of it. Ask for a little less than the full memory per vCPU so
 that jobs fill the instance. ``c7i``, ``c6i``, and ``c7a`` instances have
 2 GiB per vCPU, so the CPU job definition of the stack uses ``memory=1800``
-with ``vcpus=1``.
+with ``vcpus=1``. AWS Batch stops a job that uses more than its ``memory``,
+and the job is not rerun.
+
+A vCPU is a share of the CPUs of the instance, not a reserved core. On
+``c7i``, ``c6i``, and ``m7i`` instances one vCPU is one hyperthread. Set the
+number of threads of each job to its vCPUs in ``environment``, for example
+for ``vcpus=2``:
+
+.. code-block:: python
+
+    QCloudResources(
+        vcpus=2,
+        memory=3600,
+        environment={
+            "OMP_NUM_THREADS": "2",
+            "MKL_NUM_THREADS": "2",
+            "OPENBLAS_NUM_THREADS": "2",
+        },
+    )
+
+Without these variables, PyTorch, NumPy, and scikit-learn start one thread
+per CPU of the instance and slow down the other jobs on it.
 
 Use ``submit_flow(..., resources=...)`` to set the resources of all jobs in a
 flow. Use ``set_run_config`` to give jobs with a given name another worker or
@@ -1667,10 +1688,13 @@ is no shell access to the container.
 
    Then, in CloudShell, show the state of the job and the logs of all its
    attempts. AWS Batch keeps this information for 7 days after the job ends.
+   The first line shows the state, the reason, the exit code, and the
+   container reason of the job. A job that used more than its ``memory``
+   shows ``OutOfMemoryError`` as the container reason.
 
    .. code-block:: bash
 
-       aws batch describe-jobs --jobs "<batch_job_id>" --query 'jobs[0].[status,statusReason]' --output text
+       aws batch describe-jobs --jobs "<batch_job_id>" --query 'jobs[0].[status,statusReason,container.exitCode,container.reason]' --output text
        for S in $(aws batch describe-jobs --jobs "<batch_job_id>" --query 'jobs[0].[attempts[].container.logStreamName, container.logStreamName][]' --output text | tr '\t' '\n' | grep -v None | sort -u); do aws logs tail /aws/batch/jfr-lab --log-stream-names "$S" --since 7d; done
 
 Find out why a job waits
@@ -1686,6 +1710,7 @@ For the GPU queue, replace ``CpuJobQueueArn`` with ``GpuJobQueueArn``.
     QUEUE=$(aws cloudformation describe-stacks --stack-name jfr-lab --query "Stacks[0].Outputs[?OutputKey=='CpuJobQueueArn'].OutputValue" --output text)
     for s in RUNNABLE STARTING RUNNING SUCCEEDED FAILED; do aws batch list-jobs --job-queue "$QUEUE" --job-status "$s" --query 'jobSummaryList[].[jobName,status,statusReason]' --output text; done
 
+The last column is the reason AWS Batch gives for the state, if any.
 ``RUNNABLE`` means the job waits for an instance. If a job stays
 ``RUNNABLE`` for more than 15 minutes, read in CloudShell why AWS could
 not start an instance:
@@ -1718,6 +1743,25 @@ Stop the job if it is queued or running:
 .. code-block:: bash
 
     jf -p aws_ht job stop <db_id>
+
+AWS Batch cannot hold a job or change its resources after it is submitted.
+To keep a job that is not yet submitted (``READY`` or ``WAITING``) from
+starting, pause it, and resume it later:
+
+.. code-block:: bash
+
+    jf -p aws_ht job pause <db_id>
+    jf -p aws_ht job resume <db_id>
+
+To change the resources of a job that is queued or running, stop it, set the
+new resources, and run it again. The values below are an example. They are
+merged into the resources of the job.
+
+.. code-block:: bash
+
+    jf -p aws_ht job stop <db_id>
+    jf -p aws_ht job set resources '{"memory": 7000, "time_limit": 43200}' -did <db_id>
+    jf -p aws_ht job rerun --force <db_id>
 
 Delete the flow of the job, with all its jobs. This also cancels the AWS
 Batch jobs of the flow that are still queued or running:
