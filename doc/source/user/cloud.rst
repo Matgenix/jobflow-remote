@@ -997,7 +997,7 @@ instance, and the jobs that share an instance slow each other down.
        jf -p aws_ht runner start
        jf -p aws_ht runner status
 
-   The last command prints ``Daemon status: running``.
+   Run the last command again until it prints ``Daemon status: running``.
 
 AWS Batch starts EC2 instances when jobs are queued and terminates them a few
 minutes after the queues are empty.
