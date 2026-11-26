@@ -987,6 +987,18 @@ instance, and the jobs that share an instance slow each other down.
        python submit_phonons.py
        jf -p aws_ht runner start
 
+   If the last command prints ``Daemon process is already running``, a
+   ``Runner`` from an earlier session is still running. It may use an older
+   environment. Shut it down and start it again:
+
+   .. code-block:: bash
+
+       jf -p aws_ht runner shutdown --wait
+       jf -p aws_ht runner start
+       jf -p aws_ht runner status
+
+   The last command prints ``Daemon status: running``.
+
 AWS Batch starts EC2 instances when jobs are queued and terminates them a few
 minutes after the queues are empty.
 
@@ -1115,15 +1127,15 @@ Deleting the stack deletes the EFS file system with all job folders on it.
 The S3 bucket and its copies of the job folders are kept.
 
 1. On your computer, stop the jobs that are still queued or running, then
-   stop the ``Runner``.
+   shut down the ``Runner``.
 
    .. code-block:: bash
 
        jf -p aws_ht job stop -s SUBMITTED -s RUNNING
-       jf -p aws_ht runner stop
+       jf -p aws_ht runner shutdown --wait
        jf -p aws_ht runner status
 
-   Run the last command again until it shows that the ``Runner`` is shut down.
+   The last command prints ``Daemon status: shut_down``.
 
 2. In CloudShell, copy every job folder on EFS to S3. This also copies the
    folders of jobs whose container was stopped before the job ended. The
