@@ -21,3 +21,36 @@ def test_inter_handler_in_daemon(monkeypatch, capsys):
         resp = inter_handler("", "", [("Password: ", False), ("OTP: ", False)])
     assert resp == ("secret", "123456")
     assert capsys.readouterr() == ("Password: OTP: ", "")
+
+
+def test_close_moves_to_gateway_after_error(monkeypatch):
+    # An error while closing a connection must not stop the loop over the
+    # gateways, nor make it close the same connection forever.
+    import fabric
+
+    from jobflow_remote.remote.host.remote import RemoteHost
+
+    class CloseCalledAgainError(BaseException):
+        # a BaseException is not caught by close(): the test fails instead of
+        # hanging if the same connection is closed twice.
+        pass
+
+    gateway = fabric.Connection("gateway.example.org")
+    main = fabric.Connection("main.example.org", gateway=gateway)
+
+    calls = []
+
+    def failing_close():
+        calls.append("main")
+        if calls.count("main") > 1:
+            raise CloseCalledAgainError
+        raise OSError("Socket is closed")
+
+    monkeypatch.setattr(main, "close", failing_close)
+    monkeypatch.setattr(gateway, "close", lambda: calls.append("gateway"))
+
+    host = RemoteHost(host="main.example.org")
+    host._connection = main
+
+    assert host.close() is False
+    assert calls == ["main", "gateway"]

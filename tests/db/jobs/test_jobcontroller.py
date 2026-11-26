@@ -943,6 +943,92 @@ def test_rerun_generic(job_controller):
     )
 
 
+@pytest.mark.parametrize("state", ["SUBMITTED", "RUNNING"])
+def test_rerun_cancels_queue_process(job_controller, runner, caplog, state) -> None:
+    """Rerunning a SUBMITTED or RUNNING Job cancels its process in the queue."""
+    from jobflow import Flow
+
+    from jobflow_remote import submit_flow
+    from jobflow_remote.jobs.state import JobState
+    from jobflow_remote.testing import add_sleep
+
+    job = add_sleep(1, 30)
+    flow = Flow([job])
+    submit_flow(flow, worker="test_local_worker")
+
+    runner.run_one_job(max_seconds=20, target_state=JobState.RUNNING)
+
+    qm = runner.get_queue_manager("test_local_worker")
+    job_info = job_controller.get_job_info(job_id=job.uuid, job_index=job.index)
+    process_id = job_info.remote.process_id
+    assert len(qm.get_jobs_list([process_id])) == 1
+
+    if state == "SUBMITTED":
+        job_controller.set_job_state(
+            JobState.SUBMITTED, job_id=job.uuid, job_index=job.index
+        )
+    assert (
+        job_controller.get_job_info(job_id=job.uuid, job_index=job.index).state.value
+        == state
+    )
+
+    assert job_controller.rerun_job(job_id=job.uuid, job_index=job.index) == [
+        job_info.db_id
+    ]
+
+    assert len(qm.get_jobs_list([process_id])) == 0
+    assert "Failed cancelling the process" not in caplog.text
+    assert (
+        job_controller.get_job_info(job_id=job.uuid, job_index=job.index).state
+        == JobState.READY
+    )
+
+
+def test_rerun_force_cancels_children_queue_process(
+    job_controller, runner, caplog
+) -> None:
+    """A forced rerun cancels the queue process of a RUNNING descendant."""
+    from jobflow import Flow
+
+    from jobflow_remote import submit_flow
+    from jobflow_remote.jobs.state import JobState
+    from jobflow_remote.testing import add, add_sleep
+
+    j1 = add(1, 2)
+    j2 = add_sleep(j1.output, 30)
+    flow = Flow([j1, j2])
+    submit_flow(flow, worker="test_local_worker")
+
+    assert runner.run_one_job(max_seconds=10, job_id=[j1.uuid, j1.index])
+    runner.run_one_job(
+        max_seconds=20, job_id=[j2.uuid, j2.index], target_state=JobState.RUNNING
+    )
+
+    j1_info = job_controller.get_job_info(job_id=j1.uuid, job_index=j1.index)
+    j2_info = job_controller.get_job_info(job_id=j2.uuid, job_index=j2.index)
+    assert j1_info.state == JobState.COMPLETED
+    assert j2_info.state == JobState.RUNNING
+
+    qm = runner.get_queue_manager("test_local_worker")
+    process_id = j2_info.remote.process_id
+    assert len(qm.get_jobs_list([process_id])) == 1
+
+    assert set(
+        job_controller.rerun_job(job_id=j1.uuid, job_index=j1.index, force=True)
+    ) == {j1_info.db_id, j2_info.db_id}
+
+    assert len(qm.get_jobs_list([process_id])) == 0
+    assert "Failed cancelling the process" not in caplog.text
+    assert (
+        job_controller.get_job_info(job_id=j1.uuid, job_index=j1.index).state
+        == JobState.READY
+    )
+    assert (
+        job_controller.get_job_info(job_id=j2.uuid, job_index=j2.index).state
+        == JobState.WAITING
+    )
+
+
 def test_retry(job_controller, monkeypatch, runner) -> None:
     from jobflow import Flow
 
@@ -1196,6 +1282,92 @@ def test_reset(job_controller, two_flows_four_jobs):
         max_limit=1, validation=datetime.now().strftime("%Y-%m-%d")
     )
     assert job_controller.count_jobs() == 0
+
+
+def test_delete_job_unreachable_worker(
+    job_controller, runner, caplog, monkeypatch
+) -> None:
+    """
+    A worker that cannot be reached does not stop the deletion of the Job:
+    the Job and its output are deleted, the files are not, and the folder is
+    logged.
+    """
+    from jobflow import Flow
+
+    from jobflow_remote import submit_flow
+    from jobflow_remote.remote.host.local import LocalHost
+    from jobflow_remote.testing import add
+
+    j1 = add(1, 2)
+    j2 = add(j1.output, 4)
+    flow = Flow([j1, j2])
+    submit_flow(flow, worker="test_local_worker")
+    runner.run_all_jobs(max_seconds=20)
+
+    j2_info = job_controller.get_job_info(job_id=j2.uuid, job_index=j2.index)
+    assert os.path.isdir(j2_info.run_dir)
+
+    def unreachable_connect(self) -> None:
+        raise TimeoutError("timed out")
+
+    monkeypatch.setattr(LocalHost, "connect", unreachable_connect)
+
+    assert (
+        job_controller.delete_job(job_id=j2.uuid, delete_output=True, delete_files=True)
+        == j2_info.db_id
+    )
+
+    assert job_controller.count_jobs(job_ids=[(j2.uuid, j2.index)]) == 0
+    assert job_controller.count_jobs(flow_ids=[flow.uuid]) == 1
+    with pytest.raises(ValueError, match=".*has no outputs.*"):
+        job_controller.jobstore.get_output(j2.uuid)
+    assert os.path.isdir(j2_info.run_dir)
+    assert (
+        f"The files of Job {j2_info.db_id} in {j2_info.run_dir} were not deleted"
+    ) in caplog.text
+
+
+# the Jobs are independent, so that they can run at the same time
+@pytest.mark.filterwarnings("ignore:Some jobs are not connected")
+def test_delete_job_cancels_queue_process(job_controller, runner, caplog) -> None:
+    """Deleting a RUNNING Job cancels its process in the queue, unless disabled."""
+    from jobflow import Flow
+
+    from jobflow_remote import submit_flow
+    from jobflow_remote.jobs.state import JobState
+    from jobflow_remote.testing import add, add_sleep
+
+    j_cancel = add_sleep(1, 30)
+    j_keep = add_sleep(2, 30)
+    j_other = add(1, 2)
+    flow = Flow([j_cancel, j_keep, j_other])
+    submit_flow(flow, worker="test_local_worker")
+
+    for j in (j_cancel, j_keep):
+        runner.run_one_job(
+            max_seconds=20, job_id=[j.uuid, j.index], target_state=JobState.RUNNING
+        )
+    qm = runner.get_queue_manager("test_local_worker")
+    cancel_info = job_controller.get_job_info(job_id=j_cancel.uuid)
+    keep_info = job_controller.get_job_info(job_id=j_keep.uuid)
+    assert cancel_info.state == JobState.RUNNING
+    assert keep_info.state == JobState.RUNNING
+    assert len(qm.get_jobs_list([cancel_info.remote.process_id])) == 1
+    assert len(qm.get_jobs_list([keep_info.remote.process_id])) == 1
+
+    assert job_controller.delete_job(job_id=j_cancel.uuid) == cancel_info.db_id
+    assert len(qm.get_jobs_list([cancel_info.remote.process_id])) == 0
+    assert "Failed cancelling the process" not in caplog.text
+
+    assert (
+        job_controller.delete_job(job_id=j_keep.uuid, cancel_processes=False)
+        == keep_info.db_id
+    )
+    assert len(qm.get_jobs_list([keep_info.remote.process_id])) == 1
+    # cancel it to avoid leaving the process running after the test
+    qm.cancel(keep_info.remote.process_id)
+
+    assert job_controller.count_jobs(flow_ids=[flow.uuid]) == 1
 
 
 def test_delete_job(job_controller, two_flows_four_jobs, runner):
@@ -1815,6 +1987,10 @@ def test_resume_flow(job_controller, runner):
     assert job_controller.get_flows_info()[0].state == FlowState.RUNNING
     assert job_controller.count_jobs(states=[JobState.STOPPED, JobState.PAUSED]) == 0
 
+    # the message names the state
+    with pytest.raises(ValueError, match=r"^Cannot resume a Flow in state RUNNING$"):
+        job_controller.resume_flow(flow_id=flow.uuid)
+
 
 def test_flow_store(job_controller, two_flows_four_jobs, runner):
     from jobflow_remote.jobs.state import FlowState
@@ -1997,6 +2173,103 @@ def test_delete_flow(job_controller, runner, caplog):
 
     # Test deleting non-existent flow
     assert not job_controller.delete_flow("non-existent-uuid")
+
+
+def test_delete_flow_unreachable_worker(
+    job_controller, runner, caplog, monkeypatch
+) -> None:
+    """
+    A worker that cannot be reached does not stop the deletion of the Flow:
+    the Flow, its Jobs and their outputs are deleted, the files are not, and
+    their folders are logged.
+    """
+    from jobflow import Flow
+
+    from jobflow_remote import submit_flow
+    from jobflow_remote.jobs.state import JobState
+    from jobflow_remote.remote.host.local import LocalHost
+    from jobflow_remote.testing import add
+
+    j1 = add(1, 2)
+    j2 = add(j1.output, 4)
+    flow = Flow([j1, j2])
+    submit_flow(flow, worker="test_local_worker")
+    runner.run_all_jobs(max_seconds=20)
+
+    jobs_info = job_controller.get_jobs_info(flow_ids=[flow.uuid])
+    assert {ji.state for ji in jobs_info} == {JobState.COMPLETED}
+    for ji in jobs_info:
+        assert os.path.isdir(ji.run_dir)
+
+    connect_calls = []
+
+    def unreachable_connect(self) -> None:
+        connect_calls.append(self)
+        raise TimeoutError("timed out")
+
+    monkeypatch.setattr(LocalHost, "connect", unreachable_connect)
+
+    assert job_controller.delete_flow(flow.uuid, delete_output=True, delete_files=True)
+
+    # the documents and the outputs are deleted
+    assert job_controller.count_flows(flow_ids=[flow.uuid]) == 0
+    assert job_controller.count_jobs(flow_ids=[flow.uuid]) == 0
+    for j in (j1, j2):
+        with pytest.raises(ValueError, match=".*has no outputs.*"):
+            job_controller.jobstore.get_output(j.uuid)
+
+    # the files are not deleted, and the connection was attempted only once
+    for ji in jobs_info:
+        assert os.path.isdir(ji.run_dir)
+    assert len(connect_calls) == 1
+
+    # each folder that was not deleted is logged
+    assert "Could not connect to the worker 'test_local_worker'" in caplog.text
+    for ji in jobs_info:
+        assert f"The files of Job {ji.db_id} in {ji.run_dir} were not deleted" in (
+            caplog.text
+        )
+
+
+def test_safe_delete_files_error_on_one_job(
+    job_controller, runner, caplog, monkeypatch
+) -> None:
+    """An error while deleting the files of a Job does not stop the others."""
+    from jobflow import Flow
+
+    from jobflow_remote import submit_flow
+    from jobflow_remote.remote.host.local import LocalHost
+    from jobflow_remote.testing import add
+
+    j1 = add(1, 2)
+    j2 = add(j1.output, 4)
+    flow = Flow([j1, j2])
+    submit_flow(flow, worker="test_local_worker")
+    runner.run_all_jobs(max_seconds=20)
+
+    j1_info = job_controller.get_job_info(job_id=j1.uuid, job_index=j1.index)
+    j2_info = job_controller.get_job_info(job_id=j2.uuid, job_index=j2.index)
+
+    # emulate a file system that does not answer in time for the first Job only
+    orig_listdir = LocalHost.listdir
+
+    def slow_listdir(self, path):
+        if str(path) == j1_info.run_dir:
+            raise TimeoutError("the command did not complete in time")
+        return orig_listdir(self, path)
+
+    monkeypatch.setattr(LocalHost, "listdir", slow_listdir)
+
+    deleted = job_controller.safe_delete_files([j1_info, j2_info])
+
+    assert [ji.db_id for ji in deleted] == [j2_info.db_id]
+    assert os.path.isdir(j1_info.run_dir)
+    assert not os.path.isdir(j2_info.run_dir)
+    assert (
+        f"The files of Job {j1_info.db_id} in {j1_info.run_dir} on the worker "
+        "'test_local_worker' were not deleted"
+    ) in caplog.text
+    assert "the command did not complete in time" in caplog.text
 
 
 def test_complete_onmissing_none(job_controller, runner):

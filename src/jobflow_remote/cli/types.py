@@ -424,6 +424,17 @@ delete_all_opt = Annotated[
     ),
 ]
 
+
+keep_processes_opt = Annotated[
+    bool,
+    typer.Option(
+        "--keep-processes",
+        "-kp",
+        help="Do not attempt to cancel the processes of the SUBMITTED and RUNNING "
+        "Jobs from the queue of their worker",
+    ),
+]
+
 show_all_batches_opt = Annotated[
     bool, typer.Option("--all", "-a", help="Show all batches (running and stopped)")
 ]

@@ -36,6 +36,7 @@ from jobflow_remote.cli.types import (
     job_index_opt,
     job_state_arg,
     job_state_opt,
+    keep_processes_opt,
     locked_opt,
     max_results_opt,
     metadata_opt,
@@ -714,6 +715,7 @@ def delete(
     delete_output: delete_output_opt = False,
     delete_files: delete_files_opt = False,
     delete_all: delete_all_opt = False,
+    keep_processes: keep_processes_opt = False,
 ) -> None:
     """
     Delete Jobs individually. The Flow document will be updated accordingly but
@@ -749,6 +751,7 @@ def delete(
         interactive=True,
         delete_output=delete_output,
         delete_files=delete_files,
+        cancel_processes=not keep_processes,
     )
 
 

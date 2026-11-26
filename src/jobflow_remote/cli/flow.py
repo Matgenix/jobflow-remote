@@ -35,6 +35,7 @@ from jobflow_remote.cli.types import (
     hours_opt,
     job_flow_id_flag_opt,
     job_ids_opt,
+    keep_processes_opt,
     locked_flow_opt,
     max_results_opt,
     metadata_opt,
@@ -184,15 +185,7 @@ def delete(
     delete_output: delete_output_opt = False,
     delete_files: delete_files_opt = False,
     delete_all: delete_all_opt = False,
-    keep_processes: Annotated[
-        bool,
-        typer.Option(
-            "--keep-processes",
-            "-kp",
-            help="Do not attempt to cancel SUBMITTED and RUNNING processes from "
-            "the worker associated with the deleted Flows",
-        ),
-    ] = False,
+    keep_processes: keep_processes_opt = False,
     wait: wait_lock_opt = None,
     break_lock: break_lock_opt = False,
 ) -> None:
@@ -615,7 +608,7 @@ def clean(
         )
         if len(skipped_jobs) < 10:
             for ji in skipped_jobs:
-                out_console.print(f" - {ji.db_id} - {ji.state}")
+                out_console.print(f" - {ji.db_id} - {ji.state.value}")
         else:
             confirmed = False
             if not yes_all:
@@ -627,7 +620,7 @@ def clean(
             if yes_all or confirmed:
                 with open("skipped_cleanup.dat", "w") as f:
                     for ji in skipped_jobs:
-                        f.writelines(f" - {ji.db_id} - {ji.state}\n")
+                        f.writelines(f" - {ji.db_id} - {ji.state.value}\n")
 
     out_console.print(f"Deleted execution folders of {len(deleted)} Jobs")
 

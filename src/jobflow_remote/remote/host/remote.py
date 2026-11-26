@@ -272,17 +272,30 @@ class RemoteHost(BaseHost):
                     connection = None
 
     def close(self) -> bool:
+        """
+        Close the connection and those of all its gateways.
+
+        Returns
+        -------
+        bool
+            True if all the connections were closed without errors.
+        """
         connection = self.connection
         all_closed = True
-        while connection:
+        # the gateway can also be a string (a ProxyCommand), that does not
+        # need to be closed.
+        while isinstance(connection, fabric.Connection):
             try:
-                if isinstance(connection, fabric.Connection):
-                    connection.close()
-                    connection = connection.gateway
-                else:
-                    connection = None
+                connection.close()
             except Exception:
                 all_closed = False
+                logger.debug(
+                    f"Error while closing the connection to {connection.host}",
+                    exc_info=True,
+                )
+            # move to the gateway even if closing failed, otherwise the loop
+            # would never end.
+            connection = connection.gateway
         return all_closed
 
     @property

@@ -1156,6 +1156,9 @@ class JobController:
         When rerunning a Job in a SUBMITTED or RUNNING state the system also
         tries to cancel the process in the worker.
         Rerunning a FAILED Job also lead to change of state in its children.
+        With `force`, the descendants are set back to WAITING whatever their
+        state: for those in a SUBMITTED or RUNNING state the system also tries
+        to cancel the process in the worker.
         The full list of modified Jobs is returned.
 
         Parameters
@@ -1197,7 +1200,16 @@ class JobController:
             filter=lock_filter,
             break_lock=break_lock,
             sort=sort,
-            projection=["uuid", "index", "db_id", "state", "worker", "run_dir"],
+            projection=[
+                "uuid",
+                "index",
+                "db_id",
+                "state",
+                "worker",
+                "run_dir",
+                # required to cancel the process in the queue
+                "remote.process_id",
+            ],
             sleep=sleep,
             max_wait=wait,
             get_locked_doc=True,
@@ -1366,6 +1378,8 @@ class JobController:
                                 "state",
                                 "worker",
                                 "run_dir",
+                                # required to cancel the process in the queue
+                                "remote.process_id",
                             ],
                             sleep=sleep,
                             max_wait=wait,
@@ -1401,8 +1415,16 @@ class JobController:
 
                 # Here all the descendants are locked and could be set to WAITING.
                 # Set the new state for all of them.
+                # Share the hosts, in case several processes have to be cancelled
+                # on the same worker.
+                stack.enter_context(SharedHosts(self.project))
                 for child_lock in children_locks:
                     child_doc = child_lock.locked_document
+                    # with force, a descendant can be in any state. Try
+                    # cancelling its process in the queue, if any.
+                    self._try_cancel_queue_process(
+                        child_doc, context=f" while rerunning Job {job_id}"
+                    )
                     child_doc_update = get_reset_job_base_dict()
                     child_doc_update["state"] = JobState.WAITING.value
                     if child_doc["state"] != JobState.WAITING.value:
@@ -1443,7 +1465,8 @@ class JobController:
         ----------
         doc
             The dict of the JobDoc associated to the Job to rerun.
-            Just the "uuid", "index", "state" values are required.
+            Just the "uuid", "index", "state", "worker" and "remote.process_id"
+            values are required.
         delete_files
             Delete all the files in the worker folder of the rerun Job.
 
@@ -1452,15 +1475,8 @@ class JobController:
         dict
             Updates to be set on the Job upon lock release.
         """
-        if doc["state"] in [JobState.SUBMITTED.value, JobState.RUNNING.value]:
-            # try cancelling the job submitted to the remote queue
-            try:
-                self._cancel_queue_process(doc)
-            except Exception:
-                logger.warning(
-                    f"Failed cancelling the process for Job {doc['uuid']} {doc['index']}",
-                    exc_info=True,
-                )
+        # try cancelling the job submitted to the remote queue, if any
+        self._try_cancel_queue_process(doc)
 
         job_doc_update = get_reset_job_base_dict()
         job_doc_update["state"] = JobState.READY.value
@@ -2131,22 +2147,8 @@ class JobController:
             # lock_job_flow already checks that the locked document is not none, both for job and flow.
             job_doc = job_lock.locked_document
 
-            job_state = JobState(job_doc["state"])
-            if job_state in [JobState.SUBMITTED, JobState.RUNNING]:
-                # try cancelling the job submitted to the remote queue
-                try:
-                    self._cancel_queue_process(job_doc)
-                except Exception:
-                    logger.warning(
-                        f"Failed cancelling the process for Job {job_doc['uuid']} {job_doc['index']}",
-                        exc_info=True,
-                    )
-            elif job_state in [JobState.BATCH_SUBMITTED, JobState.BATCH_RUNNING]:
-                logger.warning(
-                    f"The job {job_doc['uuid']} {job_doc['index']} will be set to the STOPPED state, "
-                    f"but it was in the {job_state.value} state so it cannot be cancelled from "
-                    "execution on the worker."
-                )
+            # try cancelling the job submitted to the remote queue, if any
+            self._try_cancel_queue_process(job_doc)
             job_id = job_doc["uuid"]
             job_index = job_doc["index"]
             updated_states = {job_id: {job_index: JobState.USER_STOPPED}}
@@ -2454,7 +2456,9 @@ class JobController:
                 raise ValueError(f"No Flow document matching criteria {flow_filter}")
             flow_doc = FlowDoc.model_validate(flow_lock.locked_document)
             if flow_doc.state not in [FlowState.STOPPED, FlowState.PAUSED]:
-                raise ValueError(f"Cannot resume a Flow in state {flow_doc.state}")
+                raise ValueError(
+                    f"Cannot resume a Flow in state {flow_doc.state.value}"
+                )
             # loop over the STOPPED, USER_STOPPED and PAUSED jobs.
             # In principle there should be no ambiguity since in all the cases the Flow should be
             # locked. Still do not assume that at the end all the Jobs will not be stopped.
@@ -3135,7 +3139,10 @@ class JobController:
         delete_output
             If True also delete the associated output in the JobStore.
         delete_files
-            If True also delete the files on the worker.
+            If True also delete the files on the worker. The files are deleted
+            after the Flows and their Jobs. A failure to delete them, e.g.
+            because the worker cannot be reached, is logged and does not stop
+            the deletion of the Flows.
         cancel_processes
             If True will attempt to delete the processes for SUBMITTED and RUNNING jobs.
             Failure to cancel will not stop the deletion of the Flow.
@@ -3206,7 +3213,10 @@ class JobController:
         delete_output
             If True also delete the associated output in the JobStore.
         delete_files
-            If True also delete the files on the worker.
+            If True also delete the files on the worker. The files are deleted
+            after the Flow and its Jobs. A failure to delete them, e.g. because
+            the worker cannot be reached, is logged and does not stop the
+            deletion of the Flow.
         cancel_processes
             If True will attempt to delete the processes for SUBMITTED and RUNNING jobs.
             Failure to cancel will not stop the deletion of the Flow.
@@ -3227,51 +3237,56 @@ class JobController:
         sleep = None
         if wait:
             sleep = 10
-        # TODO locking the Flow prevents deleting it while one if its Jobs is
-        # completing, and thus avoids that Jobs are dynamically created while
-        # the Flow is being deleted.
-        # To avoid any sort of concurrent action it may be necessary to lock all the
-        # Jobs of the Flow. Consider doing this in the future.
-        with self.lock_flow(
-            filter={"uuid": flow_id},
-            sleep=sleep,
-            max_wait=wait,
-            get_locked_doc=True,
-            break_lock=break_lock,
-        ) as flow_lock:
-            if not flow_lock.locked_document:
-                if flow_lock.unavailable_document:
-                    raise FlowLockedError.from_flow_doc(flow_lock.unavailable_document)
-                return False
-            flow = flow_lock.locked_document
+        jobs_info: list[JobInfo] = []
+        # Share the hosts between the cancellation of the processes and the
+        # deletion of the files.
+        with SharedHosts(self.project):
+            # TODO locking the Flow prevents deleting it while one if its Jobs is
+            # completing, and thus avoids that Jobs are dynamically created while
+            # the Flow is being deleted.
+            # To avoid any sort of concurrent action it may be necessary to lock all the
+            # Jobs of the Flow. Consider doing this in the future.
+            with self.lock_flow(
+                filter={"uuid": flow_id},
+                sleep=sleep,
+                max_wait=wait,
+                get_locked_doc=True,
+                break_lock=break_lock,
+            ) as flow_lock:
+                if not flow_lock.locked_document:
+                    if flow_lock.unavailable_document:
+                        raise FlowLockedError.from_flow_doc(
+                            flow_lock.unavailable_document
+                        )
+                    return False
+                flow = flow_lock.locked_document
 
-            job_ids = flow["jobs"]
-            if delete_output:
-                jobstore = self.jobstore
-                if jobstore_name := flow.get("jobstore"):
-                    jobstore = self.optional_jobstores[jobstore_name]
-                jobstore.remove_docs({"uuid": {"$in": job_ids}})
-            if delete_files or cancel_processes:
-                jobs_info = self.get_jobs_info(flow_ids=[flow_id])
+                job_ids = flow["jobs"]
+                if delete_files or cancel_processes:
+                    jobs_info = self.get_jobs_info(flow_ids=[flow_id])
+                if delete_output:
+                    jobstore = self.jobstore
+                    if jobstore_name := flow.get("jobstore"):
+                        jobstore = self.optional_jobstores[jobstore_name]
+                    jobstore.remove_docs({"uuid": {"$in": job_ids}})
                 if cancel_processes:
                     for ji in jobs_info:
-                        if ji.state in [JobState.SUBMITTED, JobState.RUNNING]:
-                            # try cancelling the job submitted to the remote queue
-                            try:
-                                self._cancel_queue_process(ji.model_dump(mode="python"))
-                            except Exception:
-                                logger.warning(
-                                    f"Failed cancelling the process for Job {ji.uuid} {ji.index} while deleting Flow {flow_id}",
-                                    exc_info=True,
-                                )
-                # delete files after cancelling the queue job
-                if delete_files:
-                    self.safe_delete_files(jobs_info)
+                        # try cancelling the job submitted to the remote queue, if any
+                        self._try_cancel_queue_process(
+                            ji.model_dump(mode="python"),
+                            context=f" while deleting Flow {flow_id}",
+                        )
 
-            self.jobs.delete_many({"uuid": {"$in": job_ids}})
+                self.jobs.delete_many({"uuid": {"$in": job_ids}})
 
-            # Flow is deleted by the lock release
-            flow_lock.delete_on_release = True
+                # Flow is deleted by the lock release
+                flow_lock.delete_on_release = True
+
+            # Delete the files last, after cancelling the queue processes and
+            # once the Flow and its Jobs are deleted: a worker that cannot be
+            # reached does not stop the deletion. Failures are logged.
+            if delete_files:
+                self.safe_delete_files(jobs_info)
         return True
 
     def unlock_jobs(
@@ -3351,10 +3366,18 @@ class JobController:
         Checks that the folder to be deleted contains the jfremote_in.json
         file to avoid mistakenly deleting other folders.
 
+        The deletion is attempted for each Job independently: an error while
+        deleting the files of a Job is logged, and the files of the other Jobs
+        are still deleted. If the connection to a worker cannot be established,
+        the files of all the Jobs on that worker are not deleted, without
+        trying to connect again for each of them. The folder of each Job whose
+        files could not be deleted is logged.
+
         Parameters
         ----------
         jobs_info
-            A list of JobInfo whose files should be deleted.
+            A list of JobInfo, or of dictionaries with at least the "run_dir"
+            and "worker" keys, whose files should be deleted.
 
         Returns
         -------
@@ -3362,20 +3385,50 @@ class JobController:
             The list of JobInfo whose files have been actually deleted.
         """
         deleted = []
+        # the workers whose host could not be connected
+        unreachable_workers: set[str] = set()
         with SharedHosts(self.project) as shared_hosts:
             for job_info in jobs_info:
                 if isinstance(job_info, JobInfo):
                     run_dir = job_info.run_dir
                     worker = job_info.worker
+                    db_id = job_info.db_id
                 else:
                     run_dir = job_info["run_dir"]
                     worker = job_info["worker"]
-                if run_dir:
+                    db_id = job_info.get("db_id")
+                if not run_dir:
+                    continue
+                job_desc = f"Job {db_id}" if db_id else "Job"
+                if worker in unreachable_workers:
+                    logger.warning(
+                        f"The files of {job_desc} in {run_dir} were not deleted: "
+                        f"the worker '{worker}' could not be reached."
+                    )
+                    continue
+                try:
                     host = shared_hosts.get_host(worker)
+                except Exception as exc:
+                    # the message of the connection error is explicit enough:
+                    # do not log the traceback
+                    unreachable_workers.add(worker)
+                    logger.warning(
+                        f"The files of {job_desc} in {run_dir} were not deleted: "
+                        f"{exc}. The files of the other Jobs on the worker "
+                        f"'{worker}' will not be deleted either."
+                    )
+                    continue
+                try:
                     if safe_remove_job_files(
                         host=host, run_dir=run_dir, raise_on_error=False
                     ):
                         deleted.append(job_info)
+                except Exception:
+                    logger.warning(
+                        f"The files of {job_desc} in {run_dir} on the worker "
+                        f"'{worker}' were not deleted.",
+                        exc_info=True,
+                    )
         return deleted
 
     def unlock_flows(
@@ -5397,6 +5450,52 @@ class JobController:
             {"nodes": uuid}, {"$set": {"updated_on": datetime.now(timezone.utc)}}
         )
 
+    def _try_cancel_queue_process(self, job_doc: dict, context: str = "") -> bool:
+        """
+        Try to cancel the process of a Job in the remote queue, if it has one.
+
+        Only Jobs in the SUBMITTED and RUNNING states have a process in the
+        queue that can be cancelled. Jobs in the BATCH_SUBMITTED and
+        BATCH_RUNNING states run inside a batch process that cannot be
+        cancelled for a single Job: a warning is logged. Nothing is done for
+        the other states. A failure to cancel is logged and not raised, so that
+        the calling action can proceed.
+
+        Parameters
+        ----------
+        job_doc
+            The dict of the JobDoc. Requires the "uuid", "index" and "state"
+            values and, for the SUBMITTED and RUNNING states, "worker" and
+            "remote.process_id".
+        context
+            Text appended to the logged messages, e.g. to describe the action
+            being performed.
+
+        Returns
+        -------
+        bool
+            True if the process in the queue has been cancelled.
+        """
+        job_state = JobState(job_doc["state"])
+        job_desc = f"Job {job_doc['uuid']} {job_doc['index']}"
+        if job_state in (JobState.BATCH_SUBMITTED, JobState.BATCH_RUNNING):
+            logger.warning(
+                f"{job_desc} is in the {job_state.value} state, so it cannot be "
+                f"cancelled from execution on the worker{context}."
+            )
+            return False
+        if job_state not in (JobState.SUBMITTED, JobState.RUNNING):
+            return False
+        try:
+            self._cancel_queue_process(job_doc)
+        except Exception:
+            logger.warning(
+                f"Failed cancelling the process for {job_desc}{context}",
+                exc_info=True,
+            )
+            return False
+        return True
+
     def _cancel_queue_process(self, job_doc: dict) -> None:
         """
         Cancel the process in the remote queue.
@@ -5779,6 +5878,7 @@ class JobController:
         delete_files: bool = False,
         wait: int | None = None,
         break_lock: bool = False,
+        cancel_processes: bool = True,
     ) -> str:
         """
         Delete a single job from the queue store and optionally from the job store.
@@ -5797,11 +5897,18 @@ class JobController:
         delete_output : bool, default False
             If True, also delete the job output from the JobStore.
         delete_files
-            If True also delete the files on the worker.
+            If True also delete the files on the worker. The files are deleted
+            after the Job. A failure to delete them, e.g. because the worker
+            cannot be reached, is logged and does not stop the deletion of
+            the Job.
         wait
             In case the Flow or Job is locked, wait this time (in seconds) for the lock to be released.
         break_lock
             Forcibly break the lock on locked documents.
+        cancel_processes
+            If True will attempt to cancel the process in the queue of a
+            SUBMITTED or RUNNING Job. Failure to cancel will not stop the
+            deletion of the Job.
 
         Returns
         -------
@@ -5812,101 +5919,121 @@ class JobController:
         job_lock_kwargs = dict(projection=projection_job_info)
         if not delete_files:
             job_lock_kwargs = dict(
-                projection=["uuid", "index", "db_id", "state", "job"]
+                projection=[
+                    "uuid",
+                    "index",
+                    "db_id",
+                    "state",
+                    "job",
+                    # required to cancel the process in the queue
+                    "worker",
+                    "remote.process_id",
+                ]
             )
         # avoid deleting jobs in batch states. It would require additional
         # specific handling and it is an unlikely use case.
-        with self.lock_job_flow(
-            job_id=job_id,
-            db_id=db_id,
-            job_index=job_index,
-            acceptable_states=DELETABLE_STATES,
-            wait=wait,
-            break_lock=break_lock,
-            job_lock_kwargs=job_lock_kwargs,
-        ) as (job_lock, flow_lock):
-            # lock_job_flow already checks that the locked document is not none, both for job and flow
-            job_doc = job_lock.locked_document
+        # Share the hosts between the cancellation of the process and the
+        # deletion of the files.
+        with SharedHosts(self.project):
+            with self.lock_job_flow(
+                job_id=job_id,
+                db_id=db_id,
+                job_index=job_index,
+                acceptable_states=DELETABLE_STATES,
+                wait=wait,
+                break_lock=break_lock,
+                job_lock_kwargs=job_lock_kwargs,
+            ) as (job_lock, flow_lock):
+                # lock_job_flow already checks that the locked document is not none, both for job and flow
+                job_doc = job_lock.locked_document
 
-            # Update FlowDoc
-            flow_doc = FlowDoc.model_validate(flow_lock.locked_document)
-            job_uuid, job_index = job_doc["uuid"], job_doc["index"]
+                # Update FlowDoc
+                flow_doc = FlowDoc.model_validate(flow_lock.locked_document)
+                job_uuid, job_index = job_doc["uuid"], job_doc["index"]
 
-            if len(flow_doc.ids) == 1:
-                raise RuntimeError(
-                    "It is not possible to delete the only Job of the Flow. Delete the entire Flow."
-                )
-
-            # Remove job from ids list
-            flow_doc.ids = [
-                id_tuple
-                for id_tuple in flow_doc.ids
-                if id_tuple[1] != job_uuid or id_tuple[2] != job_index
-            ]
-
-            # Remove job from jobs list and as parent of other jobs if no job
-            # with that id remains in the flow
-            if not any(job_uuid == id_tuple[1] for id_tuple in flow_doc.ids):
-                # Here a flow_doc.jobs.remove could be enough. But due to a previous
-                # bug the list of jobs could contain the same uuid more than once.
-                # Make sure to remove all the instances.
-                flow_doc.jobs = [jid for jid in flow_doc.jobs if jid != job_uuid]
-
-                for parent_dict in flow_doc.parents.values():
-                    for index_list in parent_dict.values():
-                        if job_uuid in index_list:
-                            index_list.remove(job_uuid)
-
-            # Remove job from parents
-            flow_doc.parents[job_uuid].pop(str(job_index), None)
-            # if all the jobs with a given uuid have been removed, also remove
-            # the entry from the parents
-            if not flow_doc.parents[job_uuid]:
-                flow_doc.parents.pop(job_uuid, None)
-
-            # Update flow state if necessary
-            updated_states: dict[str, dict[int, Any]] = {
-                job_uuid: {job_index: None}
-            }  # None indicates job removal
-            self.update_flow_state(
-                flow_uuid=flow_doc.uuid, updated_states=updated_states
-            )
-
-            # Prepare flow update
-            flow_update = {
-                "$set": {
-                    "jobs": flow_doc.jobs,
-                    "ids": flow_doc.ids,
-                    "parents": flow_doc.parents,
-                }
-            }
-            flow_update["$set"]["updated_on"] = datetime.now(timezone.utc)
-
-            # Set flow update to be applied on lock release
-            flow_lock.update_on_release = flow_update
-
-            job_lock.delete_on_release = True
-
-            # Optionally delete from jobstore
-            if delete_output:
-                jobstore = self.jobstore
-                if self.optional_jobstores:
-                    store_name = self.get_flow_store(job_doc["job"]["hosts"][-1])
-                    if store_name:
-                        jobstore = self.optional_jobstores[store_name]
-                try:
-                    jobstore.remove_docs({"uuid": job_uuid, "index": job_index})
-                except Exception:
-                    warnings.warn(
-                        f"Error while delete the output of job {job_uuid} {job_index}",
-                        stacklevel=2,
+                if len(flow_doc.ids) == 1:
+                    raise RuntimeError(
+                        "It is not possible to delete the only Job of the Flow. Delete the entire Flow."
                     )
 
-            if delete_files:
-                job_info = JobInfo.from_query_output(job_doc)
-                self.safe_delete_files([job_info])
+                # Remove job from ids list
+                flow_doc.ids = [
+                    id_tuple
+                    for id_tuple in flow_doc.ids
+                    if id_tuple[1] != job_uuid or id_tuple[2] != job_index
+                ]
 
-            return job_doc["db_id"]
+                # Remove job from jobs list and as parent of other jobs if no job
+                # with that id remains in the flow
+                if not any(job_uuid == id_tuple[1] for id_tuple in flow_doc.ids):
+                    # Here a flow_doc.jobs.remove could be enough. But due to a previous
+                    # bug the list of jobs could contain the same uuid more than once.
+                    # Make sure to remove all the instances.
+                    flow_doc.jobs = [jid for jid in flow_doc.jobs if jid != job_uuid]
+
+                    for parent_dict in flow_doc.parents.values():
+                        for index_list in parent_dict.values():
+                            if job_uuid in index_list:
+                                index_list.remove(job_uuid)
+
+                # Remove job from parents
+                flow_doc.parents[job_uuid].pop(str(job_index), None)
+                # if all the jobs with a given uuid have been removed, also remove
+                # the entry from the parents
+                if not flow_doc.parents[job_uuid]:
+                    flow_doc.parents.pop(job_uuid, None)
+
+                # Update flow state if necessary
+                updated_states: dict[str, dict[int, Any]] = {
+                    job_uuid: {job_index: None}
+                }  # None indicates job removal
+                self.update_flow_state(
+                    flow_uuid=flow_doc.uuid, updated_states=updated_states
+                )
+
+                # Prepare flow update
+                flow_update = {
+                    "$set": {
+                        "jobs": flow_doc.jobs,
+                        "ids": flow_doc.ids,
+                        "parents": flow_doc.parents,
+                    }
+                }
+                flow_update["$set"]["updated_on"] = datetime.now(timezone.utc)
+
+                # Set flow update to be applied on lock release
+                flow_lock.update_on_release = flow_update
+
+                job_lock.delete_on_release = True
+
+                if cancel_processes:
+                    # try cancelling the job submitted to the remote queue, if any
+                    self._try_cancel_queue_process(
+                        job_doc, context=" while deleting the Job"
+                    )
+
+                # Optionally delete from jobstore
+                if delete_output:
+                    jobstore = self.jobstore
+                    if self.optional_jobstores:
+                        store_name = self.get_flow_store(job_doc["job"]["hosts"][-1])
+                        if store_name:
+                            jobstore = self.optional_jobstores[store_name]
+                    try:
+                        jobstore.remove_docs({"uuid": job_uuid, "index": job_index})
+                    except Exception:
+                        warnings.warn(
+                            f"Error while delete the output of job {job_uuid} {job_index}",
+                            stacklevel=2,
+                        )
+
+            # Delete the files last, after cancelling the queue process and
+            # once the Job is deleted: a worker that cannot be reached does not
+            # stop the deletion. Failures are logged.
+            if delete_files:
+                self.safe_delete_files([JobInfo.from_query_output(job_doc)])
+
+        return job_doc["db_id"]
 
     def delete_jobs(
         self,
@@ -5925,6 +6052,7 @@ class JobController:
         delete_output: bool = False,
         delete_files: bool = False,
         max_limit: int = 10,
+        cancel_processes: bool = True,
     ) -> list[str]:
         """
         Delete selected jobs from the queue store and optionally from the job store.
@@ -5969,10 +6097,17 @@ class JobController:
         delete_output : bool, default False
             If True, also delete the Job output from the JobStore.
         delete_files
-            If True also delete the files on the worker.
+            If True also delete the files on the worker. The files of each Job
+            are deleted after the Job. A failure to delete them, e.g. because
+            the worker cannot be reached, is logged and does not stop the
+            deletion of the Jobs.
         max_limit
             The Jobs will be deleted only if the total number is lower than the
             specified limit. 0 means no limit.
+        cancel_processes
+            If True will attempt to cancel the processes in the queue of the
+            SUBMITTED and RUNNING Jobs. Failure to cancel will not stop the
+            deletion of the Jobs.
 
         Returns
         -------
@@ -5999,6 +6134,7 @@ class JobController:
                 delete_output=delete_output,
                 delete_files=delete_files,
                 max_limit=max_limit,
+                cancel_processes=cancel_processes,
             )
 
     def get_job_output(

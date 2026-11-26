@@ -260,4 +260,26 @@ class BaseHost(MSONable):
 
 
 class HostError(Exception):
-    pass
+    """Base class for the errors related to a host."""
+
+
+class HostConnectionError(HostError):
+    """
+    Error raised when the connection to the host of a worker cannot be
+    established.
+
+    When raised by ``SharedHosts.get_host``, the original error raised while
+    connecting is chained as the ``__cause__`` of this exception.
+    """
+
+    def __init__(self, message: str, worker: str | None = None) -> None:
+        """
+        Parameters
+        ----------
+        message
+            The error message.
+        worker
+            The name of the worker whose host could not be connected.
+        """
+        super().__init__(message)
+        self.worker = worker

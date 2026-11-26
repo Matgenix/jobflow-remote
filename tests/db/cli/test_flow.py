@@ -531,3 +531,7 @@ def test_clean(
         cli_input="y\ny",
     )
     assert os.path.isfile("skipped_cleanup.dat")
+    with open("skipped_cleanup.dat") as f:
+        skipped_content = f.read()
+    # the states are written by their value, not as JobState.RUNNING
+    assert " - RUNNING\n" in skipped_content

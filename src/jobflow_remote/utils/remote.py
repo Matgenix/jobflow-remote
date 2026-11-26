@@ -1,9 +1,17 @@
 from __future__ import annotations
 
 import logging
+import socket
 from typing import TYPE_CHECKING, ClassVar
 
+from paramiko.ssh_exception import (
+    AuthenticationException,
+    NoValidConnectionsError,
+    SSHException,
+)
+
 from jobflow_remote import ConfigManager
+from jobflow_remote.remote.host.base import HostConnectionError, HostError
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -86,6 +94,12 @@ class SharedHosts:
         -------
         BaseHost
             The shared host.
+
+        Raises
+        ------
+        HostConnectionError
+            If the connection to the host cannot be established. The original
+            error is its ``__cause__``.
         """
         if worker not in self._project.workers:
             raise ValueError(f"Worker {worker} not defined in {self._project.name}")
@@ -93,7 +107,17 @@ class SharedHosts:
             return self._hosts[worker]
 
         host = self._project.workers[worker].get_host()
-        host.connect()
+        try:
+            host.connect()
+        except HostError:
+            # already a host error with a meaningful message
+            raise
+        except Exception as exc:
+            raise HostConnectionError(
+                f"Could not connect to the worker '{worker}': "
+                f"{_describe_connection_error(exc)} ({type(exc).__name__}: {exc})",
+                worker=worker,
+            ) from exc
         self._hosts[worker] = host
         return host
 
@@ -124,6 +148,37 @@ class SharedHosts:
             self.close_hosts()
             # Release the project so the next operation rebinds a fresh one
             self.__class__._project = None
+
+
+def _describe_connection_error(exc: Exception) -> str:
+    """
+    Describe in words the reason of an error raised while connecting to a host.
+
+    Parameters
+    ----------
+    exc
+        The error raised while connecting.
+
+    Returns
+    -------
+    str
+        A short description of the reason of the failure.
+    """
+    # NoValidConnectionsError is raised by paramiko when the connection is
+    # refused or the host is unreachable on all its addresses.
+    if isinstance(exc, NoValidConnectionsError):
+        return "the host refused the connection or could not be reached"
+    if isinstance(exc, TimeoutError):
+        return "the host did not answer in time"
+    if isinstance(exc, ConnectionRefusedError):
+        return "the host refused the connection"
+    if isinstance(exc, socket.gaierror):
+        return "the host name could not be resolved"
+    if isinstance(exc, AuthenticationException):
+        return "the authentication failed"
+    if isinstance(exc, SSHException):
+        return "the SSH connection failed"
+    return "the connection failed"
 
 
 class UnsafeDeletionError(Exception):
