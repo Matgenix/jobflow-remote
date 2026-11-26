@@ -1437,22 +1437,21 @@ List the flows and the jobs:
     jf -p aws_ht flow list
     jf -p aws_ht job list
 
-Each job has its own folder. ``jf -p aws_ht job info <db_id>`` shows its
-path as ``run_dir``, for example ``/jf_work/29/14/2b/<uuid>_1``. The job runs
-in this folder on EFS, at ``/mnt/jfr/runs/jf_work/29/14/2b/<uuid>_1``. Only
-the containers mount EFS. When the job ends, the whole folder is copied to
-the S3 bucket, at ``s3://<bucket>/runs/jf_work/29/14/2b/<uuid>_1``. The
-bucket keeps it, also after the stack is deleted, unless you set
-``RunFilesRetentionDays`` in Part 1, Step 3. While a job runs, its
-folder in S3 has only ``jfremote_in.json`` and a ``jfremote_out.json`` with
-the start time. The other files are copied when the job ends. If AWS stops the
-container before the job ends, they stay on EFS (see the warning at the top of
-this guide).
+Each job has its own folder:
 
-Where you submit the flows (your computer, the EC2 instance, or a Perlmutter
-login node), list the jobs of a flow with their state, their folders on EFS
-and in S3, and the files of each folder in S3. Use the flow id from
-``jf -p aws_ht flow list``.
+* While the job runs, the folder is on EFS under ``/mnt/jfr/runs/``. Only
+  the containers mount EFS.
+* When the job ends, the whole folder is copied to S3 under
+  ``s3://<bucket>/runs/``. Until then, S3 has only ``jfremote_in.json`` and
+  ``jfremote_out.json`` of the job.
+* If AWS stops the container before the job ends, the files stay on EFS
+  (see the warning at the top of this guide).
+* The bucket keeps the folders after the stack is deleted, unless you set
+  ``RunFilesRetentionDays`` in Part 1, Step 3.
+
+List the jobs of a flow, their folders on EFS and in S3, and the files in
+S3. Run it where you submit the flows. Replace ``<flow_id>`` with the flow id
+from ``jf -p aws_ht flow list``.
 
 .. code-block:: bash
 
