@@ -1220,9 +1220,7 @@ first. This guide does not cover it.
                [Install]
                WantedBy=multi-user.target
                EOF
-               sudo systemctl daemon-reload
-               sudo systemctl enable --now jfr-runner
-               systemctl is-active jfr-runner
+               sudo systemctl daemon-reload && sudo systemctl enable --now jfr-runner && systemctl is-active jfr-runner
 
            The last command prints ``active``. To follow the log of the ``Runner``,
            run ``journalctl -u jfr-runner -f`` and stop it with ``Ctrl+C``.
