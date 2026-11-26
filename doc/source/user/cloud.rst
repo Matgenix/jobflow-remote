@@ -1726,6 +1726,62 @@ Batch jobs of the flow that are still queued or running:
 
     jf -p aws_ht flow delete -did <db_id>
 
+Start over
+----------
+
+To delete all jobs and their folders, for example after a test, do the steps
+below when no jobs are queued or running. ``jf -p aws_ht admin reset`` does not
+cancel AWS Batch jobs. The project file and the AWS stack stay.
+
+1. Stop the ``Runner``, empty the database, and start the ``Runner`` again.
+   Answer ``y`` when ``admin reset`` asks.
+
+   .. tab-set::
+       :sync-group: runner
+
+       .. tab-item:: Your computer
+           :sync: computer
+
+           .. code-block:: bash
+
+               jf -p aws_ht runner shutdown --wait
+               jf -p aws_ht admin reset
+               jf -p aws_ht runner start
+               jf -p aws_ht runner status
+
+       .. tab-item:: EC2 instance
+           :sync: ec2
+
+           Run ``jfr_shell`` in CloudShell, then on the instance:
+
+           .. code-block:: bash
+
+               sudo systemctl stop jfr-runner && jf -p aws_ht admin reset && sudo systemctl start jfr-runner && systemctl is-active jfr-runner
+
+           The last command prints ``active``.
+
+       .. tab-item:: NERSC Perlmutter
+           :sync: nersc
+
+           On a Perlmutter login node:
+
+           .. code-block:: bash
+
+               module load conda && conda activate jfr && scancel --me --name=jfr_runner && jf -p aws_ht admin reset && scrontab "$HOME/jfr_runner.scron"
+
+           ``scrontab`` enables the entry again, and the ``Runner`` starts within
+           10 minutes.
+
+2. In CloudShell, delete the job folders in the S3 bucket:
+
+   .. code-block:: bash
+
+       BUCKET=$(aws cloudformation describe-stacks --stack-name jfr-lab \
+         --query "Stacks[0].Outputs[?OutputKey=='S3BucketName'].OutputValue" --output text)
+       aws s3 rm "s3://$BUCKET/runs/" --recursive
+
+   The job folders on EFS stay. New jobs get new folders.
+
 .. _cloud_update:
 
 Updating jobflow-remote
