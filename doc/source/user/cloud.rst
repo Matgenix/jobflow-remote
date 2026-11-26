@@ -1421,8 +1421,8 @@ instance, and the jobs that share an instance slow each other down.
 AWS Batch starts EC2 instances when jobs are queued and terminates them a few
 minutes after the queues are empty.
 
-Inspecting and stopping jobs
-============================
+Checking and managing jobs
+==========================
 
 Run the ``jf`` commands of this section where you submit the flows: on your
 computer, on the EC2 instance, or on a Perlmutter login node (Part 2). Run
@@ -1446,6 +1446,9 @@ environment first:
 
             source ~/.venvs/jfr/bin/activate
 
+Check the progress of flows
+---------------------------
+
 List the flows and the jobs:
 
 .. code-block:: bash
@@ -1463,8 +1466,10 @@ with your value.
       <label>DB id <input data-jfr="db_id" size="8"></label>
     </div>
 
-Job files
----------
+See the files of a job
+----------------------
+
+Each job has its own folder:
 
 * While a job runs, its folder is on EFS under ``/mnt/jfr/runs/``. Only the
   containers mount EFS.
@@ -1506,6 +1511,9 @@ the current folder:
 
     jf -p aws_ht job files ls <db_id>
     jf -p aws_ht job files get <db_id> jfremote_out.json
+
+Download a job folder to your computer
+--------------------------------------
 
 Download the whole folder of the job to your computer. The block first asks
 where to save it. Press Enter to save it in ``~/Downloads``, or paste another
@@ -1621,61 +1629,8 @@ folder. The last line prints where the folder is.
 Download the folders you need before step 3 of :ref:`cloud_cleanup`, which
 deletes the access keys of the ``jfr-lab`` profile.
 
-Jobs that wait
---------------
-
-A job stays ``SUBMITTED`` until its container starts. The first job on a
-new instance waits a few minutes while the instance starts and pulls the
-image. In CloudShell, see the AWS Batch state of the jobs in the CPU queue.
-For the GPU queue, replace ``CpuJobQueueArn`` with ``GpuJobQueueArn``.
-
-.. code-block:: bash
-
-    QUEUE=$(aws cloudformation describe-stacks --stack-name jfr-lab --query "Stacks[0].Outputs[?OutputKey=='CpuJobQueueArn'].OutputValue" --output text)
-    for s in RUNNABLE STARTING RUNNING SUCCEEDED FAILED; do aws batch list-jobs --job-queue "$QUEUE" --job-status "$s" --query 'jobSummaryList[].[jobName,status,statusReason]' --output text; done
-
-``RUNNABLE`` means the job waits for an instance. If a job stays
-``RUNNABLE`` for more than 15 minutes, read in CloudShell why AWS could
-not start an instance:
-
-.. code-block:: bash
-
-    aws autoscaling describe-scaling-activities --max-items 5 --query 'Activities[].[StartTime,AutoScalingGroupName,StatusCode,StatusMessage]' --output table
-
-The list covers every Auto Scaling group in the region, including the ones
-that AWS Batch creates for the queues. A message about the vCPU limit means
-that the quota is too low. A message that the instance type is not eligible
-for Free Tier means that the account is on the Free plan. Both are explained
-in Part 1, Step 2. If a job asks for more vCPUs or memory than any instance
-of the queue has, the queue cancels it after 30 minutes in ``RUNNABLE``, and
-the job fails.
-
-Retry, stop, and delete
------------------------
-
-A job goes to ``REMOTE_ERROR`` when an action of the ``Runner`` on AWS fails
-several times in a row, for example while AWS Batch or S3 does not answer.
-Run the failed action of the job again:
-
-.. code-block:: bash
-
-    jf -p aws_ht job retry <db_id>
-
-Stop the job if it is queued or running:
-
-.. code-block:: bash
-
-    jf -p aws_ht job stop <db_id>
-
-Delete the flow of the job, with all its jobs. This also cancels the AWS
-Batch jobs of the flow that are still queued or running:
-
-.. code-block:: bash
-
-    jf -p aws_ht flow delete -did <db_id>
-
-Logs
-----
+Read the logs of a job
+----------------------
 
 The containers write stdout and stderr to CloudWatch Logs, not to
 ``queue.out`` and ``queue.err``. For this reason ``jf job queue-out`` does not
@@ -1703,6 +1658,59 @@ is no shell access to the container.
 
        aws batch describe-jobs --jobs "<batch_job_id>" --query 'jobs[0].[status,statusReason]' --output text
        for S in $(aws batch describe-jobs --jobs "<batch_job_id>" --query 'jobs[0].[attempts[].container.logStreamName, container.logStreamName][]' --output text | tr '\t' '\n' | grep -v None | sort -u); do aws logs tail /aws/batch/jfr-lab --log-stream-names "$S" --since 7d; done
+
+Find out why a job waits
+------------------------
+
+A job stays ``SUBMITTED`` until its container starts. The first job on a
+new instance waits a few minutes while the instance starts and pulls the
+image. In CloudShell, see the AWS Batch state of the jobs in the CPU queue.
+For the GPU queue, replace ``CpuJobQueueArn`` with ``GpuJobQueueArn``.
+
+.. code-block:: bash
+
+    QUEUE=$(aws cloudformation describe-stacks --stack-name jfr-lab --query "Stacks[0].Outputs[?OutputKey=='CpuJobQueueArn'].OutputValue" --output text)
+    for s in RUNNABLE STARTING RUNNING SUCCEEDED FAILED; do aws batch list-jobs --job-queue "$QUEUE" --job-status "$s" --query 'jobSummaryList[].[jobName,status,statusReason]' --output text; done
+
+``RUNNABLE`` means the job waits for an instance. If a job stays
+``RUNNABLE`` for more than 15 minutes, read in CloudShell why AWS could
+not start an instance:
+
+.. code-block:: bash
+
+    aws autoscaling describe-scaling-activities --max-items 5 --query 'Activities[].[StartTime,AutoScalingGroupName,StatusCode,StatusMessage]' --output table
+
+The list covers every Auto Scaling group in the region, including the ones
+that AWS Batch creates for the queues. A message about the vCPU limit means
+that the quota is too low. A message that the instance type is not eligible
+for Free Tier means that the account is on the Free plan. Both are explained
+in Part 1, Step 2. If a job asks for more vCPUs or memory than any instance
+of the queue has, the queue cancels it after 30 minutes in ``RUNNABLE``, and
+the job fails.
+
+Retry, stop, or delete jobs
+---------------------------
+
+A job goes to ``REMOTE_ERROR`` when an action of the ``Runner`` on AWS fails
+several times in a row, for example while AWS Batch or S3 does not answer.
+Run the failed action of the job again:
+
+.. code-block:: bash
+
+    jf -p aws_ht job retry <db_id>
+
+Stop the job if it is queued or running:
+
+.. code-block:: bash
+
+    jf -p aws_ht job stop <db_id>
+
+Delete the flow of the job, with all its jobs. This also cancels the AWS
+Batch jobs of the flow that are still queued or running:
+
+.. code-block:: bash
+
+    jf -p aws_ht flow delete -did <db_id>
 
 .. Boxes with data-jfr fill the placeholders <name> in the code blocks of
    this page. Without JavaScript, the placeholders stay as they are.
