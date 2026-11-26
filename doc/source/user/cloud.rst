@@ -1780,7 +1780,18 @@ cancel AWS Batch jobs. The project file and the AWS stack stay.
          --query "Stacks[0].Outputs[?OutputKey=='S3BucketName'].OutputValue" --output text)
        aws s3 rm "s3://$BUCKET/runs/" --recursive
 
-   The job folders on EFS stay. New jobs get new folders.
+3. In CloudShell, delete the job folders on EFS. Only the containers mount
+   EFS, so the command runs one AWS Batch job on the CPU queue that deletes
+   ``/mnt/jfr/runs``.
+
+   .. code-block:: bash
+
+       OUT() { aws cloudformation describe-stacks --stack-name jfr-lab --query "Stacks[0].Outputs[?OutputKey=='$1'].OutputValue" --output text; }
+       CLEAN_JOB=$(aws batch submit-job --job-name delete-job-folders --job-queue "$(OUT CpuJobQueueArn)" --job-definition "$(OUT CpuJobDefinitionArn)" --container-overrides '{"command": ["sh", "-c", "rm -rf /mnt/jfr/runs"]}' --query jobId --output text)
+       STATUS=SUBMITTED
+       while [ "$STATUS" != SUCCEEDED ] && [ "$STATUS" != FAILED ]; do sleep 20; STATUS=$(aws batch describe-jobs --jobs "$CLEAN_JOB" --query 'jobs[0].status' --output text); echo "$STATUS"; done
+
+   The last line is ``SUCCEEDED`` when the folders are deleted.
 
 .. _cloud_update:
 
