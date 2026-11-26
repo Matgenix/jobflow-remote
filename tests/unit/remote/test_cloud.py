@@ -173,6 +173,38 @@ def aws_cloud_env(monkeypatch):
 
 
 class TestS3Storage:
+    def test_uri_under_prefix(self, s3_env):
+        storage, _s3, bucket = s3_env
+        uri = f"s3://{bucket}/proj/a/b.txt"
+        assert storage.get_uri(uri) == uri
+        with pytest.raises(ValueError, match="outside storage prefix"):
+            storage.get_uri(f"s3://{bucket}/projX/a.txt")
+
+    def test_pagination_and_sibling_prefixes(self, s3_env, tmp_path, monkeypatch):
+        storage, _s3, _bucket = s3_env
+        for name in ("a.txt", "b.txt", "sub/c.txt"):
+            storage.put(io.BytesIO(b"x"), f"/d/{name}")
+        storage.put(io.BytesIO(b"keep"), "/dd/keep.txt")
+        client = storage._get_client()
+        orig = client.list_objects_v2
+        monkeypatch.setattr(
+            client, "list_objects_v2", lambda **kw: orig(**{**kw, "MaxKeys": 1})
+        )
+        assert sorted(storage.listdir("/d")) == ["a.txt", "b.txt", "sub"]
+        storage.download_dir("/d", tmp_path / "dl")
+        assert (tmp_path / "dl" / "sub" / "c.txt").is_file()
+        assert not (tmp_path / "dl" / "keep.txt").exists()
+        assert not storage.exists("/d/a")
+        assert storage.rmtree("/d", raise_on_error=True)
+        assert storage.listdir("/d") == []
+        assert storage.exists("/dd/keep.txt")
+
+    def test_download_dir_refuses_traversal(self, s3_env, tmp_path):
+        storage, s3, bucket = s3_env
+        s3.put_object(Bucket=bucket, Key="proj/d/../../evil.txt", Body=b"x")
+        with pytest.raises(StorageError, match="outside target directory"):
+            storage.download_dir("/d", tmp_path / "dl")
+
     def test_put_get_exists_listdir_remove_and_rmtree(self, s3_env, tmp_path):
         storage, _s3, bucket = s3_env
         assert storage.test() is None
@@ -190,13 +222,11 @@ class TestS3Storage:
         storage.get("/jf_work/ab/cd/jfremote_in.json", dl_file)
         assert dl_file.read_text() == '{"hello": "world"}'
 
-        # Missing object raises FileNotFoundError and leaves no empty file behind
-        missing_dl = tmp_path / "missing.json"
+        # Missing object raises FileNotFoundError
         with pytest.raises(FileNotFoundError):
-            storage.get("/jf_work/ab/cd/nope.json", missing_dl)
-        assert not missing_dl.exists()
+            storage.get("/jf_work/ab/cd/nope.json", tmp_path / "missing.json")
 
-        # Directory upload (skipping broken symlink and skip_files) & download roundtrip
+        # upload_dir skips broken links and skip_files, and download_dir gets the files back
         src_dir = tmp_path / "src_dir"
         (src_dir / "sub").mkdir(parents=True)
         (src_dir / "a.txt").write_text("alpha")
@@ -229,7 +259,7 @@ class TestS3Storage:
     def test_path_validation_prefix_guards_and_equality(self, s3_env):
         storage, _s3, _bucket = s3_env
 
-        with pytest.raises(ValueError, match="non-empty"):
+        with pytest.raises(ValueError, match="must not be empty"):
             S3Storage(bucket="")
         with pytest.raises(ValueError, match=r"\.\."):
             S3Storage(bucket="b1", prefix="a/../b")
@@ -240,10 +270,10 @@ class TestS3Storage:
 
         # Refuse deleting bucket root, storage prefix root, or ancestor prefix
         s_root = S3Storage(bucket="b1")
-        with pytest.raises(ValueError, match="prefix root"):
+        with pytest.raises(ValueError, match="root of the storage"):
             s_root.rmtree("/", raise_on_error=True)
         assert s_root.rmtree("/", raise_on_error=False) is False
-        with pytest.raises(ValueError, match="prefix root"):
+        with pytest.raises(ValueError, match="root of the storage"):
             storage.rmtree("/", raise_on_error=True)
 
         nested = S3Storage(bucket="jf-test-bucket", prefix="proj/sub")
@@ -265,7 +295,7 @@ class TestS3Storage:
         from botocore.exceptions import ClientError
 
         storage, _s3, _bucket = s3_env
-        client, _ = storage._get_client_and_errors()
+        client = storage._get_client()
 
         # Non-404 head_object error wrapped in StorageError
         monkeypatch.setattr(
@@ -307,7 +337,7 @@ class TestS3Storage:
             return real_import(name, *args, **kwargs)
 
         monkeypatch.setattr(builtins, "__import__", fake_import)
-        with pytest.raises(ImportError, match="jobflow-remote\\[aws\\]"):
+        with pytest.raises(ImportError, match="pip install boto3"):
             fresh.put(io.BytesIO(b"x"), "k")
 
 
@@ -338,10 +368,10 @@ class TestCloudWorkerAndQueueManager:
         assert worker.get_scheduler_io().endpoint_url == "http://batch.local"
         assert worker.get_storage().endpoint_url == "http://minio.local"
         assert worker.get_storage().get_run_cloud_options() == [
-            "--region",
-            "us-east-2",
-            "--endpoint-url",
-            "http://minio.local",
+            "--storage-option",
+            "region_name=us-east-2",
+            "--storage-option",
+            "endpoint_url=http://minio.local",
         ]
         assert isinstance(worker.get_transfer_backend(), S3Storage)
         with pytest.raises(NotImplementedError):
@@ -371,7 +401,7 @@ class TestCloudWorkerAndQueueManager:
                 storage_kwargs={"bucket": "my-bucket"},
                 scheduler_type=SlurmIO().as_dict(),
             )
-        with pytest.raises(ValueError, match="non-empty"):
+        with pytest.raises(ValueError, match="must not be empty"):
             CloudWorker(storage_kwargs={"bucket": "   "})
         with pytest.raises(
             ValueError, match="Invalid scheduler_kwargs or storage_kwargs"
@@ -385,8 +415,12 @@ class TestCloudWorkerAndQueueManager:
                     work_dir=Path("/scratch/w"),
                 ),
             )
-        with pytest.raises(ValueError, match="Unknown cloud API scheduler"):
+        with pytest.raises(ValueError, match="Unknown cloud scheduler"):
             CloudWorker(storage_kwargs={"bucket": "my-bucket"}, scheduler_type="slurm")
+        with pytest.raises(ValueError, match="absolute POSIX path"):
+            CloudWorker(storage_kwargs={"bucket": "my-bucket"}, work_dir="jf_work")
+        with pytest.raises(ValueError, match="Unknown storage type"):
+            CloudWorker(storage_kwargs={"bucket": "my-bucket"}, storage_type="gcs")
 
     def test_cloud_queue_manager_with_moto(self, aws_cloud_env):
         from qtoolkit.core.data_objects import QCloudResources
@@ -419,8 +453,12 @@ class TestCloudWorkerAndQueueManager:
         # Empty dict options convert to QCloudResources; explicit job_name preserved
         sub_empty = qm.submit(commands="echo hi", options={}, job_name="empty opts")
         assert sub_empty.status == SubmissionStatus.SUCCESSFUL
+        assert (
+            batch.describe_jobs(jobs=[sub_empty.job_id])["jobs"][0]["jobName"]
+            == "empty_opts"
+        )
 
-        # A non-empty dict of backend options still gets the job name
+        # A non-empty dict of scheduler options still gets the job name
         sub_dict = qm.submit(
             commands="echo hi", options={"tags": {"k": "v"}}, job_name="dict opts"
         )
@@ -435,18 +473,22 @@ class TestCloudWorkerAndQueueManager:
             ).job_name
             == "keep-me"
         )
-        with pytest.raises(TypeError, match="options must be"):
+        # A job with resources={} stores an empty QResources, which means no options
+        assert qm.prepare_options(QResources(), job_name="x").scheduler_kwargs == {}
+        with pytest.raises(TypeError, match="does not support QResources"):
+            qm.prepare_options(options=QResources(processes=4))
+        with pytest.raises(TypeError, match="does not support int"):
             qm.prepare_options(options=123)
 
         jobs = qm.get_jobs_list(jobs=[sub.job_id])
         assert [j.job_id for j in jobs] == [sub.job_id]
-        with pytest.raises(TypeError, match="str/bytes"):
+        with pytest.raises(TypeError, match="not a str"):
             qm.get_jobs_list(jobs=sub.job_id)
 
         cancel_res = qm.cancel(sub.job_id, reason="stop")
         assert cancel_res.status == CancelStatus.SUCCESSFUL
 
-    def test_job_doc_accepts_qcloudresources_and_preserves_plain_dicts(self):
+    def test_job_doc_resources(self):
         pytest.importorskip("qtoolkit.io.api")
         from qtoolkit.core.data_objects import QCloudResources
 
@@ -466,7 +508,14 @@ class TestCloudWorkerAndQueueManager:
         assert isinstance(parsed.resources, QCloudResources)
         assert parsed.as_db_dict()["resources"]["vcpus"] == 4
 
-        for plain in ({}, {"gpus": 1}, {"time_limit": 3600}, {"memory": 4096}):
+        # Dicts matching the QResources fields become QResources, as for HPC
+        # workers. Other dicts, e.g. AWS Batch options, stay dicts.
+        for plain, expected in (
+            ({}, QResources()),
+            ({"processes": 4}, QResources(processes=4)),
+            ({"tags": {"k": "v"}}, {"tags": {"k": "v"}}),
+            ({"memory": 4096}, {"memory": 4096}),
+        ):
             plain_doc = get_initial_job_doc_dict(
                 job=jf_job,
                 parents=[],
@@ -477,24 +526,26 @@ class TestCloudWorkerAndQueueManager:
                 priority=0,
             )
             validated = JobDoc.model_validate(plain_doc)
-            assert isinstance(validated.resources, dict)
-            assert validated.resources == plain
-            assert "@class" not in validated.as_db_dict()["resources"]
+            assert validated.resources == expected
+            assert JobDoc.model_validate(validated.as_db_dict()).resources == expected
 
 
 class TestRunCloudJobAndCli:
     def test_run_cloud_job_no_double_upload(self, s3_env, tmp_path, monkeypatch):
         storage, _s3, _bucket = s3_env
         uri = _upload_job_in(storage, write_nested_file(41), "/jf_work/test_job")
-        # Plant stale files from an aborted prior attempt
+        # Output files of an earlier attempt are in the storage.
         storage.put(io.BytesIO(b"stale"), "/jf_work/test_job/jfremote_out.json")
         storage.put(io.BytesIO(b"stale"), "/jf_work/test_job/remote_job_data.json")
 
-        uploaded_keys: list[str] = []
+        skipped_files: list[str] = []
         orig_upload_dir = S3Storage.upload_dir
 
         def spy_upload_dir(self, local_dir, remote_dir, skip_files=None):
-            uploaded_keys.extend(sorted(skip_files or ()))
+            skipped_files.extend(sorted(skip_files or ()))
+            # The outputs are uploaded before the rest of the folder.
+            storage.get("/jf_work/test_job/jfremote_out.json", tmp_path / "first.json")
+            assert "response" in loadfn(tmp_path / "first.json")
             return orig_upload_dir(self, local_dir, remote_dir, skip_files=skip_files)
 
         monkeypatch.setattr(S3Storage, "upload_dir", spy_upload_dir)
@@ -502,12 +553,12 @@ class TestRunCloudJobAndCli:
         run_cloud_job(
             storage_uri=uri,
             local_dir=tmp_path / "container_run",
-            region_name="us-east-1",
+            storage_options={"region_name": "us-east-1"},
         )
 
-        # Critical files were passed via skip_files so upload_dir does not re-upload them
-        assert "jfremote_out.json" in uploaded_keys
-        assert "remote_job_data.json" in uploaded_keys
+        # The output files are in skip_files, so upload_dir does not upload them again.
+        assert "jfremote_out.json" in skipped_files
+        assert "remote_job_data.json" in skipped_files
         assert storage.exists("/jf_work/test_job/nested_subdir/marker.txt")
 
         out_local = tmp_path / "out.json"
@@ -524,7 +575,7 @@ class TestRunCloudJobAndCli:
         run_cloud_job(
             storage_uri=uri,
             local_dir=tmp_path / "fail_run",
-            region_name="us-east-1",
+            storage_options={"region_name": "us-east-1"},
         )
         out_local = tmp_path / "fail_out.json"
         storage.get("/jf_work/fail_job/jfremote_out.json", out_local)
@@ -551,11 +602,49 @@ class TestRunCloudJobAndCli:
         run.run_cloud_job(
             storage_uri=uri,
             local_dir=tmp_path / "killed_run",
-            region_name="us-east-1",
+            storage_options={"region_name": "us-east-1"},
         )
         assert len(outputs_seen) == 1
         assert "start_time" in outputs_seen[0]
         assert "response" not in outputs_seen[0]
+
+    def test_run_cloud_job_downloads_only_input(self, s3_env, tmp_path, monkeypatch):
+        # Files of an earlier attempt in the storage are not downloaded.
+        from jobflow_remote.jobs import run
+
+        storage, _s3, _bucket = s3_env
+        uri = _upload_job_in(storage, add(1, 2), "/jf_work/stale_job")
+        storage.put(io.BytesIO(b"{}"), "/jf_work/stale_job/remote_job_data.json")
+        storage.put(io.BytesIO(b"old"), "/jf_work/stale_job/OUTCAR")
+        files_seen = []
+        monkeypatch.setattr(
+            run,
+            "run_remote_job",
+            lambda run_dir: files_seen.extend(p.name for p in run_dir.iterdir()),
+        )
+        run.run_cloud_job(
+            storage_uri=uri,
+            local_dir=tmp_path / "stale_run",
+            storage_options={"region_name": "us-east-1"},
+        )
+        assert sorted(files_seen) == ["jfremote_in.json", "jfremote_out.json"]
+
+    def test_run_cloud_job_first_previous_attempt(self, s3_env, tmp_path):
+        storage, _s3, _bucket = s3_env
+        uri = _upload_job_in(storage, add(1, 2), "/jf_work/first_retry")
+        run_dir = tmp_path / "c" / "proj" / "jf_work" / "first_retry"
+        run_dir.mkdir(parents=True)
+        (run_dir / "OUTCAR").write_text("old")
+        run_cloud_job(
+            uri, local_dir=tmp_path / "c", storage_options={"region_name": "us-east-1"}
+        )
+        assert (run_dir / "previous_attempt_1" / "OUTCAR").read_text() == "old"
+
+    def test_post_run_keeps_job_exit_code(self):
+        lines = CloudQueueManager(scheduler_io=None).build_command_lines(
+            "run_job", post_run="echo post"
+        )
+        assert lines == ["run_job", "_jf_rc=$?", "echo post", "exit $_jf_rc"]
 
     def test_run_cloud_job_keeps_folder_and_previous_attempt(self, s3_env, tmp_path):
         # The job folder is kept after the job. Files of an earlier attempt are
@@ -568,7 +657,9 @@ class TestRunCloudJobAndCli:
         (run_dir / "previous_attempt_2").mkdir()
 
         run_cloud_job(
-            storage_uri=uri, local_dir=tmp_path / "container", region_name="us-east-1"
+            storage_uri=uri,
+            local_dir=tmp_path / "container",
+            storage_options={"region_name": "us-east-1"},
         )
 
         assert (run_dir / "jfremote_out.json").is_file()
@@ -576,6 +667,7 @@ class TestRunCloudJobAndCli:
             run_dir / "previous_attempt_3" / "OUTCAR"
         ).read_text() == "killed attempt"
         assert not (run_dir / "OUTCAR").exists()
+        assert (run_dir / "previous_attempt_2").is_dir()
         assert storage.exists("/jf_work/retry_job/previous_attempt_3/OUTCAR")
 
     def test_run_cloud_job_reads_folder_of_earlier_job(self, s3_env, tmp_path):
@@ -584,20 +676,28 @@ class TestRunCloudJobAndCli:
         storage, _s3, _bucket = s3_env
         shared = tmp_path / "shared"
         uri = _upload_job_in(storage, write_file("hello"), "/jf_work/first")
-        run_cloud_job(storage_uri=uri, local_dir=shared, region_name="us-east-1")
+        run_cloud_job(
+            storage_uri=uri,
+            local_dir=shared,
+            storage_options={"region_name": "us-east-1"},
+        )
 
         first_dir = shared / "proj" / "jf_work" / "first"
         uri = _upload_job_in(storage, read_file(str(first_dir)), "/jf_work/second")
-        run_cloud_job(storage_uri=uri, local_dir=shared, region_name="us-east-1")
+        run_cloud_job(
+            storage_uri=uri,
+            local_dir=shared,
+            storage_options={"region_name": "us-east-1"},
+        )
 
         data_local = tmp_path / "second_data.json"
         storage.get("/jf_work/second/remote_job_data.json", data_local)
         assert loadfn(data_local)[0].output == "hello"
 
     def test_run_cloud_job_rejects_invalid_uris(self, tmp_path):
-        with pytest.raises(ValueError, match="Unsupported cloud storage URI"):
+        with pytest.raises(ValueError, match="Unknown storage scheme"):
             run_cloud_job("gs://bucket/path", local_dir=tmp_path)
-        with pytest.raises(ValueError, match="non-root key prefix"):
+        with pytest.raises(ValueError, match="no job folder"):
             run_cloud_job("s3://bucket/.", local_dir=tmp_path)
         with pytest.raises(ValueError, match=r"\.\."):
             run_cloud_job("s3://bucket/a/../b", local_dir=tmp_path)
@@ -617,10 +717,10 @@ class TestRunCloudJobAndCli:
                 "execution",
                 "run-cloud",
                 uri,
-                "--work-dir",
+                "--local-dir",
                 str(tmp_path / "cli_run"),
-                "--region",
-                "us-east-1",
+                "--storage-option",
+                "region_name=us-east-1",
             ],
         )
         assert result.exit_code == 0, result.output
@@ -697,6 +797,14 @@ class TestRunnerAndControllerCloudIntegration:
 
         # 2. submit() builds per-job run-cloud command and submits to AWS Batch
         doc["state"] = JobState.UPLOADED.value
+        submitted_options = []
+        orig_submit = CloudQueueManager.submit
+
+        def spy_submit(self, *args, **kwargs):
+            submitted_options.append(kwargs["options"])
+            return orig_submit(self, *args, **kwargs)
+
+        monkeypatch.setattr(CloudQueueManager, "submit", spy_submit)
         submit_lock = make_lock(doc)
         runner.submit(submit_lock)
         assert (
@@ -709,8 +817,10 @@ class TestRunnerAndControllerCloudIntegration:
         cmd_str = raw["container"]["command"][-1]
         expected_uri = storage.get_uri(doc["run_dir"])
         assert expected_uri in cmd_str
-        assert f"--work-dir {worker.container_work_dir}" in cmd_str
-        assert "--region us-east-1" in cmd_str
+        assert f"--local-dir {worker.container_work_dir}" in cmd_str
+        assert "--storage-option region_name=us-east-1" in cmd_str
+        # A job without resources uses the resources of the worker.
+        assert submitted_options == [QCloudResources(vcpus=2, memory=4096)]
 
         # Non-cloud worker rejects QCloudResources with clear TypeError
         bad_local_doc = dict(
@@ -726,8 +836,10 @@ class TestRunnerAndControllerCloudIntegration:
         run_cloud_job(
             storage_uri=expected_uri,
             local_dir=tmp_path / "exec_dir",
-            region_name="us-east-1",
+            storage_options={"region_name": "us-east-1"},
         )
+        storage.get(f"{doc['run_dir']}/jfremote_out.json", tmp_path / "o.json")
+        assert loadfn(tmp_path / "o.json")["error"] is None
 
         # 4. download() skips queue.out/queue.err on cloud workers
         fetched_paths: list[str] = []
@@ -768,6 +880,15 @@ class TestRunnerAndControllerCloudIntegration:
         )
         fake_qm.get_jobs_list.assert_called_once_with(jobs=[process_id], user=None)
 
+        # A RUNNING job of a non-cloud worker is not moved back to SUBMITTED.
+        local_doc = dict(doc, worker="local_w")
+        runner.queue_managers["local_w"] = fake_qm
+        local_lock = make_lock(local_doc)
+        runner.job_controller.get_jobs.return_value = [local_doc]
+        runner.job_controller.lock_job_for_update.return_value = local_lock
+        runner.check_run_status()
+        assert local_lock.update_on_release is None
+
         runner.cleanup()
 
     def test_job_controller_cancel_delete_and_resources_on_cloud(
@@ -803,7 +924,7 @@ class TestRunnerAndControllerCloudIntegration:
                 {"worker": "cloud_w", "remote": {"process_id": sub.job_id}}
             )
 
-        # safe_delete_files on CloudWorker uses S3Storage via SharedHosts.get_transfer
+        # safe_delete_files on a CloudWorker deletes the files through SharedHosts.get_transfer_backend.
         storage = worker.get_storage()
         storage.put(io.BytesIO(b"{}"), "/jf_work/del_me/jfremote_in.json")
         deleted = jc.safe_delete_files(
@@ -846,7 +967,7 @@ class TestRunnerAndControllerCloudIntegration:
         )
         assert err_res is not None
 
-        # Invalid AWS Batch QCloudResources (time_limit < 60) caught by check_convert_resources
+        # Invalid AWS Batch QCloudResources (time_limit < 60) caught by check_convert_qresources
         err_limit, _ = check_worker(
             worker.model_copy(
                 update={"resources": QCloudResources(time_limit=10).as_dict()}

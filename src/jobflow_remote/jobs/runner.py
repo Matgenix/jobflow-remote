@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from monty.json import MontyDecoder
-from qtoolkit.core.data_objects import QState, SubmissionStatus
+from qtoolkit.core.data_objects import QResources, QState, SubmissionStatus
 from qtoolkit.io import BaseSchedulerIO
 from rich.prompt import Confirm
 
@@ -124,8 +124,8 @@ class Runner:
         self.project_name = self.project.name
         self.job_controller: JobController = JobController.from_project(self.project)
         self.workers: dict[str, WorkerBase] = self.project.workers
-        # Build the dictionary of hosts (and cloud storages for cloud workers).
-        # If two hosts/storages match, use the same instance.
+        # Build the dictionaries of hosts and of cloud storages. The key is the
+        # worker name. Workers with equal hosts or storages share one instance.
         self.hosts: dict[str, BaseHost] = {}
         self.storages: dict[str, BaseCloudStorage] = {}
         for wname, w in self.workers.items():
@@ -247,16 +247,21 @@ class Runner:
         return host
 
     def get_storage(self, worker_name: str) -> BaseCloudStorage:
-        """Get the cloud storage associated with a cloud worker."""
+        """Get the cloud storage of a cloud worker."""
         storage = self.storages[worker_name]
         if not storage.is_connected:
             storage.connect()
         return storage
 
+    def get_transfer_backend(self, worker_name: str) -> BaseHost | BaseCloudStorage:
+        """Get the storage of a cloud worker or the host of any other worker."""
+        if self.get_worker(worker_name).is_cloud:
+            return self.get_storage(worker_name)
+        return self.get_host(worker_name)
+
     def get_queue_manager(self, worker_name: str) -> QueueManager | CloudQueueManager:
         """
-        Get an instance of the queue manager associated to a worker, based on its host
-        or cloud storage backend.
+        Get the queue manager of a worker (CloudQueueManager for cloud workers).
 
         Parameters
         ----------
@@ -719,11 +724,7 @@ class Runner:
         job_dict = doc["job"]
 
         worker = self.get_worker(doc["worker"])
-        transfer: BaseHost | BaseCloudStorage = (
-            self.get_storage(doc["worker"])
-            if worker.is_cloud
-            else self.get_host(doc["worker"])
-        )
+        backend = self.get_transfer_backend(doc["worker"])
 
         # if prerun_cleanup is specified (job was likely rerun) delete the folder before
         # reuploading the data
@@ -731,7 +732,7 @@ class Runner:
         if doc.get("remote", {}).get("prerun_cleanup", False):
             try:
                 deleted = safe_remove_job_files(
-                    host=transfer, run_dir=run_dir, raise_on_error=True
+                    host=backend, run_dir=run_dir, raise_on_error=True
                 )
                 # Log as debug. If deletion failed because of an error it will raise.
                 not_string = "" if deleted else "not "
@@ -768,13 +769,15 @@ class Runner:
         # will be None don't add the serializer, at this stage the default_orjson
         # serializer could undergo refactoring and this could break deserialization
         # of older FWs. It is set in the FireTask at runtime.
+        # A cloud job runs in a container folder that differs from remote_path,
+        # so the remote store uses paths relative to the job folder.
         remote_store = get_remote_store(
             store=store,
             work_dir="." if worker.is_cloud else remote_path,
             config_dict=self.project.remote_jobstore,
         )
 
-        created = transfer.mkdir(remote_path)
+        created = backend.mkdir(remote_path)
         if not created:
             err_msg = (
                 f"Could not create remote directory {remote_path} for db_id {db_id}"
@@ -785,7 +788,7 @@ class Runner:
         serialized_input = get_remote_in_file(job_dict, remote_store, doc)
 
         path_file = Path(remote_path, IN_FILENAME)
-        transfer.put(serialized_input, str(path_file))
+        backend.put(serialized_input, str(path_file))
 
         set_output = {
             "$set": {
@@ -831,7 +834,7 @@ class Runner:
                     "execution",
                     "run-cloud",
                     storage_uri,
-                    "--work-dir",
+                    "--local-dir",
                     worker.container_work_dir,
                     *storage.get_run_cloud_options(),
                 ]
@@ -841,6 +844,8 @@ class Runner:
             script_commands = [execution_cmd.format(remote_path)]
 
         queue_manager = self.get_queue_manager(worker_name)
+        qout_fpath = remote_path / OUT_FNAME
+        qerr_fpath = remote_path / ERR_FNAME
 
         exec_config = doc["exec_config"]
         if isinstance(exec_config, str):
@@ -855,14 +860,11 @@ class Runner:
 
         if worker_name in self.batch_workers:
             if not isinstance(queue_manager, QueueManager):
-                raise TypeError("Batch workers require a host-backed QueueManager.")
+                raise TypeError("Batch workers need a QueueManager.")
             resources: dict = {}
 
             set_name_out(
-                resources,
-                job_dict["name"],
-                out_fpath=remote_path / OUT_FNAME,
-                err_fpath=remote_path / ERR_FNAME,
+                resources, job_dict["name"], out_fpath=qout_fpath, err_fpath=qerr_fpath
             )
             shell_manager = queue_manager.get_shell_manager()
             shell_manager.write_submission_script(
@@ -885,13 +887,10 @@ class Runner:
                 }
             }
         else:
-            # decode in case it contains a QResources / QCloudResources.
-            # Preserve an explicit empty dict {} on the job doc instead of falling back.
-            raw_res = (
-                doc["resources"] if doc["resources"] is not None else worker.resources
-            )
+            # decode in case it contains a QResources or QCloudResources.
             resources = (
-                MontyDecoder().process_decoded(raw_res) if raw_res is not None else {}
+                MontyDecoder().process_decoded(doc["resources"] or worker.resources)
+                or {}
             )
 
             pre_run = worker.pre_run or ""
@@ -912,8 +911,6 @@ class Runner:
                     job_name=job_dict["name"],
                 )
             else:
-                from qtoolkit.core.data_objects import QResources
-
                 if not isinstance(resources, dict | QResources):
                     raise TypeError(
                         f"Non-cloud worker '{worker_name}' does not support "
@@ -922,8 +919,8 @@ class Runner:
                 set_name_out(
                     resources,
                     job_dict["name"],
-                    out_fpath=remote_path / OUT_FNAME,
-                    err_fpath=remote_path / ERR_FNAME,
+                    out_fpath=qout_fpath,
+                    err_fpath=qerr_fpath,
                 )
                 submit_result = queue_manager.submit(
                     commands=script_commands,
@@ -980,11 +977,7 @@ class Runner:
         # from SUBMITTED/RUNNING to DOWNLOADED in case of local worker
         worker = self.get_worker(doc["worker"])
         if not worker.is_local:
-            transfer: BaseHost | BaseCloudStorage = (
-                self.get_storage(doc["worker"])
-                if worker.is_cloud
-                else self.get_host(doc["worker"])
-            )
+            backend = self.get_transfer_backend(doc["worker"])
             store = self.get_jobstore(job_dict["hosts"][-1])
 
             remote_path = doc["run_dir"]
@@ -1004,7 +997,7 @@ class Runner:
                 remote_file_path = str(Path(remote_path, fname))
                 local_file_path = Path(local_path, fname)
                 try:
-                    transfer.get(remote_file_path, str(local_file_path))
+                    backend.get(remote_file_path, str(local_file_path))
                 except FileNotFoundError as exc:
                     # fabric may still create an empty local file even if the remote
                     # file does not exist. Remove it to avoid errors when checking
@@ -1020,8 +1013,8 @@ class Runner:
                     logger.warning(err_msg)
 
             # download the queue files first, so if an error is triggered
-            # afterwards they can be inserted in the DB. Cloud workers stream
-            # stdout/stderr to cloud logs instead of queue.out/queue.err files.
+            # afterwards they can be inserted in the DB. Cloud workers have no
+            # queue files. The cloud scheduler keeps stdout and stderr in its logs.
             if not worker.is_cloud:
                 for fn in ("queue.out", "queue.err"):
                     download_file(fn, mandatory=False)
@@ -1154,14 +1147,15 @@ class Runner:
                         f"remote job with id {remote_doc['process_id']} is running"
                     )
                 elif (
-                    qstate in (QState.QUEUED, QState.REQUEUED)
+                    worker.is_cloud
+                    and qstate == QState.QUEUED
                     and doc["state"] == JobState.RUNNING.value
                 ):
-                    # A running job can be requeued by the scheduler (e.g. cloud spot
-                    # preemption retry); return it to SUBMITTED while it waits to rerun.
+                    # The cloud scheduler queued the job again for a new attempt,
+                    # e.g. after a Spot reclaim on AWS Batch.
                     next_state = JobState.SUBMITTED
                     logger.debug(
-                        f"remote job with id {remote_doc['process_id']} returned to queued ({qstate.value})"
+                        f"remote job with id {remote_doc['process_id']} is queued again for a new attempt"
                     )
                 elif qstate in [None, QState.DONE, QState.FAILED]:
                     # if the worker is local go directly to DOWNLOADED, as files
@@ -1269,7 +1263,7 @@ class Runner:
             worker = self.get_worker(worker_name)
             queue_manager = self.get_queue_manager(worker_name)
             if not isinstance(queue_manager, QueueManager):
-                raise TypeError("Batch workers require a host-backed QueueManager.")
+                raise TypeError("Batch workers need a QueueManager.")
             # first check the processes that are running from the folder
             # and set them to running if needed
             running_jobs = self.batch_update_running_jobs(
@@ -1751,7 +1745,7 @@ class Runner:
                 storage.close()
             except Exception:
                 logger.exception(
-                    f"error while closing storage connection to worker {worker_name}"
+                    f"error while closing the storage of worker {worker_name}"
                 )
 
         try:

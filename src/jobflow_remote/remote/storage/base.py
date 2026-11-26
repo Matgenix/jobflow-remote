@@ -11,11 +11,23 @@ if TYPE_CHECKING:
 
 
 class StorageError(Exception):
-    """Exception raised for cloud object storage failures."""
+    """Exception raised for cloud storage failures."""
 
 
 class BaseCloudStorage(MSONable, abc.ABC):
-    """Base class for cloud object storage backends."""
+    """Base class for cloud storage.
+
+    The key of a storage class in ``cloud_storage_mapping`` is the scheme of its
+    URIs, for example ``s3``.
+    """
+
+    @classmethod
+    @abc.abstractmethod
+    def from_uri(cls, uri: str, **kwargs) -> tuple[BaseCloudStorage, str]:
+        """Return the storage of ``uri`` and the key of ``uri`` in it.
+
+        ``kwargs`` are passed to the storage class.
+        """
 
     @abc.abstractmethod
     def put(self, src: str | Path | io.BytesIO, dst: str | Path) -> None:
@@ -42,12 +54,12 @@ class BaseCloudStorage(MSONable, abc.ABC):
 
     @abc.abstractmethod
     def rmtree(self, path: str | Path, raise_on_error: bool = False) -> bool:
-        """Recursively delete all objects under prefix ``path``."""
+        """Delete all objects under ``path``. Return False on error, or raise if ``raise_on_error``."""
 
     def mkdir(
         self, directory: str | Path, recursive: bool = True, exist_ok: bool = True
     ) -> bool:
-        """No-op for flat object stores; prefixes are created on upload."""
+        """Return True. Cloud storage has no folders, so nothing is created."""
         return True
 
     @abc.abstractmethod
@@ -57,26 +69,27 @@ class BaseCloudStorage(MSONable, abc.ABC):
         remote_dir: str | Path,
         skip_files: set[str] | None = None,
     ) -> None:
-        """Recursively upload all files in ``local_dir`` to ``remote_dir``."""
+        """Upload all files in ``local_dir`` to ``remote_dir``, except the relative paths in ``skip_files``."""
 
     @abc.abstractmethod
     def download_dir(self, remote_dir: str | Path, local_dir: str | Path) -> None:
-        """Recursively download all objects under ``remote_dir`` into ``local_dir``."""
+        """Download all files under ``remote_dir`` into ``local_dir``."""
 
     @abc.abstractmethod
     def get_uri(self, path: str | Path) -> str:
         """Return the storage URI (e.g. ``s3://bucket/key``) for ``path``."""
 
     def get_run_cloud_options(self) -> list[str]:
-        """Return the ``jf execution run-cloud`` options that open this storage in the container.
+        """Return the ``--storage-option`` options of ``jf execution run-cloud`` for this storage.
 
-        ``jf execution run-cloud`` currently supports only S3 storage.
+        ``from_uri`` gets the values as strings. The options are visible in the
+        job description of the cloud scheduler, so they must not hold credentials.
         """
         return []
 
     @abc.abstractmethod
     def test(self) -> str | None:
-        """Verify access to the underlying storage. Return ``None`` if OK, else an error message."""
+        """Return ``None`` if the storage can be accessed, else an error message."""
 
     def connect(self) -> None:
         """Initialize the underlying client if needed."""

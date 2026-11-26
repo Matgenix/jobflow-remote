@@ -9,13 +9,21 @@ from typing import Any
 
 from jobflow_remote.remote.storage.base import BaseCloudStorage, StorageError
 
+try:
+    from boto3.exceptions import Boto3Error
+    from botocore.exceptions import BotoCoreError, ClientError
+
+    _BOTO_ERRORS: tuple[type[Exception], ...] = (Boto3Error, BotoCoreError, ClientError)
+except ModuleNotFoundError:
+    _BOTO_ERRORS = ()
+
 logger = logging.getLogger(__name__)
 
 _DELETE_BATCH_SIZE = 1000
 
 
-def _normalize_posix_rel(raw: str) -> str:
-    """Normalize a POSIX-style S3 key path, rejecting any ``..`` traversal."""
+def _normalize_key(raw: str) -> str:
+    """Return ``raw`` as an S3 key without empty or ``.`` parts. ``..`` is not allowed."""
     parts: list[str] = []
     for part in raw.replace("\\", "/").split("/"):
         if part == "..":
@@ -29,11 +37,11 @@ def parse_s3_uri(uri: str) -> tuple[str, str]:
     """Parse ``s3://<bucket>/<key>`` into ``(bucket, normalized_key)``."""
     if not uri.startswith("s3://"):
         raise ValueError(
-            f"Unsupported cloud storage URI '{uri}'. Expected 's3://<bucket>/<prefix>'."
+            f"Unsupported cloud storage URI '{uri}'. Expected 's3://<bucket>/<key>'."
         )
     parts = uri[5:].split("/", 1)
     bucket = parts[0].strip()
-    key = _normalize_posix_rel(parts[1] if len(parts) > 1 else "")
+    key = _normalize_key(parts[1] if len(parts) > 1 else "")
     return bucket, key
 
 
@@ -52,7 +60,7 @@ class S3Storage(BaseCloudStorage):
         Optional key prefix prepended to non-URI paths (``s3://`` URIs must
         already fall under this prefix).
     region_name
-        AWS region name (falls back to standard boto3 resolution if ``None``).
+        AWS region name (falls back to standard boto3 configuration if ``None``).
     profile_name
         AWS credentials profile name.
     endpoint_url
@@ -67,37 +75,37 @@ class S3Storage(BaseCloudStorage):
         profile_name: str | None = None,
         endpoint_url: str | None = None,
     ) -> None:
-        if not isinstance(bucket, str) or not bucket.strip():
-            raise ValueError("bucket must be a non-empty string.")
+        if not bucket.strip():
+            raise ValueError("bucket must not be empty.")
         self.bucket = bucket.strip()
-        self.prefix = _normalize_posix_rel(prefix)
+        self.prefix = _normalize_key(prefix)
         self.region_name = region_name
         self.profile_name = profile_name
         self.endpoint_url = endpoint_url
         self._client: Any = None
-        self._boto_errors: tuple[type[Exception], ...] | None = None
 
-    def _get_client_and_errors(self) -> tuple[Any, tuple[type[Exception], ...]]:
-        if self._client is None or self._boto_errors is None:
+    @classmethod
+    def from_uri(cls, uri: str, **kwargs) -> tuple[S3Storage, str]:
+        bucket, key = parse_s3_uri(uri)
+        # The key is the full key in the bucket, so the storage has no prefix.
+        return cls(bucket=bucket, prefix="", **kwargs), key
+
+    def _get_client(self) -> Any:
+        """Return the boto3 S3 client, created on the first call."""
+        if self._client is None:
             try:
                 import boto3
-                from boto3.exceptions import Boto3Error
-                from botocore.exceptions import BotoCoreError, ClientError
             except ModuleNotFoundError as exc:
-                msg = (
-                    "boto3 is required for S3Storage. "
-                    "Install it with 'pip install jobflow-remote[aws]'."
-                )
+                msg = "S3Storage needs boto3. Install it with 'pip install boto3'."
                 raise ImportError(msg) from exc
-
-            self._boto_errors = (ClientError, BotoCoreError, Boto3Error)
-            if self._client is None:
+            try:
                 session = boto3.Session(
-                    region_name=self.region_name,
-                    profile_name=self.profile_name,
+                    region_name=self.region_name, profile_name=self.profile_name
                 )
                 self._client = session.client("s3", endpoint_url=self.endpoint_url)
-        return self._client, self._boto_errors
+            except _BOTO_ERRORS as exc:
+                raise StorageError(f"Failed to create the S3 client: {exc}") from exc
+        return self._client
 
     def _to_key(self, path: str | Path) -> str:
         raw = str(path).replace("\\", "/")
@@ -117,7 +125,7 @@ class S3Storage(BaseCloudStorage):
                 )
             return uri_key
 
-        norm = _normalize_posix_rel(raw)
+        norm = _normalize_key(raw)
         if not norm:
             return self.prefix
         if self.prefix:
@@ -133,13 +141,13 @@ class S3Storage(BaseCloudStorage):
     def get_run_cloud_options(self) -> list[str]:
         options = []
         if self.region_name:
-            options += ["--region", self.region_name]
+            options += ["--storage-option", f"region_name={self.region_name}"]
         if self.endpoint_url:
-            options += ["--endpoint-url", self.endpoint_url]
+            options += ["--storage-option", f"endpoint_url={self.endpoint_url}"]
         return options
 
     def connect(self) -> None:
-        self._get_client_and_errors()
+        self._get_client()
 
     def close(self) -> bool:
         self._client = None
@@ -153,14 +161,14 @@ class S3Storage(BaseCloudStorage):
         key = self._to_key(dst)
         if not key:
             raise ValueError("Destination S3 key must not be empty.")
-        client, boto_errors = self._get_client_and_errors()
+        client = self._get_client()
         try:
             if isinstance(src, io.BytesIO):
                 src.seek(0)
                 client.upload_fileobj(src, self.bucket, key)
             else:
                 client.upload_file(str(src), self.bucket, key)
-        except boto_errors as exc:
+        except _BOTO_ERRORS as exc:
             raise StorageError(
                 f"Failed to upload to s3://{self.bucket}/{key}: {exc}"
             ) from exc
@@ -169,16 +177,12 @@ class S3Storage(BaseCloudStorage):
         key = self._to_key(src)
         if not key:
             raise ValueError("Source S3 key must not be empty.")
-        client, boto_errors = self._get_client_and_errors()
+        client = self._get_client()
         dst_path = Path(dst)
-        existed_before = dst_path.exists()
         try:
             dst_path.parent.mkdir(parents=True, exist_ok=True)
             client.download_file(self.bucket, key, str(dst_path))
-        except boto_errors as exc:
-            # download_file can create an empty file before raising; remove it if newly created.
-            if not existed_before and dst_path.is_file():
-                dst_path.unlink(missing_ok=True)
+        except _BOTO_ERRORS as exc:
             if _s3_error_code(exc) in {"404", "NoSuchKey", "NotFound"}:
                 raise FileNotFoundError(
                     f"S3 object s3://{self.bucket}/{key} does not exist."
@@ -189,12 +193,12 @@ class S3Storage(BaseCloudStorage):
 
     def exists(self, path: str | Path) -> bool:
         key = self._to_key(path)
-        client, boto_errors = self._get_client_and_errors()
+        client = self._get_client()
         try:
             if not key:
                 try:
                     client.head_bucket(Bucket=self.bucket)
-                except boto_errors as exc:
+                except _BOTO_ERRORS as exc:
                     if _s3_error_code(exc) in {"404", "NoSuchBucket", "NotFound"}:
                         return False
                     raise
@@ -202,7 +206,7 @@ class S3Storage(BaseCloudStorage):
 
             try:
                 client.head_object(Bucket=self.bucket, Key=key)
-            except boto_errors as exc:
+            except _BOTO_ERRORS as exc:
                 if _s3_error_code(exc) not in {"404", "NoSuchKey", "NotFound"}:
                     raise
             else:
@@ -211,8 +215,8 @@ class S3Storage(BaseCloudStorage):
             resp = client.list_objects_v2(
                 Bucket=self.bucket, Prefix=f"{key}/", MaxKeys=1
             )
-            return bool(resp.get("KeyCount", 0) > 0)
-        except boto_errors as exc:
+            return resp.get("KeyCount", 0) > 0
+        except _BOTO_ERRORS as exc:
             raise StorageError(
                 f"Failed to check s3://{self.bucket}/{key}: {exc}"
             ) from exc
@@ -220,7 +224,7 @@ class S3Storage(BaseCloudStorage):
     def listdir(self, path: str | Path) -> list[str]:
         key = self._to_key(path)
         prefix = f"{key}/" if key else ""
-        client, boto_errors = self._get_client_and_errors()
+        client = self._get_client()
         names: list[str] = []
         seen: set[str] = set()
         kwargs: dict[str, Any] = {
@@ -244,7 +248,7 @@ class S3Storage(BaseCloudStorage):
                 if not resp.get("IsTruncated"):
                     break
                 kwargs["ContinuationToken"] = resp["NextContinuationToken"]
-        except boto_errors as exc:
+        except _BOTO_ERRORS as exc:
             raise StorageError(
                 f"Failed to list s3://{self.bucket}/{prefix}: {exc}"
             ) from exc
@@ -254,33 +258,28 @@ class S3Storage(BaseCloudStorage):
         key = self._to_key(path)
         if not key:
             raise ValueError("S3 key to remove must not be empty.")
-        client, boto_errors = self._get_client_and_errors()
+        client = self._get_client()
         try:
             client.delete_object(Bucket=self.bucket, Key=key)
-        except boto_errors as exc:
+        except _BOTO_ERRORS as exc:
             raise StorageError(
                 f"Failed to delete s3://{self.bucket}/{key}: {exc}"
             ) from exc
 
     def rmtree(self, path: str | Path, raise_on_error: bool = False) -> bool:
         key = self._to_key(path)
-        if not key or (self.prefix and not key.startswith(f"{self.prefix}/")):
-            msg = "Refusing to recursively delete the S3 bucket or storage prefix root."
+        if key == self.prefix:
+            msg = "Cannot delete the root of the storage (the bucket or the storage prefix)."
             if raise_on_error:
                 raise ValueError(msg)
             logger.error(msg)
             return False
 
         prefix = f"{key}/"
-        client, boto_errors = self._get_client_and_errors()
+        client = self._get_client()
         keys_to_delete: list[dict[str, str]] = []
         kwargs: dict[str, Any] = {"Bucket": self.bucket, "Prefix": prefix}
         try:
-            exact = client.list_objects_v2(Bucket=self.bucket, Prefix=key, MaxKeys=1)
-            keys_to_delete.extend(
-                {"Key": key} for obj in exact.get("Contents", []) if obj["Key"] == key
-            )
-
             while True:
                 resp = client.list_objects_v2(**kwargs)
                 keys_to_delete.extend(
@@ -298,16 +297,16 @@ class S3Storage(BaseCloudStorage):
                 )
                 if del_resp.get("Errors"):
                     delete_errors.extend(del_resp["Errors"])
-        except boto_errors as exc:
+        except _BOTO_ERRORS as exc:
             if raise_on_error:
                 raise StorageError(
-                    f"Error deleting s3://{self.bucket}/{prefix}: {exc}"
+                    f"Failed to delete s3://{self.bucket}/{prefix}: {exc}"
                 ) from exc
-            logger.warning(f"Error deleting s3://{self.bucket}/{prefix}: {exc}")
+            logger.warning(f"Failed to delete s3://{self.bucket}/{prefix}: {exc}")
             return False
 
         if delete_errors:
-            msg = f"Errors deleting objects under s3://{self.bucket}/{prefix}: {delete_errors}"
+            msg = f"Failed to delete some objects under s3://{self.bucket}/{prefix}: {delete_errors}"
             if raise_on_error:
                 raise StorageError(msg)
             logger.warning(msg)
@@ -324,7 +323,7 @@ class S3Storage(BaseCloudStorage):
         if not base_local.is_dir():
             raise FileNotFoundError(f"Local directory does not exist: {base_local}")
         base_key = self._to_key(remote_dir)
-        client, boto_errors = self._get_client_and_errors()
+        client = self._get_client()
         try:
             for root, _dirs, files in os.walk(base_local):
                 for fname in files:
@@ -337,7 +336,7 @@ class S3Storage(BaseCloudStorage):
                         continue
                     key = f"{base_key}/{rel}" if base_key else rel
                     client.upload_file(str(fpath), self.bucket, key)
-        except boto_errors as exc:
+        except _BOTO_ERRORS as exc:
             raise StorageError(
                 f"Failed to upload directory {base_local} to s3://{self.bucket}/{base_key}: {exc}"
             ) from exc
@@ -346,7 +345,7 @@ class S3Storage(BaseCloudStorage):
         base_local = Path(local_dir).resolve()
         base_key = self._to_key(remote_dir)
         prefix = f"{base_key}/" if base_key else ""
-        client, boto_errors = self._get_client_and_errors()
+        client = self._get_client()
         kwargs: dict[str, Any] = {"Bucket": self.bucket, "Prefix": prefix}
         try:
             base_local.mkdir(parents=True, exist_ok=True)
@@ -367,14 +366,14 @@ class S3Storage(BaseCloudStorage):
                 if not resp.get("IsTruncated"):
                     break
                 kwargs["ContinuationToken"] = resp["NextContinuationToken"]
-        except boto_errors as exc:
+        except _BOTO_ERRORS as exc:
             raise StorageError(
                 f"Failed to download s3://{self.bucket}/{prefix} to {base_local}: {exc}"
             ) from exc
 
     def test(self) -> str | None:
         try:
-            client, _ = self._get_client_and_errors()
+            client = self._get_client()
             client.head_bucket(Bucket=self.bucket)
         except Exception:
             return (

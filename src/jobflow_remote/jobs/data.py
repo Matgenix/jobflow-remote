@@ -2,11 +2,11 @@ from collections import defaultdict
 from datetime import datetime, timezone
 from enum import Enum
 from functools import cached_property
-from typing import TYPE_CHECKING, Any, TypeAlias, TypeGuard
+from typing import TYPE_CHECKING, Any, TypeAlias
 
 from jobflow import Flow, Job
 from monty.json import MontyDecoder, jsanitize
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, TypeAdapter, field_validator
 from qtoolkit.core.data_objects import QResources, QState
 
 from jobflow_remote.config.base import ExecutionConfig
@@ -18,24 +18,17 @@ from jobflow_remote.jobs.state import (
 )
 
 if TYPE_CHECKING:
-    from qtoolkit.core.data_objects import QCloudResources
+    from qtoolkit.core.data_objects import BaseQResources, QCloudResources
 
     ResourcesType: TypeAlias = QResources | QCloudResources | dict | None
 else:
     try:
-        from qtoolkit.core.data_objects import QCloudResources
+        from qtoolkit.core.data_objects import BaseQResources, QCloudResources
 
         ResourcesType = QResources | QCloudResources | dict | None
     except ImportError:  # pragma: no cover - older qtoolkit releases
-        QCloudResources = None
+        BaseQResources = QResources
         ResourcesType = QResources | dict | None
-
-
-def is_resource_obj(value: Any) -> "TypeGuard[QResources | QCloudResources]":
-    """Return True if ``value`` is a QResources or QCloudResources instance."""
-    return isinstance(value, QResources) or (
-        QCloudResources is not None and isinstance(value, QCloudResources)
-    )
 
 
 IN_FILENAME = "jfremote_in.json"
@@ -372,20 +365,23 @@ class JobDoc(BaseModel):
         )
         d["job"] = jsanitize(job, strict=True, allow_bson=True)
         # required since the resources are not serialized otherwise
-        if is_resource_obj(self.resources):
+        if isinstance(self.resources, BaseQResources):
             d["resources"] = self.resources.as_dict()
         return d
 
     @field_validator("resources", mode="wrap")
     @classmethod
     def resources_validator(cls, value: Any, handler: Any) -> Any:
-        # Preserve plain dicts instead of letting Pydantic coerce them to QResources/QCloudResources.
-        if value is None or is_resource_obj(value):
+        # Decode serialized resources objects. Other dicts become QResources if
+        # they match its fields, otherwise they stay dicts.
+        if value is None or isinstance(value, BaseQResources):
             return value
         if isinstance(value, dict):
-            if value.get("@class") in ("QResources", "QCloudResources"):
-                return MontyDecoder().process_decoded(value)
-            return value
+            if "@class" in value:
+                decoded = MontyDecoder().process_decoded(value)
+                if isinstance(decoded, BaseQResources):
+                    return decoded
+            return TypeAdapter(QResources | dict).validate_python(value)
         return handler(value)
 
     @field_validator("state", mode="before")

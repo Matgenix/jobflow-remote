@@ -36,7 +36,7 @@ def set_name_out(
 
 
 class BaseQueueManager:
-    """Shared shell-command helpers for host-backed and cloud queue managers."""
+    """Methods that build shell lines, shared by QueueManager and CloudQueueManager."""
 
     def get_pre_run(self, pre_run: str | list[str] | None) -> str:
         if isinstance(pre_run, list | tuple):

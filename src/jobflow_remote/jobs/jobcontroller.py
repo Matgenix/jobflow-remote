@@ -50,7 +50,6 @@ from jobflow_remote.jobs.data import (
     get_initial_flow_doc_dict,
     get_initial_job_doc_dict,
     get_reset_job_base_dict,
-    is_resource_obj,
     projection_flow_info_jobs,
     projection_job_info,
 )
@@ -2489,7 +2488,7 @@ class JobController:
                 set_dict["exec_config"] = exec_config
 
         if resources:
-            if is_resource_obj(resources):
+            if not isinstance(resources, dict):
                 resources = resources.as_dict()
                 # if passing a QResources it is pointless to update
                 # all the keywords will be overwritten and if the previous
@@ -3028,9 +3027,9 @@ class JobController:
                     run_dir = job_info["run_dir"]
                     worker = job_info["worker"]
                 if run_dir:
-                    target = shared_hosts.get_transfer(worker)
+                    backend = shared_hosts.get_transfer_backend(worker)
                     if safe_remove_job_files(
-                        host=target, run_dir=run_dir, raise_on_error=False
+                        host=backend, run_dir=run_dir, raise_on_error=False
                     ):
                         deleted.append(job_info)
         return deleted
