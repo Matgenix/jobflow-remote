@@ -1168,8 +1168,12 @@ first. This guide does not cover it.
            prompt. They say **on the instance**. If the prompt is ``~ $``, you
            are in CloudShell, for example because the session closed after 20
            minutes without input. Then run this item again. Type ``exit`` twice
-           to close the shell. In every later shell on the instance, run
-           ``source ~/.venvs/jfr/bin/activate`` after ``sudo -iu ec2-user``.
+           to close the shell.
+
+           Closing the shell or CloudShell does not stop anything. The
+           ``Runner`` runs as a service on the instance (item 6), and MongoDB
+           keeps the queue on the disk of the instance. To check your flows
+           later, run this item again and use the ``jf`` commands.
 
         3. On the instance, wait until the setup of the instance is done and check
            that MongoDB runs:
@@ -1188,7 +1192,12 @@ first. This guide does not cover it.
                curl -LsSf https://astral.sh/uv/install.sh | sh
                export PATH="$HOME/.local/bin:$PATH"
 
-           Then run the **uv** tab of Part 1, Step 1 on the instance.
+           Then run the **uv** tab of Part 1, Step 1 on the instance. Make
+           every later shell on the instance activate the environment:
+
+           .. code-block:: bash
+
+               echo 'source ~/.venvs/jfr/bin/activate' >> ~/.bashrc && source ~/.bashrc
 
         5. On the instance, create ``make_project.py`` with item 1 of Part 1, Step 5.
            Then create the project file. Without ``AWS_PROFILE``, the ``Runner`` uses
