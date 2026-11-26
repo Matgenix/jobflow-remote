@@ -1029,7 +1029,15 @@ pulled before.
        EOF
 
 2. In CloudShell, build the image and push it to ECR. Build the CPU image
-   first. Build the GPU image only if you use the GPU queue.
+   first. Build the GPU image only if you use the GPU queue. Type the tag of
+   the new image into its box. Use a tag you have not used before.
+
+   .. raw:: html
+
+       <div class="jfr-inputs">
+         <label>CPU image tag <input data-jfr="cpu_tag" value="mace-cpu-v1" size="14"></label>
+         <label>GPU image tag <input data-jfr="gpu_tag" value="mace-gpu-v1" size="14"></label>
+       </div>
 
    .. tab-set::
 
@@ -1037,7 +1045,7 @@ pulled before.
 
            .. code-block:: bash
 
-               IMAGE_TAG="mace-cpu-v1"
+               IMAGE_TAG="<cpu_tag>"
                TORCH_INDEX="https://download.pytorch.org/whl/cpu"
                BUCKET=$(aws cloudformation describe-stacks --stack-name jfr-lab \
                  --query "Stacks[0].Outputs[?OutputKey=='S3BucketName'].OutputValue" --output text)
@@ -1059,7 +1067,7 @@ pulled before.
 
            .. code-block:: bash
 
-               IMAGE_TAG="mace-gpu-v1"
+               IMAGE_TAG="<gpu_tag>"
                TORCH_INDEX="https://download.pytorch.org/whl/cu124"
                BUCKET=$(aws cloudformation describe-stacks --stack-name jfr-lab \
                  --query "Stacks[0].Outputs[?OutputKey=='S3BucketName'].OutputValue" --output text)
@@ -1086,8 +1094,16 @@ Step 2. Point the job definitions at the image
 ----------------------------------------------
 
 In CloudShell, in the folder with ``aws_batch.yaml`` from Part 1, Step 3,
-update the stack so that the job definitions use the new image. Parameters
-you do not pass keep their current values.
+update the stack so that the job definitions use the new image. The tags in
+the boxes are the ones of Step 1. Parameters you do not pass keep their
+current values.
+
+.. raw:: html
+
+    <div class="jfr-inputs">
+      <label>CPU image tag <input data-jfr="cpu_tag" value="mace-cpu-v1" size="14"></label>
+      <label>GPU image tag <input data-jfr="gpu_tag" value="mace-gpu-v1" size="14"></label>
+    </div>
 
 .. tab-set::
     :sync-group: queues
@@ -1103,7 +1119,7 @@ you do not pass keep their current values.
               --template-file aws_batch.yaml \
               --stack-name jfr-lab \
               --capabilities CAPABILITY_IAM \
-              --parameter-overrides ContainerImage="${ECR_REPO_URI}:mace-cpu-v1"
+              --parameter-overrides ContainerImage="${ECR_REPO_URI}:<cpu_tag>"
 
     .. tab-item:: CPU and GPU
         :sync: gpu
@@ -1117,10 +1133,8 @@ you do not pass keep their current values.
               --stack-name jfr-lab \
               --capabilities CAPABILITY_IAM \
               --parameter-overrides \
-                ContainerImage="${ECR_REPO_URI}:mace-cpu-v1" \
-                GpuContainerImage="${ECR_REPO_URI}:mace-gpu-v1"
-
-Change the tags if you built other ones in Step 1.
+                ContainerImage="${ECR_REPO_URI}:<cpu_tag>" \
+                GpuContainerImage="${ECR_REPO_URI}:<gpu_tag>"
 
 The update creates a new revision of each job definition whose image changed.
 The workers in ``aws_ht.yaml`` use the latest revision, so you do not need to
@@ -1711,6 +1725,78 @@ Batch jobs of the flow that are still queued or running:
 .. code-block:: bash
 
     jf -p aws_ht flow delete -did <db_id>
+
+.. _cloud_update:
+
+Updating jobflow-remote
+=======================
+
+A new version of jobflow-remote or qtoolkit goes into two places: the
+container image and the environment of the ``Runner``. Update both at the same
+time, when no jobs are queued or running. A ``Runner`` and a container with
+different versions can fail to run the jobs.
+
+1. Build a new image with a new tag (:ref:`Part 3, Step 1 <cloud_build_image>`,
+   item 2) and point the job definitions at it (Part 3, Step 2).
+
+2. Update the environment of the ``Runner`` and restart the ``Runner``:
+
+   .. tab-set::
+       :sync-group: runner
+
+       .. tab-item:: Your computer
+           :sync: computer
+
+           .. tab-set::
+               :sync-group: env
+
+               .. tab-item:: conda
+                   :sync: conda
+
+                   .. code-block:: bash
+
+                       jf -p aws_ht runner shutdown --wait
+                       pip install --force-reinstall --no-deps "jobflow-remote[aws] @ git+https://github.com/hrushikesh-s/jobflow-remote.git@cloud-worker-docs" "qtoolkit[aws] @ git+https://github.com/hrushikesh-s/qtoolkit.git@aws-batch-api"
+                       jf -p aws_ht runner start
+                       jf -p aws_ht runner status
+
+               .. tab-item:: uv
+                   :sync: uv
+
+                   .. code-block:: bash
+
+                       jf -p aws_ht runner shutdown --wait
+                       uv pip install --reinstall-package jobflow-remote --reinstall-package qtoolkit "jobflow-remote[aws] @ git+https://github.com/hrushikesh-s/jobflow-remote.git@cloud-worker-docs" "qtoolkit[aws] @ git+https://github.com/hrushikesh-s/qtoolkit.git@aws-batch-api"
+                       jf -p aws_ht runner start
+                       jf -p aws_ht runner status
+
+           Run the last command again until it prints ``Daemon status: running``.
+
+       .. tab-item:: EC2 instance
+           :sync: ec2
+
+           Run ``jfr_shell`` in CloudShell, then on the instance:
+
+           .. code-block:: bash
+
+               uv pip install --reinstall-package jobflow-remote --reinstall-package qtoolkit "jobflow-remote[aws] @ git+https://github.com/hrushikesh-s/jobflow-remote.git@cloud-worker-docs" "qtoolkit[aws] @ git+https://github.com/hrushikesh-s/qtoolkit.git@aws-batch-api" && sudo systemctl restart jfr-runner && systemctl is-active jfr-runner
+
+           The last command prints ``active``.
+
+       .. tab-item:: NERSC Perlmutter
+           :sync: nersc
+
+           On a Perlmutter login node:
+
+           .. code-block:: bash
+
+               module load conda && conda activate jfr && pip install --force-reinstall --no-deps "jobflow-remote[aws] @ git+https://github.com/hrushikesh-s/jobflow-remote.git@cloud-worker-docs" "qtoolkit[aws] @ git+https://github.com/hrushikesh-s/qtoolkit.git@aws-batch-api" && scancel --me --name=jfr_runner && scrontab "$HOME/jfr_runner.scron"
+
+           ``scancel`` stops the ``Runner`` and disables its ``scrontab`` entry.
+           ``scrontab`` enables the entry again, and the ``Runner`` starts within
+           10 minutes.
+
+3. Run the test flows of Part 1, Step 6 again to check the update.
 
 .. Boxes with data-jfr fill the placeholders <name> in the code blocks of
    this page. Without JavaScript, the placeholders stay as they are.
