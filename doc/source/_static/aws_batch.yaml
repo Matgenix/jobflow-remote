@@ -1,6 +1,14 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Description: AWS Batch, S3, ECR, and CodeBuild for jobflow-remote cloud workers.
 
+# RunnerImageId is a plain AMI ID instead of an SSM parameter. CloudFormation
+# resolves SSM parameters again at every update, and a new AMI would replace
+# the Runner instance and delete its MongoDB data.
+Metadata:
+  cfn-lint:
+    config:
+      ignore_checks: [W2506]
+
 Parameters:
   ContainerImage:
     Type: String
@@ -47,12 +55,25 @@ Parameters:
     Default: 172800
     MinValue: 60
     Description: Time limit in seconds of a job that sets no time_limit (default 48 hours).
+  EnableRunnerInstance:
+    Type: String
+    Default: "false"
+    AllowedValues: ["true", "false"]
+    Description: Create an EC2 instance with MongoDB for the Runner.
+  RunnerInstanceType:
+    Type: String
+    Default: t3a.small
+  RunnerImageId:
+    Type: String
+    Default: ""
+    Description: Amazon Linux 2023 x86_64 AMI of the Runner instance.
 
 Conditions:
   HasGpuQueue: {Fn::Equals: [{Ref: EnableGpuQueue}, "true"]}
   ExpireRunFiles: {Fn::Not: [{Fn::Equals: [{Ref: RunFilesRetentionDays}, "0"]}]}
   IsCpuSpot: {Fn::Equals: [{Ref: CpuAllocationType}, "SPOT"]}
   IsGpuSpot: {Fn::Equals: [{Ref: GpuAllocationType}, "SPOT"]}
+  HasRunnerInstance: {Fn::Equals: [{Ref: EnableRunnerInstance}, "true"]}
 
 Resources:
   # Network: a public VPC with two subnets and no NAT Gateway.
@@ -193,7 +214,8 @@ Resources:
       LogGroupName: {Fn::Sub: "/aws/codebuild/${AWS::StackName}-build"}
       RetentionInDays: {Ref: LogRetentionDays}
 
-  # IAM: roles for the containers and EC2 instances, and a user for the Runner.
+  # IAM: roles for the containers and EC2 instances, and a user and an optional
+  # instance for the Runner.
   BatchTaskRole:
     Type: AWS::IAM::Role
     Properties:
@@ -228,27 +250,86 @@ Resources:
     Properties:
       Roles: [{Ref: EcsInstanceRole}]
 
+  RunnerPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action: [s3:ListBucket, s3:GetBucketLocation]
+            Resource: {Fn::GetAtt: [StagingBucket, Arn]}
+          - Effect: Allow
+            Action: [s3:GetObject, s3:PutObject, s3:DeleteObject]
+            Resource: {Fn::Sub: "${StagingBucket.Arn}/*"}
+          - Effect: Allow
+            Action: [batch:SubmitJob, batch:DescribeJobs, batch:ListJobs, batch:TerminateJob]
+            Resource: "*"
+            Condition: {StringEquals: {"aws:RequestedRegion": {Ref: AWS::Region}}}
+          - Effect: Allow
+            Action: cloudformation:DescribeStacks
+            Resource: {Ref: AWS::StackId}
+
   RunnerUser:
     Type: AWS::IAM::User
     Properties:
-      Policies:
-        - PolicyName: JobflowRemoteRunner
-          PolicyDocument:
-            Version: "2012-10-17"
-            Statement:
-              - Effect: Allow
-                Action: [s3:ListBucket, s3:GetBucketLocation]
-                Resource: {Fn::GetAtt: [StagingBucket, Arn]}
-              - Effect: Allow
-                Action: [s3:GetObject, s3:PutObject, s3:DeleteObject]
-                Resource: {Fn::Sub: "${StagingBucket.Arn}/*"}
-              - Effect: Allow
-                Action: [batch:SubmitJob, batch:DescribeJobs, batch:ListJobs, batch:TerminateJob]
-                Resource: "*"
-                Condition: {StringEquals: {"aws:RequestedRegion": {Ref: AWS::Region}}}
-              - Effect: Allow
-                Action: cloudformation:DescribeStacks
-                Resource: {Ref: AWS::StackId}
+      ManagedPolicyArns: [{Ref: RunnerPolicy}]
+
+  # Optional instance for the Runner, with MongoDB on its own disk. It has no
+  # open ports. Users connect with Session Manager.
+  RunnerInstanceRole:
+    Type: AWS::IAM::Role
+    Condition: HasRunnerInstance
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - {Effect: Allow, Principal: {Service: ec2.amazonaws.com}, Action: sts:AssumeRole}
+      ManagedPolicyArns:
+        - {Ref: RunnerPolicy}
+        - {Fn::Sub: "arn:${AWS::Partition}:iam::aws:policy/AmazonSSMManagedInstanceCore"}
+
+  RunnerInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Condition: HasRunnerInstance
+    Properties:
+      Roles: [{Ref: RunnerInstanceRole}]
+
+  RunnerInstance:
+    Type: AWS::EC2::Instance
+    Condition: HasRunnerInstance
+    DependsOn: PublicRoute
+    Metadata:
+      cfn-lint:
+        config:
+          ignore_checks: [W1030]
+    Properties:
+      ImageId: {Ref: RunnerImageId}
+      InstanceType: {Ref: RunnerInstanceType}
+      IamInstanceProfile: {Ref: RunnerInstanceProfile}
+      SubnetId: {Ref: PublicSubnet1}
+      SecurityGroupIds: [{Ref: BatchSecurityGroup}]
+      BlockDeviceMappings:
+        - DeviceName: /dev/xvda
+          Ebs: {VolumeSize: 20, VolumeType: gp3, Encrypted: true, DeleteOnTermination: true}
+      Tags:
+        - {Key: Name, Value: {Fn::Sub: "${AWS::StackName}-runner"}}
+      UserData:
+        Fn::Base64:
+          Fn::Sub: |
+            #!/bin/bash
+            set -euo pipefail
+            echo "export AWS_DEFAULT_REGION=${AWS::Region}" > /etc/profile.d/aws-region.sh
+            cat > /etc/yum.repos.d/mongodb-org-8.0.repo <<'EOF'
+            [mongodb-org-8.0]
+            name=MongoDB Repository
+            baseurl=https://repo.mongodb.org/yum/amazon/2023/mongodb-org/8.0/x86_64/
+            gpgcheck=1
+            enabled=1
+            gpgkey=https://pgp.mongodb.com/server-8.0.asc
+            EOF
+            dnf install -y git mongodb-org
+            systemctl enable --now mongod
 
   # Instances pull each image once and reuse the cached copy for later jobs.
   EcsLaunchTemplate:
@@ -488,3 +569,6 @@ Outputs:
     Value: {Ref: CodeBuildProject}
   RunnerUserName:
     Value: {Ref: RunnerUser}
+  RunnerInstanceId:
+    Condition: HasRunnerInstance
+    Value: {Ref: RunnerInstance}
