@@ -1507,8 +1507,15 @@ the current folder:
     jf -p aws_ht job files ls <db_id>
     jf -p aws_ht job files get <db_id> jfremote_out.json
 
-Download the whole folder of the job into the current folder on your
-computer. The last line prints where it is.
+Download the whole folder of the job to your computer. It goes to your
+``Downloads`` folder. To save it somewhere else, type that folder into the box.
+The last line prints where the folder is.
+
+.. raw:: html
+
+    <div class="jfr-inputs">
+      <label>Download to <input data-jfr="download_dir" size="40" value="~/Downloads"></label>
+    </div>
 
 .. tab-set::
     :sync-group: runner
@@ -1528,7 +1535,7 @@ computer. The last line prints where it is.
             jc = JobController.from_project_name("aws_ht")
             info = jc.get_job_info(db_id="<db_id>")
             storage = jc.project.workers[info.worker].get_storage()
-            folder = Path(Path(info.run_dir).name)
+            folder = Path("<download_dir>").expanduser() / Path(info.run_dir).name
             storage.download_dir(info.run_dir, folder)
             print("Downloaded to", folder.resolve())
             EOF
@@ -1564,7 +1571,7 @@ computer. The last line prints where it is.
             stack = boto3.Session(profile_name="jfr-lab").client("cloudformation").describe_stacks(StackName="jfr-lab")
             outputs = {o["OutputKey"]: o["OutputValue"] for o in stack["Stacks"][0]["Outputs"]}
             storage = S3Storage(bucket=outputs["S3BucketName"], prefix="runs", profile_name="jfr-lab")
-            folder = Path(Path(run_dir).name)
+            folder = Path("<download_dir>").expanduser() / Path(run_dir).name
             storage.download_dir(run_dir, folder)
             print("Downloaded to", folder.resolve())
             EOF
@@ -1600,7 +1607,7 @@ computer. The last line prints where it is.
             stack = boto3.Session(profile_name="jfr-lab").client("cloudformation").describe_stacks(StackName="jfr-lab")
             outputs = {o["OutputKey"]: o["OutputValue"] for o in stack["Stacks"][0]["Outputs"]}
             storage = S3Storage(bucket=outputs["S3BucketName"], prefix="runs", profile_name="jfr-lab")
-            folder = Path(Path(run_dir).name)
+            folder = Path("<download_dir>").expanduser() / Path(run_dir).name
             storage.download_dir(run_dir, folder)
             print("Downloaded to", folder.resolve())
             EOF
