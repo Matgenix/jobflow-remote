@@ -263,6 +263,28 @@ class HostError(Exception):
     """Base class for the errors related to a host."""
 
 
+class InteractiveLoginRequiredError(HostError):
+    """
+    Error raised when connecting to a host that requires an interactive login,
+    while interactive logins are not allowed in the current process (the
+    ``allow_interactive_login`` setting is False).
+
+    It is raised before opening the connection, so no prompt is shown.
+    """
+
+    def __init__(self, message: str, host: str | None = None) -> None:
+        """
+        Parameters
+        ----------
+        message
+            The error message.
+        host
+            The name of the host that requires the interactive login.
+        """
+        super().__init__(message)
+        self.host = host
+
+
 class HostConnectionError(HostError):
     """
     Error raised when the connection to the host of a worker cannot be
