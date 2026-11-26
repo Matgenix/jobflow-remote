@@ -1146,29 +1146,26 @@ first. This guide does not cover it.
            after AWS releases a new image replaces the instance and deletes its
            MongoDB data.
 
-        2. In CloudShell, open a shell on the instance with Session Manager.
-           CloudShell has the Session Manager plugin already.
+        2. In CloudShell, open a shell on the instance as the user ``ec2-user``
+           with Session Manager. CloudShell has the Session Manager plugin
+           already.
 
            .. code-block:: bash
 
                RUNNER_ID=$(aws cloudformation describe-stacks --stack-name jfr-lab \
                  --query "Stacks[0].Outputs[?OutputKey=='RunnerInstanceId'].OutputValue" --output text)
-               aws ssm start-session --target "$RUNNER_ID"
+               aws ssm start-session --target "$RUNNER_ID" \
+                 --document-name AWS-StartInteractiveCommand --parameters command="sudo -iu ec2-user"
 
            It prints ``Starting session with SessionId``, and the prompt changes to
-           one that starts with ``sh``. If it prints ``TargetNotConnected``, the
-           instance is still starting. Wait a minute and run the last command again.
-           Then, in the shell on the instance, switch to the user ``ec2-user``:
+           ``[ec2-user@ip-... ~]$``. If it prints ``TargetNotConnected``, the
+           instance is still starting. Wait a minute and run the block again.
 
-           .. code-block:: bash
-
-               sudo -iu ec2-user
-
-           The prompt is now ``[ec2-user@ip-... ~]$``. The next items run at this
-           prompt. They say **on the instance**. If the prompt is ``~ $``, you
-           are in CloudShell, for example because the session closed after 20
-           minutes without input. Then run this item again. Type ``exit`` twice
-           to close the shell.
+           The next items run at this prompt. They say **on the instance**. A
+           prompt ``~ $`` is CloudShell, not the instance. This is the case in a
+           new CloudShell tab, and after the session closes after 20 minutes
+           without input. Then run this item again. Type ``exit`` to close the
+           shell on the instance.
 
            Closing the shell or CloudShell does not stop anything. The
            ``Runner`` runs as a service on the instance (item 6), and MongoDB
