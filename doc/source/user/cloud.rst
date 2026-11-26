@@ -1146,31 +1146,43 @@ first. This guide does not cover it.
            after AWS releases a new image replaces the instance and deletes its
            MongoDB data.
 
-        2. In CloudShell, open a shell on the instance as the user ``ec2-user``
-           with Session Manager. CloudShell has the Session Manager plugin
-           already.
+        2. In CloudShell, add the command ``jfr_shell`` to ``~/.bashrc``. It
+           opens a shell on the instance as the user ``ec2-user`` with Session
+           Manager. CloudShell has the Session Manager plugin already and keeps
+           ``~/.bashrc``, so you run this block once.
 
            .. code-block:: bash
 
-               RUNNER_ID=$(aws cloudformation describe-stacks --stack-name jfr-lab \
-                 --query "Stacks[0].Outputs[?OutputKey=='RunnerInstanceId'].OutputValue" --output text)
-               aws ssm start-session --target "$RUNNER_ID" \
-                 --document-name AWS-StartInteractiveCommand --parameters command="sudo -iu ec2-user"
+               cat >> ~/.bashrc <<'EOF'
+               jfr_shell() {
+                 aws ssm start-session --document-name AWS-StartInteractiveCommand \
+                   --parameters command="sudo -iu ec2-user" \
+                   --target "$(aws cloudformation describe-stacks --stack-name jfr-lab \
+                     --query "Stacks[0].Outputs[?OutputKey=='RunnerInstanceId'].OutputValue" --output text)"
+               }
+               EOF
+               source ~/.bashrc
+
+           Then, in CloudShell, open the shell on the instance:
+
+           .. code-block:: bash
+
+               jfr_shell
 
            It prints ``Starting session with SessionId``, and the prompt changes to
            ``[ec2-user@ip-... ~]$``. If it prints ``TargetNotConnected``, the
-           instance is still starting. Wait a minute and run the block again.
+           instance is still starting. Wait a minute and run ``jfr_shell`` again.
 
            The next items run at this prompt. They say **on the instance**. A
            prompt ``~ $`` is CloudShell, not the instance. This is the case in a
            new CloudShell tab, and after the session closes after 20 minutes
-           without input. Then run this item again. Type ``exit`` to close the
-           shell on the instance.
+           without input. Then run ``jfr_shell`` again. Type ``exit`` to close
+           the shell on the instance.
 
            Closing the shell or CloudShell does not stop anything. The
            ``Runner`` runs as a service on the instance (item 6), and MongoDB
            keeps the queue on the disk of the instance. To check your flows
-           later, run this item again and use the ``jf`` commands.
+           later, run ``jfr_shell`` in CloudShell and use the ``jf`` commands.
 
         3. On the instance, wait until the setup of the instance is done and check
            that MongoDB runs:
