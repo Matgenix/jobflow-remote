@@ -1531,28 +1531,44 @@ or running.
 
     jf -p aws_ht flow delete -fid <flow_id>
 
-Download the whole folder of a job from S3 to your computer. This works
-wherever the ``Runner`` runs, because it needs only the ``jfr-lab`` profile
-of Part 1, Step 4, not MongoDB. On your computer, set ``S3_URI`` to the S3
-path that the listing above prints for the job, for example the job
-``generate_frequencies_eigenvectors`` of a phonon flow. The folder is saved
-in the current folder, with the name of the job folder.
+Download the whole folder of a job from S3 to your computer:
 
-.. code-block:: bash
+1. Where you submit the flows, show the folder of the job:
 
-    S3_URI=<s3_path>
-    env -u AWS_DEFAULT_REGION S3_URI="$S3_URI" python - <<'EOF'
-    import os
-    from pathlib import PurePosixPath
+   .. code-block:: bash
 
-    from jobflow_remote.remote.storage import S3Storage
+       jf -p aws_ht job files ls <db_id>
 
-    bucket, key = os.environ["S3_URI"].removeprefix("s3://").split("/", 1)
-    S3Storage(bucket=bucket, profile_name="jfr-lab").download_dir(
-        key, PurePosixPath(key).name
-    )
-    print("Downloaded to", PurePosixPath(key).name)
-    EOF
+   The first line ends with the folder, for example
+   ``/jf_work/c7/97/bc/<uuid>_1``.
+
+2. On your computer, set ``RUN_DIR`` to this folder and download it into the
+   current folder. This needs only the ``jfr-lab`` profile of Part 1, Step 4,
+   so it works wherever the ``Runner`` runs.
+
+   .. code-block:: bash
+
+       RUN_DIR=<run_dir>
+       env -u AWS_DEFAULT_REGION RUN_DIR="$RUN_DIR" python - <<'EOF'
+       import os
+       from pathlib import PurePosixPath
+
+       import boto3
+
+       from jobflow_remote.remote.storage import S3Storage
+
+       session = boto3.Session(profile_name="jfr-lab")
+       stack = session.client("cloudformation").describe_stacks(StackName="jfr-lab")
+       bucket = next(
+           o["OutputValue"]
+           for o in stack["Stacks"][0]["Outputs"]
+           if o["OutputKey"] == "S3BucketName"
+       )
+       name = PurePosixPath(os.environ["RUN_DIR"]).name
+       storage = S3Storage(bucket=bucket, prefix="runs", profile_name="jfr-lab")
+       storage.download_dir(os.environ["RUN_DIR"], name)
+       print("Downloaded to", name)
+       EOF
 
 Download the folders you need before step 3 of :ref:`cloud_cleanup`, which
 deletes the access keys of the ``jfr-lab`` profile.
