@@ -44,8 +44,8 @@ The container never connects to your MongoDB database.
       Several jobs cannot share one GPU.
 
 The setup has three parts. Part 1 is done once per lab or AWS account. Part 2
-is repeated for each campaign. Part 3 moves the ``Runner`` to a machine that
-is always on.
+chooses where the ``Runner`` runs: your computer or a machine that is always
+on. Part 3 is repeated for each campaign.
 
 How to use this guide
 =====================
@@ -54,7 +54,7 @@ This guide uses two terminals. Every command block says which one to use.
 
 * **Your computer** is the machine where you submit flows and run the
   ``Runner``. It needs Python and access to your MongoDB database.
-* Part 3 can move the ``Runner`` to an EC2 instance or to NERSC. Its blocks
+* Part 2 can move the ``Runner`` to an EC2 instance or to NERSC. Its blocks
   then say **on the instance** or **on a Perlmutter login node**.
 * **AWS CloudShell** is a terminal inside the AWS Console in your web
   browser. Its AWS CLI is already signed in as your AWS Console user. This
@@ -276,7 +276,7 @@ same page.
    ``GpuAllocationType=EC2``. Then run Step 5 again, so that the project file
    gets the ``aws_gpu`` worker. If the ``Runner`` is running, restart it on
    your computer with ``jf -p aws_ht runner restart``, so that it reads the
-   new worker. If the ``Runner`` runs on the EC2 instance (Part 3), open a
+   new worker. If the ``Runner`` runs on the EC2 instance (Part 2), open a
    shell on it as in item 2 of the **EC2 instance** tab of :ref:`cloud_runner_host` and run:
 
    .. code-block:: bash
@@ -285,7 +285,7 @@ same page.
        MONGO_HOST=127.0.0.1 MONGO_PORT=27017 python make_project.py
        sudo systemctl restart jfr-runner
 
-   If the ``Runner`` runs at NERSC (Part 3), run ``module load conda`` and
+   If the ``Runner`` runs at NERSC (Part 2), run ``module load conda`` and
    ``conda activate jfr`` on a Perlmutter login node. Then run the block of
    item 3 of the **NERSC Perlmutter** tab of :ref:`cloud_runner_host` and restart the ``Runner``:
 
@@ -630,7 +630,340 @@ Step 6. Check the setup
    ``'shared folders work'``. Stop the ``Runner`` with ``Ctrl+C`` in the
    first terminal.
 
-Part 2: Running a campaign
+.. _cloud_runner_host:
+
+Part 2: Choosing where the Runner runs
+======================================
+
+The ``Runner`` must run as long as flows run. If it stops, AWS Batch finishes
+the jobs it already has. No new jobs are submitted and no results are stored
+until the ``Runner`` runs again. A computer that sleeps or loses its network
+stops the ``Runner``.
+
+You can run the ``Runner`` in one of three places. Choose one and follow only
+its tab below. The tabs of Part 3 and of :ref:`cloud_cleanup` follow your
+choice.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 20 25 25 30
+
+   * - Place
+     - MongoDB
+     - Cost
+     - Notes
+   * - Your computer
+     - On your computer
+     - Free
+     - Stops when the computer sleeps. Good for tests and short campaigns.
+   * - EC2 instance
+     - On the instance
+     - About 0.019 USD per hour for a ``t3a.small`` in ``us-east-2``, plus
+       0.005 USD per hour for its public IPv4 address and 0.08 USD per GB
+       and month for its 20 GB disk
+     - Runs without your computer. You submit flows on the instance.
+   * - NERSC Perlmutter
+     - A MongoDB database at NERSC
+     - Needs access to the ``workflow`` QOS
+     - Runs on a workflow node with ``scrontab``. You submit flows on a
+       Perlmutter login node.
+
+Each place has its own MongoDB, so each starts with an empty queue. Let the
+flows of the old place finish before you move. Their results stay in the old
+MongoDB. Run one ``Runner`` per MongoDB database.
+
+NERSC Spin can also run always-on services, but it needs the SpinUp training
+first. This guide does not cover it.
+
+.. tab-set::
+    :sync-group: runner
+
+    .. tab-item:: Your computer
+        :sync: computer
+
+        1. On your computer, start the ``Runner`` as a daemon:
+
+           .. code-block:: bash
+
+               jf -p aws_ht runner start
+               jf -p aws_ht runner status
+
+           Run the last command again until it prints ``Daemon status: running``.
+           If ``runner start`` prints ``Daemon process is already running``, a
+           ``Runner`` from an earlier session is still running. It may use an
+           older environment. Shut it down and start it again:
+
+           .. code-block:: bash
+
+               jf -p aws_ht runner shutdown --wait
+               jf -p aws_ht runner start
+               jf -p aws_ht runner status
+
+        2. On macOS, keep the computer awake while flows run. Run this in a separate
+           terminal and leave it open:
+
+           .. code-block:: bash
+
+               caffeinate -is
+
+           ``-s`` works only while the computer is plugged in. Closing the lid still
+           puts a laptop to sleep. Stop ``caffeinate`` with ``Ctrl+C`` when the flows
+           are done.
+
+    .. tab-item:: EC2 instance
+        :sync: ec2
+
+        The stack can create an instance with MongoDB for the ``Runner``. The
+        instance gets its AWS permissions from an IAM role, so it needs no access
+        keys. It has no open ports. You open a shell on it from CloudShell with
+        Session Manager. Deleting the stack deletes the instance and its MongoDB
+        data. Step 1 of :ref:`cloud_cleanup` copies the data to S3 first.
+
+        1. In CloudShell, create ``aws_batch.yaml`` again with item 1 of Part 1,
+           Step 3, so that you have the current template. Then add the instance to
+           the stack. Update the stack only when no jobs are running.
+
+           .. code-block:: bash
+
+               RUNNER_AMI=$(aws ssm get-parameter \
+                 --name /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64 \
+                 --query Parameter.Value --output text)
+               aws cloudformation deploy \
+                 --template-file aws_batch.yaml \
+                 --stack-name jfr-lab \
+                 --capabilities CAPABILITY_IAM \
+                 --parameter-overrides EnableRunnerInstance=true RunnerImageId="$RUNNER_AMI"
+
+           Run this block only once. Later updates without ``RunnerImageId`` keep
+           this image, so they do not replace the instance. Running this block again
+           after AWS releases a new image replaces the instance and deletes its
+           MongoDB data.
+
+        2. In CloudShell, add the command ``jfr_shell`` to ``~/.bashrc``. It
+           opens a shell on the instance as the user ``ec2-user`` with Session
+           Manager. CloudShell has the Session Manager plugin already and keeps
+           ``~/.bashrc``, so you run this block once.
+
+           .. code-block:: bash
+
+               cat >> ~/.bashrc <<'EOF'
+               jfr_shell() {
+                 aws ssm start-session --document-name AWS-StartInteractiveCommand \
+                   --parameters command="sudo -iu ec2-user" \
+                   --target "$(aws cloudformation describe-stacks --stack-name jfr-lab \
+                     --query "Stacks[0].Outputs[?OutputKey=='RunnerInstanceId'].OutputValue" --output text)"
+               }
+               EOF
+               source ~/.bashrc
+
+           Then, in CloudShell, open the shell on the instance:
+
+           .. code-block:: bash
+
+               jfr_shell
+
+           It prints ``Starting session with SessionId``, and the prompt changes to
+           ``[ec2-user@ip-... ~]$``. If it prints ``TargetNotConnected``, the
+           instance is still starting. Wait a minute and run ``jfr_shell`` again.
+
+           The next items run at this prompt. They say **on the instance**. A
+           prompt ``~ $`` is CloudShell, not the instance. This is the case in a
+           new CloudShell tab, and after the session closes after 20 minutes
+           without input. Then run ``jfr_shell`` again. Type ``exit`` to close
+           the shell on the instance.
+
+           Closing the shell or CloudShell does not stop anything. The
+           ``Runner`` runs as a service on the instance (item 6), and MongoDB
+           keeps the queue on the disk of the instance. To check your flows
+           later, run ``jfr_shell`` in CloudShell and use the ``jf`` commands.
+
+        3. On the instance, wait until the setup of the instance is done and check
+           that MongoDB runs:
+
+           .. code-block:: bash
+
+               cloud-init status --wait
+               systemctl is-active mongod
+
+           The commands print ``status: done`` and ``active``.
+
+        4. On the instance, install uv:
+
+           .. code-block:: bash
+
+               curl -LsSf https://astral.sh/uv/install.sh | sh
+               export PATH="$HOME/.local/bin:$PATH"
+
+           Then run the **uv** tab of Part 1, Step 1 on the instance. Make
+           every later shell on the instance activate the environment:
+
+           .. code-block:: bash
+
+               echo 'source ~/.venvs/jfr/bin/activate' >> ~/.bashrc && source ~/.bashrc
+
+        5. On the instance, create ``make_project.py`` with item 1 of Part 1, Step 5.
+           Then create the project file. Without ``AWS_PROFILE``, the ``Runner`` uses
+           the IAM role of the instance.
+
+           .. code-block:: bash
+
+               MONGO_HOST=127.0.0.1 MONGO_PORT=27017 python make_project.py
+               jf -p aws_ht project check --errors
+               jf -p aws_ht admin reset
+
+        6. On the instance, run the ``Runner`` as a service. The service starts the
+           ``Runner`` again after a crash or a restart of the instance.
+
+           .. code-block:: bash
+
+               sudo tee /etc/systemd/system/jfr-runner.service > /dev/null <<EOF
+               [Unit]
+               Description=jobflow-remote Runner of the project aws_ht
+               After=network-online.target mongod.service
+               Wants=network-online.target
+
+               [Service]
+               User=$USER
+               ExecStart=$HOME/.venvs/jfr/bin/jf -p aws_ht runner run
+               Restart=always
+               RestartSec=60
+
+               [Install]
+               WantedBy=multi-user.target
+               EOF
+               sudo systemctl daemon-reload && sudo systemctl enable --now jfr-runner && systemctl is-active jfr-runner
+
+           The last command prints ``active``. To follow the log of the ``Runner``,
+           run ``journalctl -u jfr-runner -f`` and stop it with ``Ctrl+C``.
+
+        7. On the instance, create ``test_aws.py`` with item 2 of Part 1, Step 6.
+           Then submit the test flows. The service runs them.
+
+           .. code-block:: bash
+
+               python test_aws.py
+
+           Check them with the commands of the **uv** tab of item 4 of Part 1,
+           Step 6.
+
+        To read the results on your computer, copy the database to S3 on the
+        instance:
+
+        .. code-block:: bash
+
+            BUCKET=$(aws cloudformation describe-stacks --stack-name jfr-lab \
+              --query "Stacks[0].Outputs[?OutputKey=='S3BucketName'].OutputValue" --output text)
+            mongodump --gzip --archive=jfr_aws.gz
+            aws s3 cp jfr_aws.gz "s3://$BUCKET/mongodump/jfr_aws.gz"
+
+        Then, on your computer, download it and load the outputs into the database
+        ``jfr_ec2_outputs`` of your local MongoDB. ``mongorestore`` is part of the
+        MongoDB Database Tools.
+
+        .. code-block:: bash
+
+            env -u AWS_DEFAULT_REGION python - <<'EOF'
+            import boto3
+
+            session = boto3.Session(profile_name="jfr-lab")
+            stack = session.client("cloudformation").describe_stacks(StackName="jfr-lab")
+            out = {o["OutputKey"]: o["OutputValue"] for o in stack["Stacks"][0]["Outputs"]}
+            session.client("s3").download_file(out["S3BucketName"], "mongodump/jfr_aws.gz", "jfr_aws.gz")
+            EOF
+            mongorestore --gzip --archive=jfr_aws.gz --nsInclude 'jfr_aws_outputs.*' \
+              --nsFrom 'jfr_aws_outputs.*' --nsTo 'jfr_ec2_outputs.*'
+
+    .. tab-item:: NERSC Perlmutter
+        :sync: nersc
+
+        The ``Runner`` runs in the ``workflow`` QOS of Perlmutter, which is meant for
+        light processes that run for a long time. A job in this QOS can run up to 90
+        days on a workflow node. ``scrontab`` starts it again if it ends. If the job
+        is cancelled, for example before a NERSC maintenance, Slurm disables the
+        entry. Run ``scrontab -e`` and remove the ``#DISABLED`` marks to start it
+        again. You need:
+
+        * access to the ``workflow`` QOS. Request it with the form linked in the
+          `NERSC docs of the workflow QOS
+          <https://docs.nersc.gov/jobs/workflow/workflow-queue/>`_.
+        * a MongoDB database at NERSC. Request one with the form linked in the
+          `NERSC docs of databases <https://docs.nersc.gov/services/databases/>`_.
+          Use a database that no other project uses, because Part 1, Step 6 runs
+          ``jf -p aws_ht admin reset`` on it. NERSC gives you its host, database
+          name, user, and password. It is reachable from Perlmutter, not from your
+          computer or from AWS.
+
+        1. On a Perlmutter login node, load conda:
+
+           .. code-block:: bash
+
+               module load conda
+
+           Then run the **conda** tab of Part 1, Step 1. In every later shell on
+           Perlmutter, run ``module load conda`` before ``conda activate jfr``.
+
+        2. In CloudShell, run item 1 of Part 1, Step 4 to create a new access key.
+           Then run item 2 of Part 1, Step 4 on a Perlmutter login node.
+
+        3. On a Perlmutter login node, create ``make_project.py`` with item 1 of
+           Part 1, Step 5. Then create the project file. Replace the values in
+           ``<...>`` with those from NERSC. The block asks for the password of the
+           database. The project file keeps it and is readable only by you.
+
+           .. code-block:: bash
+
+               {
+               MONGO_HOST=<host>
+               MONGO_PORT=27017
+               MONGO_DB=<database>
+               MONGO_USER=<user>
+               printf "MongoDB password: "; read -rs MONGO_PASSWORD; echo
+               export MONGO_PASSWORD
+               env -u AWS_DEFAULT_REGION AWS_PROFILE=jfr-lab MONGO_HOST="$MONGO_HOST" MONGO_PORT="$MONGO_PORT" \
+                 MONGO_DB="$MONGO_DB" MONGO_USER="$MONGO_USER" python make_project.py
+               }
+
+           With ``MONGO_DB``, the queue and the outputs share this one database.
+
+        4. On a Perlmutter login node, run items 1 to 4 of Part 1, Step 6. The
+           ``Runner`` of item 3 runs on the login node for this short test. Stop it
+           with ``Ctrl+C`` when the four jobs are ``COMPLETED``.
+
+        5. On a Perlmutter login node, run the ``Runner`` in the ``workflow`` QOS with
+           ``scrontab``. Replace ``<project>`` with your NERSC project. The entry
+           starts the ``Runner`` if it is not running, checking every 10 minutes.
+
+           .. code-block:: bash
+
+               NERSC_PROJECT=<project>
+               cat > "$HOME/jfr_runner.sh" <<'EOF'
+               #!/bin/bash
+               module load conda
+               conda activate jfr
+               exec jf -p aws_ht runner run
+               EOF
+               chmod +x "$HOME/jfr_runner.sh"
+               cat > "$HOME/jfr_runner.scron" <<EOF
+               #SCRON -q workflow
+               #SCRON -C cron
+               #SCRON -A $NERSC_PROJECT
+               #SCRON -t 30-00:00:00
+               #SCRON --job-name=jfr_runner
+               #SCRON --dependency=singleton
+               #SCRON -o $HOME/jfr_runner-%j.out
+               #SCRON --open-mode=append
+               */10 * * * * $HOME/jfr_runner.sh
+               EOF
+               scrontab -l
+               scrontab "$HOME/jfr_runner.scron"
+               scrontab -l
+
+           ``scrontab FILE`` replaces all your ``scrontab`` entries. If the first
+           ``scrontab -l`` shows other entries, add them to ``jfr_runner.scron``
+           first. ``squeue --me -q workflow`` shows the job of the ``Runner``. Its
+           log is in ``~/jfr_runner-<jobid>.out``.
+
+Part 3: Running a campaign
 ==========================
 
 .. _cloud_build_image:
@@ -856,8 +1189,10 @@ CPU queue then runs the fits of many structures at the same time.
 its vCPUs. Without it, PyTorch in each job starts one thread per core of the
 instance, and the jobs that share an instance slow each other down.
 
-1. On your computer, install ``atomate2`` in the environment from Part 1,
-   Step 1. You need it to build the flows.
+1. Where you submit the flows, install ``atomate2`` in the environment from
+   Part 1, Step 1. You need it to build the flows. This is your computer, the
+   EC2 instance, or a Perlmutter login node, depending on where the
+   ``Runner`` runs (Part 2).
 
    .. tab-set::
        :sync-group: env
@@ -878,7 +1213,7 @@ instance, and the jobs that share an instance slow each other down.
                source ~/.venvs/jfr/bin/activate
                uv pip install "atomate2[pheasy]"
 
-2. On your computer, create the submission script:
+2. Where you submit the flows, create the submission script:
 
    .. tab-set::
        :sync-group: queues
@@ -1025,365 +1360,56 @@ instance, and the jobs that share an instance slow each other down.
            Keep ``run_phonon_displacements`` on ``aws_gpu``, because the force
            job it creates runs on the same worker as this step.
 
-3. On your computer, submit the flow and start the ``Runner`` as a daemon:
+3. Submit the flow where the ``Runner`` runs (Part 2):
 
-   .. code-block:: bash
+   .. tab-set::
+       :sync-group: runner
 
-       python submit_phonons.py
-       jf -p aws_ht runner start
+       .. tab-item:: Your computer
+           :sync: computer
 
-   If the last command prints ``Daemon process is already running``, a
-   ``Runner`` from an earlier session is still running. It may use an older
-   environment. Shut it down and start it again:
+           On your computer:
 
-   .. code-block:: bash
+           .. code-block:: bash
 
-       jf -p aws_ht runner shutdown --wait
-       jf -p aws_ht runner start
-       jf -p aws_ht runner status
+               python submit_phonons.py
+               jf -p aws_ht runner status
 
-   Run the last command again until it prints ``Daemon status: running``.
+           The last command prints ``Daemon status: running``. If not, start
+           the ``Runner`` as in the **Your computer** tab of Part 2.
+
+       .. tab-item:: EC2 instance
+           :sync: ec2
+
+           On the instance. The service of Part 2 runs the ``Runner``.
+
+           .. code-block:: bash
+
+               python submit_phonons.py
+               systemctl is-active jfr-runner
+
+           The last command prints ``active``.
+
+       .. tab-item:: NERSC Perlmutter
+           :sync: nersc
+
+           On a Perlmutter login node. ``scrontab`` runs the ``Runner``.
+
+           .. code-block:: bash
+
+               python submit_phonons.py
+               squeue --me -q workflow
+
+           The last command shows the job ``jfr_runner``.
 
 AWS Batch starts EC2 instances when jobs are queued and terminates them a few
 minutes after the queues are empty.
-
-.. _cloud_runner_host:
-
-Part 3: Running the Runner on an always-on machine
-==================================================
-
-The ``Runner`` must run as long as flows run. If it stops, AWS Batch finishes
-the jobs it already has. No new jobs are submitted and no results are stored
-until the ``Runner`` runs again. A computer that sleeps or loses its network
-stops the ``Runner``.
-
-You can run the ``Runner`` in one of three places. Choose one and follow only
-its tab below. The tabs of :ref:`cloud_cleanup` follow your choice.
-
-.. list-table::
-   :header-rows: 1
-   :widths: 20 25 25 30
-
-   * - Place
-     - MongoDB
-     - Cost
-     - Notes
-   * - Your computer
-     - On your computer
-     - Free
-     - Stops when the computer sleeps. Good for tests and short campaigns.
-   * - EC2 instance
-     - On the instance
-     - About 0.019 USD per hour for a ``t3a.small`` in ``us-east-2``, plus
-       0.005 USD per hour for its public IPv4 address and 0.08 USD per GB
-       and month for its 20 GB disk
-     - Runs without your computer. You submit flows on the instance.
-   * - NERSC Perlmutter
-     - A MongoDB database at NERSC
-     - Needs access to the ``workflow`` QOS
-     - Runs on a workflow node with ``scrontab``. You submit flows on a
-       Perlmutter login node.
-
-Each place has its own MongoDB, so each starts with an empty queue. Let the
-flows of the old place finish before you move. Their results stay in the old
-MongoDB. Run one ``Runner`` per MongoDB database.
-
-NERSC Spin can also run always-on services, but it needs the SpinUp training
-first. This guide does not cover it.
-
-.. tab-set::
-    :sync-group: runner
-
-    .. tab-item:: Your computer
-        :sync: computer
-
-        1. On your computer, start the ``Runner`` as a daemon:
-
-           .. code-block:: bash
-
-               jf -p aws_ht runner start
-               jf -p aws_ht runner status
-
-           Run the last command again until it prints ``Daemon status: running``.
-
-        2. On macOS, keep the computer awake while flows run. Run this in a separate
-           terminal and leave it open:
-
-           .. code-block:: bash
-
-               caffeinate -is
-
-           ``-s`` works only while the computer is plugged in. Closing the lid still
-           puts a laptop to sleep. Stop ``caffeinate`` with ``Ctrl+C`` when the flows
-           are done.
-
-    .. tab-item:: EC2 instance
-        :sync: ec2
-
-        The stack can create an instance with MongoDB for the ``Runner``. The
-        instance gets its AWS permissions from an IAM role, so it needs no access
-        keys. It has no open ports. You open a shell on it from CloudShell with
-        Session Manager. Deleting the stack deletes the instance and its MongoDB
-        data. Step 1 of :ref:`cloud_cleanup` copies the data to S3 first.
-
-        1. In CloudShell, create ``aws_batch.yaml`` again with item 1 of Part 1,
-           Step 3, so that you have the current template. Then add the instance to
-           the stack. Update the stack only when no jobs are running.
-
-           .. code-block:: bash
-
-               RUNNER_AMI=$(aws ssm get-parameter \
-                 --name /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64 \
-                 --query Parameter.Value --output text)
-               aws cloudformation deploy \
-                 --template-file aws_batch.yaml \
-                 --stack-name jfr-lab \
-                 --capabilities CAPABILITY_IAM \
-                 --parameter-overrides EnableRunnerInstance=true RunnerImageId="$RUNNER_AMI"
-
-           Run this block only once. Later updates without ``RunnerImageId`` keep
-           this image, so they do not replace the instance. Running this block again
-           after AWS releases a new image replaces the instance and deletes its
-           MongoDB data.
-
-        2. In CloudShell, add the command ``jfr_shell`` to ``~/.bashrc``. It
-           opens a shell on the instance as the user ``ec2-user`` with Session
-           Manager. CloudShell has the Session Manager plugin already and keeps
-           ``~/.bashrc``, so you run this block once.
-
-           .. code-block:: bash
-
-               cat >> ~/.bashrc <<'EOF'
-               jfr_shell() {
-                 aws ssm start-session --document-name AWS-StartInteractiveCommand \
-                   --parameters command="sudo -iu ec2-user" \
-                   --target "$(aws cloudformation describe-stacks --stack-name jfr-lab \
-                     --query "Stacks[0].Outputs[?OutputKey=='RunnerInstanceId'].OutputValue" --output text)"
-               }
-               EOF
-               source ~/.bashrc
-
-           Then, in CloudShell, open the shell on the instance:
-
-           .. code-block:: bash
-
-               jfr_shell
-
-           It prints ``Starting session with SessionId``, and the prompt changes to
-           ``[ec2-user@ip-... ~]$``. If it prints ``TargetNotConnected``, the
-           instance is still starting. Wait a minute and run ``jfr_shell`` again.
-
-           The next items run at this prompt. They say **on the instance**. A
-           prompt ``~ $`` is CloudShell, not the instance. This is the case in a
-           new CloudShell tab, and after the session closes after 20 minutes
-           without input. Then run ``jfr_shell`` again. Type ``exit`` to close
-           the shell on the instance.
-
-           Closing the shell or CloudShell does not stop anything. The
-           ``Runner`` runs as a service on the instance (item 6), and MongoDB
-           keeps the queue on the disk of the instance. To check your flows
-           later, run ``jfr_shell`` in CloudShell and use the ``jf`` commands.
-
-        3. On the instance, wait until the setup of the instance is done and check
-           that MongoDB runs:
-
-           .. code-block:: bash
-
-               cloud-init status --wait
-               systemctl is-active mongod
-
-           The commands print ``status: done`` and ``active``.
-
-        4. On the instance, install uv:
-
-           .. code-block:: bash
-
-               curl -LsSf https://astral.sh/uv/install.sh | sh
-               export PATH="$HOME/.local/bin:$PATH"
-
-           Then run the **uv** tab of Part 1, Step 1 on the instance. Make
-           every later shell on the instance activate the environment:
-
-           .. code-block:: bash
-
-               echo 'source ~/.venvs/jfr/bin/activate' >> ~/.bashrc && source ~/.bashrc
-
-        5. On the instance, create ``make_project.py`` with item 1 of Part 1, Step 5.
-           Then create the project file. Without ``AWS_PROFILE``, the ``Runner`` uses
-           the IAM role of the instance.
-
-           .. code-block:: bash
-
-               MONGO_HOST=127.0.0.1 MONGO_PORT=27017 python make_project.py
-               jf -p aws_ht project check --errors
-               jf -p aws_ht admin reset
-
-        6. On the instance, run the ``Runner`` as a service. The service starts the
-           ``Runner`` again after a crash or a restart of the instance.
-
-           .. code-block:: bash
-
-               sudo tee /etc/systemd/system/jfr-runner.service > /dev/null <<EOF
-               [Unit]
-               Description=jobflow-remote Runner of the project aws_ht
-               After=network-online.target mongod.service
-               Wants=network-online.target
-
-               [Service]
-               User=$USER
-               ExecStart=$HOME/.venvs/jfr/bin/jf -p aws_ht runner run
-               Restart=always
-               RestartSec=60
-
-               [Install]
-               WantedBy=multi-user.target
-               EOF
-               sudo systemctl daemon-reload && sudo systemctl enable --now jfr-runner && systemctl is-active jfr-runner
-
-           The last command prints ``active``. To follow the log of the ``Runner``,
-           run ``journalctl -u jfr-runner -f`` and stop it with ``Ctrl+C``.
-
-        7. On the instance, create ``test_aws.py`` with item 2 of Part 1, Step 6.
-           Then submit the test flows. The service runs them.
-
-           .. code-block:: bash
-
-               python test_aws.py
-
-           Check them with the commands of the **uv** tab of item 4 of Part 1,
-           Step 6.
-
-        For a campaign, run items 1 and 2 of Part 2, Step 4 on the instance, with
-        the **uv** tabs. Then run ``python submit_phonons.py``. Do not run
-        ``jf -p aws_ht runner start``, because the service already runs the
-        ``Runner``.
-
-        To read the results on your computer, copy the database to S3 on the
-        instance:
-
-        .. code-block:: bash
-
-            BUCKET=$(aws cloudformation describe-stacks --stack-name jfr-lab \
-              --query "Stacks[0].Outputs[?OutputKey=='S3BucketName'].OutputValue" --output text)
-            mongodump --gzip --archive=jfr_aws.gz
-            aws s3 cp jfr_aws.gz "s3://$BUCKET/mongodump/jfr_aws.gz"
-
-        Then, on your computer, download it and load the outputs into the database
-        ``jfr_ec2_outputs`` of your local MongoDB. ``mongorestore`` is part of the
-        MongoDB Database Tools.
-
-        .. code-block:: bash
-
-            env -u AWS_DEFAULT_REGION python - <<'EOF'
-            import boto3
-
-            session = boto3.Session(profile_name="jfr-lab")
-            stack = session.client("cloudformation").describe_stacks(StackName="jfr-lab")
-            out = {o["OutputKey"]: o["OutputValue"] for o in stack["Stacks"][0]["Outputs"]}
-            session.client("s3").download_file(out["S3BucketName"], "mongodump/jfr_aws.gz", "jfr_aws.gz")
-            EOF
-            mongorestore --gzip --archive=jfr_aws.gz --nsInclude 'jfr_aws_outputs.*' \
-              --nsFrom 'jfr_aws_outputs.*' --nsTo 'jfr_ec2_outputs.*'
-
-    .. tab-item:: NERSC Perlmutter
-        :sync: nersc
-
-        The ``Runner`` runs in the ``workflow`` QOS of Perlmutter, which is meant for
-        light processes that run for a long time. A job in this QOS can run up to 90
-        days on a workflow node. ``scrontab`` starts it again if it ends. If the job
-        is cancelled, for example before a NERSC maintenance, Slurm disables the
-        entry. Run ``scrontab -e`` and remove the ``#DISABLED`` marks to start it
-        again. You need:
-
-        * access to the ``workflow`` QOS. Request it with the form linked in the
-          `NERSC docs of the workflow QOS
-          <https://docs.nersc.gov/jobs/workflow/workflow-queue/>`_.
-        * a MongoDB database at NERSC. Request one with the form linked in the
-          `NERSC docs of databases <https://docs.nersc.gov/services/databases/>`_.
-          Use a database that no other project uses, because Part 1, Step 6 runs
-          ``jf -p aws_ht admin reset`` on it. NERSC gives you its host, database
-          name, user, and password. It is reachable from Perlmutter, not from your
-          computer or from AWS.
-
-        1. On a Perlmutter login node, load conda:
-
-           .. code-block:: bash
-
-               module load conda
-
-           Then run the **conda** tab of Part 1, Step 1. In every later shell on
-           Perlmutter, run ``module load conda`` before ``conda activate jfr``.
-
-        2. In CloudShell, run item 1 of Part 1, Step 4 to create a new access key.
-           Then run item 2 of Part 1, Step 4 on a Perlmutter login node.
-
-        3. On a Perlmutter login node, create ``make_project.py`` with item 1 of
-           Part 1, Step 5. Then create the project file. Replace the values in
-           ``<...>`` with those from NERSC. The block asks for the password of the
-           database. The project file keeps it and is readable only by you.
-
-           .. code-block:: bash
-
-               {
-               MONGO_HOST=<host>
-               MONGO_PORT=27017
-               MONGO_DB=<database>
-               MONGO_USER=<user>
-               printf "MongoDB password: "; read -rs MONGO_PASSWORD; echo
-               export MONGO_PASSWORD
-               env -u AWS_DEFAULT_REGION AWS_PROFILE=jfr-lab MONGO_HOST="$MONGO_HOST" MONGO_PORT="$MONGO_PORT" \
-                 MONGO_DB="$MONGO_DB" MONGO_USER="$MONGO_USER" python make_project.py
-               }
-
-           With ``MONGO_DB``, the queue and the outputs share this one database.
-
-        4. On a Perlmutter login node, run items 1 to 4 of Part 1, Step 6. The
-           ``Runner`` of item 3 runs on the login node for this short test. Stop it
-           with ``Ctrl+C`` when the four jobs are ``COMPLETED``.
-
-        5. On a Perlmutter login node, run the ``Runner`` in the ``workflow`` QOS with
-           ``scrontab``. Replace ``<project>`` with your NERSC project. The entry
-           starts the ``Runner`` if it is not running, checking every 10 minutes.
-
-           .. code-block:: bash
-
-               NERSC_PROJECT=<project>
-               cat > "$HOME/jfr_runner.sh" <<'EOF'
-               #!/bin/bash
-               module load conda
-               conda activate jfr
-               exec jf -p aws_ht runner run
-               EOF
-               chmod +x "$HOME/jfr_runner.sh"
-               cat > "$HOME/jfr_runner.scron" <<EOF
-               #SCRON -q workflow
-               #SCRON -C cron
-               #SCRON -A $NERSC_PROJECT
-               #SCRON -t 30-00:00:00
-               #SCRON --job-name=jfr_runner
-               #SCRON --dependency=singleton
-               #SCRON -o $HOME/jfr_runner-%j.out
-               #SCRON --open-mode=append
-               */10 * * * * $HOME/jfr_runner.sh
-               EOF
-               scrontab -l
-               scrontab "$HOME/jfr_runner.scron"
-               scrontab -l
-
-           ``scrontab FILE`` replaces all your ``scrontab`` entries. If the first
-           ``scrontab -l`` shows other entries, add them to ``jfr_runner.scron``
-           first. ``squeue --me -q workflow`` shows the job of the ``Runner``. Its
-           log is in ``~/jfr_runner-<jobid>.out``.
-
-        For a campaign, run items 1 and 2 of Part 2, Step 4 on a Perlmutter login
-        node, with the **conda** tabs. Then run ``python submit_phonons.py``. Do not
-        run ``jf -p aws_ht runner start``, because ``scrontab`` runs the ``Runner``.
 
 Inspecting and stopping jobs
 ============================
 
 Run the ``jf`` commands of this section where you submit the flows: on your
-computer, on the EC2 instance, or on a Perlmutter login node (Part 3). Run
+computer, on the EC2 instance, or on a Perlmutter login node (Part 2). Run
 the ``aws`` commands in CloudShell. In a new terminal, activate the
 environment first:
 
@@ -1555,7 +1581,7 @@ Deleting the stack deletes the EFS file system with all job folders on it.
 The S3 bucket and its copies of the job folders are kept.
 
 1. Stop the jobs that are still queued or running, then stop the
-   ``Runner``. Use the tab of the place where the ``Runner`` runs (Part 3).
+   ``Runner``. Use the tab of the place where the ``Runner`` runs (Part 2).
 
    .. tab-set::
        :sync-group: runner
