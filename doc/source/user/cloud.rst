@@ -826,14 +826,19 @@ MongoDB. Run one ``Runner`` per MongoDB database.
            later, run ``jfr_shell`` in CloudShell and use the ``jf`` commands.
 
         3. On the instance, wait until the setup of the instance is done and check
-           that MongoDB runs:
+           that MongoDB runs. Then add 2 GB of swap. A ``t3a.small`` has 2 GiB of
+           memory and no swap, and without swap a memory peak, for example from
+           MongoDB and an analysis script at the same time, freezes the instance.
 
            .. code-block:: bash
 
                cloud-init status --wait
                systemctl is-active mongod
+               sudo dd if=/dev/zero of=/swapfile bs=1M count=2048 status=none && sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile && echo '/swapfile swap swap defaults 0 0' | sudo tee -a /etc/fstab >/dev/null && free -m | tail -1
 
-           The commands print ``status: done`` and ``active``.
+           The commands print ``status: done``, ``active``, and a ``Swap:`` line
+           with about 2047 MB. Run the swap command only once. Run heavy analysis,
+           for example post-processing of many large cells, on your computer.
 
         4. On the instance, install uv:
 
@@ -964,6 +969,19 @@ MongoDB. Run one ``Runner`` per MongoDB database.
            It prints ``pending``. Wait a minute, then run ``jfr_shell``. To stop
            the instance yourself, run the same block with ``stop-instances`` and
            ``StoppingInstances``.
+
+           If ``jfr_shell`` still prints ``TargetNotConnected`` a few minutes
+           after the instance is ``running``, the instance is most likely frozen,
+           for example by a memory peak. A reboot may not get through. Stop and
+           start it in CloudShell. MongoDB keeps its data, and the AWS Batch jobs
+           keep running. The ``Runner`` collects their results when it is back.
+
+           .. code-block:: bash
+
+               ID=$(aws cloudformation describe-stacks --stack-name jfr-lab --query "Stacks[0].Outputs[?OutputKey=='RunnerInstanceId'].OutputValue" --output text) && aws ec2 stop-instances --instance-ids $ID --query "StoppingInstances[0].CurrentState.Name" --output text && aws ec2 wait instance-stopped --instance-ids $ID && aws ec2 start-instances --instance-ids $ID --query "StartingInstances[0].CurrentState.Name" --output text && aws ec2 wait instance-running --instance-ids $ID && echo started
+
+           It prints ``stopping``, ``pending``, and ``started`` within a few
+           minutes. Then run ``jfr_shell``.
 
         To read the results on your computer, copy the database to S3 on the
         instance:
@@ -1238,8 +1256,13 @@ on a test run before a campaign, and again when the workflow or the inputs
 change. Requests that are too large leave instances half empty, and requests
 that are too small stop jobs.
 
-1. Pick one or two inputs that need the most memory and time, for example the
-   largest cell with the fewest symmetry operations. Give every job generous
+1. Pick one or two inputs that need the most memory and time. Think of the
+   step that needs the most, not of the input. In a phonon flow this is the
+   supercell, not the primitive cell: pick the largest supercells with the
+   fewest symmetry operations. In a 50-material phonon test, the two test cases
+   had the largest primitive cells but not the largest supercells. Seven jobs
+   of other materials then ran out of memory, and some needed more than three
+   times the memory set from the test cases. Give every job generous
    resources.
 
 2. Where you submit the flows, add a ``post_run`` line to the
@@ -1321,6 +1344,10 @@ that are too small stop jobs.
    Smaller requests let more jobs share an instance. Instance types with more
    vCPUs in ``CpuInstanceTypes`` (Part 1, Step 3) let AWS Batch put more jobs
    on one instance, so fewer instances start.
+
+5. Expect a few jobs of a campaign to need more memory than the test cases.
+   Run them again with more memory, see "Run again the jobs that ran out of
+   memory" in :ref:`cloud_manage`.
 
 .. _cloud_submit:
 
@@ -1547,6 +1574,8 @@ instance, and the jobs that share an instance slow each other down.
 
 AWS Batch starts EC2 instances when jobs are queued and terminates them a few
 minutes after the queues are empty.
+
+.. _cloud_manage:
 
 Checking and managing jobs
 ==========================
@@ -1867,6 +1896,83 @@ Batch jobs of the flow that are still queued or running:
 .. code-block:: bash
 
     jf -p aws_ht flow delete -did <db_id>
+
+Run again the jobs that ran out of memory
+-----------------------------------------
+
+AWS Batch stops a job that uses more than its ``memory``. In
+``jf -p aws_ht job info <db_id>``, its error ends with
+``died with <Signals.SIGKILL: 9>`` when a program that the job started was
+killed, or with ``The job was likely killed before completing`` when the
+whole container was stopped. The second error also comes from the
+``time_limit``, so the block below asks AWS Batch for the reason
+(``OutOfMemoryError``).
+
+Type the new memory in MiB into the box. Where you submit the flows, the block
+runs every ``FAILED`` or ``REMOTE_ERROR`` job that ran out of memory again with
+this memory. It prints the error of the other jobs. It needs the same AWS
+access as the ``Runner``, and AWS Batch keeps the reason for 7 days.
+
+.. raw:: html
+
+    <div class="jfr-inputs">
+      <label>Memory (MiB) <input data-jfr="memory" value="16000" size="8"></label>
+    </div>
+
+.. code-block:: bash
+
+    python - <<'EOF'
+    import subprocess
+
+    import boto3
+    from jobflow_remote import JobController
+    from jobflow_remote.jobs.state import JobState
+
+    jc = JobController.from_project_name("aws_ht")
+    batch = boto3.client("batch")
+    for job in jc.get_jobs_info(states=[JobState.FAILED, JobState.REMOTE_ERROR]):
+        error = f"{job.error or ''} {job.remote.error or ''}"
+        batch_jobs = batch.describe_jobs(jobs=[job.remote.process_id])["jobs"] if job.remote.process_id else []
+        reason = batch_jobs[0]["container"].get("reason", "") if batch_jobs else ""
+        if "SIGKILL" in error or reason.startswith("OutOfMemoryError"):
+            subprocess.run(["jf", "-p", "aws_ht", "job", "set", "resources", '{"memory": <memory>}', "-did", job.db_id], check=True)
+            subprocess.run(["jf", "-p", "aws_ht", "job", "rerun", "--force", job.db_id], check=True)
+            print(job.db_id, job.name, "run again with <memory> MiB")
+        else:
+            print(job.db_id, job.name, "not changed:", error.strip().splitlines()[-1][:150])
+    EOF
+
+Check the jobs again after a while, since more jobs of the same kind may run
+out of memory. If the same job runs out of memory again, give it more.
+
+Outputs larger than 16 MB
+-------------------------
+
+MongoDB stores documents of at most 16 MB. If the output of a job is larger,
+the job ends in ``REMOTE_ERROR``, and ``jf -p aws_ht job info <db_id>`` shows
+``BSONObjectTooLarge``. jobflow puts the output fields that a job lists in its
+``data`` argument, for example ``@job(data=["force_constants"])``, into the
+``data`` store of the project. That store is GridFS, which has no size limit
+(Part 1, Step 5).
+
+For flows that you submit later, add the large fields to ``data`` in the code
+that builds the flows. For a job that is already submitted, set the new list
+in the database and run the job again. Type the fields as a Python list into
+the box. The list replaces the ``data`` list of the job, so include the fields
+that it already had. Run this where you submit the flows:
+
+.. raw:: html
+
+    <div class="jfr-inputs">
+      <label>Fields <input data-jfr="data_fields" value='"phonon_bandstructure", "phonon_dos", "force_constants"' size="60"></label>
+    </div>
+
+.. code-block:: bash
+
+    python -c 'from jobflow_remote import JobController; JobController.from_project_name("aws_ht").set_job_doc_properties({"job.data": [<data_fields>]}, db_id="<db_id>")' && jf -p aws_ht job rerun --force <db_id>
+
+The example fields are those of the phonon jobs of atomate2, whose band
+structure and DOS are not sent to the ``data`` store before atomate2 PR #1670.
 
 Start over
 ----------
