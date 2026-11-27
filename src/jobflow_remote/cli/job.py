@@ -1060,6 +1060,14 @@ def resources(
             help="If present the values in `resources_value` will be interpreted as arguments for a QResources object",
         ),
     ] = False,
+    qcloud_resources: Annotated[
+        bool,
+        typer.Option(
+            "--qcloud-resources",
+            "-qcr",
+            help="If present the values in `resources_value` will be interpreted as arguments for a QCloudResources object",
+        ),
+    ] = False,
     job_id: job_ids_indexes_opt = None,
     db_id: db_ids_opt = None,
     flow_id: flow_ids_opt = None,
@@ -1079,10 +1087,22 @@ def resources(
     Set the resources for the selected Jobs.
     Only Jobs not in an evolving state (e.g. CHECKED_OUT, UPLOADED, ...)
     """
+    check_incompatible_opt(
+        {"qresources": qresources, "qcloud_resources": qcloud_resources}
+    )
+
     resources = str_to_dict(resources_value)
 
     if qresources:
         resources = QResources(**resources)
+    elif qcloud_resources:
+        try:
+            from qtoolkit.core.data_objects import QCloudResources
+        except ImportError:
+            exit_with_error_msg(
+                "QCloudResources requires a newer qtoolkit release with cloud support"
+            )
+        resources = QCloudResources(**resources)
 
     jc = get_job_controller()
     execute_multi_jobs_cmd(
