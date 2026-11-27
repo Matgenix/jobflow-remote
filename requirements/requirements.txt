@@ -2,7 +2,7 @@ jobflow==0.4.0
 pydantic==2.14.4
 pymongo==4.10.1
 fabric==3.2.3
-tomlkit==0.15.2
+tomlkit==0.15.3
 qtoolkit==0.1.7
 typer==0.29.1
 rich==15.0.0
