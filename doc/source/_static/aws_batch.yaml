@@ -1,0 +1,574 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: AWS Batch, S3, ECR, and CodeBuild for jobflow-remote cloud workers.
+
+# RunnerImageId is a plain AMI ID instead of an SSM parameter. CloudFormation
+# resolves SSM parameters again at every update, and a new AMI would replace
+# the Runner instance and delete its MongoDB data.
+Metadata:
+  cfn-lint:
+    config:
+      ignore_checks: [W2506]
+
+Parameters:
+  ContainerImage:
+    Type: String
+    Default: public.ecr.aws/docker/library/python:3.12-slim
+    Description: Image of the CPU job definition.
+  GpuContainerImage:
+    Type: String
+    Default: public.ecr.aws/docker/library/python:3.12-slim
+    Description: Image of the EC2 GPU job definition.
+  CpuAllocationType:
+    Type: String
+    Default: SPOT
+    AllowedValues: [SPOT, EC2]
+  CpuInstanceTypes:
+    Type: CommaDelimitedList
+    Default: c7i,c6i,c7a,m7i
+  CpuMaxvCpus:
+    Type: Number
+    Default: 16
+  EnableGpuQueue:
+    Type: String
+    Default: "false"
+    AllowedValues: ["true", "false"]
+  GpuAllocationType:
+    Type: String
+    Default: SPOT
+    AllowedValues: [SPOT, EC2]
+  GpuInstanceTypes:
+    Type: CommaDelimitedList
+    Default: g5,g6
+  GpuMaxvCpus:
+    Type: Number
+    Default: 4
+  LogRetentionDays:
+    Type: Number
+    Default: 7
+  RunFilesRetentionDays:
+    Type: Number
+    Default: 0
+    MinValue: 0
+    Description: Days after which the job files under runs/ in the bucket are deleted. 0 keeps them.
+  DefaultTimeLimit:
+    Type: Number
+    Default: 172800
+    MinValue: 60
+    Description: Time limit in seconds of a job that sets no time_limit (default 48 hours).
+  EnableRunnerInstance:
+    Type: String
+    Default: "false"
+    AllowedValues: ["true", "false"]
+    Description: Create an EC2 instance with MongoDB for the Runner.
+  RunnerInstanceType:
+    Type: String
+    Default: t3a.small
+  RunnerImageId:
+    Type: String
+    Default: ""
+    Description: Amazon Linux 2023 x86_64 AMI of the Runner instance.
+
+Conditions:
+  HasGpuQueue: {Fn::Equals: [{Ref: EnableGpuQueue}, "true"]}
+  ExpireRunFiles: {Fn::Not: [{Fn::Equals: [{Ref: RunFilesRetentionDays}, "0"]}]}
+  IsCpuSpot: {Fn::Equals: [{Ref: CpuAllocationType}, "SPOT"]}
+  IsGpuSpot: {Fn::Equals: [{Ref: GpuAllocationType}, "SPOT"]}
+  HasRunnerInstance: {Fn::Equals: [{Ref: EnableRunnerInstance}, "true"]}
+
+Resources:
+  # Network: a public VPC with two subnets and no NAT Gateway.
+  BatchVpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.42.0.0/16
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+
+  VpcGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: {Ref: BatchVpc}
+      InternetGatewayId: {Ref: InternetGateway}
+
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: {Ref: BatchVpc}
+
+  PublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: VpcGatewayAttachment
+    Properties:
+      RouteTableId: {Ref: PublicRouteTable}
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: {Ref: InternetGateway}
+
+  PublicSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: {Ref: BatchVpc}
+      CidrBlock: 10.42.1.0/24
+      AvailabilityZone: {Fn::Select: [0, {Fn::GetAZs: ""}]}
+      MapPublicIpOnLaunch: true
+
+  PublicSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: {Ref: BatchVpc}
+      CidrBlock: 10.42.2.0/24
+      AvailabilityZone: {Fn::Select: [1, {Fn::GetAZs: ""}]}
+      MapPublicIpOnLaunch: true
+
+  Subnet1RouteAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: {Ref: PublicSubnet1}
+      RouteTableId: {Ref: PublicRouteTable}
+
+  Subnet2RouteAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: {Ref: PublicSubnet2}
+      RouteTableId: {Ref: PublicRouteTable}
+
+  BatchSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Outbound traffic only
+      VpcId: {Ref: BatchVpc}
+      SecurityGroupEgress:
+        - {IpProtocol: "-1", CidrIp: 0.0.0.0/0}
+
+  # Storage: S3 bucket for job files, ECR repository for images, and logs.
+  # The bucket keeps the job files after the stack is deleted.
+  StagingBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LifecycleConfiguration:
+        Fn::If:
+          - ExpireRunFiles
+          - Rules:
+              - Id: DeleteOldJobFiles
+                Status: Enabled
+                Prefix: runs/
+                ExpirationInDays: {Ref: RunFilesRetentionDays}
+          - {Ref: AWS::NoValue}
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  EcrRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      EmptyOnDelete: true
+
+  # Shared file system mounted at /mnt/jfr in every container. Jobs run in their
+  # folders on it, so a job can read the folders of earlier jobs (prev_dir).
+  # Deleting the stack deletes it.
+  RunFileSystem:
+    Type: AWS::EFS::FileSystem
+    Properties:
+      Encrypted: true
+      ThroughputMode: elastic
+      LifecyclePolicies:
+        - TransitionToIA: AFTER_30_DAYS
+
+  EfsSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: NFS from the Batch instances
+      VpcId: {Ref: BatchVpc}
+      SecurityGroupIngress:
+        - {IpProtocol: tcp, FromPort: 2049, ToPort: 2049, SourceSecurityGroupId: {Ref: BatchSecurityGroup}}
+
+  MountTarget1:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId: {Ref: RunFileSystem}
+      SubnetId: {Ref: PublicSubnet1}
+      SecurityGroups: [{Ref: EfsSecurityGroup}]
+
+  MountTarget2:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId: {Ref: RunFileSystem}
+      SubnetId: {Ref: PublicSubnet2}
+      SecurityGroups: [{Ref: EfsSecurityGroup}]
+
+  BatchLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: {Fn::Sub: "/aws/batch/${AWS::StackName}"}
+      RetentionInDays: {Ref: LogRetentionDays}
+
+  CodeBuildLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: {Fn::Sub: "/aws/codebuild/${AWS::StackName}-build"}
+      RetentionInDays: {Ref: LogRetentionDays}
+
+  # IAM: roles for the containers and EC2 instances, and a user and an optional
+  # instance for the Runner.
+  BatchTaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - {Effect: Allow, Principal: {Service: ecs-tasks.amazonaws.com}, Action: sts:AssumeRole}
+      Policies:
+        - PolicyName: S3JobFiles
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: [s3:ListBucket, s3:GetBucketLocation]
+                Resource: {Fn::GetAtt: [StagingBucket, Arn]}
+              - Effect: Allow
+                Action: [s3:GetObject, s3:PutObject]
+                Resource: {Fn::Sub: "${StagingBucket.Arn}/*"}
+
+  EcsInstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - {Effect: Allow, Principal: {Service: ec2.amazonaws.com}, Action: sts:AssumeRole}
+      ManagedPolicyArns:
+        - {Fn::Sub: "arn:${AWS::Partition}:iam::aws:policy/service-role/AmazonEC2ContainerServiceforEC2Role"}
+
+  EcsInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles: [{Ref: EcsInstanceRole}]
+
+  RunnerPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action: [s3:ListBucket, s3:GetBucketLocation]
+            Resource: {Fn::GetAtt: [StagingBucket, Arn]}
+          - Effect: Allow
+            Action: [s3:GetObject, s3:PutObject, s3:DeleteObject]
+            Resource: {Fn::Sub: "${StagingBucket.Arn}/*"}
+          - Effect: Allow
+            Action: [batch:SubmitJob, batch:DescribeJobs, batch:ListJobs, batch:TerminateJob]
+            Resource: "*"
+            Condition: {StringEquals: {"aws:RequestedRegion": {Ref: AWS::Region}}}
+          - Effect: Allow
+            Action: cloudformation:DescribeStacks
+            Resource: {Ref: AWS::StackId}
+
+  RunnerUser:
+    Type: AWS::IAM::User
+    Properties:
+      ManagedPolicyArns: [{Ref: RunnerPolicy}]
+
+  # Optional instance for the Runner, with MongoDB on its own disk. It has no
+  # open ports. Users connect with Session Manager.
+  RunnerInstanceRole:
+    Type: AWS::IAM::Role
+    Condition: HasRunnerInstance
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - {Effect: Allow, Principal: {Service: ec2.amazonaws.com}, Action: sts:AssumeRole}
+      ManagedPolicyArns:
+        - {Ref: RunnerPolicy}
+        - {Fn::Sub: "arn:${AWS::Partition}:iam::aws:policy/AmazonSSMManagedInstanceCore"}
+
+  RunnerInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Condition: HasRunnerInstance
+    Properties:
+      Roles: [{Ref: RunnerInstanceRole}]
+
+  RunnerInstance:
+    Type: AWS::EC2::Instance
+    Condition: HasRunnerInstance
+    DependsOn: [PublicRoute, Subnet1RouteAssoc]
+    Metadata:
+      cfn-lint:
+        config:
+          ignore_checks: [W1030]
+    Properties:
+      ImageId: {Ref: RunnerImageId}
+      InstanceType: {Ref: RunnerInstanceType}
+      IamInstanceProfile: {Ref: RunnerInstanceProfile}
+      SubnetId: {Ref: PublicSubnet1}
+      SecurityGroupIds: [{Ref: BatchSecurityGroup}]
+      BlockDeviceMappings:
+        - DeviceName: /dev/xvda
+          Ebs: {VolumeSize: 20, VolumeType: gp3, Encrypted: true, DeleteOnTermination: true}
+      Tags:
+        - {Key: Name, Value: {Fn::Sub: "${AWS::StackName}-runner"}}
+      UserData:
+        Fn::Base64:
+          Fn::Sub: |
+            #!/bin/bash
+            set -euo pipefail
+            echo "export AWS_DEFAULT_REGION=${AWS::Region}" > /etc/profile.d/aws-region.sh
+            cat > /etc/yum.repos.d/mongodb-org-8.0.repo <<'EOF'
+            [mongodb-org-8.0]
+            name=MongoDB Repository
+            baseurl=https://repo.mongodb.org/yum/amazon/2023/mongodb-org/8.0/x86_64/
+            gpgcheck=1
+            enabled=1
+            gpgkey=https://pgp.mongodb.com/server-8.0.asc
+            EOF
+            dnf install -y git mongodb-org
+            systemctl enable --now mongod
+
+  # Instances pull each image once and reuse the cached copy for later jobs.
+  EcsLaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateData:
+        UserData:
+          Fn::Base64: |
+            MIME-Version: 1.0
+            Content-Type: multipart/mixed; boundary="==BOUNDARY=="
+
+            --==BOUNDARY==
+            Content-Type: text/x-shellscript; charset="us-ascii"
+
+            #!/bin/bash
+            echo "ECS_IMAGE_PULL_BEHAVIOR=prefer-cached" >> /etc/ecs/ecs.config
+
+            --==BOUNDARY==--
+
+  # CPU queue: several jobs can share one instance.
+  CpuComputeEnvironment:
+    Type: AWS::Batch::ComputeEnvironment
+    DependsOn: [PublicRoute, Subnet1RouteAssoc, Subnet2RouteAssoc]
+    Properties:
+      Type: MANAGED
+      # Update the instances in place instead of deleting the compute environment.
+      ReplaceComputeEnvironment: false
+      ComputeResources:
+        Type: {Ref: CpuAllocationType}
+        AllocationStrategy:
+          Fn::If: [IsCpuSpot, SPOT_PRICE_CAPACITY_OPTIMIZED, BEST_FIT_PROGRESSIVE]
+        Ec2Configuration: [{ImageType: ECS_AL2023}]
+        LaunchTemplate:
+          LaunchTemplateId: {Ref: EcsLaunchTemplate}
+          Version: {Fn::GetAtt: [EcsLaunchTemplate, LatestVersionNumber]}
+        MinvCpus: 0
+        MaxvCpus: {Ref: CpuMaxvCpus}
+        InstanceTypes: {Ref: CpuInstanceTypes}
+        InstanceRole: {Fn::GetAtt: [EcsInstanceProfile, Arn]}
+        Subnets: [{Ref: PublicSubnet1}, {Ref: PublicSubnet2}]
+        SecurityGroupIds: [{Ref: BatchSecurityGroup}]
+        Tags: {Project: {Ref: AWS::StackName}}
+
+  CpuJobQueue:
+    Type: AWS::Batch::JobQueue
+    Properties:
+      Priority: 1
+      ComputeEnvironmentOrder:
+        - {Order: 1, ComputeEnvironment: {Ref: CpuComputeEnvironment}}
+      JobStateTimeLimitActions:
+        # Cancel jobs that no instance of the queue can ever run.
+        - {Action: CANCEL, MaxTimeSeconds: 1800, State: RUNNABLE, Reason: "MISCONFIGURATION:JOB_RESOURCE_REQUIREMENT"}
+        - {Action: CANCEL, MaxTimeSeconds: 1800, State: RUNNABLE, Reason: "MISCONFIGURATION:COMPUTE_ENVIRONMENT_MAX_RESOURCE"}
+
+  CpuJobDefinition:
+    Type: AWS::Batch::JobDefinition
+    DependsOn: [MountTarget1, MountTarget2]
+    Properties:
+      Type: container
+      PlatformCapabilities: [EC2]
+      Timeout: {AttemptDurationSeconds: {Ref: DefaultTimeLimit}}
+      ContainerProperties:
+        Image: {Ref: ContainerImage}
+        JobRoleArn: {Fn::GetAtt: [BatchTaskRole, Arn]}
+        Volumes:
+          - Name: run-folders
+            EfsVolumeConfiguration:
+              FileSystemId: {Ref: RunFileSystem}
+              TransitEncryption: ENABLED
+        MountPoints:
+          - {SourceVolume: run-folders, ContainerPath: /mnt/jfr}
+        ResourceRequirements:
+          - {Type: VCPU, Value: "1"}
+          - {Type: MEMORY, Value: "1800"}
+        LogConfiguration:
+          LogDriver: awslogs
+          Options:
+            awslogs-group: {Ref: BatchLogGroup}
+            awslogs-region: {Ref: AWS::Region}
+            awslogs-stream-prefix: jfr-cpu
+      RetryStrategy:
+        Attempts: 3
+        EvaluateOnExit:
+          - {OnStatusReason: "Host EC2*", Action: RETRY}
+          - {OnStatusReason: "*", Action: EXIT}
+
+  # Optional EC2 GPU queue: one GPU per job.
+  GpuComputeEnvironment:
+    Type: AWS::Batch::ComputeEnvironment
+    Condition: HasGpuQueue
+    DependsOn: [PublicRoute, Subnet1RouteAssoc, Subnet2RouteAssoc]
+    Properties:
+      Type: MANAGED
+      ReplaceComputeEnvironment: false
+      ComputeResources:
+        Type: {Ref: GpuAllocationType}
+        AllocationStrategy:
+          Fn::If: [IsGpuSpot, SPOT_PRICE_CAPACITY_OPTIMIZED, BEST_FIT_PROGRESSIVE]
+        Ec2Configuration: [{ImageType: ECS_AL2023_NVIDIA}]
+        LaunchTemplate:
+          LaunchTemplateId: {Ref: EcsLaunchTemplate}
+          Version: {Fn::GetAtt: [EcsLaunchTemplate, LatestVersionNumber]}
+        MinvCpus: 0
+        MaxvCpus: {Ref: GpuMaxvCpus}
+        InstanceTypes: {Ref: GpuInstanceTypes}
+        InstanceRole: {Fn::GetAtt: [EcsInstanceProfile, Arn]}
+        Subnets: [{Ref: PublicSubnet1}, {Ref: PublicSubnet2}]
+        SecurityGroupIds: [{Ref: BatchSecurityGroup}]
+        Tags: {Project: {Ref: AWS::StackName}}
+
+  GpuJobQueue:
+    Type: AWS::Batch::JobQueue
+    Condition: HasGpuQueue
+    Properties:
+      Priority: 1
+      ComputeEnvironmentOrder:
+        - {Order: 1, ComputeEnvironment: {Ref: GpuComputeEnvironment}}
+      JobStateTimeLimitActions:
+        # Cancel jobs that no instance of the queue can ever run.
+        - {Action: CANCEL, MaxTimeSeconds: 1800, State: RUNNABLE, Reason: "MISCONFIGURATION:JOB_RESOURCE_REQUIREMENT"}
+        - {Action: CANCEL, MaxTimeSeconds: 1800, State: RUNNABLE, Reason: "MISCONFIGURATION:COMPUTE_ENVIRONMENT_MAX_RESOURCE"}
+
+  GpuJobDefinition:
+    Type: AWS::Batch::JobDefinition
+    Condition: HasGpuQueue
+    DependsOn: [MountTarget1, MountTarget2]
+    Properties:
+      Type: container
+      PlatformCapabilities: [EC2]
+      Timeout: {AttemptDurationSeconds: {Ref: DefaultTimeLimit}}
+      ContainerProperties:
+        Image: {Ref: GpuContainerImage}
+        JobRoleArn: {Fn::GetAtt: [BatchTaskRole, Arn]}
+        Volumes:
+          - Name: run-folders
+            EfsVolumeConfiguration:
+              FileSystemId: {Ref: RunFileSystem}
+              TransitEncryption: ENABLED
+        MountPoints:
+          - {SourceVolume: run-folders, ContainerPath: /mnt/jfr}
+        ResourceRequirements:
+          - {Type: VCPU, Value: "4"}
+          - {Type: MEMORY, Value: "14000"}
+          - {Type: GPU, Value: "1"}
+        LogConfiguration:
+          LogDriver: awslogs
+          Options:
+            awslogs-group: {Ref: BatchLogGroup}
+            awslogs-region: {Ref: AWS::Region}
+            awslogs-stream-prefix: jfr-gpu
+      RetryStrategy:
+        Attempts: 3
+        EvaluateOnExit:
+          - {OnStatusReason: "Host EC2*", Action: RETRY}
+          - {OnStatusReason: "*", Action: EXIT}
+
+  # CodeBuild project that builds an image from build/context.zip in the bucket.
+  CodeBuildRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - {Effect: Allow, Principal: {Service: codebuild.amazonaws.com}, Action: sts:AssumeRole}
+      Policies:
+        - PolicyName: BuildAndPushImage
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: ecr:GetAuthorizationToken
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - ecr:BatchCheckLayerAvailability
+                  - ecr:CompleteLayerUpload
+                  - ecr:InitiateLayerUpload
+                  - ecr:PutImage
+                  - ecr:UploadLayerPart
+                Resource: {Fn::GetAtt: [EcrRepository, Arn]}
+              - Effect: Allow
+                Action: [s3:GetBucketLocation, s3:GetBucketAcl]
+                Resource: {Fn::GetAtt: [StagingBucket, Arn]}
+              - Effect: Allow
+                Action: [s3:GetObject, s3:GetObjectVersion]
+                Resource: {Fn::Sub: "${StagingBucket.Arn}/build/*"}
+              - Effect: Allow
+                Action: [logs:CreateLogStream, logs:PutLogEvents]
+                Resource: {Fn::GetAtt: [CodeBuildLogGroup, Arn]}
+
+  CodeBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      ServiceRole: {Fn::GetAtt: [CodeBuildRole, Arn]}
+      Artifacts: {Type: NO_ARTIFACTS}
+      LogsConfig:
+        CloudWatchLogs: {Status: ENABLED, GroupName: {Ref: CodeBuildLogGroup}}
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_MEDIUM
+        Image: aws/codebuild/standard:7.0
+        PrivilegedMode: true
+        EnvironmentVariables:
+          - {Name: ECR_REPO_URI, Value: {Fn::GetAtt: [EcrRepository, RepositoryUri]}}
+          - {Name: IMAGE_TAG, Value: latest}
+          - {Name: TORCH_INDEX, Value: "https://download.pytorch.org/whl/cpu"}
+      Source:
+        Type: S3
+        Location: {Fn::Sub: "${StagingBucket}/build/context.zip"}
+        BuildSpec: |
+          version: 0.2
+          phases:
+            build:
+              commands:
+                - aws ecr get-login-password | docker login --username AWS --password-stdin "${ECR_REPO_URI%%/*}"
+                - docker build --platform linux/amd64 --build-arg TORCH_INDEX="${TORCH_INDEX}" -t "${ECR_REPO_URI}:${IMAGE_TAG}" .
+                - docker push "${ECR_REPO_URI}:${IMAGE_TAG}"
+
+Outputs:
+  Region:
+    Value: {Ref: AWS::Region}
+  S3BucketName:
+    Value: {Ref: StagingBucket}
+  CpuJobQueueArn:
+    Value: {Ref: CpuJobQueue}
+  CpuJobDefinitionArn:
+    Value: {Ref: CpuJobDefinition}
+  GpuJobQueueArn:
+    Condition: HasGpuQueue
+    Value: {Ref: GpuJobQueue}
+  GpuJobDefinitionArn:
+    Condition: HasGpuQueue
+    Value: {Ref: GpuJobDefinition}
+  EcrRepositoryUri:
+    Value: {Fn::GetAtt: [EcrRepository, RepositoryUri]}
+  CodeBuildProjectName:
+    Value: {Ref: CodeBuildProject}
+  RunnerUserName:
+    Value: {Ref: RunnerUser}
+  RunnerInstanceId:
+    Condition: HasRunnerInstance
+    Value: {Ref: RunnerInstance}

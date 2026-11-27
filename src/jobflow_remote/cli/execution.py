@@ -4,7 +4,7 @@ import typer
 
 from jobflow_remote.cli.jf import app
 from jobflow_remote.cli.jfr_typer import JFRTyper
-from jobflow_remote.jobs.run import run_batch_jobs, run_remote_job
+from jobflow_remote.jobs.run import run_batch_jobs, run_cloud_job, run_remote_job
 
 app_execution = JFRTyper(
     name="execution",
@@ -26,6 +26,43 @@ def run(
 ) -> None:
     """Run the Job in the selected folder based on the job files."""
     run_remote_job(run_dir)
+
+
+@app_execution.command(name="run-cloud")
+def run_cloud(
+    storage_uri: Annotated[
+        str,
+        typer.Argument(
+            help="Cloud storage URI of the job folder (e.g. s3://bucket/jf_work/<job folder>)",
+        ),
+    ],
+    local_dir: Annotated[
+        str,
+        typer.Option(
+            "--local-dir",
+            help="Folder in the container under which the job folder is created, "
+            "with the same path as in the storage. The job folder is kept after the job.",
+        ),
+    ],
+    storage_options: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--storage-option",
+            help="Option of the storage class as KEY=VALUE, e.g. region_name=us-east-2. "
+            "Can be repeated.",
+        ),
+    ] = None,
+) -> None:
+    """Download the input of a job from cloud storage, run the job, and upload the folder."""
+    options = {}
+    for option in storage_options or []:
+        key, sep, value = option.partition("=")
+        if not sep:
+            raise typer.BadParameter(
+                f"'{option}' is not KEY=VALUE.", param_hint="--storage-option"
+            )
+        options[key] = value
+    run_cloud_job(storage_uri=storage_uri, local_dir=local_dir, storage_options=options)
 
 
 @app_execution.command()
