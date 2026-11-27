@@ -1087,6 +1087,98 @@ Use ``submit_flow(..., resources=...)`` to set the resources of all jobs in a
 flow. Use ``set_run_config`` to give jobs with a given name another worker or
 other resources. The example in :ref:`cloud_submit` uses both.
 
+Measure the resources of a workflow
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The right resources depend on the workflow and its inputs. Measure them once
+on a test run before a campaign, and again when the workflow or the inputs
+change. Requests that are too large leave instances half empty, and requests
+that are too small stop jobs.
+
+1. Pick one or two inputs that need the most memory and time, for example the
+   largest cell with the fewest symmetry operations. Give every job generous
+   resources.
+
+2. Where you submit the flows, add a ``post_run`` line to the
+   ``ExecutionConfig`` of the test flows. At the end of each job it writes the
+   peak memory and the CPU time of the container to its log:
+
+   .. code-block:: python
+
+       from jobflow_remote.config.base import ExecutionConfig
+
+       exec_config = ExecutionConfig(
+           post_run=(
+               'echo "jfr_usage peak_memory_bytes $(cat /sys/fs/cgroup/memory.peak) '
+               "cpu_usage_usec $(awk '/^usage_usec/ {print $2}' /sys/fs/cgroup/cpu.stat)\""
+           )
+       )
+
+   Pass it to ``submit_flow(..., exec_config=exec_config)``. A job stopped by
+   its ``time_limit`` or by a Spot reclaim writes no line.
+
+3. When the test jobs have ended, in CloudShell, print one line per job of the
+   CPU queue from the last 7 days: the run time, the requested vCPUs and
+   memory, the peak memory, the CPU time, and the average number of busy
+   threads (CPU time divided by run time). For the GPU queue, replace
+   ``CpuJobQueueArn`` with ``GpuJobQueueArn``.
+
+   .. code-block:: bash
+
+       QUEUE=$(aws cloudformation describe-stacks --stack-name jfr-lab --query "Stacks[0].Outputs[?OutputKey=='CpuJobQueueArn'].OutputValue" --output text) python3 - <<'EOF'
+       import os
+
+       import boto3
+
+       batch = boto3.client("batch")
+       logs = boto3.client("logs")
+       ids = [
+           job["jobId"]
+           for status in ("SUCCEEDED", "FAILED")
+           for page in batch.get_paginator("list_jobs").paginate(jobQueue=os.environ["QUEUE"], jobStatus=status)
+           for job in page["jobSummaryList"]
+       ]
+       print(f"{'job':<36} {'min':>6} {'vCPU':>4} {'MiB':>6} {'peak MiB':>8} {'CPU s':>7} {'threads':>7}")
+       for start in range(0, len(ids), 100):
+           for job in batch.describe_jobs(jobs=ids[start : start + 100])["jobs"]:
+               if not job.get("startedAt"):
+                   continue
+               seconds = (job["stoppedAt"] - job["startedAt"]) / 1000
+               asked = {r["type"]: r["value"] for r in job["container"].get("resourceRequirements", [])}
+               peak = cpu = ""
+               if job["container"].get("logStreamName"):
+                   pages = logs.get_paginator("filter_log_events").paginate(
+                       logGroupName="/aws/batch/jfr-lab",
+                       logStreamNames=[job["container"]["logStreamName"]],
+                       filterPattern='"jfr_usage"',
+                   )
+                   for event in (e for page in pages for e in page["events"]):
+                       words = event["message"].split()
+                       values = dict(zip(words[1::2], words[2::2]))
+                       peak = round(int(values["peak_memory_bytes"]) / 2**20)
+                       cpu = round(int(values["cpu_usage_usec"]) / 1e6)
+               threads = f"{cpu / seconds:.1f}" if cpu != "" and seconds else ""
+               print(
+                   f"{job['jobName'][:36]:<36} {seconds / 60:>6.1f} {asked.get('VCPU', ''):>4} "
+                   f"{asked.get('MEMORY', ''):>6} {peak:>8} {cpu:>7} {threads:>7}"
+               )
+       EOF
+
+4. Set the resources of each job name from the table:
+
+   * ``memory``: the peak memory times about 1.3. The peak includes page cache,
+     for example the library files the job read, so it is an upper bound.
+   * ``vcpus``: the number of busy threads, rounded up. A job that keeps only
+     one thread busy gets ``vcpus=1``. With fewer vCPUs, the run time grows to
+     about the CPU time divided by the new ``vcpus``.
+   * ``time_limit``: about three times the run time with the new ``vcpus``.
+   * The thread variables in ``environment``: the new ``vcpus``.
+
+   Set them per job name with ``set_run_config``, as in :ref:`cloud_submit`.
+   Smaller requests let more jobs share an instance. Instance types with more
+   vCPUs in ``CpuInstanceTypes`` (Part 1, Step 3) let AWS Batch put more jobs
+   on one instance, so fewer instances start.
+
 .. _cloud_submit:
 
 Step 4. Submit the flows
