@@ -103,8 +103,9 @@ To keep the cost low on AWS:
 * Set ``time_limit`` for each job, so that a stuck job does not keep an
   instance running.
 * Keep the CPU queue on Spot instances.
-* Stop the ``Runner`` instance when no flows run, and delete job folders,
-  images, and stacks you no longer need (see :ref:`cloud_cleanup`).
+* Let the ``Runner`` instance stop itself when it has no work (Part 2,
+  **EC2 instance** tab, item 8), and delete job folders, images, and stacks
+  you no longer need (see :ref:`cloud_cleanup`).
 
 Prices: `Amazon EC2 <https://aws.amazon.com/ec2/pricing/>`_,
 `Amazon EFS <https://aws.amazon.com/efs/pricing/>`_,
@@ -759,6 +760,13 @@ MongoDB. Run one ``Runner`` per MongoDB database.
         Session Manager. Deleting the stack deletes the instance and its MongoDB
         data. Step 1 of :ref:`cloud_cleanup` copies the data to S3 first.
 
+        .. warning::
+
+            The instance is billed while it runs, also when no flow runs:
+            about 0.024 USD per hour, or 0.58 USD per day. AWS does not stop it.
+            Item 8 makes the instance stop itself when it has no work. A stopped
+            instance is billed only for its disk, about 1.60 USD per month.
+
         1. In CloudShell, create ``aws_batch.yaml`` again with item 1 of Part 1,
            Step 3, so that you have the current template. Then add the instance to
            the stack. Update the stack only when no jobs are running.
@@ -885,6 +893,77 @@ MongoDB. Run one ``Runner`` per MongoDB database.
 
            Check them with the commands of the **uv** tab of item 4 of Part 1,
            Step 6.
+
+        8. On the instance, make the instance stop itself when it has no work.
+           A timer runs ``jfr_idle_stop.py`` every 10 minutes, the first time
+           30 minutes after the instance starts. The script stops the instance
+           when no job is ready, queued, or running, no job changed in the last
+           30 minutes, and no shell is open on the instance. Waiting, completed,
+           failed, paused, and stopped jobs do not keep it running.
+
+           .. code-block:: bash
+
+               cat > ~/jfr_idle_stop.py <<'EOF'
+               import subprocess
+               from datetime import datetime, timedelta, timezone
+
+               from jobflow_remote import JobController
+               from jobflow_remote.jobs.state import JobState
+
+               idle_states = {
+                   JobState.WAITING, JobState.COMPLETED, JobState.FAILED, JobState.PAUSED,
+                   JobState.STOPPED, JobState.USER_STOPPED, JobState.REMOTE_ERROR,
+               }
+               jc = JobController.from_project_name("aws_ht")
+               active = jc.count_jobs(states=[s for s in JobState if s not in idle_states])
+               last = jc.get_jobs_info(sort=[("updated_on", -1)], limit=1)
+               now = datetime.now(timezone.utc)
+               recent = bool(last) and now - last[0].updated_on.replace(tzinfo=timezone.utc) < timedelta(minutes=30)
+               shell = subprocess.run(["pgrep", "-f", "ssm-session-worker"], capture_output=True).returncode == 0
+               print(f"active jobs: {active}, job changed in the last 30 min: {recent}, shell open: {shell}")
+               if not (active or recent or shell):
+                   subprocess.run(["sudo", "systemctl", "poweroff"], check=True)
+               EOF
+               sudo tee /etc/systemd/system/jfr-idle-stop.service > /dev/null <<EOF
+               [Unit]
+               Description=Stop the instance when the jobflow-remote Runner has no work
+               After=mongod.service
+
+               [Service]
+               Type=oneshot
+               User=$USER
+               ExecStart=$HOME/.venvs/jfr/bin/python $HOME/jfr_idle_stop.py
+               EOF
+               sudo tee /etc/systemd/system/jfr-idle-stop.timer > /dev/null <<EOF
+               [Timer]
+               OnBootSec=30min
+               OnUnitActiveSec=10min
+
+               [Install]
+               WantedBy=timers.target
+               EOF
+               sudo systemctl daemon-reload && sudo systemctl enable --now jfr-idle-stop.timer && python ~/jfr_idle_stop.py
+
+           The last command prints ``shell open: True``, so it does not stop the
+           instance. To see the checks of the timer, run
+           ``journalctl -u jfr-idle-stop``. To keep the instance running without a
+           shell, for example for a long analysis, run
+           ``sudo systemctl stop jfr-idle-stop.timer``. The timer starts again with
+           the next start of the instance.
+
+           To use a stopped instance, start it in CloudShell. ``jfr_shell`` prints
+           ``TargetNotConnected`` while the instance is stopped or starting. MongoDB
+           and the ``Runner`` start with the instance.
+
+           .. code-block:: bash
+
+               aws ec2 start-instances --instance-ids "$(aws cloudformation describe-stacks --stack-name jfr-lab \
+                 --query "Stacks[0].Outputs[?OutputKey=='RunnerInstanceId'].OutputValue" --output text)" \
+                 --query "StartingInstances[0].CurrentState.Name" --output text
+
+           It prints ``pending``. Wait a minute, then run ``jfr_shell``. To stop
+           the instance yourself, run the same block with ``stop-instances`` and
+           ``StoppingInstances``.
 
         To read the results on your computer, copy the database to S3 on the
         instance:
