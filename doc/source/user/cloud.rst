@@ -47,6 +47,70 @@ The setup has three parts. Part 1 is done once per lab or AWS account. Part 2
 chooses where the ``Runner`` runs: your computer or a machine that is always
 on. Part 3 is repeated for each campaign.
 
+Costs and waiting compared with NERSC
+=====================================
+
+.. list-table::
+   :header-rows: 1
+   :widths: 18 41 41
+
+   * -
+     - NERSC (Perlmutter CPU)
+     - AWS (this guide)
+   * - What you pay with
+     - Node-hours of the project allocation
+     - Money, billed to the AWS account
+   * - What is charged
+     - Nodes times elapsed hours times the QOS factor (``regular`` 1,
+       ``premium`` 2 or 4, ``overrun`` 0)
+     - Each instance per second from its start to its end, at least 60
+       seconds, at its On-Demand or Spot price
+   * - Size of the unit
+     - A whole node (128 cores, 512 GB), or a fraction of it in the
+       ``shared`` QOS
+     - An instance of 2 to 192 vCPUs. AWS Batch puts several jobs on one
+       instance when its free vCPUs and memory allow.
+   * - Unused resources
+     - Idle cores of a reserved node are charged
+     - Free vCPUs and memory of a running instance are charged. AWS Batch ends
+       an instance a few minutes after it has no more jobs.
+   * - Waiting before a job starts
+     - Queue wait, from minutes to days
+     - No queue of other users. A job waits about 2 to 3 minutes when a new
+       instance starts, and longer when the vCPU quota (Part 1, Step 2) is
+       used up or no Spot capacity is free.
+   * - Longest job
+     - 48 hours in ``regular``
+     - The ``time_limit`` of the job (default 48 hours in this stack). AWS can
+       reclaim a Spot instance with a 2-minute notice, and the stack then
+       reruns the job.
+   * - Storage
+     - Scratch and CFS within the project quotas
+     - S3 and EFS per GB and month. EFS also per GB read and written.
+   * - Parts that run all the time
+     - None
+     - The ``Runner`` instance of Part 2, if you use it, and a public IPv4
+       address per running instance
+   * - Usage
+     - Iris
+     - Cost Explorer and the budget of Part 1, about a day later
+
+To keep the cost low on AWS:
+
+* Ask each job for the vCPUs and memory it needs, see
+  "Measure the resources of a workflow" in Part 3, Step 3. Unused vCPUs and
+  memory of a running instance are paid for.
+* Set ``time_limit`` for each job, so that a stuck job does not keep an
+  instance running.
+* Keep the CPU queue on Spot instances.
+* Stop the ``Runner`` instance when no flows run, and delete job folders,
+  images, and stacks you no longer need (see :ref:`cloud_cleanup`).
+
+Prices: `Amazon EC2 <https://aws.amazon.com/ec2/pricing/>`_,
+`Amazon EFS <https://aws.amazon.com/efs/pricing/>`_,
+`Amazon S3 <https://aws.amazon.com/s3/pricing/>`_. NERSC charges:
+`QOS and charges <https://docs.nersc.gov/jobs/policy/>`_.
+
 How to use this guide
 =====================
 
@@ -1604,6 +1668,52 @@ is no shell access to the container.
 
        aws batch describe-jobs --jobs "<batch_job_id>" --query 'jobs[0].[status,statusReason,container.exitCode,container.reason]' --output text
        for S in $(aws batch describe-jobs --jobs "<batch_job_id>" --query 'jobs[0].[attempts[].container.logStreamName, container.logStreamName][]' --output text | tr '\t' '\n' | grep -v None | sort -u); do aws logs tail /aws/batch/jfr-lab --log-stream-names "$S" --since 7d; done
+
+See the running instances
+-------------------------
+
+In CloudShell, list the instances of the CPU queue. Each line shows the
+instance type, its vCPUs and memory, how much of them is still free, the
+number of jobs on it, and how long it has run. For the GPU queue, replace
+``CpuJobQueueArn`` with ``GpuJobQueueArn``.
+
+.. code-block:: bash
+
+    QUEUE=$(aws cloudformation describe-stacks --stack-name jfr-lab --query "Stacks[0].Outputs[?OutputKey=='CpuJobQueueArn'].OutputValue" --output text) python3 - <<'EOF'
+    import os
+    from datetime import datetime, timezone
+
+    import boto3
+
+    batch = boto3.client("batch")
+    ecs = boto3.client("ecs")
+    queue = batch.describe_job_queues(jobQueues=[os.environ["QUEUE"]])["jobQueues"][0]
+    environments = [c["computeEnvironment"] for c in queue["computeEnvironmentOrder"]]
+    clusters = [
+        e["ecsClusterArn"]
+        for e in batch.describe_compute_environments(computeEnvironments=environments)["computeEnvironments"]
+    ]
+    now = datetime.now(timezone.utc)
+    total = [0, 0, 0, 0, 0]
+    print(f"{'instance':<20} {'type':<12} {'vCPU':>4} {'free':>4} {'GiB':>5} {'free':>5} {'jobs':>4} {'up (min)':>8}")
+    for cluster in clusters:
+        arns = ecs.list_container_instances(cluster=cluster, status="ACTIVE")["containerInstanceArns"]
+        for start in range(0, len(arns), 100):
+            for ci in ecs.describe_container_instances(cluster=cluster, containerInstances=arns[start : start + 100])[
+                "containerInstances"
+            ]:
+                have = {r["name"]: r.get("integerValue", 0) for r in ci["registeredResources"]}
+                free = {r["name"]: r.get("integerValue", 0) for r in ci["remainingResources"]}
+                kind = {a["name"]: a.get("value") for a in ci["attributes"]}.get("ecs.instance-type", "")
+                row = [have["CPU"] // 1024, free["CPU"] // 1024, have["MEMORY"] / 1024, free["MEMORY"] / 1024, ci["runningTasksCount"]]
+                total = [a + b for a, b in zip(total, row)]
+                minutes = (now - ci["registeredAt"]).total_seconds() / 60
+                print(f"{ci['ec2InstanceId']:<20} {kind:<12} {row[0]:>4} {row[1]:>4} {row[2]:>5.1f} {row[3]:>5.1f} {row[4]:>4} {minutes:>8.0f}")
+    print(f"{'total':<33} {total[0]:>4} {total[1]:>4} {total[2]:>5.1f} {total[3]:>5.1f} {total[4]:>4}")
+    EOF
+
+AWS bills every listed instance for the time it runs. Free vCPUs and memory
+show room that the jobs of the queue do not use.
 
 Find out why a job waits
 ------------------------
