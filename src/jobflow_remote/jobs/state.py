@@ -89,13 +89,36 @@ RESETTABLE_STATES = [
     JobState.DOWNLOADED,
 ]
 
-RESETTABLE_STATES_V = RUNNING_STATES_V
+RESETTABLE_STATES_V = [s.value for s in RESETTABLE_STATES]
 
-DELETABLE_STATES = [
-    s for s in JobState if s not in [JobState.BATCH_SUBMITTED, JobState.BATCH_RUNNING]
-]
+# The states of the Jobs executed inside a batch process, that cannot be
+# cancelled for a single Job.
+BATCH_STATES = [JobState.BATCH_SUBMITTED, JobState.BATCH_RUNNING]
+
+DELETABLE_STATES = [s for s in JobState if s not in BATCH_STATES]
 
 ERROR_STATES = [JobState.REMOTE_ERROR, JobState.FAILED]
+
+# The states of the Jobs with a process in the queue of the worker. The actions
+# that stop, rerun or delete such a Job try to cancel that process.
+CANCELLABLE_STATES = [JobState.SUBMITTED, JobState.RUNNING]
+
+# The states in which each action accepts a Job. Depending on the action, other
+# conditions are checked only when it is performed, e.g. the states of the
+# other Jobs of the Flow or the locks on the documents.
+STOPPABLE_STATES = [JobState.READY, *RUNNING_STATES]
+
+RESUMABLE_STATES = [JobState.PAUSED, JobState.STOPPED, JobState.USER_STOPPED]
+
+RETRYABLE_STATES = [JobState.REMOTE_ERROR, *RUNNING_STATES]
+
+# rerun without the "force" option
+RERUNNABLE_STATES = [*RESETTABLE_STATES, JobState.REMOTE_ERROR, JobState.FAILED]
+
+# rerun with the "force" option
+RERUNNABLE_STATES_FORCE = [
+    s for s in JobState if s not in (JobState.READY, JobState.WAITING)
+]
 
 
 class FlowState(Enum):
@@ -149,6 +172,10 @@ class FlowState(Enum):
         if any(js == JobState.PAUSED for js in jobs_states):
             return cls.PAUSED
         return cls.RUNNING
+
+
+# The states in which a Flow can be resumed.
+RESUMABLE_FLOW_STATES = [FlowState.STOPPED, FlowState.PAUSED]
 
 
 class BatchState(Enum):

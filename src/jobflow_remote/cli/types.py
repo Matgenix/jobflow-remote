@@ -5,6 +5,7 @@ import typer
 
 from jobflow_remote.cli.formatting import header_name_data_getter_map
 from jobflow_remote.cli.utils import (
+    FlowSortOption,
     IndexDirection,
     SerializeFileFormat,
     SortOption,
@@ -224,6 +225,17 @@ sort_opt = Annotated[
     SortOption,
     typer.Option(
         "--sort",
+        help="The field on which the results will be sorted. In descending order. "
+        "Note that db_id is sorted alphabetically (e.g. '100' before '99'): "
+        "use created_on for the creation order",
+    ),
+]
+
+
+flow_sort_opt = Annotated[
+    FlowSortOption,
+    typer.Option(
+        "--sort",
         help="The field on which the results will be sorted. In descending order",
     ),
 ]
@@ -409,6 +421,17 @@ delete_all_opt = Annotated[
         "--all",
         "-a",
         help="enable --output and --files",
+    ),
+]
+
+
+keep_processes_opt = Annotated[
+    bool,
+    typer.Option(
+        "--keep-processes",
+        "-kp",
+        help="Do not attempt to cancel the processes of the SUBMITTED and RUNNING "
+        "Jobs from the queue of their worker",
     ),
 ]
 

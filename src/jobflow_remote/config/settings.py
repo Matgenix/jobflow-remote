@@ -38,6 +38,15 @@ class JobflowRemoteSettings(BaseSettings):
         default=True,
         description="If False the CLI plugins will not be loaded.",
     )
+    allow_interactive_login: bool = Field(
+        default=True,
+        description="If False, connecting to a worker with interactive_login raises "
+        "an InteractiveLoginRequiredError instead of prompting for the credentials. "
+        "Meant for processes that cannot answer a prompt, such as a server. Set it "
+        "for that process only (e.g. with the JFREMOTE_ALLOW_INTERACTIVE_LOGIN "
+        "environment variable), since in the config file it also applies to the "
+        "CLI and to the runner.",
+    )
 
     model_config = SettingsConfigDict(env_prefix="jfremote_")
 

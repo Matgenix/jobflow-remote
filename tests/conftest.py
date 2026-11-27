@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import inspect
 import logging
 import logging.config
@@ -10,9 +12,17 @@ import warnings
 from contextlib import contextmanager
 from functools import partial
 from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
 import pytest
 from rich.console import Console
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Generator
+
+    from pymongo.collection import Collection
+
+    from jobflow_remote.jobs.jobcontroller import JobController
 
 
 @pytest.fixture()
@@ -278,41 +288,237 @@ def shared_test_out_dir(tmp_path_factory):
         print(f"Database dump saved as artifact: {artifact_path}")
 
 
-@pytest.fixture()
-def job_controller(random_project_name, request, shared_test_out_dir, patch_project):
-    """Yields a jobcontroller instance for the test suite that also sets up the
-    jobstore, resetting it after every test.
+# Snapshots of the state of the DB right after a full ``JobController.reset``.
+# Used by the ``job_controller`` fixture to restore the DB without rebuilding all
+# the indexes, which is by far the most expensive part of the reset.
+# The key identifies the database and collections, the value is the snapshot.
+_RESET_SNAPSHOTS: dict[tuple, dict[str, Any]] = {}
 
-    Notes:
-        This job_controller fixture depends on patch_project to make sure that patch_project
-        is called before initializing the JobController object. The patch_project fixture is
-        not explicitly used within this fixture though.
+# Set this environment variable to a non-empty value to force a full reset in the
+# ``job_controller`` fixture, i.e. to disable the snapshot based restore.
+FULL_RESET_ENV_VAR = "JF_TEST_FULL_RESET"
+
+
+def _tracked_collections(jc: JobController) -> dict[str, Collection]:
+    """
+    Collections whose content and indexes are restored by the snapshot.
+
+    Parameters
+    ----------
+    jc
+        The JobController whose collections should be returned.
+
+    Returns
+    -------
+    dict
+        The collections created or modified by ``JobController.reset``, by name.
+    """
+    colls = {
+        "jobs": jc.jobs,
+        "flows": jc.flows,
+        "auxiliary": jc.auxiliary,
+        "batches": jc.batches,
+    }
+    # also track the indexes of the collections where the outputs are stored, as
+    # they are created by the reset as well. Only if the store exposes the collection.
+    stores = {"default": jc.jobstore, **jc.optional_jobstores}
+    for store_name, jobstore in stores.items():
+        coll = getattr(jobstore.docs_store, "_collection", None)
+        if coll is not None:
+            colls[f"jobstore_{store_name}"] = coll
+    return colls
+
+
+def _snapshot_key(jc: JobController) -> tuple:
+    """
+    Key identifying the database and the collections handled by a JobController.
+
+    Parameters
+    ----------
+    jc
+        The JobController to identify.
+
+    Returns
+    -------
+    tuple
+        The key to be used in ``_RESET_SNAPSHOTS``.
+    """
+    return tuple(
+        (name, coll.database.name, coll.name)
+        for name, coll in _tracked_collections(jc).items()
+    )
+
+
+def _take_snapshot(jc: JobController) -> dict[str, Any]:
+    """
+    Store the indexes and the documents of the collections just after a reset.
+
+    Parameters
+    ----------
+    jc
+        A JobController that has just been reset.
+
+    Returns
+    -------
+    dict
+        The snapshot, with the index information of all the tracked collections
+        and the documents of the collections of the JobController.
+    """
+    colls = _tracked_collections(jc)
+    return {
+        "indexes": {name: coll.index_information() for name, coll in colls.items()},
+        "docs": {
+            name: list(coll.find())
+            for name, coll in colls.items()
+            if not name.startswith("jobstore_")
+        },
+    }
+
+
+def _prepare_db(jc: JobController, full_reset: bool) -> None:
+    """
+    Bring the DB of a JobController to the state obtained with a reset.
+
+    A full ``JobController.reset`` is performed if requested, if it is the first
+    time the database is seen or if the indexes do not match those obtained
+    with the reset (e.g. because a test dropped the database or changed the indexes).
+    Otherwise the documents are restored to those of the snapshot taken after a
+    full reset, avoiding the expensive rebuild of the indexes.
+
+    Notes
+    -----
+    The snapshot is generated from the outcome of ``JobController.reset``, so
+    changes to the reset procedure are automatically taken into account. The
+    side effects of the reset that are not related to the DB (e.g. the cleanup
+    of the folders of batch workers) are not repeated.
+
+    Parameters
+    ----------
+    jc
+        The JobController to prepare.
+    full_reset
+        If True always perform a full reset.
+    """
+    key = _snapshot_key(jc)
+    snapshot = _RESET_SNAPSHOTS.get(key)
+
+    if not full_reset and snapshot is not None:
+        colls = _tracked_collections(jc)
+        try:
+            indexes_ok = all(
+                coll.index_information() == snapshot["indexes"][name]
+                for name, coll in colls.items()
+            )
+        except Exception:
+            indexes_ok = False
+        if indexes_ok:
+            for name, docs in snapshot["docs"].items():
+                coll = colls[name]
+                coll.delete_many({})
+                if docs:
+                    coll.insert_many(docs)
+            return
+
+    assert jc.reset(max_limit=0)
+    _RESET_SNAPSHOTS[key] = _take_snapshot(jc)
+
+
+def _job_controller_impl(
+    random_project_name: str,
+    request: pytest.FixtureRequest,
+    shared_test_out_dir: Callable[[], Path],
+    full_reset: bool,
+) -> Generator[JobController, None, None]:
+    """
+    Generator implementing the ``job_controller`` and ``job_controller_reset``
+    fixtures.
+
+    Parameters
+    ----------
+    random_project_name
+        The name of the project.
+    request
+        The pytest request of the fixture.
+    shared_test_out_dir
+        Function returning the folder where the DB is dumped if the test fails.
+    full_reset
+        If True always perform a full reset of the DB at the beginning.
+
+    Yields
+    ------
+    JobController
+        The JobController with the DB in the same state as after a reset.
     """
     from monty.serialization import dumpfn
 
     from jobflow_remote.jobs.jobcontroller import JobController
 
     jc = JobController.from_project_name(random_project_name)
-    assert jc.reset(max_limit=0)
-    yield jc
+    # Always close the connections at the end. Otherwise the open sockets
+    # accumulate across the tests until garbage collected and, in long test
+    # sessions, can exceed the limit of open files (e.g. 256 by default on macOS)
+    try:
+        _prepare_db(jc, full_reset=full_reset)
+        yield jc
 
-    if hasattr(request.node, "rep_call") and request.node.rep_call.failed:
-        target_dir = shared_test_out_dir()
+        if hasattr(request.node, "rep_call") and request.node.rep_call.failed:
+            target_dir = shared_test_out_dir()
 
-        # use the test name (including parameters) as a target folder
-        test_name = request.node.name
-        sanitized_test_name = "".join(c if c.isalnum() else "_" for c in test_name)
+            # use the test name (including parameters) as a target folder
+            test_name = request.node.name
+            sanitized_test_name = "".join(c if c.isalnum() else "_" for c in test_name)
 
-        test_dump_dir = target_dir / sanitized_test_name
-        test_dump_dir.mkdir(parents=True, exist_ok=True)
+            test_dump_dir = target_dir / sanitized_test_name
+            test_dump_dir.mkdir(parents=True, exist_ok=True)
 
-        # don't use the backup to create indented json files for easier access
+            # don't use the backup to create indented json files for easier access
 
-        for coll in [jc.jobs, jc.flows, jc.auxiliary]:
-            dump_file_path = test_dump_dir / f"{coll.name}.json"
-            dumpfn(list(coll.find()), dump_file_path, indent=2)
+            for coll in [jc.jobs, jc.flows, jc.auxiliary]:
+                dump_file_path = test_dump_dir / f"{coll.name}.json"
+                dumpfn(list(coll.find()), dump_file_path, indent=2)
 
-        print(f"Data dumped to {test_dump_dir}")
+            print(f"Data dumped to {test_dump_dir}")
+    finally:
+        jc.close()
+
+
+@pytest.fixture()
+def job_controller(random_project_name, request, shared_test_out_dir, patch_project):
+    """Yields a jobcontroller instance for the test suite that also sets up the
+    jobstore, bringing the DB to the state obtained after a reset before every test.
+
+    The first time a database is used a full reset is performed. Afterwards the
+    documents are restored from a snapshot taken after that reset, without
+    rebuilding the indexes (see ``_prepare_db``). A full reset is performed
+    again if the indexes do not match the snapshot. Use ``job_controller_reset``
+    for the tests that need a full reset, or set the ``JF_TEST_FULL_RESET``
+    environment variable to force it for all the tests.
+
+    Notes:
+        This job_controller fixture depends on patch_project to make sure that patch_project
+        is called before initializing the JobController object. The patch_project fixture is
+        not explicitly used within this fixture though.
+    """
+    yield from _job_controller_impl(
+        random_project_name,
+        request,
+        shared_test_out_dir,
+        full_reset=bool(os.getenv(FULL_RESET_ENV_VAR)),
+    )
+
+
+@pytest.fixture()
+def job_controller_reset(
+    random_project_name, request, shared_test_out_dir, patch_project
+):
+    """Same as ``job_controller``, but always performs a full ``JobController.reset``
+    before the test. To be used by the tests that depend on the reset procedure
+    itself (e.g. on the creation of the indexes or on the cleanup of the batch
+    workers) and not only on the DB being empty.
+    """
+    yield from _job_controller_impl(
+        random_project_name, request, shared_test_out_dir, full_reset=True
+    )
 
 
 @pytest.fixture()
@@ -400,6 +606,34 @@ def pytest_addoption(parser):
         dest="keep_containers_alive",
         help="Keep the containers alive for inspection.",
     )
+
+
+@pytest.fixture(scope="session", autouse=True)
+def raise_open_files_limit() -> None:
+    """
+    Raise the soft limit of open files for the test session.
+
+    Each JobController opens several MongoClient, whose sockets and monitoring
+    threads are released asynchronously after closing them. When the tests run
+    quickly the open files can transiently exceed the low default soft limit of
+    some systems (256 on macOS). When this happens connections fail in
+    seemingly random ways (e.g. ``AutoReconnect`` due to ``localhost`` not being
+    resolved).
+    """
+    try:
+        import resource
+    except ImportError:  # e.g. on Windows
+        return
+
+    target = 8192
+    try:
+        soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
+        if soft >= target:
+            return
+        new_soft = target if hard == resource.RLIM_INFINITY else min(target, hard)
+        resource.setrlimit(resource.RLIMIT_NOFILE, (new_soft, hard))
+    except (ValueError, OSError):
+        warnings.warn("Could not raise the limit of open files.", stacklevel=2)
 
 
 def pytest_sessionstart(session):

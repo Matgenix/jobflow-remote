@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import contextlib
-import fnmatch
 import importlib.metadata
 import logging
 import shutil
@@ -10,6 +9,7 @@ import warnings
 from collections import defaultdict
 from collections.abc import MutableMapping
 from contextlib import ExitStack
+from contextvars import ContextVar
 from datetime import datetime, timedelta, timezone
 from functools import cached_property
 from pathlib import Path
@@ -48,10 +48,17 @@ from jobflow_remote.jobs.data import (
     projection_job_info,
 )
 from jobflow_remote.jobs.state import (
+    BATCH_STATES,
+    CANCELLABLE_STATES,
     DELETABLE_STATES,
     PAUSABLE_STATES,
+    RERUNNABLE_STATES,
+    RERUNNABLE_STATES_FORCE,
     RESETTABLE_STATES,
-    RUNNING_STATES,
+    RESUMABLE_FLOW_STATES,
+    RESUMABLE_STATES,
+    RETRYABLE_STATES,
+    STOPPABLE_STATES,
     BatchState,
     FlowState,
     JobState,
@@ -71,16 +78,23 @@ from jobflow_remote.utils.data import (
 )
 from jobflow_remote.utils.db import (
     FlowLockedError,
+    FlowNotFoundError,
     JobLockedError,
+    JobNotFoundError,
     LockedDocumentError,
     MissingDocumentError,
     MongoLock,
+    fnmatch_to_mongo_query,
     mongodump_from_store,
     mongorestore_to_store,
     pymongo_dump,
     pymongo_restore,
 )
-from jobflow_remote.utils.remote import SharedHosts, safe_remove_job_files
+from jobflow_remote.utils.remote import (
+    SharedHosts,
+    UnsafeDeletionError,
+    safe_remove_job_files,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Generator, Sequence
@@ -88,6 +102,7 @@ if TYPE_CHECKING:
 
     from maggma.stores import MongoStore
     from monty.json import MSONable
+    from pymongo.collection import Collection
 
     obj_type = str | Enum | type[MSONable] | list[Enum | str | type[MSONable]]
     load_type = bool | dict[str, bool | obj_type]
@@ -97,6 +112,194 @@ logger = logging.getLogger(__name__)
 
 
 _MAX_ARCHIVED_RUNNER_PINGS = 50
+
+
+# Operators whose field references cannot be determined statically.
+_OPAQUE_OPERATORS = frozenset(
+    {"$where", "$function", "$getField", "$setField", "$unsetField"}
+)
+# Aggregation variables referring to the whole document.
+_ROOT_VARIABLES = ("$$ROOT", "$$CURRENT")
+
+
+def _references_field(obj: Any, field: str) -> bool:
+    """
+    Check if a MongoDB filter or pipeline stage may refer to a field.
+
+    Looks for keys equal to the field or starting with "field.", and for string
+    values referring to it as "$field" or "$field." (e.g. in $expr), also
+    through the "$$ROOT" and "$$CURRENT" variables.
+
+    The check is conservative: if the object contains references that cannot
+    be resolved statically (operators like $where or $getField, or the whole
+    document as "$$ROOT"), the field is considered referenced.
+
+    Parameters
+    ----------
+    obj
+        The filter, stage or list of stages to inspect.
+    field
+        The name of the top level field.
+
+    Returns
+    -------
+    bool
+        True if the field may be referenced anywhere in the object.
+    """
+
+    def matches(s: str) -> bool:
+        return s == field or s.startswith(f"{field}.")
+
+    if isinstance(obj, dict):
+        return any(
+            (isinstance(k, str) and (k in _OPAQUE_OPERATORS or matches(k)))
+            or _references_field(v, field)
+            for k, v in obj.items()
+        )
+    if isinstance(obj, list | tuple):
+        return any(_references_field(v, field) for v in obj)
+    if isinstance(obj, str):
+        for var in _ROOT_VARIABLES:
+            if obj == var:
+                # the whole document is used
+                return True
+            if obj.startswith(f"{var}."):
+                return matches(obj[len(var) + 1 :])
+        return obj.startswith("$") and matches(obj[1:])
+    return False
+
+
+def _merge_custom_query(query: dict, custom_query: dict | None) -> dict:
+    """
+    Add a custom query to the query built from the standard filters.
+
+    Parameters
+    ----------
+    query
+        The query built from the standard filters.
+    custom_query
+        A generic query. Its keys must not overlap with those of query.
+
+    Returns
+    -------
+    dict
+        The merged query.
+
+    Raises
+    ------
+    ValueError
+        If the keys of the two queries overlap.
+    """
+    custom_query = custom_query or {}
+    if not set(query).isdisjoint(custom_query):
+        raise ValueError(
+            "Custom_query must not overlap with other query options. "
+            f"Duplicates: {set(query) & set(custom_query)}"
+        )
+
+    return query | custom_query
+
+
+# The list collecting the failed cancellations of the processes in the queue,
+# when a collect_cancel_errors block is active in the current thread or task.
+_cancel_errors: ContextVar[list[tuple[str, Exception]] | None] = ContextVar(
+    "_cancel_errors", default=None
+)
+
+
+@contextlib.contextmanager
+def collect_cancel_errors() -> Generator[list[tuple[str, Exception]], None, None]:
+    """
+    Collect the failed cancellations of the processes in the queue.
+
+    The actions that stop, rerun or delete SUBMITTED and RUNNING Jobs try to
+    cancel their process in the queue of the worker. A failure to cancel only
+    logs a warning, and the action is performed anyway. Inside this context
+    manager each failure is also appended to the returned list, as a tuple
+    with the db_id of the Job and the exception raised, so that the caller
+    can report which processes may still be running.
+
+    The list is specific to the current thread (and asyncio task), so that
+    concurrent callers each get only their own failures. In nested blocks
+    the failures are collected only by the innermost one.
+
+    Returns
+    -------
+    list
+        The list of (db_id, exception) of the failed cancellations, filled
+        while the block runs.
+
+    Examples
+    --------
+    >>> with collect_cancel_errors() as cancel_errors:
+    ...     job_controller.stop_jobs(flow_ids=flow_uuid)
+    >>> for db_id, exc in cancel_errors:
+    ...     print(f"The process of Job {db_id} could not be cancelled: {exc}")
+    """
+    errors: list[tuple[str, Exception]] = []
+    token = _cancel_errors.set(errors)
+    try:
+        yield errors
+    finally:
+        _cancel_errors.reset(token)
+
+
+# The list collecting the Jobs whose files could not be deleted, when a
+# collect_delete_files_errors block is active in the current thread or task.
+_delete_files_errors: ContextVar[
+    list[tuple[str | None, str, str, Exception]] | None
+] = ContextVar("_delete_files_errors", default=None)
+
+
+@contextlib.contextmanager
+def collect_delete_files_errors() -> (
+    Generator[list[tuple[str | None, str, str, Exception]], None, None]
+):
+    """
+    Collect the Jobs whose files on the worker could not be deleted.
+
+    The deletion of the files of the Jobs (e.g. ``delete_flow`` or
+    ``delete_job`` with ``delete_files=True``, or ``safe_delete_files``) is
+    performed on a best-effort basis: a failure only logs a warning, and the
+    other Jobs, as well as the deletion of the documents, go on. Inside this
+    context manager each failure is also appended to the returned list, as a
+    tuple with the db_id of the Job, the name of the worker, the folder that
+    was not deleted and the exception raised, so that the caller can report
+    which files stayed. These are still available after the documents of the
+    Jobs have been deleted.
+
+    A failure is any case where the files stay: the worker cannot be reached
+    (the Jobs of that worker skipped after the first failure get the same
+    exception), a command fails or times out, the folder does not look like
+    the one of a Job (UnsafeDeletionError), or its deletion fails. A folder
+    that does not exist is not a failure.
+
+    The list is specific to the current thread (and asyncio task), so that
+    concurrent callers each get only their own failures. In nested blocks
+    the failures are collected only by the innermost one.
+
+    Returns
+    -------
+    list
+        The list of (db_id, worker, run_dir, exception) of the Jobs whose
+        files could not be deleted, filled while the block runs.
+
+    Examples
+    --------
+    >>> with (
+    ...     collect_cancel_errors() as cancel_errors,
+    ...     collect_delete_files_errors() as files_errors,
+    ... ):
+    ...     job_controller.delete_flow(flow_uuid, delete_files=True)
+    >>> for db_id, worker, run_dir, exc in files_errors:
+    ...     print(f"The files of Job {db_id} in {run_dir} on {worker} stayed: {exc}")
+    """
+    errors: list[tuple[str | None, str, str, Exception]] = []
+    token = _delete_files_errors.set(errors)
+    try:
+        yield errors
+    finally:
+        _delete_files_errors.reset(token)
 
 
 class JobController:
@@ -296,14 +499,18 @@ class JobController:
         db_ids = [db_ids] if isinstance(db_ids, str) else db_ids or []
 
         flow_ids = [flow_ids] if isinstance(flow_ids, str) else flow_ids or []
-        flow_uuids = [
-            fid
-            if check_valid_uuid(fid)
-            else self.flows.find_one(
+        flow_uuids: list[str] = []
+        for fid in flow_ids:
+            if check_valid_uuid(fid):
+                flow_uuids.append(fid)
+                continue
+            # fid is the db_id of a Job: resolve it to the Flow containing that Job.
+            # If no Flow is found keep the original value, so the query
+            # matches nothing instead of silently dropping the filter.
+            doc = self.flows.find_one(
                 {"ids": {"$elemMatch": {"0": fid}}}, projection=["uuid"]
-            )["uuid"]
-            for fid in flow_ids
-        ]
+            )
+            flow_uuids.append(doc["uuid"] if doc else fid)
 
         if isinstance(states, JobState):
             states = [states]
@@ -338,10 +545,7 @@ class JobController:
             query["lock_id"] = {"$ne": None}
 
         if name:
-            # Add the beginning of the line, so that it will match the string
-            # exactly if no wildcard is given. Otherwise will match substrings.
-            mongo_regex = "^" + fnmatch.translate(name).replace("\\\\", "\\")
-            query["job.name"] = {"$regex": mongo_regex}
+            query["job.name"] = fnmatch_to_mongo_query(name)
 
         if metadata:
             metadata_dict = {f"job.metadata.{k}": v for k, v in metadata.items()}
@@ -350,13 +554,7 @@ class JobController:
         if workers:
             query["worker"] = {"$in": workers}
 
-        custom_query = custom_query or {}
-        if not set(query).isdisjoint(custom_query):
-            raise ValueError(
-                f"Custom_query must not overlap with other query options. Duplicates: {set(query) & set(custom_query)}"
-            )
-
-        return query | custom_query
+        return _merge_custom_query(query, custom_query)
 
     def _build_query_flow(
         self,
@@ -369,6 +567,7 @@ class JobController:
         name: str | None,
         metadata: dict | None,
         locked: bool,
+        custom_query: dict | None = None,
     ) -> dict:
         """
         Build a query to search for Flows, based on standard parameters.
@@ -398,6 +597,9 @@ class JobController:
             exact match for all the values provided.
         locked
             If True only locked Flows will be selected.
+        custom_query
+            A generic query on the fields of the Flow document. Keys must not
+            overlap with other specified query options.
 
         Returns
         -------
@@ -437,8 +639,7 @@ class JobController:
             query.setdefault("updated_on", {})["$lte"] = end_date_utc
 
         if name:
-            mongo_regex = "^" + fnmatch.translate(name).replace("\\\\", "\\")
-            query["name"] = {"$regex": mongo_regex}
+            query["name"] = fnmatch_to_mongo_query(name)
 
         if metadata:
             metadata_dict = {f"metadata.{k}": v for k, v in metadata.items()}
@@ -447,7 +648,7 @@ class JobController:
         if locked:
             query["lock_id"] = {"$ne": None}
 
-        return query
+        return _merge_custom_query(query, custom_query)
 
     def get_jobs_info_query(self, query: dict = None, **kwargs) -> list[JobInfo]:
         """
@@ -639,6 +840,90 @@ class JobController:
         )
         return self.get_jobs_doc_query(query=query, sort=sort, limit=limit)
 
+    def get_jobs_db_ids(
+        self,
+        custom_query: dict | None = None,
+        job_ids: tuple[str, int] | list[tuple[str, int]] | None = None,
+        db_ids: str | list[str] | None = None,
+        flow_ids: str | list[str] | None = None,
+        states: JobState | list[JobState] | None = None,
+        start_date: datetime | None = None,
+        end_date: datetime | None = None,
+        name: str | None = None,
+        metadata: dict | None = None,
+        workers: str | list[str] | None = None,
+        locked: bool = False,
+        sort: list[tuple[str, int]] | None = None,
+        limit: int = 0,
+        skip: int = 0,
+    ) -> list[str]:
+        """
+        Query for Jobs based on standard parameters and return a list of Job db_id.
+
+        Parameters
+        ----------
+        custom_query
+            A dictionary representing the filter.
+        job_ids
+            One or more tuples, each containing the (uuid, index) pair of the
+            Jobs to retrieve.
+        db_ids
+            One or more db_ids of the Jobs to retrieve.
+        flow_ids
+            One or more Flow uuids to which the Jobs to retrieve belong. Can contain db_ids and uuids.
+        states
+            One or more states of the Jobs.
+        locked
+            If True only locked Jobs will be selected.
+        start_date
+            Filter Jobs that were updated_on after this date.
+            Should be in the machine local time zone. It will be converted to UTC.
+        end_date
+            Filter Jobs that were updated_on before this date.
+            Should be in the machine local time zone. It will be converted to UTC.
+        name
+            Pattern matching the name of Job. Default is an exact match, but all
+            conventions from python fnmatch can be used (e.g. *test*)
+        metadata
+            A dictionary of the values of the metadata to match. Should be an
+            exact match for all the values provided.
+        workers
+            One or more worker names.
+        sort
+            A list of (key, direction) pairs specifying the sort order for this
+            query. Follows pymongo conventions.
+        limit
+            Maximum number of entries to retrieve. 0 means no limit.
+        skip
+            The number of documents to omit (from the start of the result set).
+
+        Returns
+        -------
+        list
+            A list of Job db_id matching the criteria.
+        """
+        query = self._build_query_job(
+            job_ids=job_ids,
+            db_ids=db_ids,
+            flow_ids=flow_ids,
+            states=states,
+            locked=locked,
+            start_date=start_date,
+            end_date=end_date,
+            name=name,
+            metadata=metadata,
+            workers=workers,
+            custom_query=custom_query,
+        )
+        docs = self.jobs.find(
+            query,
+            projection={"db_id": 1, "_id": 0},
+            sort=sort,
+            limit=limit,
+            skip=skip,
+        )
+        return [doc["db_id"] for doc in docs]
+
     @staticmethod
     def generate_job_id_query(
         db_id: str | None = None,
@@ -786,6 +1071,11 @@ class JobController:
         Used to provide a common interface between all the methods that
         should be applied on a list of jobs sequentially.
 
+        The connections to the hosts of the workers are shared among all the
+        Jobs, so that a worker is connected at most once, even if the action
+        needs to reach it for several Jobs (e.g. to cancel their processes in
+        the queue).
+
         Parameters
         ----------
         method
@@ -801,8 +1091,6 @@ class JobController:
             One or more Flow uuids to which the Jobs to retrieve belong. Can contain db_ids and uuids.
         states
             The state of the Jobs.
-        locked
-            If True only locked Jobs will be selected.
         start_date
             Filter Jobs that were updated_on after this date.
             Should be in the machine local time zone. It will be converted to UTC.
@@ -833,7 +1121,8 @@ class JobController:
         list
             List of db_ids of the updated Jobs.
         """
-        query = self._build_query_job(
+        queried_dbs_ids = self.get_jobs_db_ids(
+            custom_query=custom_query,
             job_ids=job_ids,
             db_ids=db_ids,
             flow_ids=flow_ids,
@@ -843,12 +1132,7 @@ class JobController:
             name=name,
             metadata=metadata,
             workers=workers,
-            locked=False,
-            custom_query=custom_query,
         )
-        result = self.jobs.find(query, projection=["db_id"])
-
-        queried_dbs_ids = [r["db_id"] for r in result]
 
         if max_limit != 0 and len(queried_dbs_ids) > max_limit:
             raise ValueError(
@@ -858,19 +1142,24 @@ class JobController:
             )
 
         updated_ids = set()
-        for db_id in queried_dbs_ids:
-            try:
-                job_updated_ids = method(db_id=db_id, **method_kwargs)
-                if not isinstance(job_updated_ids, list | tuple):
-                    job_updated_ids = (
-                        [] if job_updated_ids is None else [job_updated_ids]
+        # Share the hosts among all the Jobs. No connection is opened unless
+        # the method needs one.
+        with SharedHosts(self.project):
+            for db_id in queried_dbs_ids:
+                try:
+                    job_updated_ids = method(db_id=db_id, **method_kwargs)
+                    if not isinstance(job_updated_ids, list | tuple):
+                        job_updated_ids = (
+                            [] if job_updated_ids is None else [job_updated_ids]
+                        )
+                    if job_updated_ids:
+                        updated_ids.update(job_updated_ids)
+                except Exception:
+                    if raise_on_error:
+                        raise
+                    logger.exception(
+                        f"Error while {action_description} for job {db_id}"
                     )
-                if job_updated_ids:
-                    updated_ids.update(job_updated_ids)
-            except Exception:
-                if raise_on_error:
-                    raise
-                logger.exception(f"Error while {action_description} for job {db_id}")
 
         return list(updated_ids)
 
@@ -993,6 +1282,9 @@ class JobController:
         When rerunning a Job in a SUBMITTED or RUNNING state the system also
         tries to cancel the process in the worker.
         Rerunning a FAILED Job also lead to change of state in its children.
+        With `force`, the descendants are set back to WAITING whatever their
+        state: for those in a SUBMITTED or RUNNING state the system also tries
+        to cancel the process in the worker.
         The full list of modified Jobs is returned.
 
         Parameters
@@ -1034,7 +1326,16 @@ class JobController:
             filter=lock_filter,
             break_lock=break_lock,
             sort=sort,
-            projection=["uuid", "index", "db_id", "state", "worker", "run_dir"],
+            projection=[
+                "uuid",
+                "index",
+                "db_id",
+                "state",
+                "worker",
+                "run_dir",
+                # required to cancel the process in the queue
+                "remote.process_id",
+            ],
             sleep=sleep,
             max_wait=wait,
             get_locked_doc=True,
@@ -1043,34 +1344,34 @@ class JobController:
             if not job_doc_dict:
                 if job_lock.unavailable_document:
                     raise JobLockedError.from_job_doc(job_lock.unavailable_document)
-                raise ValueError(f"No Job document matching criteria {lock_filter}")
+                raise JobNotFoundError(
+                    f"No Job document matching criteria {lock_filter}"
+                )
             job_state = JobState(job_doc_dict["state"])
 
-            if job_state in [JobState.READY]:
-                raise ValueError("The Job is in the READY state. No need to rerun.")
-            if job_state in [JobState.WAITING]:
-                raise ValueError("The Job is in the WAITING state. Cannot be rerun.")
+            rerunnable_states = RERUNNABLE_STATES_FORCE if force else RERUNNABLE_STATES
+            if job_state not in rerunnable_states:
+                if job_state == JobState.READY:
+                    raise ValueError("The Job is in the READY state. No need to rerun.")
+                if job_state == JobState.WAITING:
+                    raise ValueError(
+                        "The Job is in the WAITING state. Cannot be rerun."
+                    )
+                if job_state in BATCH_STATES:
+                    raise ValueError(
+                        "Rerunning a BATCH_SUBMITTED or BATCH_RUNNING can lead to multiple execution of the "
+                        "same job if the job has already started. If this is not the case or the job is not "
+                        "running anymore, use the 'force' option to bypass the check."
+                    )
+                raise ValueError(
+                    f"Job in state {job_doc_dict['state']} cannot be rerun. "
+                    "Use the 'force' option to override this check."
+                )
             if job_state in RESETTABLE_STATES:
                 # if in one of the resettable states no need to lock the flow or
                 # update children.
                 doc_update = self._reset_remote(job_doc_dict, delete_files=delete_files)
                 modified_jobs = []
-            elif (
-                job_state in [JobState.BATCH_SUBMITTED, JobState.BATCH_RUNNING]
-                and not force
-            ):
-                raise ValueError(
-                    "Rerunning a BATCH_SUBMITTED or BATCH_RUNNING can lead to multiple execution of the "
-                    "same job if the job has already started. If this is not the case or the job is not "
-                    "running anymore, use the 'force' option to bypass the check."
-                )
-            elif (
-                job_state not in [JobState.FAILED, JobState.REMOTE_ERROR] and not force
-            ):
-                raise ValueError(
-                    f"Job in state {job_doc_dict['state']} cannot be rerun. "
-                    "Use the 'force' option to override this check."
-                )
             else:
                 # full restart required
                 doc_update, modified_jobs = self._full_rerun(
@@ -1143,7 +1444,9 @@ class JobController:
             if not flow_lock.locked_document:
                 if flow_lock.unavailable_document:
                     raise FlowLockedError.from_flow_doc(flow_lock.unavailable_document)
-                raise ValueError(f"No Flow document matching criteria {flow_filter}")
+                raise FlowNotFoundError(
+                    f"No Flow document matching criteria {flow_filter}"
+                )
 
             flow_doc = FlowDoc.model_validate(flow_lock.locked_document)
 
@@ -1203,6 +1506,8 @@ class JobController:
                                 "state",
                                 "worker",
                                 "run_dir",
+                                # required to cancel the process in the queue
+                                "remote.process_id",
                             ],
                             sleep=sleep,
                             max_wait=wait,
@@ -1238,8 +1543,16 @@ class JobController:
 
                 # Here all the descendants are locked and could be set to WAITING.
                 # Set the new state for all of them.
+                # Share the hosts, in case several processes have to be cancelled
+                # on the same worker.
+                stack.enter_context(SharedHosts(self.project))
                 for child_lock in children_locks:
                     child_doc = child_lock.locked_document
+                    # with force, a descendant can be in any state. Try
+                    # cancelling its process in the queue, if any.
+                    self._try_cancel_queue_process(
+                        child_doc, context=f" while rerunning Job {job_id}"
+                    )
                     child_doc_update = get_reset_job_base_dict()
                     child_doc_update["state"] = JobState.WAITING.value
                     if child_doc["state"] != JobState.WAITING.value:
@@ -1280,7 +1593,8 @@ class JobController:
         ----------
         doc
             The dict of the JobDoc associated to the Job to rerun.
-            Just the "uuid", "index", "state" values are required.
+            Just the "uuid", "index", "state", "worker" and "remote.process_id"
+            values are required.
         delete_files
             Delete all the files in the worker folder of the rerun Job.
 
@@ -1289,15 +1603,8 @@ class JobController:
         dict
             Updates to be set on the Job upon lock release.
         """
-        if doc["state"] in [JobState.SUBMITTED.value, JobState.RUNNING.value]:
-            # try cancelling the job submitted to the remote queue
-            try:
-                self._cancel_queue_process(doc)
-            except Exception:
-                logger.warning(
-                    f"Failed cancelling the process for Job {doc['uuid']} {doc['index']}",
-                    exc_info=True,
-                )
+        # try cancelling the job submitted to the remote queue, if any
+        self._try_cancel_queue_process(doc)
 
         job_doc_update = get_reset_job_base_dict()
         job_doc_update["state"] = JobState.READY.value
@@ -1430,7 +1737,7 @@ class JobController:
                     raise JobLockedError(
                         f"The Job matching criteria {lock_filter} is locked."
                     )
-                raise ValueError(f"No Job matching criteria {lock_filter}")
+                raise JobNotFoundError(f"No Job matching criteria {lock_filter}")
             if acceptable_states and JobState(doc["state"]) not in acceptable_states:
                 raise ValueError(
                     f"Job in state {doc['state']}. The action cannot be performed"
@@ -1730,8 +2037,10 @@ class JobController:
                     raise JobLockedError(
                         f"The Job matching criteria {lock_filter} is locked."
                     )
-                raise ValueError(f"No Job matching criteria {lock_filter}")
+                raise JobNotFoundError(f"No Job matching criteria {lock_filter}")
             state = JobState(doc["state"])
+            if state not in RETRYABLE_STATES:
+                raise ValueError(f"Job in state {state.value} cannot be retried.")
             if state == JobState.REMOTE_ERROR:
                 previous_state = doc["previous_state"]
                 try:
@@ -1744,7 +2053,8 @@ class JobController:
                 set_dict["state"] = previous_state
 
                 lock.update_on_release = {"$set": set_dict}
-            elif state in RUNNING_STATES:
+            else:
+                # one of the running states
                 set_dict = {
                     "remote.step_attempts": 0,
                     "remote.retry_time_limit": None,
@@ -1753,8 +2063,6 @@ class JobController:
                     "remote.queue_err": None,
                 }
                 lock.update_on_release = {"$set": set_dict}
-            else:
-                raise ValueError(f"Job in state {state.value} cannot be retried.")
             return doc["db_id"]
 
     def pause_jobs(
@@ -1956,7 +2264,7 @@ class JobController:
         )
         flow_lock_kwargs = dict(projection=["uuid"])
         with self.lock_job_flow(
-            acceptable_states=[JobState.READY, *RUNNING_STATES],
+            acceptable_states=STOPPABLE_STATES,
             job_id=job_id,
             db_id=db_id,
             job_index=job_index,
@@ -1968,22 +2276,8 @@ class JobController:
             # lock_job_flow already checks that the locked document is not none, both for job and flow.
             job_doc = job_lock.locked_document
 
-            job_state = JobState(job_doc["state"])
-            if job_state in [JobState.SUBMITTED, JobState.RUNNING]:
-                # try cancelling the job submitted to the remote queue
-                try:
-                    self._cancel_queue_process(job_doc)
-                except Exception:
-                    logger.warning(
-                        f"Failed cancelling the process for Job {job_doc['uuid']} {job_doc['index']}",
-                        exc_info=True,
-                    )
-            elif job_state in [JobState.BATCH_SUBMITTED, JobState.BATCH_RUNNING]:
-                logger.warning(
-                    f"The job {job_doc['uuid']} {job_doc['index']} will be set to the STOPPED state, "
-                    f"but it was in the {job_state.value} state so it cannot be cancelled from "
-                    "execution on the worker."
-                )
+            # try cancelling the job submitted to the remote queue, if any
+            self._try_cancel_queue_process(job_doc)
             job_id = job_doc["uuid"]
             job_index = job_doc["index"]
             updated_states = {job_id: {job_index: JobState.USER_STOPPED}}
@@ -2177,11 +2471,7 @@ class JobController:
         )
         flow_lock_kwargs = dict(projection=["uuid"])
         with self.lock_job_flow(
-            acceptable_states=[
-                JobState.PAUSED,
-                JobState.STOPPED,
-                JobState.USER_STOPPED,
-            ],
+            acceptable_states=RESUMABLE_STATES,
             job_id=job_id,
             db_id=db_id,
             job_index=job_index,
@@ -2288,16 +2578,20 @@ class JobController:
             if not flow_lock.locked_document:
                 if flow_lock.unavailable_document:
                     raise FlowLockedError.from_flow_doc(flow_lock.unavailable_document)
-                raise ValueError(f"No Flow document matching criteria {flow_filter}")
+                raise FlowNotFoundError(
+                    f"No Flow document matching criteria {flow_filter}"
+                )
             flow_doc = FlowDoc.model_validate(flow_lock.locked_document)
-            if flow_doc.state not in [FlowState.STOPPED, FlowState.PAUSED]:
-                raise ValueError(f"Cannot resume a Flow in state {flow_doc.state}")
+            if flow_doc.state not in RESUMABLE_FLOW_STATES:
+                raise ValueError(
+                    f"Cannot resume a Flow in state {flow_doc.state.value}"
+                )
             # loop over the STOPPED, USER_STOPPED and PAUSED jobs.
             # In principle there should be no ambiguity since in all the cases the Flow should be
             # locked. Still do not assume that at the end all the Jobs will not be stopped.
             jobs_filter = self._build_query_job(
                 flow_ids=[flow_doc.uuid],
-                states=[JobState.STOPPED, JobState.USER_STOPPED, JobState.PAUSED],
+                states=RESUMABLE_STATES,
                 job_ids=None,
                 db_ids=None,
                 locked=False,
@@ -2342,11 +2636,7 @@ class JobController:
                         )
                     # this should not happen, but handle the case to avoid inconsistencies
                     # no error is raised as the job should already be in the correct state
-                    if JobState(job_doc_dict["state"]) not in [
-                        JobState.STOPPED,
-                        JobState.USER_STOPPED,
-                        JobState.PAUSED,
-                    ]:
+                    if JobState(job_doc_dict["state"]) not in RESUMABLE_STATES:
                         continue
                     final_state = self._resume_job_locked(job_doc_dict)
                     job_lock.update_on_release = {"$set": {"state": final_state.value}}
@@ -2523,11 +2813,21 @@ class JobController:
         sort: list[tuple] | None = None,
         jobs_sort: list[tuple] | None = None,
         limit: int = 0,
+        skip: int = 0,
     ) -> list[dict]:
         """
         Retrieve data about Flows and all their Jobs through an aggregation.
 
         In the aggregation the list of Jobs are identified as `jobs_list`.
+
+        If the query and the sort only involve fields of the Flow document,
+        the filter, sort, skip and limit are applied before the $lookup, so
+        that only the Jobs of the selected Flows are fetched. If they refer to
+        `jobs_list`, they are applied after the $lookup, which can be much
+        slower on large databases.
+
+        All the Jobs of a Flow are added to a single document, so the aggregation
+        fails if their size exceeds the maximum size of a MongoDB document (16 MB).
 
         Parameters
         ----------
@@ -2540,30 +2840,26 @@ class JobController:
         sort
             A list of (key, direction) pairs specifying the sort order for this
             query. Follows pymongo conventions.
+        jobs_sort
+            A list of (key, direction) pairs specifying the sort order of the
+            Jobs in `jobs_list`. Only used if projection_job is defined.
         limit
             Maximum number of entries to retrieve. 0 means no limit.
+        skip
+            The number of documents to omit (from the start of the result set).
 
         Returns
         -------
         list
             The list of dictionaries resulting from the query.
         """
-        pipeline: list[dict] = [
-            {
-                "$lookup": {
-                    "from": self.jobs_collection,
-                    "localField": "jobs",
-                    "foreignField": "uuid",
-                    "as": "jobs_list",
-                }
-            }
-        ]
-
-        if query:
-            pipeline.append({"$match": query})
-
-        if projection_flow:
-            pipeline.append({"$project": projection_flow})
+        lookup: dict = {
+            "from": self.jobs_collection,
+            "localField": "jobs",
+            "foreignField": "uuid",
+            "as": "jobs_list",
+        }
+        project = dict(projection_flow) if projection_flow else None
 
         if projection_job:
             # insert the pipeline for the projection of the Job fields
@@ -2578,18 +2874,37 @@ class JobController:
                 ]
             else:
                 job_pipeline = [{"$project": projection_job}]
-            pipeline[0]["$lookup"]["pipeline"] = job_pipeline
+            lookup["pipeline"] = job_pipeline
             # if the additional projection is set, the keys need to be specified
             # in that part of the pipeline as well.
-            if projection_flow:
+            if project:
                 for k in projection_job:
-                    pipeline[-1]["$project"][f"jobs_list.{k}"] = 1
+                    project[f"jobs_list.{k}"] = 1
 
+        selection: list[dict] = []
+        if query:
+            selection.append({"$match": query})
         if sort:
-            pipeline.append({"$sort": dict(sort)})
-
+            selection.append({"$sort": dict(sort)})
+        if skip:
+            selection.append({"$skip": skip})
         if limit:
-            pipeline.append({"$limit": limit})
+            selection.append({"$limit": limit})
+
+        project_stage = [{"$project": project}] if project else []
+        if _references_field(selection, "jobs_list"):
+            # the selection needs the Jobs: apply it after the $lookup.
+            # The $match goes before the $project, as it may need fields
+            # excluded by the projection.
+            pipeline = [{"$lookup": lookup}]
+            if query:
+                pipeline.append(selection.pop(0))
+            pipeline += project_stage + selection
+        else:
+            # MongoDB cannot move $sort, $skip and $limit before the $lookup
+            # by itself if the $project refers to jobs_list. Put them first,
+            # so that only the Jobs of the selected Flows are looked up.
+            pipeline = [*selection, {"$lookup": lookup}, *project_stage]
 
         return list(self.flows.aggregate(pipeline))
 
@@ -2609,6 +2924,7 @@ class JobController:
         limit: int = 0,
         skip: int = 0,
         with_jobs_info: bool | list = False,
+        custom_query: dict | None = None,
     ) -> list[FlowInfo]:
         """
         Query for Flows based on standard parameters and return a list of FlowInfo.
@@ -2649,9 +2965,17 @@ class JobController:
             The number of documents to omit (from the start of the result set).
         with_jobs_info
             If True or a list, data is fetched from both the Flow collection and
-            Job collection with an aggregate and JobInfo for each job will be created.
+            Job collection and JobInfo for each job will be created.
             If a list, it should contain additional properties to add to the job info.
             If False, only the Job information in the Flow document will be used.
+            The Jobs are fetched with a separate query, so that there is no limit
+            on the number of Jobs in a Flow. Only if the sort refers to the
+            fields of the Jobs (as `jobs_list.<field>`) an aggregation is used,
+            which fails if the Jobs of a Flow exceed the maximum size of a
+            MongoDB document (about 30,000 Jobs).
+        custom_query
+            A generic query on the fields of the Flow document. Keys must not
+            overlap with other specified query options.
 
         Returns
         -------
@@ -2668,9 +2992,10 @@ class JobController:
             name=name,
             metadata=metadata,
             locked=locked,
+            custom_query=custom_query,
         )
 
-        # Only use the full aggregation if more job details are needed.
+        # Only fetch the Jobs if more job details are needed.
         # The single flow document is enough for basic information
         if with_jobs_info is not False:
             if isinstance(with_jobs_info, bool):
@@ -2679,20 +3004,173 @@ class JobController:
                 projection_job = {
                     f: 1 for f in projection_flow_info_jobs + with_jobs_info
                 }
-            projection_flow = {k: 1 for k in FlowDoc.model_fields}
 
-            data = self.get_flow_job_aggreg(
-                query=query,
-                sort=sort,
-                jobs_sort=jobs_sort,
-                limit=limit,
-                projection_flow=projection_flow,
-                projection_job=projection_job,
-            )
+            if sort and _references_field(dict(sort), "jobs_list"):
+                # sorting on the fields of the Jobs requires joining them to
+                # the Flows. Subject to the size limit of the MongoDB documents.
+                data = self.get_flow_job_aggreg(
+                    query=query,
+                    sort=sort,
+                    jobs_sort=jobs_sort,
+                    limit=limit,
+                    skip=skip,
+                    projection_flow={k: 1 for k in FlowDoc.model_fields},
+                    projection_job=projection_job,
+                )
+            else:
+                data = self._find_flows_with_jobs(
+                    query=query,
+                    projection_job=projection_job,
+                    sort=sort,
+                    jobs_sort=jobs_sort,
+                    limit=limit,
+                    skip=skip,
+                )
         else:
             data = list(self.flows.find(query, sort=sort, limit=limit, skip=skip))
 
         return [FlowInfo.from_query_dict(d) for d in data]
+
+    def _find_flows_with_jobs(
+        self,
+        query: dict,
+        projection_job: dict,
+        sort: list[tuple] | None = None,
+        jobs_sort: list[tuple] | None = None,
+        limit: int = 0,
+        skip: int = 0,
+    ) -> list[dict]:
+        """
+        Fetch the Flow documents and add the list of their Jobs.
+
+        Equivalent to the output of `get_flow_job_aggreg`, but the Jobs are
+        fetched with a separate query, instead of a $lookup. This avoids the
+        limit on the size of a single document in an aggregation, that would
+        be exceeded for Flows with a large number of Jobs.
+
+        Parameters
+        ----------
+        query
+            The filter for the Flow documents. Should only involve fields of
+            the Flow document.
+        projection_job
+            Projection of the fields for the Job documents.
+        sort
+            A list of (key, direction) pairs specifying the sort order for the
+            Flows. Follows pymongo conventions.
+        jobs_sort
+            A list of (key, direction) pairs specifying the sort order of the
+            Jobs of each Flow.
+        limit
+            Maximum number of Flows to retrieve. 0 means no limit.
+        skip
+            The number of Flows to omit (from the start of the result set).
+
+        Returns
+        -------
+        list
+            The Flow documents, each with the list of its Jobs as `jobs_list`.
+        """
+        flows = list(self.flows.find(query, sort=sort, limit=limit, skip=skip))
+        if not flows:
+            return []
+
+        jobs_by_flow: dict[str, list[dict]] = {f["uuid"]: [] for f in flows}
+        # the hosts are needed to assign the Jobs to their Flow
+        projection = dict(projection_job)
+        projection["job.hosts"] = 1
+        jobs = self.jobs.find(
+            {"job.hosts": {"$in": list(jobs_by_flow)}},
+            projection=projection,
+            sort=jobs_sort,
+        )
+        for job in jobs:
+            # the root Flow is the last of the hosts
+            jobs_by_flow[job["job"]["hosts"][-1]].append(job)
+
+        for flow in flows:
+            flow["jobs_list"] = jobs_by_flow[flow["uuid"]]
+        return flows
+
+    def get_flows_uuids(
+        self,
+        job_ids: str | list[str] | None = None,
+        db_ids: str | list[str] | None = None,
+        flow_ids: str | list[str] | None = None,
+        states: FlowState | list[FlowState] | None = None,
+        start_date: datetime | None = None,
+        end_date: datetime | None = None,
+        name: str | None = None,
+        metadata: dict | None = None,
+        locked: bool = False,
+        sort: list[tuple] | None = None,
+        limit: int = 0,
+        skip: int = 0,
+        custom_query: dict | None = None,
+    ) -> list[str]:
+        """
+        Query for Flows based on standard parameters and return a list of Flow uuids.
+
+        Parameters
+        ----------
+        job_ids
+            One or more strings with uuids of Jobs belonging to the Flow.
+        db_ids
+            One or more db_ids of Jobs belonging to the Flow.
+        flow_ids
+            One or more Flow uuids.
+        states
+            One or more states of the Flow.
+        start_date
+            Filter Flows that were updated_on after this date.
+            Should be in the machine local time zone. It will be converted to UTC.
+        end_date
+            Filter Flows that were updated_on before this date.
+            Should be in the machine local time zone. It will be converted to UTC.
+        name
+            Pattern matching the name of Flow. Default is an exact match, but all
+            conventions from python fnmatch can be used (e.g. *test*)
+        metadata
+            A dictionary of the values of the metadata to match. Should be an
+            exact match for all the values provided.
+        locked
+            If True only locked Flows will be selected.
+        sort
+            A list of (key, direction) pairs specifying the sort order for this
+            query. Follows pymongo conventions.
+        limit
+            Maximum number of entries to retrieve. 0 means no limit.
+        skip
+            The number of documents to omit (from the start of the result set).
+        custom_query
+            A generic query on the fields of the Flow document. Keys must not
+            overlap with other specified query options.
+
+        Returns
+        -------
+        list
+            A list of Flow uuids matching the criteria.
+        """
+        query = self._build_query_flow(
+            job_ids=job_ids,
+            db_ids=db_ids,
+            flow_ids=flow_ids,
+            states=states,
+            start_date=start_date,
+            end_date=end_date,
+            name=name,
+            metadata=metadata,
+            locked=locked,
+            custom_query=custom_query,
+        )
+        docs = self.flows.find(
+            query,
+            projection={"uuid": 1, "_id": 0},
+            sort=sort,
+            limit=limit,
+            skip=skip,
+        )
+        return [doc["uuid"] for doc in docs]
 
     def get_flow_store(self, flow_id: str) -> str | None:
         """
@@ -2711,7 +3189,7 @@ class JobController:
         """
         out = self.flows.find_one({"uuid": flow_id}, projection=["jobstore"])
         if not out:
-            raise ValueError(f"No Flow matching id {flow_id}")
+            raise FlowNotFoundError(f"No Flow matching id {flow_id}")
         return out.get("jobstore") or None
 
     def set_flow_store(
@@ -2751,7 +3229,9 @@ class JobController:
             if not flow_lock.locked_document:
                 if flow_lock.unavailable_document:
                     raise FlowLockedError.from_flow_doc(flow_lock.unavailable_document)
-                raise ValueError(f"No Flow document matching criteria {filter_query}")
+                raise FlowNotFoundError(
+                    f"No Flow document matching criteria {filter_query}"
+                )
             if FlowState(flow_lock.locked_document["state"]) != FlowState.READY:
                 raise RuntimeError("The JobStore can be set only for a READY Flow")
             flow_lock.update_on_release = {
@@ -2784,7 +3264,10 @@ class JobController:
         delete_output
             If True also delete the associated output in the JobStore.
         delete_files
-            If True also delete the files on the worker.
+            If True also delete the files on the worker. The files are deleted
+            after the Flows and their Jobs. A failure to delete them, e.g.
+            because the worker cannot be reached, is logged and does not stop
+            the deletion of the Flows.
         cancel_processes
             If True will attempt to delete the processes for SUBMITTED and RUNNING jobs.
             Failure to cancel will not stop the deletion of the Flow.
@@ -2855,7 +3338,10 @@ class JobController:
         delete_output
             If True also delete the associated output in the JobStore.
         delete_files
-            If True also delete the files on the worker.
+            If True also delete the files on the worker. The files are deleted
+            after the Flow and its Jobs. A failure to delete them, e.g. because
+            the worker cannot be reached, is logged and does not stop the
+            deletion of the Flow.
         cancel_processes
             If True will attempt to delete the processes for SUBMITTED and RUNNING jobs.
             Failure to cancel will not stop the deletion of the Flow.
@@ -2876,51 +3362,56 @@ class JobController:
         sleep = None
         if wait:
             sleep = 10
-        # TODO locking the Flow prevents deleting it while one if its Jobs is
-        # completing, and thus avoids that Jobs are dynamically created while
-        # the Flow is being deleted.
-        # To avoid any sort of concurrent action it may be necessary to lock all the
-        # Jobs of the Flow. Consider doing this in the future.
-        with self.lock_flow(
-            filter={"uuid": flow_id},
-            sleep=sleep,
-            max_wait=wait,
-            get_locked_doc=True,
-            break_lock=break_lock,
-        ) as flow_lock:
-            if not flow_lock.locked_document:
-                if flow_lock.unavailable_document:
-                    raise FlowLockedError.from_flow_doc(flow_lock.unavailable_document)
-                return False
-            flow = flow_lock.locked_document
+        jobs_info: list[JobInfo] = []
+        # Share the hosts between the cancellation of the processes and the
+        # deletion of the files.
+        with SharedHosts(self.project):
+            # TODO locking the Flow prevents deleting it while one if its Jobs is
+            # completing, and thus avoids that Jobs are dynamically created while
+            # the Flow is being deleted.
+            # To avoid any sort of concurrent action it may be necessary to lock all the
+            # Jobs of the Flow. Consider doing this in the future.
+            with self.lock_flow(
+                filter={"uuid": flow_id},
+                sleep=sleep,
+                max_wait=wait,
+                get_locked_doc=True,
+                break_lock=break_lock,
+            ) as flow_lock:
+                if not flow_lock.locked_document:
+                    if flow_lock.unavailable_document:
+                        raise FlowLockedError.from_flow_doc(
+                            flow_lock.unavailable_document
+                        )
+                    return False
+                flow = flow_lock.locked_document
 
-            job_ids = flow["jobs"]
-            if delete_output:
-                jobstore = self.jobstore
-                if jobstore_name := flow.get("jobstore"):
-                    jobstore = self.optional_jobstores[jobstore_name]
-                jobstore.remove_docs({"uuid": {"$in": job_ids}})
-            if delete_files or cancel_processes:
-                jobs_info = self.get_jobs_info(flow_ids=[flow_id])
+                job_ids = flow["jobs"]
+                if delete_files or cancel_processes:
+                    jobs_info = self.get_jobs_info(flow_ids=[flow_id])
+                if delete_output:
+                    jobstore = self.jobstore
+                    if jobstore_name := flow.get("jobstore"):
+                        jobstore = self.optional_jobstores[jobstore_name]
+                    jobstore.remove_docs({"uuid": {"$in": job_ids}})
                 if cancel_processes:
                     for ji in jobs_info:
-                        if ji.state in [JobState.SUBMITTED, JobState.RUNNING]:
-                            # try cancelling the job submitted to the remote queue
-                            try:
-                                self._cancel_queue_process(ji.model_dump(mode="python"))
-                            except Exception:
-                                logger.warning(
-                                    f"Failed cancelling the process for Job {ji.uuid} {ji.index} while deleting Flow {flow_id}",
-                                    exc_info=True,
-                                )
-                # delete files after cancelling the queue job
-                if delete_files:
-                    self.safe_delete_files(jobs_info)
+                        # try cancelling the job submitted to the remote queue, if any
+                        self._try_cancel_queue_process(
+                            ji.model_dump(mode="python"),
+                            context=f" while deleting Flow {flow_id}",
+                        )
 
-            self.jobs.delete_many({"uuid": {"$in": job_ids}})
+                self.jobs.delete_many({"uuid": {"$in": job_ids}})
 
-            # Flow is deleted by the lock release
-            flow_lock.delete_on_release = True
+                # Flow is deleted by the lock release
+                flow_lock.delete_on_release = True
+
+            # Delete the files last, after cancelling the queue processes and
+            # once the Flow and its Jobs are deleted: a worker that cannot be
+            # reached does not stop the deletion. Failures are logged.
+            if delete_files:
+                self.safe_delete_files(jobs_info)
         return True
 
     def unlock_jobs(
@@ -3000,10 +3491,19 @@ class JobController:
         Checks that the folder to be deleted contains the jfremote_in.json
         file to avoid mistakenly deleting other folders.
 
+        The deletion is attempted for each Job independently: an error while
+        deleting the files of a Job is logged, and the files of the other Jobs
+        are still deleted. If the connection to a worker cannot be established,
+        the files of all the Jobs on that worker are not deleted, without
+        trying to connect again for each of them. The folder of each Job whose
+        files could not be deleted is logged and, inside a
+        `collect_delete_files_errors` block, added to its list.
+
         Parameters
         ----------
         jobs_info
-            A list of JobInfo whose files should be deleted.
+            A list of JobInfo, or of dictionaries with at least the "run_dir"
+            and "worker" keys, whose files should be deleted.
 
         Returns
         -------
@@ -3011,20 +3511,64 @@ class JobController:
             The list of JobInfo whose files have been actually deleted.
         """
         deleted = []
+        # the workers whose host could not be connected, with the error
+        unreachable_workers: dict[str, Exception] = {}
+        # the list of an active collect_delete_files_errors block, if any
+        collected_errors = _delete_files_errors.get()
+
         with SharedHosts(self.project) as shared_hosts:
             for job_info in jobs_info:
                 if isinstance(job_info, JobInfo):
                     run_dir = job_info.run_dir
                     worker = job_info.worker
+                    db_id = job_info.db_id
                 else:
                     run_dir = job_info["run_dir"]
                     worker = job_info["worker"]
-                if run_dir:
+                    db_id = job_info.get("db_id")
+                if not run_dir:
+                    continue
+                job_desc = f"Job {db_id}" if db_id else "Job"
+                if worker in unreachable_workers:
+                    logger.warning(
+                        f"The files of {job_desc} in {run_dir} were not deleted: "
+                        f"the worker '{worker}' could not be reached."
+                    )
+                    if collected_errors is not None:
+                        collected_errors.append(
+                            (db_id, worker, run_dir, unreachable_workers[worker])
+                        )
+                    continue
+                try:
                     host = shared_hosts.get_host(worker)
+                except Exception as exc:
+                    # the message of the connection error is explicit enough:
+                    # do not log the traceback
+                    unreachable_workers[worker] = exc
+                    logger.warning(
+                        f"The files of {job_desc} in {run_dir} were not deleted: "
+                        f"{exc}. The files of the other Jobs on the worker "
+                        f"'{worker}' will not be deleted either."
+                    )
+                    if collected_errors is not None:
+                        collected_errors.append((db_id, worker, run_dir, exc))
+                    continue
+                try:
+                    # raise on error, so that every failure has its exception.
+                    # A folder that does not exist only returns False.
                     if safe_remove_job_files(
-                        host=host, run_dir=run_dir, raise_on_error=False
+                        host=host, run_dir=run_dir, raise_on_error=True
                     ):
                         deleted.append(job_info)
+                except Exception as exc:
+                    # the reason of an UnsafeDeletionError is in its message
+                    logger.warning(
+                        f"The files of {job_desc} in {run_dir} on the worker "
+                        f"'{worker}' were not deleted: {exc}",
+                        exc_info=not isinstance(exc, UnsafeDeletionError),
+                    )
+                    if collected_errors is not None:
+                        collected_errors.append((db_id, worker, run_dir, exc))
         return deleted
 
     def unlock_flows(
@@ -3226,13 +3770,16 @@ class JobController:
             background=background,
         )
 
+        # No index on "uuid" alone: the compound (uuid, index) index above
+        # serves the queries on uuid through its prefix.
         job_indexes = [
-            "uuid",
             "index",
             "state",
             "updated_on",
             "name",
             "worker",
+            # used to fetch the Jobs of a Flow (e.g. in update_flow_state)
+            "job.hosts",
             [("priority", pymongo.DESCENDING)],
             ["state", "remote.retry_time_limit"],
         ]
@@ -3248,6 +3795,7 @@ class JobController:
             "name",
             "state",
             "updated_on",
+            "created_on",
             "ids",
             "jobs",
         ]
@@ -3331,6 +3879,26 @@ class JobController:
         coll = self.get_collection(collection)
         for idx in indexes:
             coll.create_index(idx, background=background, unique=unique)
+
+    def get_indexes(
+        self, collection: DbCollection = DbCollection.JOBS
+    ) -> dict[str, dict[str, Any]]:
+        """
+        Get the indexes present in a collection.
+
+        Parameters
+        ----------
+        collection
+            The collection whose indexes are listed.
+
+        Returns
+        -------
+        dict
+            A dictionary with the index names as keys and their information as
+            values, as returned by pymongo's index_information. The "key"
+            entry of each value contains the list of (field, direction) pairs.
+        """
+        return self.get_collection(collection).index_information()
 
     def get_collection(self, collection: DbCollection):
         """
@@ -3430,6 +3998,8 @@ class JobController:
         name: str | None = None,
         metadata: dict | None = None,
         workers: str | list[str] | None = None,
+        limit: int = 0,
+        estimated: bool = False,
     ) -> int:
         """
         Count Jobs based on filters.
@@ -3464,6 +4034,17 @@ class JobController:
         workers
             One or more worker names.
 
+        limit
+            If larger than 0, stop counting when this number is reached, so that
+            the returned value is at most limit. Can be much faster than a full
+            count on large collections.
+        estimated
+            If True and no filter is applied, return the estimated number of
+            documents from the collection metadata, instead of counting them.
+            Much faster on large collections, but the value may be inaccurate,
+            e.g. after an unclean shutdown of MongoDB. Ignored if any filter is
+            applied.
+
         Returns
         -------
         int
@@ -3482,7 +4063,9 @@ class JobController:
             workers=workers,
             custom_query=query,
         )
-        return self.jobs.count_documents(full_query)
+        return self._count_documents(
+            self.jobs, full_query, limit=limit, estimated=estimated
+        )
 
     def count_flows(
         self,
@@ -3496,6 +4079,8 @@ class JobController:
         name: str | None = None,
         metadata: dict | None = None,
         locked: bool = False,
+        limit: int = 0,
+        estimated: bool = False,
     ) -> int:
         """
         Count flows based on filter parameters.
@@ -3503,7 +4088,8 @@ class JobController:
         Parameters
         ----------
         query
-            A generic query. Will override all the other parameters.
+            A generic query on the fields of the Flow document. Keys must not
+            overlap with other specified query options.
         job_ids
             One or more strings with uuids of Jobs belonging to the Flow.
         db_ids
@@ -3527,24 +4113,68 @@ class JobController:
         locked
             If True only locked Flows will be counted.
 
+        limit
+            If larger than 0, stop counting when this number is reached, so that
+            the returned value is at most limit. Can be much faster than a full
+            count on large collections.
+        estimated
+            If True and no filter is applied, return the estimated number of
+            documents from the collection metadata, instead of counting them.
+            Much faster on large collections, but the value may be inaccurate,
+            e.g. after an unclean shutdown of MongoDB. Ignored if any filter is
+            applied.
+
         Returns
         -------
         int
             Number of Flows matching the criteria.
         """
-        if not query:
-            query = self._build_query_flow(
-                job_ids=job_ids,
-                db_ids=db_ids,
-                flow_ids=flow_ids,
-                states=states,
-                start_date=start_date,
-                end_date=end_date,
-                name=name,
-                metadata=metadata,
-                locked=locked,
-            )
-        return self.flows.count_documents(query)
+        full_query = self._build_query_flow(
+            job_ids=job_ids,
+            db_ids=db_ids,
+            flow_ids=flow_ids,
+            states=states,
+            start_date=start_date,
+            end_date=end_date,
+            name=name,
+            metadata=metadata,
+            locked=locked,
+            custom_query=query,
+        )
+        return self._count_documents(
+            self.flows, full_query, limit=limit, estimated=estimated
+        )
+
+    @staticmethod
+    def _count_documents(
+        collection: Collection, query: dict, limit: int = 0, estimated: bool = False
+    ) -> int:
+        """
+        Count the documents of a collection matching a query.
+
+        Parameters
+        ----------
+        collection
+            The collection where the documents are counted.
+        query
+            The filter for the documents.
+        limit
+            If larger than 0, the maximum number of documents counted.
+        estimated
+            If True and the query is empty, use the estimated number of documents
+            from the collection metadata.
+
+        Returns
+        -------
+        int
+            The number of documents.
+        """
+        if estimated and not query:
+            count = collection.estimated_document_count()
+            return min(count, limit) if limit > 0 else count
+        # count_documents adds a $limit stage if limit is passed, even if 0
+        kwargs = {"limit": limit} if limit > 0 else {}
+        return collection.count_documents(query, **kwargs)
 
     def count_jobs_states(
         self, states: list[JobState], worker: str | None = None
@@ -3608,6 +4238,20 @@ class JobController:
             out[state] = out.get(state, 0)
 
         return out
+
+    def get_assigned_workers(self) -> list[str]:
+        """
+        Get the names of the workers assigned to the Jobs in the database.
+
+        Can include workers that are no longer defined in the project
+        configuration, but are still assigned to existing Jobs.
+
+        Returns
+        -------
+        list[str]
+            The sorted list of the distinct worker names.
+        """
+        return sorted(w for w in self.jobs.distinct("worker") if w is not None)
 
     def get_trends(
         self,
@@ -4835,7 +5479,9 @@ class JobController:
             if not job_doc_dict:
                 if job_lock.unavailable_document:
                     raise JobLockedError.from_job_doc(job_lock.unavailable_document)
-                raise ValueError(f"No Job document matching criteria {lock_filter}")
+                raise JobNotFoundError(
+                    f"No Job document matching criteria {lock_filter}"
+                )
             job_state = JobState(job_doc_dict["state"])
             if acceptable_states and job_state not in acceptable_states:
                 raise ValueError(
@@ -4856,7 +5502,7 @@ class JobController:
                         raise FlowLockedError.from_flow_doc(
                             flow_lock.unavailable_document
                         )
-                    raise ValueError(
+                    raise FlowNotFoundError(
                         f"No Flow document matching criteria {flow_filter}"
                     )
 
@@ -4945,6 +5591,55 @@ class JobController:
         self.flows.find_one_and_update(
             {"nodes": uuid}, {"$set": {"updated_on": datetime.now(timezone.utc)}}
         )
+
+    def _try_cancel_queue_process(self, job_doc: dict, context: str = "") -> bool:
+        """
+        Try to cancel the process of a Job in the remote queue, if it has one.
+
+        Only Jobs in the SUBMITTED and RUNNING states have a process in the
+        queue that can be cancelled. Jobs in the BATCH_SUBMITTED and
+        BATCH_RUNNING states run inside a batch process that cannot be
+        cancelled for a single Job: a warning is logged. Nothing is done for
+        the other states. A failure to cancel is logged and not raised, so that
+        the calling action can proceed. Inside a `collect_cancel_errors` block
+        the failure is also added to its list.
+
+        Parameters
+        ----------
+        job_doc
+            The dict of the JobDoc. Requires the "uuid", "index" and "state"
+            values and, for the SUBMITTED and RUNNING states, "db_id",
+            "worker" and "remote.process_id".
+        context
+            Text appended to the logged messages, e.g. to describe the action
+            being performed.
+
+        Returns
+        -------
+        bool
+            True if the process in the queue has been cancelled.
+        """
+        job_state = JobState(job_doc["state"])
+        job_desc = f"Job {job_doc['uuid']} {job_doc['index']}"
+        if job_state in BATCH_STATES:
+            logger.warning(
+                f"{job_desc} is in the {job_state.value} state, so it cannot be "
+                f"cancelled from execution on the worker{context}."
+            )
+            return False
+        if job_state not in CANCELLABLE_STATES:
+            return False
+        try:
+            self._cancel_queue_process(job_doc)
+        except Exception as exc:
+            logger.warning(
+                f"Failed cancelling the process for {job_desc}{context}",
+                exc_info=True,
+            )
+            if (cancel_errors := _cancel_errors.get()) is not None:
+                cancel_errors.append((job_doc["db_id"], exc))
+            return False
+        return True
 
     def _cancel_queue_process(self, job_doc: dict) -> None:
         """
@@ -5328,6 +6023,7 @@ class JobController:
         delete_files: bool = False,
         wait: int | None = None,
         break_lock: bool = False,
+        cancel_processes: bool = True,
     ) -> str:
         """
         Delete a single job from the queue store and optionally from the job store.
@@ -5346,11 +6042,18 @@ class JobController:
         delete_output : bool, default False
             If True, also delete the job output from the JobStore.
         delete_files
-            If True also delete the files on the worker.
+            If True also delete the files on the worker. The files are deleted
+            after the Job. A failure to delete them, e.g. because the worker
+            cannot be reached, is logged and does not stop the deletion of
+            the Job.
         wait
             In case the Flow or Job is locked, wait this time (in seconds) for the lock to be released.
         break_lock
             Forcibly break the lock on locked documents.
+        cancel_processes
+            If True will attempt to cancel the process in the queue of a
+            SUBMITTED or RUNNING Job. Failure to cancel will not stop the
+            deletion of the Job.
 
         Returns
         -------
@@ -5361,101 +6064,121 @@ class JobController:
         job_lock_kwargs = dict(projection=projection_job_info)
         if not delete_files:
             job_lock_kwargs = dict(
-                projection=["uuid", "index", "db_id", "state", "job"]
+                projection=[
+                    "uuid",
+                    "index",
+                    "db_id",
+                    "state",
+                    "job",
+                    # required to cancel the process in the queue
+                    "worker",
+                    "remote.process_id",
+                ]
             )
         # avoid deleting jobs in batch states. It would require additional
         # specific handling and it is an unlikely use case.
-        with self.lock_job_flow(
-            job_id=job_id,
-            db_id=db_id,
-            job_index=job_index,
-            acceptable_states=DELETABLE_STATES,
-            wait=wait,
-            break_lock=break_lock,
-            job_lock_kwargs=job_lock_kwargs,
-        ) as (job_lock, flow_lock):
-            # lock_job_flow already checks that the locked document is not none, both for job and flow
-            job_doc = job_lock.locked_document
+        # Share the hosts between the cancellation of the process and the
+        # deletion of the files.
+        with SharedHosts(self.project):
+            with self.lock_job_flow(
+                job_id=job_id,
+                db_id=db_id,
+                job_index=job_index,
+                acceptable_states=DELETABLE_STATES,
+                wait=wait,
+                break_lock=break_lock,
+                job_lock_kwargs=job_lock_kwargs,
+            ) as (job_lock, flow_lock):
+                # lock_job_flow already checks that the locked document is not none, both for job and flow
+                job_doc = job_lock.locked_document
 
-            # Update FlowDoc
-            flow_doc = FlowDoc.model_validate(flow_lock.locked_document)
-            job_uuid, job_index = job_doc["uuid"], job_doc["index"]
+                # Update FlowDoc
+                flow_doc = FlowDoc.model_validate(flow_lock.locked_document)
+                job_uuid, job_index = job_doc["uuid"], job_doc["index"]
 
-            if len(flow_doc.ids) == 1:
-                raise RuntimeError(
-                    "It is not possible to delete the only Job of the Flow. Delete the entire Flow."
-                )
-
-            # Remove job from ids list
-            flow_doc.ids = [
-                id_tuple
-                for id_tuple in flow_doc.ids
-                if id_tuple[1] != job_uuid or id_tuple[2] != job_index
-            ]
-
-            # Remove job from jobs list and as parent of other jobs if no job
-            # with that id remains in the flow
-            if not any(job_uuid == id_tuple[1] for id_tuple in flow_doc.ids):
-                # Here a flow_doc.jobs.remove could be enough. But due to a previous
-                # bug the list of jobs could contain the same uuid more than once.
-                # Make sure to remove all the instances.
-                flow_doc.jobs = [jid for jid in flow_doc.jobs if jid != job_uuid]
-
-                for parent_dict in flow_doc.parents.values():
-                    for index_list in parent_dict.values():
-                        if job_uuid in index_list:
-                            index_list.remove(job_uuid)
-
-            # Remove job from parents
-            flow_doc.parents[job_uuid].pop(str(job_index), None)
-            # if all the jobs with a given uuid have been removed, also remove
-            # the entry from the parents
-            if not flow_doc.parents[job_uuid]:
-                flow_doc.parents.pop(job_uuid, None)
-
-            # Update flow state if necessary
-            updated_states: dict[str, dict[int, Any]] = {
-                job_uuid: {job_index: None}
-            }  # None indicates job removal
-            self.update_flow_state(
-                flow_uuid=flow_doc.uuid, updated_states=updated_states
-            )
-
-            # Prepare flow update
-            flow_update = {
-                "$set": {
-                    "jobs": flow_doc.jobs,
-                    "ids": flow_doc.ids,
-                    "parents": flow_doc.parents,
-                }
-            }
-            flow_update["$set"]["updated_on"] = datetime.now(timezone.utc)
-
-            # Set flow update to be applied on lock release
-            flow_lock.update_on_release = flow_update
-
-            job_lock.delete_on_release = True
-
-            # Optionally delete from jobstore
-            if delete_output:
-                jobstore = self.jobstore
-                if self.optional_jobstores:
-                    store_name = self.get_flow_store(job_doc["job"]["hosts"][-1])
-                    if store_name:
-                        jobstore = self.optional_jobstores[store_name]
-                try:
-                    jobstore.remove_docs({"uuid": job_uuid, "index": job_index})
-                except Exception:
-                    warnings.warn(
-                        f"Error while delete the output of job {job_uuid} {job_index}",
-                        stacklevel=2,
+                if len(flow_doc.ids) == 1:
+                    raise RuntimeError(
+                        "It is not possible to delete the only Job of the Flow. Delete the entire Flow."
                     )
 
-            if delete_files:
-                job_info = JobInfo.from_query_output(job_doc)
-                self.safe_delete_files([job_info])
+                # Remove job from ids list
+                flow_doc.ids = [
+                    id_tuple
+                    for id_tuple in flow_doc.ids
+                    if id_tuple[1] != job_uuid or id_tuple[2] != job_index
+                ]
 
-            return job_doc["db_id"]
+                # Remove job from jobs list and as parent of other jobs if no job
+                # with that id remains in the flow
+                if not any(job_uuid == id_tuple[1] for id_tuple in flow_doc.ids):
+                    # Here a flow_doc.jobs.remove could be enough. But due to a previous
+                    # bug the list of jobs could contain the same uuid more than once.
+                    # Make sure to remove all the instances.
+                    flow_doc.jobs = [jid for jid in flow_doc.jobs if jid != job_uuid]
+
+                    for parent_dict in flow_doc.parents.values():
+                        for index_list in parent_dict.values():
+                            if job_uuid in index_list:
+                                index_list.remove(job_uuid)
+
+                # Remove job from parents
+                flow_doc.parents[job_uuid].pop(str(job_index), None)
+                # if all the jobs with a given uuid have been removed, also remove
+                # the entry from the parents
+                if not flow_doc.parents[job_uuid]:
+                    flow_doc.parents.pop(job_uuid, None)
+
+                # Update flow state if necessary
+                updated_states: dict[str, dict[int, Any]] = {
+                    job_uuid: {job_index: None}
+                }  # None indicates job removal
+                self.update_flow_state(
+                    flow_uuid=flow_doc.uuid, updated_states=updated_states
+                )
+
+                # Prepare flow update
+                flow_update = {
+                    "$set": {
+                        "jobs": flow_doc.jobs,
+                        "ids": flow_doc.ids,
+                        "parents": flow_doc.parents,
+                    }
+                }
+                flow_update["$set"]["updated_on"] = datetime.now(timezone.utc)
+
+                # Set flow update to be applied on lock release
+                flow_lock.update_on_release = flow_update
+
+                job_lock.delete_on_release = True
+
+                if cancel_processes:
+                    # try cancelling the job submitted to the remote queue, if any
+                    self._try_cancel_queue_process(
+                        job_doc, context=" while deleting the Job"
+                    )
+
+                # Optionally delete from jobstore
+                if delete_output:
+                    jobstore = self.jobstore
+                    if self.optional_jobstores:
+                        store_name = self.get_flow_store(job_doc["job"]["hosts"][-1])
+                        if store_name:
+                            jobstore = self.optional_jobstores[store_name]
+                    try:
+                        jobstore.remove_docs({"uuid": job_uuid, "index": job_index})
+                    except Exception:
+                        warnings.warn(
+                            f"Error while delete the output of job {job_uuid} {job_index}",
+                            stacklevel=2,
+                        )
+
+            # Delete the files last, after cancelling the queue process and
+            # once the Job is deleted: a worker that cannot be reached does not
+            # stop the deletion. Failures are logged.
+            if delete_files:
+                self.safe_delete_files([JobInfo.from_query_output(job_doc)])
+
+        return job_doc["db_id"]
 
     def delete_jobs(
         self,
@@ -5474,6 +6197,7 @@ class JobController:
         delete_output: bool = False,
         delete_files: bool = False,
         max_limit: int = 10,
+        cancel_processes: bool = True,
     ) -> list[str]:
         """
         Delete selected jobs from the queue store and optionally from the job store.
@@ -5518,37 +6242,44 @@ class JobController:
         delete_output : bool, default False
             If True, also delete the Job output from the JobStore.
         delete_files
-            If True also delete the files on the worker.
+            If True also delete the files on the worker. The files of each Job
+            are deleted after the Job. A failure to delete them, e.g. because
+            the worker cannot be reached, is logged and does not stop the
+            deletion of the Jobs.
         max_limit
             The Jobs will be deleted only if the total number is lower than the
             specified limit. 0 means no limit.
+        cancel_processes
+            If True will attempt to cancel the processes in the queue of the
+            SUBMITTED and RUNNING Jobs. Failure to cancel will not stop the
+            deletion of the Jobs.
 
         Returns
         -------
         list
             List of db_ids of the deleted Jobs.
         """
-        # Open the SharedHosts so that hosts will be shared for all the Jobs
-        with SharedHosts(self.project):
-            return self._many_jobs_action(
-                method=self.delete_job,
-                action_description="deleting",
-                job_ids=job_ids,
-                db_ids=db_ids,
-                flow_ids=flow_ids,
-                states=states,
-                start_date=start_date,
-                end_date=end_date,
-                name=name,
-                metadata=metadata,
-                workers=workers,
-                custom_query=custom_query,
-                raise_on_error=raise_on_error,
-                wait=wait,
-                delete_output=delete_output,
-                delete_files=delete_files,
-                max_limit=max_limit,
-            )
+        # _many_jobs_action shares the hosts among all the Jobs
+        return self._many_jobs_action(
+            method=self.delete_job,
+            action_description="deleting",
+            job_ids=job_ids,
+            db_ids=db_ids,
+            flow_ids=flow_ids,
+            states=states,
+            start_date=start_date,
+            end_date=end_date,
+            name=name,
+            metadata=metadata,
+            workers=workers,
+            custom_query=custom_query,
+            raise_on_error=raise_on_error,
+            wait=wait,
+            delete_output=delete_output,
+            delete_files=delete_files,
+            max_limit=max_limit,
+            cancel_processes=cancel_processes,
+        )
 
     def get_job_output(
         self,
@@ -5588,7 +6319,7 @@ class JobController:
                 db_id=db_id,
             )
             if not job_info:
-                raise ValueError(f"No Job with db_id {db_id}")
+                raise JobNotFoundError(f"No Job with db_id {db_id}")
             job_id = job_info.uuid
             job_index = job_info.index
 
@@ -5601,7 +6332,7 @@ class JobController:
                     job_index=job_index,
                 )
                 if not job_info:
-                    raise ValueError(
+                    raise JobNotFoundError(
                         "The Job is not present in the Queue DB, cannot "
                         "determine the store to fetch the output"
                     )

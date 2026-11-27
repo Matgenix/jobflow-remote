@@ -24,6 +24,10 @@ def test_flows_list(job_controller, two_flows_four_jobs, run_check_cli) -> None:
     outputs = ["The number of Flows printed is limited by the maximum selected"]
     run_check_cli(["flow", "list", "-m", "1"], required_out=outputs)
 
+    # sort, but not on db_id that is not defined for flows
+    run_check_cli(["flow", "list", "--sort", "created_on"], required_out="flow_1")
+    run_check_cli(["flow", "list", "--sort", "db_id"], error=True)
+
     outputs = ["READY"]
     run_check_cli(
         ["flow", "list", "-fid", two_flows_four_jobs[0].uuid], required_out=outputs
@@ -49,6 +53,39 @@ def test_flows_list(job_controller, two_flows_four_jobs, run_check_cli) -> None:
     run_check_cli(
         ["flow", "list", "--metadata", "test=x", "--count"],
         required_out="Number of Flows: 1",
+    )
+
+    # custom query
+    run_check_cli(
+        ["flow", "list", "-q", '{"name": "flow_1"}'],
+        required_out=[two_flows_four_jobs[0].uuid[:5]],
+        excluded_out=[two_flows_four_jobs[1].uuid[:5], flow.uuid[:5]],
+    )
+    run_check_cli(
+        ["flow", "list", "-q", '{"name": "flow_1"}', "--count"],
+        required_out="Number of Flows: 1",
+    )
+    run_check_cli(
+        ["flow", "list", "-q", "metadata.test=x", "-v"],
+        required_out=[flow.uuid[:5]],
+    )
+    # combined with the other filters
+    run_check_cli(
+        [
+            "flow",
+            "list",
+            "-q",
+            '{"name": {"$in": ["flow_1", "flow_2"]}}',
+            "-fid",
+            two_flows_four_jobs[1].uuid,
+            "--count",
+        ],
+        required_out="Number of Flows: 1",
+    )
+    run_check_cli(
+        ["flow", "list", "-q", '{"name": "flow_1"}', "-n", "flow_1"],
+        error=True,
+        required_out="Custom_query must not overlap with other query options",
     )
 
 
@@ -222,6 +259,11 @@ def test_flow_info(job_controller, two_flows_four_jobs, run_check_cli, runner) -
     assert table_flow_info_vvv == table_job_list_vvv
 
     run_check_cli(["flow", "info", "-j", "3", "-v"], required_out=["Metadata: {}"])
+
+    # the lock is shown only for a locked Flow
+    run_check_cli(["flow", "info", "-j", "1"], excluded_out="LOCKED")
+    with job_controller.lock_flow(filter={"uuid": two_flows_four_jobs[0].uuid}):
+        run_check_cli(["flow", "info", "-j", "1"], required_out="LOCKED since")
 
     run_check_cli(
         ["flow", "info", "-j", "1", "--report"],
@@ -417,7 +459,7 @@ def test_clean(
         "Deleted execution folders of 1 Jobs",
         "Folder was not deleted for the following jobs:",
         f"- {job_2_2_doc.db_id}",
-        "WARNING  Did not delete folder",
+        f"WARNING  The files of Job {job_2_2_doc.db_id}",
         "jfremote_in.json is missing",
     ]
     excluded_out = ["Proceed anyway"]
@@ -489,3 +531,7 @@ def test_clean(
         cli_input="y\ny",
     )
     assert os.path.isfile("skipped_cleanup.dat")
+    with open("skipped_cleanup.dat") as f:
+        skipped_content = f.read()
+    # the states are written by their value, not as JobState.RUNNING
+    assert " - RUNNING\n" in skipped_content

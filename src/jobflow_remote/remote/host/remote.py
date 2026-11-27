@@ -17,7 +17,7 @@ from fabric.auth import OpenSSHAuthStrategy
 from paramiko.auth_strategy import AuthSource
 from paramiko.ssh_exception import SSHException
 
-from jobflow_remote.remote.host.base import BaseHost
+from jobflow_remote.remote.host.base import BaseHost, InteractiveLoginRequiredError
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -260,6 +260,26 @@ class RemoteHost(BaseHost):
         return buf.read().decode()
 
     def connect(self) -> None:
+        """
+        Open the connection to the host.
+
+        Raises
+        ------
+        InteractiveLoginRequiredError
+            If the host requires an interactive login and interactive logins
+            are not allowed in this process. Raised before opening the
+            connection, so that no prompt is shown.
+        """
+        if self.interactive_login:
+            from jobflow_remote import SETTINGS
+
+            if not SETTINGS.allow_interactive_login:
+                raise InteractiveLoginRequiredError(
+                    f"The host '{self.host}' requires an interactive login, which "
+                    "is not allowed in this process (allow_interactive_login "
+                    "setting, JFREMOTE_ALLOW_INTERACTIVE_LOGIN environment variable).",
+                    host=self.host,
+                )
         self.connection.open()
         if self.keepalive:
             # create all the nested connections for all the gateways.
@@ -272,17 +292,30 @@ class RemoteHost(BaseHost):
                     connection = None
 
     def close(self) -> bool:
+        """
+        Close the connection and those of all its gateways.
+
+        Returns
+        -------
+        bool
+            True if all the connections were closed without errors.
+        """
         connection = self.connection
         all_closed = True
-        while connection:
+        # the gateway can also be a string (a ProxyCommand), that does not
+        # need to be closed.
+        while isinstance(connection, fabric.Connection):
             try:
-                if isinstance(connection, fabric.Connection):
-                    connection.close()
-                    connection = connection.gateway
-                else:
-                    connection = None
+                connection.close()
             except Exception:
                 all_closed = False
+                logger.debug(
+                    f"Error while closing the connection to {connection.host}",
+                    exc_info=True,
+                )
+            # move to the gateway even if closing failed, otherwise the loop
+            # would never end.
+            connection = connection.gateway
         return all_closed
 
     @property
@@ -465,6 +498,8 @@ class RemoteHost(BaseHost):
         shell
             The name of the shell to start
         """
+        # fabric would open the connection by itself: go through connect()
+        self._check_connected()
         cmd = shell
         if pre_cmd:
             cmd = f"{pre_cmd}; {shell}"
@@ -484,6 +519,8 @@ class RemoteHost(BaseHost):
         bool
             True if the path exists
         """
+        # fabric would open the connection by itself: go through connect()
+        self._check_connected()
         try:
             stat = self._execute_remote_func(
                 lambda host: host.connection.sftp().stat, str(path)

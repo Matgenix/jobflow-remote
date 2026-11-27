@@ -76,6 +76,11 @@ def test_queries(job_controller, runner) -> None:
     assert job_controller.count_jobs(states=JobState.READY) == 2
     assert job_controller.count_jobs(db_ids="1") == 1
     assert job_controller.count_jobs(job_ids=(add_first.uuid, 1)) == 1
+    # capped and estimated counts
+    assert job_controller.count_jobs(limit=2) == 2
+    assert job_controller.count_jobs(estimated=True) == 4
+    assert job_controller.count_jobs(states=JobState.READY, estimated=True) == 2
+    assert job_controller.count_flows(estimated=True, limit=1) == 1
     jobs_start_date = job_controller.get_jobs_info(start_date=date_create)
     assert len(jobs_start_date) == 2
     assert {j.uuid for j in jobs_start_date} == {add_first.uuid, add_second.uuid}
@@ -130,6 +135,453 @@ def test_queries(job_controller, runner) -> None:
         skipped_flows[0].updated_on
         == job_controller.get_flows_info(sort=["updated_on"])[1].updated_on
     )
+
+
+def test_get_jobs_db_ids(job_controller, two_flows_four_jobs) -> None:
+    from jobflow_remote.jobs.state import JobState
+
+    all_docs = job_controller.get_jobs_doc()
+    all_db_ids = [doc.db_id for doc in all_docs]
+    assert len(all_db_ids) == 4
+
+    # no filter: all the db_ids are returned, as strings
+    res = job_controller.get_jobs_db_ids()
+    assert all(isinstance(db_id, str) for db_id in res)
+    assert sorted(res) == sorted(all_db_ids)
+
+    # filter by name
+    doc_job1 = next(doc for doc in all_docs if doc.job.name == "add_job1")
+    assert job_controller.get_jobs_db_ids(name="add_job1") == [doc_job1.db_id]
+
+    # filter by flow id
+    flow_1_uuids = {job.uuid for job in two_flows_four_jobs[0]}
+    flow_1_db_ids = [doc.db_id for doc in all_docs if doc.uuid in flow_1_uuids]
+    assert len(flow_1_db_ids) == 2
+    res = job_controller.get_jobs_db_ids(flow_ids=two_flows_four_jobs[0].uuid)
+    assert sorted(res) == sorted(flow_1_db_ids)
+
+    # filter by state: only the first job of each flow is READY
+    ready_db_ids = [doc.db_id for doc in all_docs if doc.state == JobState.READY]
+    assert len(ready_db_ids) == 2
+    res = job_controller.get_jobs_db_ids(states=JobState.READY)
+    assert sorted(res) == sorted(ready_db_ids)
+
+    # combined filters
+    res = job_controller.get_jobs_db_ids(
+        flow_ids=two_flows_four_jobs[0].uuid, states=JobState.READY
+    )
+    assert res == [doc_job1.db_id]
+
+    # sort and limit
+    res = job_controller.get_jobs_db_ids(sort=[("db_id", -1)], limit=1)
+    assert len(res) == 1
+
+    # pages with skip and limit: not overlapping and in the sort order
+    sort = [("db_id", 1)]
+    all_sorted = job_controller.get_jobs_db_ids(sort=sort)
+    page_1 = job_controller.get_jobs_db_ids(sort=sort, limit=2)
+    page_2 = job_controller.get_jobs_db_ids(sort=sort, limit=2, skip=2)
+    assert page_1 == all_sorted[:2]
+    assert page_2 == all_sorted[2:]
+    assert job_controller.get_jobs_db_ids(sort=sort, skip=4) == []
+
+    # no match
+    assert job_controller.get_jobs_db_ids(name="missing_job") == []
+    assert job_controller.get_jobs_db_ids(custom_query={"db_id": "missing"}) == []
+
+
+def test_get_flows_uuids(job_controller, two_flows_four_jobs) -> None:
+    from jobflow_remote.jobs.state import FlowState
+
+    flow_1, flow_2 = two_flows_four_jobs
+
+    # no filter: all the flow uuids are returned
+    res = job_controller.get_flows_uuids()
+    assert sorted(res) == sorted([flow_1.uuid, flow_2.uuid])
+
+    # filter by name
+    assert job_controller.get_flows_uuids(name="flow_1") == [flow_1.uuid]
+
+    # filter by metadata
+    assert job_controller.get_flows_uuids(metadata={"f1_metadata": "some_info"}) == [
+        flow_1.uuid
+    ]
+
+    # filter by flow id
+    assert job_controller.get_flows_uuids(flow_ids=flow_2.uuid) == [flow_2.uuid]
+
+    # filter by uuid of a job belonging to the flow
+    assert job_controller.get_flows_uuids(job_ids=flow_2[0].uuid) == [flow_2.uuid]
+
+    # filter by db_id of a job belonging to the flow
+    job_doc = job_controller.get_job_doc(job_id=flow_1[0].uuid)
+    assert job_controller.get_flows_uuids(db_ids=job_doc.db_id) == [flow_1.uuid]
+
+    # filter by state
+    res = job_controller.get_flows_uuids(states=FlowState.READY)
+    assert sorted(res) == sorted([flow_1.uuid, flow_2.uuid])
+    assert job_controller.get_flows_uuids(states=FlowState.COMPLETED) == []
+
+    # sort and limit
+    res = job_controller.get_flows_uuids(sort=[("name", 1)], limit=1)
+    assert res == [flow_1.uuid]
+    res = job_controller.get_flows_uuids(sort=[("name", -1)], limit=1)
+    assert res == [flow_2.uuid]
+    res = job_controller.get_flows_uuids(sort=[("name", -1)])
+    assert res == [flow_2.uuid, flow_1.uuid]
+
+    # pages with skip and limit
+    assert job_controller.get_flows_uuids(sort=[("name", 1)], limit=1, skip=1) == [
+        flow_2.uuid
+    ]
+    assert job_controller.get_flows_uuids(sort=[("name", -1)], skip=1) == [flow_1.uuid]
+    assert job_controller.get_flows_uuids(sort=[("name", 1)], skip=2) == []
+
+    # no match
+    assert job_controller.get_flows_uuids(name="missing_flow") == []
+
+
+def test_query_flow_ids_no_match(job_controller, two_flows_four_jobs) -> None:
+    flow_1, _ = two_flows_four_jobs
+    flow_1_job_uuids = sorted(job.uuid for job in flow_1)
+
+    # a value that is not a uuid is a Job db_id. If no Flow contains that
+    # Job, nothing should match.
+    assert job_controller.count_jobs(flow_ids="no-such-id") == 0
+    assert job_controller.get_jobs_info(flow_ids="no-such-id") == []
+    assert job_controller.get_jobs_db_ids(flow_ids="no-such-id") == []
+
+    # mixing a valid Flow uuid and an unknown value only returns that Flow's Jobs
+    jobs_info = job_controller.get_jobs_info(flow_ids=[flow_1.uuid, "no-such-id"])
+    assert sorted(ji.uuid for ji in jobs_info) == flow_1_job_uuids
+    assert job_controller.count_jobs(flow_ids=[flow_1.uuid, "no-such-id"]) == 2
+
+    # the db_id of a Job is resolved to the Flow containing it
+    db_id = job_controller.get_job_doc(job_id=flow_1[0].uuid).db_id
+    jobs_info = job_controller.get_jobs_info(flow_ids=[db_id, "no-such-id"])
+    assert sorted(ji.uuid for ji in jobs_info) == flow_1_job_uuids
+
+
+def test_flows_custom_query(job_controller, two_flows_four_jobs) -> None:
+    from jobflow_remote.jobs.state import FlowState
+
+    flow_1, flow_2 = two_flows_four_jobs
+
+    def check(expected: list[str], **kwargs) -> None:
+        custom_query = kwargs.pop("custom_query")
+        infos = job_controller.get_flows_info(custom_query=custom_query, **kwargs)
+        assert sorted(fi.flow_id for fi in infos) == sorted(expected)
+        infos = job_controller.get_flows_info(
+            custom_query=custom_query, with_jobs_info=True, **kwargs
+        )
+        assert sorted(fi.flow_id for fi in infos) == sorted(expected)
+        uuids = job_controller.get_flows_uuids(custom_query=custom_query, **kwargs)
+        assert sorted(uuids) == sorted(expected)
+        assert job_controller.count_flows(query=custom_query, **kwargs) == len(expected)
+
+    # alone
+    check([flow_1.uuid], custom_query={"name": "flow_1"})
+    check(
+        [flow_1.uuid, flow_2.uuid],
+        custom_query={"name": {"$in": ["flow_1", "flow_2"]}},
+    )
+    check([], custom_query={"name": "missing"})
+
+    # combined with the other filters, not replaced by them
+    check(
+        [flow_1.uuid],
+        custom_query={"metadata.f1_metadata": "some_info"},
+        states=FlowState.READY,
+    )
+    check([], custom_query={"name": "flow_1"}, flow_ids=flow_2.uuid)
+    check([flow_2.uuid], custom_query={"uuid": {"$ne": flow_1.uuid}}, name="flow_*")
+
+    # keys overlapping with the other filters
+    with pytest.raises(ValueError, match="must not overlap"):
+        job_controller.get_flows_info(custom_query={"name": "flow_1"}, name="flow_1")
+    with pytest.raises(ValueError, match="must not overlap"):
+        job_controller.get_flows_uuids(
+            custom_query={"uuid": flow_1.uuid}, flow_ids=flow_1.uuid
+        )
+    with pytest.raises(ValueError, match="must not overlap"):
+        job_controller.count_flows(query={"state": "READY"}, states=FlowState.READY)
+
+
+NAMES_FILTER = [
+    "relax",
+    "relax_1",
+    "relax_2",
+    "relaxation",
+    "pre_relax",
+    "relax.x-1",
+    "relax.x-2",
+    "relaxyx-1",
+    "rel+ax",
+    "re(l)ax",
+    "rel-ax",
+    "relbx",
+    "rel\\ax",
+    "relax\\b",
+    "static",
+]
+
+
+@pytest.fixture()
+def flows_with_names(random_project_name):
+    """Add one flow with one job for each name. Flow and Job share the name."""
+    from jobflow import Flow
+
+    from jobflow_remote import submit_flow
+    from jobflow_remote.testing import add
+
+    for name in NAMES_FILTER:
+        job = add(1, 2)
+        job.name = name
+        flow = Flow([job], name=name)
+        submit_flow(flow, worker="test_local_worker")
+
+
+NAME_PATTERNS = [
+    "relax",
+    "relax*",
+    "*relax*",
+    "*relax",
+    "rel?x",
+    "rel[ab]x",
+    "relax.x*",
+    "relax.x-*",
+    "relax.*",
+    "rel+ax",
+    "re(l)ax",
+    "re(l*",
+    "rel-ax",
+    "r*x*1",
+    "rel\\ax",
+    "relax\\b",
+    "rel\\*",
+    "*\\*",
+    "missing",
+]
+
+
+def test_name_filter(job_controller, flows_with_names) -> None:
+    """
+    Check the name filter for all the patterns on the same set of Flows.
+
+    The patterns are checked in a loop, instead of parametrizing the test, to
+    avoid populating the DB for each of them. All the failures are collected
+    and reported together.
+    """
+    import fnmatch
+
+    failures: list[str] = []
+
+    def check(description: str, actual: object, expected: object) -> None:
+        if actual != expected:
+            failures.append(f"{description}: got {actual!r}, expected {expected!r}")
+
+    for pattern in NAME_PATTERNS:
+        expected = sorted(n for n in NAMES_FILTER if fnmatch.fnmatchcase(n, pattern))
+        # the full translation of the pattern, without the index optimizations
+        full_regex = {"$regex": "^" + fnmatch.translate(pattern)}
+
+        # jobs
+        check(
+            f"[{pattern}] count_jobs",
+            job_controller.count_jobs(name=pattern),
+            len(expected),
+        )
+        check(
+            f"[{pattern}] jobs full regex",
+            job_controller.jobs.count_documents({"job.name": full_regex}),
+            len(expected),
+        )
+        jobs_info = job_controller.get_jobs_info(name=pattern)
+        check(
+            f"[{pattern}] get_jobs_info", sorted(ji.name for ji in jobs_info), expected
+        )
+
+        # flows
+        check(
+            f"[{pattern}] count_flows",
+            job_controller.count_flows(name=pattern),
+            len(expected),
+        )
+        check(
+            f"[{pattern}] flows full regex",
+            job_controller.flows.count_documents({"name": full_regex}),
+            len(expected),
+        )
+        flows_info = job_controller.get_flows_info(name=pattern)
+        check(
+            f"[{pattern}] get_flows_info",
+            sorted(fi.name for fi in flows_info),
+            expected,
+        )
+
+    assert not failures, "\n".join(failures)
+
+
+def test_get_flows_info_with_jobs_info_pages(
+    job_controller, flows_with_names, mocker
+) -> None:
+    sort = [("name", 1)]
+    pages = []
+    for skip in (0, 3):
+        spy = mocker.spy(job_controller.flows, "aggregate")
+        flows_info = job_controller.get_flows_info(
+            sort=sort, limit=3, skip=skip, with_jobs_info=True
+        )
+        # the jobs are fetched with a separate query, not with an aggregation
+        assert spy.call_count == 0
+        mocker.stop(spy)
+
+        assert len(flows_info) == 3
+        assert all(len(fi.jobs_info) == 1 for fi in flows_info)
+        assert all(fi.jobs_info[0].name == fi.name for fi in flows_info)
+        ids = [fi.flow_id for fi in flows_info]
+        # same page as without the jobs info
+        ids_no_jobs = [
+            fi.flow_id
+            for fi in job_controller.get_flows_info(sort=sort, limit=3, skip=skip)
+        ]
+        assert ids == ids_no_jobs
+        pages.append(ids)
+
+    assert set(pages[0]).isdisjoint(pages[1])
+    expected_names = sorted(NAMES_FILTER)[3:6]
+    assert [
+        fi.name
+        for fi in job_controller.get_flows_info(
+            sort=sort, limit=3, skip=3, with_jobs_info=True
+        )
+    ] == expected_names
+
+    # with a filter as well
+    flows_info = job_controller.get_flows_info(
+        name="relax*", sort=sort, limit=2, skip=1, with_jobs_info=True
+    )
+    assert [fi.name for fi in flows_info] == sorted(
+        n for n in NAMES_FILTER if n.startswith("relax")
+    )[1:3]
+    assert all(fi.jobs_info[0].name == fi.name for fi in flows_info)
+
+
+def test_get_flows_info_with_jobs_info(
+    job_controller, two_flows_four_jobs, mocker
+) -> None:
+    from jobflow import Flow
+
+    from jobflow_remote import submit_flow
+    from jobflow_remote.jobs.data import FlowDoc, FlowInfo, projection_flow_info_jobs
+    from jobflow_remote.testing import add
+
+    # a nested Flow: the hosts of the inner Job include both Flows
+    inner_job = add(1, 2)
+    inner_job.name = "inner_job"
+    outer_job = add(inner_job.output, 3)
+    outer_job.name = "outer_job"
+    nested_flow = Flow([Flow([inner_job], name="inner"), outer_job], name="nested")
+    submit_flow(nested_flow, worker="test_local_worker")
+
+    flow_1, flow_2 = two_flows_four_jobs
+    expected_jobs = {
+        flow_1.uuid: ["add_job1", "add_job2"],
+        flow_2.uuid: ["add_job3", "add_job4"],
+        nested_flow.uuid: ["inner_job", "outer_job"],
+    }
+
+    sort = [("created_on", 1)]
+    jobs_sort = [("job.name", -1)]
+    flows_info = job_controller.get_flows_info(
+        sort=sort, jobs_sort=jobs_sort, with_jobs_info=True
+    )
+    assert [fi.flow_id for fi in flows_info] == list(expected_jobs)
+    for fi in flows_info:
+        # each Flow has its own Jobs, in the order of jobs_sort
+        names = [ji.name for ji in fi.jobs_info]
+        assert names == sorted(expected_jobs[fi.flow_id], reverse=True)
+        assert fi.job_names == names
+        assert [ji.db_id for ji in fi.jobs_info] == fi.db_ids
+
+    # same output as the aggregation
+    data = job_controller.get_flow_job_aggreg(
+        sort=sort,
+        jobs_sort=jobs_sort,
+        projection_flow={k: 1 for k in FlowDoc.model_fields},
+        projection_job={f: 1 for f in projection_flow_info_jobs},
+    )
+    assert [FlowInfo.from_query_dict(d) for d in data] == flows_info
+
+    # additional Job properties
+    flows_info = job_controller.get_flows_info(
+        flow_ids=flow_1.uuid, with_jobs_info=["remote"]
+    )
+    assert len(flows_info) == 1
+    assert len(flows_info[0].jobs_info) == 2
+
+    # a Flow without matching Jobs
+    assert (
+        job_controller.get_flows_info(flow_ids="no-such-id", with_jobs_info=True) == []
+    )
+
+    # sorting on the fields of the Jobs requires the aggregation
+    spy = mocker.spy(job_controller.flows, "aggregate")
+    flows_info = job_controller.get_flows_info(
+        sort=[("jobs_list.job.name", 1)], with_jobs_info=True
+    )
+    assert spy.call_count == 1
+    assert [fi.flow_id for fi in flows_info] == list(expected_jobs)
+
+
+def test_flows_info_lock(job_controller, two_flows_four_jobs) -> None:
+    flow_1, flow_2 = two_flows_four_jobs
+
+    # the three ways of reading the Flows: the Flow documents only, with the
+    # Jobs from a separate query and with the aggregation (sort on the Jobs)
+    read_options = [
+        {},
+        {"with_jobs_info": True},
+        {"with_jobs_info": True, "sort": [("jobs_list.db_id", 1)]},
+    ]
+
+    for kwargs in read_options:
+        for fi in job_controller.get_flows_info(**kwargs):
+            assert fi.lock_id is None
+            assert fi.lock_time is None
+            assert not fi.is_locked
+
+    with job_controller.lock_flow(filter={"uuid": flow_1.uuid}):
+        flow_doc = job_controller.flows.find_one({"uuid": flow_1.uuid})
+        assert flow_doc["lock_id"] is not None
+        for kwargs in read_options:
+            infos = {fi.flow_id: fi for fi in job_controller.get_flows_info(**kwargs)}
+            assert infos[flow_1.uuid].is_locked
+            assert infos[flow_1.uuid].lock_id == flow_doc["lock_id"]
+            assert infos[flow_1.uuid].lock_time == flow_doc["lock_time"]
+            assert not infos[flow_2.uuid].is_locked
+            assert infos[flow_2.uuid].lock_time is None
+
+        locked = job_controller.get_flows_info(locked=True)
+        assert [fi.flow_id for fi in locked] == [flow_1.uuid]
+
+    assert not job_controller.get_flows_info(flow_ids=flow_1.uuid)[0].is_locked
+
+
+def test_get_flow_job_aggreg_jobs_list_query(
+    job_controller, flows_with_names, mocker
+) -> None:
+    # a query and a sort referring to the jobs need to be applied after the $lookup
+    spy = mocker.spy(job_controller.flows, "aggregate")
+    data = job_controller.get_flow_job_aggreg(
+        query={"jobs_list.job.name": {"$in": ["relax", "static", "relbx"]}},
+        sort=[("jobs_list.job.name", -1)],
+        skip=1,
+        limit=1,
+    )
+    stages = [next(iter(stage)) for stage in spy.call_args.args[0]]
+    assert stages == ["$lookup", "$match", "$sort", "$skip", "$limit"]
+    assert [d["name"] for d in data] == ["relbx"]
 
 
 def test_rerun_completed(job_controller, runner) -> None:
@@ -491,6 +943,92 @@ def test_rerun_generic(job_controller):
     )
 
 
+@pytest.mark.parametrize("state", ["SUBMITTED", "RUNNING"])
+def test_rerun_cancels_queue_process(job_controller, runner, caplog, state) -> None:
+    """Rerunning a SUBMITTED or RUNNING Job cancels its process in the queue."""
+    from jobflow import Flow
+
+    from jobflow_remote import submit_flow
+    from jobflow_remote.jobs.state import JobState
+    from jobflow_remote.testing import add_sleep
+
+    job = add_sleep(1, 30)
+    flow = Flow([job])
+    submit_flow(flow, worker="test_local_worker")
+
+    runner.run_one_job(max_seconds=20, target_state=JobState.RUNNING)
+
+    qm = runner.get_queue_manager("test_local_worker")
+    job_info = job_controller.get_job_info(job_id=job.uuid, job_index=job.index)
+    process_id = job_info.remote.process_id
+    assert len(qm.get_jobs_list([process_id])) == 1
+
+    if state == "SUBMITTED":
+        job_controller.set_job_state(
+            JobState.SUBMITTED, job_id=job.uuid, job_index=job.index
+        )
+    assert (
+        job_controller.get_job_info(job_id=job.uuid, job_index=job.index).state.value
+        == state
+    )
+
+    assert job_controller.rerun_job(job_id=job.uuid, job_index=job.index) == [
+        job_info.db_id
+    ]
+
+    assert len(qm.get_jobs_list([process_id])) == 0
+    assert "Failed cancelling the process" not in caplog.text
+    assert (
+        job_controller.get_job_info(job_id=job.uuid, job_index=job.index).state
+        == JobState.READY
+    )
+
+
+def test_rerun_force_cancels_children_queue_process(
+    job_controller, runner, caplog
+) -> None:
+    """A forced rerun cancels the queue process of a RUNNING descendant."""
+    from jobflow import Flow
+
+    from jobflow_remote import submit_flow
+    from jobflow_remote.jobs.state import JobState
+    from jobflow_remote.testing import add, add_sleep
+
+    j1 = add(1, 2)
+    j2 = add_sleep(j1.output, 30)
+    flow = Flow([j1, j2])
+    submit_flow(flow, worker="test_local_worker")
+
+    assert runner.run_one_job(max_seconds=10, job_id=[j1.uuid, j1.index])
+    runner.run_one_job(
+        max_seconds=20, job_id=[j2.uuid, j2.index], target_state=JobState.RUNNING
+    )
+
+    j1_info = job_controller.get_job_info(job_id=j1.uuid, job_index=j1.index)
+    j2_info = job_controller.get_job_info(job_id=j2.uuid, job_index=j2.index)
+    assert j1_info.state == JobState.COMPLETED
+    assert j2_info.state == JobState.RUNNING
+
+    qm = runner.get_queue_manager("test_local_worker")
+    process_id = j2_info.remote.process_id
+    assert len(qm.get_jobs_list([process_id])) == 1
+
+    assert set(
+        job_controller.rerun_job(job_id=j1.uuid, job_index=j1.index, force=True)
+    ) == {j1_info.db_id, j2_info.db_id}
+
+    assert len(qm.get_jobs_list([process_id])) == 0
+    assert "Failed cancelling the process" not in caplog.text
+    assert (
+        job_controller.get_job_info(job_id=j1.uuid, job_index=j1.index).state
+        == JobState.READY
+    )
+    assert (
+        job_controller.get_job_info(job_id=j2.uuid, job_index=j2.index).state
+        == JobState.WAITING
+    )
+
+
 def test_retry(job_controller, monkeypatch, runner) -> None:
     from jobflow import Flow
 
@@ -576,6 +1114,88 @@ def test_stop(job_controller, one_job, caplog) -> None:
     assert job_controller.stop_jobs(job_ids=(j.uuid, 1)) == ["1"]
     assert job_controller.get_job_info(job_id=j.uuid).state == JobState.USER_STOPPED
     assert "cannot be cancelled from execution on the worker" in caplog.text
+
+
+@pytest.mark.parametrize(
+    "action", ["pause", "stop", "resume", "retry", "rerun", "rerun_force"]
+)
+def test_actions_accepted_states(job_controller, one_job, action) -> None:
+    """
+    A Job without children is accepted by each action exactly in the states
+    of the action's constant.
+    """
+    from jobflow_remote.jobs.state import (
+        PAUSABLE_STATES,
+        RERUNNABLE_STATES,
+        RERUNNABLE_STATES_FORCE,
+        RESUMABLE_STATES,
+        RETRYABLE_STATES,
+        STOPPABLE_STATES,
+        JobState,
+    )
+
+    actions = {
+        "pause": (job_controller.pause_job, {}, PAUSABLE_STATES),
+        "stop": (job_controller.stop_job, {}, STOPPABLE_STATES),
+        "resume": (job_controller.resume_job, {}, RESUMABLE_STATES),
+        "retry": (job_controller.retry_job, {}, RETRYABLE_STATES),
+        "rerun": (job_controller.rerun_job, {}, RERUNNABLE_STATES),
+        "rerun_force": (
+            job_controller.rerun_job,
+            {"force": True},
+            RERUNNABLE_STATES_FORCE,
+        ),
+    }
+    method, kwargs, expected_states = actions[action]
+    job = one_job.jobs[0]
+
+    accepted = set()
+    for state in JobState:
+        # a valid previous_state is required to retry a REMOTE_ERROR Job
+        assert job_controller.set_job_doc_properties(
+            {"state": state.value, "previous_state": JobState.CHECKED_OUT.value},
+            job_id=job.uuid,
+        )
+        try:
+            method(job_id=job.uuid, **kwargs)
+        except ValueError:
+            continue
+        accepted.add(state)
+
+    assert accepted == set(expected_states)
+
+
+def test_missing_documents_raise_not_found(job_controller) -> None:
+    """The actions raise JobNotFoundError or FlowNotFoundError for missing ids."""
+    from jobflow_remote.utils.db import FlowNotFoundError, JobNotFoundError
+
+    # lock_job_flow, used by stop, pause, resume and delete
+    with pytest.raises(JobNotFoundError):
+        job_controller.stop_job(db_id="99999")
+    with pytest.raises(JobNotFoundError):
+        job_controller.rerun_job(db_id="99999")
+    with pytest.raises(JobNotFoundError):
+        job_controller.retry_job(db_id="99999")
+    with pytest.raises(FlowNotFoundError):
+        job_controller.resume_flow(flow_id="no-such-flow")
+
+
+def test_resume_flow_accepted_states(job_controller, one_job) -> None:
+    """A Flow is resumed exactly in the states of RESUMABLE_FLOW_STATES."""
+    from jobflow_remote.jobs.state import RESUMABLE_FLOW_STATES, FlowState
+
+    accepted = set()
+    for state in FlowState:
+        job_controller.flows.update_one(
+            {"uuid": one_job.uuid}, {"$set": {"state": state.value}}
+        )
+        try:
+            job_controller.resume_flow(flow_id=one_job.uuid)
+        except ValueError:
+            continue
+        accepted.add(state)
+
+    assert accepted == set(RESUMABLE_FLOW_STATES)
 
 
 def test_unlock_jobs(job_controller, one_job) -> None:
@@ -669,7 +1289,7 @@ def test_set_job_run_properties(job_controller, one_job) -> None:
 
 def test_set_job_doc_properties(job_controller, one_job) -> None:
     from jobflow_remote.jobs.state import JobState
-    from jobflow_remote.utils.db import JobLockedError
+    from jobflow_remote.utils.db import JobLockedError, JobNotFoundError
 
     # error missing input
     with pytest.raises(
@@ -690,7 +1310,7 @@ def test_set_job_doc_properties(job_controller, one_job) -> None:
         )
 
     # error missing job
-    with pytest.raises(ValueError, match="No Job matching criteria"):
+    with pytest.raises(JobNotFoundError, match="No Job matching criteria"):
         job_controller.set_job_doc_properties(
             values={"job.metadata.x": "y"},
             job_id="wrong_uuid",
@@ -744,6 +1364,92 @@ def test_reset(job_controller, two_flows_four_jobs):
         max_limit=1, validation=datetime.now().strftime("%Y-%m-%d")
     )
     assert job_controller.count_jobs() == 0
+
+
+def test_delete_job_unreachable_worker(
+    job_controller, runner, caplog, monkeypatch
+) -> None:
+    """
+    A worker that cannot be reached does not stop the deletion of the Job:
+    the Job and its output are deleted, the files are not, and the folder is
+    logged.
+    """
+    from jobflow import Flow
+
+    from jobflow_remote import submit_flow
+    from jobflow_remote.remote.host.local import LocalHost
+    from jobflow_remote.testing import add
+
+    j1 = add(1, 2)
+    j2 = add(j1.output, 4)
+    flow = Flow([j1, j2])
+    submit_flow(flow, worker="test_local_worker")
+    runner.run_all_jobs(max_seconds=20)
+
+    j2_info = job_controller.get_job_info(job_id=j2.uuid, job_index=j2.index)
+    assert os.path.isdir(j2_info.run_dir)
+
+    def unreachable_connect(self) -> None:
+        raise TimeoutError("timed out")
+
+    monkeypatch.setattr(LocalHost, "connect", unreachable_connect)
+
+    assert (
+        job_controller.delete_job(job_id=j2.uuid, delete_output=True, delete_files=True)
+        == j2_info.db_id
+    )
+
+    assert job_controller.count_jobs(job_ids=[(j2.uuid, j2.index)]) == 0
+    assert job_controller.count_jobs(flow_ids=[flow.uuid]) == 1
+    with pytest.raises(ValueError, match=".*has no outputs.*"):
+        job_controller.jobstore.get_output(j2.uuid)
+    assert os.path.isdir(j2_info.run_dir)
+    assert (
+        f"The files of Job {j2_info.db_id} in {j2_info.run_dir} were not deleted"
+    ) in caplog.text
+
+
+# the Jobs are independent, so that they can run at the same time
+@pytest.mark.filterwarnings("ignore:Some jobs are not connected")
+def test_delete_job_cancels_queue_process(job_controller, runner, caplog) -> None:
+    """Deleting a RUNNING Job cancels its process in the queue, unless disabled."""
+    from jobflow import Flow
+
+    from jobflow_remote import submit_flow
+    from jobflow_remote.jobs.state import JobState
+    from jobflow_remote.testing import add, add_sleep
+
+    j_cancel = add_sleep(1, 30)
+    j_keep = add_sleep(2, 30)
+    j_other = add(1, 2)
+    flow = Flow([j_cancel, j_keep, j_other])
+    submit_flow(flow, worker="test_local_worker")
+
+    for j in (j_cancel, j_keep):
+        runner.run_one_job(
+            max_seconds=20, job_id=[j.uuid, j.index], target_state=JobState.RUNNING
+        )
+    qm = runner.get_queue_manager("test_local_worker")
+    cancel_info = job_controller.get_job_info(job_id=j_cancel.uuid)
+    keep_info = job_controller.get_job_info(job_id=j_keep.uuid)
+    assert cancel_info.state == JobState.RUNNING
+    assert keep_info.state == JobState.RUNNING
+    assert len(qm.get_jobs_list([cancel_info.remote.process_id])) == 1
+    assert len(qm.get_jobs_list([keep_info.remote.process_id])) == 1
+
+    assert job_controller.delete_job(job_id=j_cancel.uuid) == cancel_info.db_id
+    assert len(qm.get_jobs_list([cancel_info.remote.process_id])) == 0
+    assert "Failed cancelling the process" not in caplog.text
+
+    assert (
+        job_controller.delete_job(job_id=j_keep.uuid, cancel_processes=False)
+        == keep_info.db_id
+    )
+    assert len(qm.get_jobs_list([keep_info.remote.process_id])) == 1
+    # cancel it to avoid leaving the process running after the test
+    qm.cancel(keep_info.remote.process_id)
+
+    assert job_controller.count_jobs(flow_ids=[flow.uuid]) == 1
 
 
 def test_delete_job(job_controller, two_flows_four_jobs, runner):
@@ -899,8 +1605,42 @@ def test_add_flow(job_controller):
     assert job_controller.count_jobs() == 1
 
 
+def test_get_indexes(job_controller, one_job):
+    from jobflow_remote.jobs.data import DbCollection
+
+    # jobs is the default collection
+    job_indexes = job_controller.get_indexes()
+    assert job_indexes == job_controller.jobs.index_information()
+    assert job_indexes["db_id_1"]["unique"]
+    assert job_indexes["uuid_1_index_1"]["key"] == [("uuid", 1), ("index", 1)]
+    assert "job.hosts_1" in job_indexes
+
+    flow_indexes = job_controller.get_indexes(DbCollection.FLOWS)
+    assert flow_indexes == job_controller.flows.index_information()
+    assert "created_on_1" in flow_indexes
+
+    # a newly created index is listed
+    job_controller.create_indexes(
+        [[("xxx", pymongo.DESCENDING), ("yyy", pymongo.ASCENDING)]],
+        collection=DbCollection.FLOWS,
+        background=False,
+    )
+    flow_indexes = job_controller.get_indexes(DbCollection.FLOWS)
+    assert flow_indexes["xxx_-1_yyy_1"]["key"] == [("xxx", -1), ("yyy", 1)]
+
+
 def test_indexes(job_controller, one_job):
-    assert len(list(job_controller.jobs.list_indexes())) == 11
+    job_indexes = job_controller.jobs.index_information()
+    assert len(job_indexes) == 11
+    assert "job.hosts_1" in job_indexes
+    # uuid alone is served by the prefix of the compound (uuid, index) index
+    assert "uuid_1" not in job_indexes
+    assert "uuid_1_index_1" in job_indexes
+
+    flow_indexes = job_controller.flows.index_information()
+    assert len(flow_indexes) == 8
+    assert "created_on_1" in flow_indexes
+
     job_controller.create_indexes(
         [[("xxx", pymongo.DESCENDING), ("yyy", pymongo.ASCENDING)]],
         unique=True,
@@ -1054,6 +1794,36 @@ def test_backup(job_controller_drop, python, compress):
                 job_controller_drop.backup_dump(
                     dir_path=dir_name, compress=compress, python=python
                 )
+
+
+def test_get_assigned_workers(job_controller) -> None:
+    from jobflow import Flow
+
+    from jobflow_remote import submit_flow
+    from jobflow_remote.testing import add
+
+    assert job_controller.get_assigned_workers() == []
+
+    submit_flow(Flow([add(1, 2), add(3, 4)]), worker="test_local_worker")
+    submit_flow(Flow([add(1, 2)]), worker="test_local_batch_worker")
+    submit_flow(Flow([add(1, 2)]), worker="test_local_worker")
+
+    # each worker once, sorted
+    assert job_controller.get_assigned_workers() == [
+        "test_local_batch_worker",
+        "test_local_worker",
+    ]
+
+    # a worker no longer in the configuration is still listed, while
+    # a worker without Jobs is not
+    job_controller.jobs.update_one(
+        {"worker": "test_local_batch_worker"},
+        {"$set": {"worker": "a_removed_worker"}},
+    )
+    assert job_controller.get_assigned_workers() == [
+        "a_removed_worker",
+        "test_local_worker",
+    ]
 
 
 def test_count_states(job_controller):
@@ -1299,9 +2069,14 @@ def test_resume_flow(job_controller, runner):
     assert job_controller.get_flows_info()[0].state == FlowState.RUNNING
     assert job_controller.count_jobs(states=[JobState.STOPPED, JobState.PAUSED]) == 0
 
+    # the message names the state
+    with pytest.raises(ValueError, match=r"^Cannot resume a Flow in state RUNNING$"):
+        job_controller.resume_flow(flow_id=flow.uuid)
+
 
 def test_flow_store(job_controller, two_flows_four_jobs, runner):
     from jobflow_remote.jobs.state import FlowState
+    from jobflow_remote.utils.db import FlowNotFoundError
 
     job_controller.set_flow_store("other_jobstore", flow_id=two_flows_four_jobs[0].uuid)
 
@@ -1319,7 +2094,7 @@ def test_flow_store(job_controller, two_flows_four_jobs, runner):
             "wrong_jobstore", flow_id=two_flows_four_jobs[0].uuid
         )
 
-    with pytest.raises(ValueError, match="No Flow document matching criteria"):
+    with pytest.raises(FlowNotFoundError, match="No Flow document matching criteria"):
         job_controller.set_flow_store("other_jobstore", flow_id="wrong_id")
 
     job_controller.set_flow_store("other_jobstore", flow_id=two_flows_four_jobs[1].uuid)
@@ -1330,7 +2105,7 @@ def test_flow_store(job_controller, two_flows_four_jobs, runner):
     job_controller.set_flow_store(None, flow_id=two_flows_four_jobs[1].uuid)
     assert job_controller.get_flow_store(flow_id=two_flows_four_jobs[1].uuid) is None
 
-    with pytest.raises(ValueError, match="No Flow matching id"):
+    with pytest.raises(FlowNotFoundError, match="No Flow matching id"):
         job_controller.get_flow_store(flow_id="wrong_id")
 
     runner.run_one_job(job_id=(two_flows_four_jobs[0][0].uuid, 1))
@@ -1483,6 +2258,135 @@ def test_delete_flow(job_controller, runner, caplog):
     assert not job_controller.delete_flow("non-existent-uuid")
 
 
+def test_delete_flow_unreachable_worker(
+    job_controller, runner, caplog, monkeypatch
+) -> None:
+    """
+    A worker that cannot be reached does not stop the deletion of the Flow:
+    the Flow, its Jobs and their outputs are deleted, the files are not, and
+    their folders are logged and collected.
+    """
+    from jobflow import Flow
+
+    from jobflow_remote import submit_flow
+    from jobflow_remote.jobs.jobcontroller import collect_delete_files_errors
+    from jobflow_remote.jobs.state import JobState
+    from jobflow_remote.remote.host.base import HostConnectionError
+    from jobflow_remote.remote.host.local import LocalHost
+    from jobflow_remote.testing import add
+
+    j1 = add(1, 2)
+    j2 = add(j1.output, 4)
+    flow = Flow([j1, j2])
+    submit_flow(flow, worker="test_local_worker")
+    runner.run_all_jobs(max_seconds=20)
+
+    jobs_info = job_controller.get_jobs_info(flow_ids=[flow.uuid])
+    assert {ji.state for ji in jobs_info} == {JobState.COMPLETED}
+    for ji in jobs_info:
+        assert os.path.isdir(ji.run_dir)
+
+    connect_calls = []
+
+    def unreachable_connect(self) -> None:
+        connect_calls.append(self)
+        raise TimeoutError("timed out")
+
+    monkeypatch.setattr(LocalHost, "connect", unreachable_connect)
+
+    with collect_delete_files_errors() as files_errors:
+        assert job_controller.delete_flow(
+            flow.uuid, delete_output=True, delete_files=True
+        )
+
+    # the documents and the outputs are deleted
+    assert job_controller.count_flows(flow_ids=[flow.uuid]) == 0
+    assert job_controller.count_jobs(flow_ids=[flow.uuid]) == 0
+    for j in (j1, j2):
+        with pytest.raises(ValueError, match=".*has no outputs.*"):
+            job_controller.jobstore.get_output(j.uuid)
+
+    # the files are not deleted, and the connection was attempted only once
+    for ji in jobs_info:
+        assert os.path.isdir(ji.run_dir)
+    assert len(connect_calls) == 1
+
+    # each folder that was not deleted is logged
+    assert "Could not connect to the worker 'test_local_worker'" in caplog.text
+    for ji in jobs_info:
+        assert f"The files of Job {ji.db_id} in {ji.run_dir} were not deleted" in (
+            caplog.text
+        )
+
+    # and collected, also the Job skipped after the first failure, with the
+    # same connection error
+    assert sorted(entry[:3] for entry in files_errors) == sorted(
+        (ji.db_id, "test_local_worker", ji.run_dir) for ji in jobs_info
+    )
+    exc = files_errors[0][3]
+    assert isinstance(exc, HostConnectionError)
+    assert exc.worker == "test_local_worker"
+    assert all(entry[3] is exc for entry in files_errors)
+
+
+def test_safe_delete_files_errors(job_controller, runner, caplog, monkeypatch) -> None:
+    """
+    An error while deleting the files of a Job does not stop the others, and
+    each Job whose files stay is collected with its error.
+    """
+    from jobflow import Flow
+
+    from jobflow_remote import submit_flow
+    from jobflow_remote.jobs.jobcontroller import collect_delete_files_errors
+    from jobflow_remote.remote.host.local import LocalHost
+    from jobflow_remote.testing import add
+    from jobflow_remote.utils.remote import UnsafeDeletionError
+
+    j1 = add(1, 2)
+    j2 = add(j1.output, 4)
+    j3 = add(j2.output, 5)
+    flow = Flow([j1, j2, j3])
+    submit_flow(flow, worker="test_local_worker")
+    runner.run_all_jobs(max_seconds=20)
+
+    j1_info = job_controller.get_job_info(job_id=j1.uuid, job_index=j1.index)
+    j2_info = job_controller.get_job_info(job_id=j2.uuid, job_index=j2.index)
+    j3_info = job_controller.get_job_info(job_id=j3.uuid, job_index=j3.index)
+
+    # a folder that may not be the one of a Job is not deleted
+    os.unlink(os.path.join(j3_info.run_dir, "jfremote_in.json"))
+
+    # emulate a file system that does not answer in time for the first Job only
+    orig_listdir = LocalHost.listdir
+
+    def slow_listdir(self, path):
+        if str(path) == j1_info.run_dir:
+            raise TimeoutError("the command did not complete in time")
+        return orig_listdir(self, path)
+
+    monkeypatch.setattr(LocalHost, "listdir", slow_listdir)
+
+    with collect_delete_files_errors() as files_errors:
+        deleted = job_controller.safe_delete_files([j1_info, j2_info, j3_info])
+
+    assert [ji.db_id for ji in deleted] == [j2_info.db_id]
+    assert os.path.isdir(j1_info.run_dir)
+    assert not os.path.isdir(j2_info.run_dir)
+    assert os.path.isdir(j3_info.run_dir)
+    assert (
+        f"The files of Job {j1_info.db_id} in {j1_info.run_dir} on the worker "
+        "'test_local_worker' were not deleted"
+    ) in caplog.text
+    assert "the command did not complete in time" in caplog.text
+
+    assert [entry[:3] for entry in files_errors] == [
+        (j1_info.db_id, "test_local_worker", j1_info.run_dir),
+        (j3_info.db_id, "test_local_worker", j3_info.run_dir),
+    ]
+    assert isinstance(files_errors[0][3], TimeoutError)
+    assert isinstance(files_errors[1][3], UnsafeDeletionError)
+
+
 def test_complete_onmissing_none(job_controller, runner):
     from jobflow import Flow
 
@@ -1606,3 +2510,109 @@ def test_stop_job_running(job_controller, runner) -> None:
     assert len(jobs_list) == 0
     assert job_controller.get_job_info(job_id=job.uuid).state == JobState.USER_STOPPED
     assert job_controller.get_flows_info(job_ids=job.uuid)[0].state == FlowState.STOPPED
+
+
+def test_collect_cancel_errors(job_controller) -> None:
+    """
+    A failed cancellation is collected with the db_id of the Job, and the
+    action is performed anyway.
+    """
+    from jobflow import Flow
+
+    from jobflow_remote import submit_flow
+    from jobflow_remote.jobs.jobcontroller import collect_cancel_errors
+    from jobflow_remote.jobs.state import JobState
+    from jobflow_remote.testing import add
+
+    j1 = add(1, 2)
+    j2 = add(j1.output, 3)
+    j3 = add(j1.output, 4)
+    flow = Flow([j1, j2, j3])
+    submit_flow(flow, worker="test_local_worker")
+    db_ids = {j.uuid: job_controller.get_job_info(job_id=j.uuid).db_id for j in flow}
+
+    def set_state(job, state=JobState.RUNNING) -> None:
+        # a RUNNING Job without a process id: its cancellation fails
+        assert job_controller.set_job_doc_properties(
+            {"state": state.value}, job_id=job.uuid
+        )
+
+    def state(job) -> JobState:
+        return job_controller.get_job_info(job_id=job.uuid).state
+
+    with collect_cancel_errors() as errors:
+        set_state(j2)
+        job_controller.stop_jobs(job_ids=[(j2.uuid, 1)])
+        assert state(j2) == JobState.USER_STOPPED
+
+        # rerun of a RUNNING Job
+        set_state(j2)
+        job_controller.rerun_job(job_id=j2.uuid)
+        assert state(j2) == JobState.READY
+
+        # forced rerun of the parent of a RUNNING Job
+        set_state(j1, JobState.COMPLETED)
+        set_state(j2)
+        job_controller.rerun_job(job_id=j1.uuid, force=True)
+        assert state(j2) == JobState.WAITING
+
+        set_state(j3)
+        job_controller.delete_job(job_id=j3.uuid)
+        assert job_controller.count_jobs(job_ids=[(j3.uuid, 1)]) == 0
+
+        set_state(j1)
+        assert job_controller.delete_flow(flow.uuid)
+
+    assert [db_id for db_id, _ in errors] == [
+        db_ids[j2.uuid],
+        db_ids[j2.uuid],
+        db_ids[j2.uuid],
+        db_ids[j3.uuid],
+        db_ids[j1.uuid],
+    ]
+    for _, exc in errors:
+        assert isinstance(exc, ValueError)
+        assert "process id is not defined" in str(exc)
+
+
+# the Jobs are independent, so that they can run at the same time
+@pytest.mark.filterwarnings("ignore:Some jobs are not connected")
+def test_many_jobs_action_shares_hosts(job_controller, runner, monkeypatch) -> None:
+    """Cancelling the processes of several Jobs connects to their worker once."""
+    from jobflow import Flow
+
+    from jobflow_remote import submit_flow
+    from jobflow_remote.jobs.state import JobState
+    from jobflow_remote.remote.host.local import LocalHost
+    from jobflow_remote.testing import add_sleep
+
+    jobs = [add_sleep(1, 30), add_sleep(2, 30)]
+    flow = Flow(jobs)
+    submit_flow(flow, worker="test_local_worker")
+    for j in jobs:
+        runner.run_one_job(
+            max_seconds=20, job_id=[j.uuid, j.index], target_state=JobState.RUNNING
+        )
+
+    qm = runner.get_queue_manager("test_local_worker")
+    jobs_info = [job_controller.get_job_info(job_id=j.uuid) for j in jobs]
+    process_ids = [ji.remote.process_id for ji in jobs_info]
+    assert {ji.state for ji in jobs_info} == {JobState.RUNNING}
+    assert len(qm.get_jobs_list(process_ids)) == 2
+
+    connect_calls = []
+    orig_connect = LocalHost.connect
+
+    def counting_connect(self) -> None:
+        connect_calls.append(self)
+        orig_connect(self)
+
+    with monkeypatch.context() as m:
+        m.setattr(LocalHost, "connect", counting_connect)
+        updated = job_controller.stop_jobs(flow_ids=[flow.uuid])
+
+    assert set(updated) == {ji.db_id for ji in jobs_info}
+    assert len(connect_calls) == 1
+    assert len(qm.get_jobs_list(process_ids)) == 0
+    for j in jobs:
+        assert job_controller.get_job_info(job_id=j.uuid).state == JobState.USER_STOPPED

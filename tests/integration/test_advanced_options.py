@@ -145,7 +145,7 @@ def test_run_batch_multi_fail(
     proj = job_controller.project
     worker_name = "test_batch_multi_remote_worker"
 
-    job_ids = submit_jobs(2, sleep=60)
+    job_ids = submit_jobs(2, sleep=300)
 
     daemon_manager.start()
     wait_daemon_started(daemon_manager)
