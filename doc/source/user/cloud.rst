@@ -5,8 +5,8 @@ Running on Cloud (AWS)
 ======================
 
 A ``cloud`` worker runs jobflow-remote jobs on AWS Batch. Job files move
-through an Amazon S3 bucket. No SSH connection and no shared filesystem are
-needed.
+through an Amazon S3 bucket. No SSH connection and no shared filesystem with
+the ``Runner`` are needed.
 
 How a cloud worker runs a job
 =============================
@@ -54,8 +54,8 @@ This guide uses two terminals. Every command block says which one to use.
 
 * **Your computer** is the machine where you submit flows and run the
   ``Runner``. It needs Python and access to your MongoDB database.
-* Part 2 can move the ``Runner`` to an EC2 instance or to NERSC. Its blocks
-  then say **on the instance** or **on a Perlmutter login node**.
+* Part 2 can move the ``Runner`` to an EC2 instance. Its blocks then say
+  **on the instance**.
 * **AWS CloudShell** is a terminal inside the AWS Console in your web
   browser. Its AWS CLI is already signed in as your AWS Console user. This
   user needs permission to create IAM roles and CloudFormation stacks (for
@@ -285,19 +285,7 @@ same page.
        MONGO_HOST=127.0.0.1 MONGO_PORT=27017 python make_project.py
        sudo systemctl restart jfr-runner
 
-   If the ``Runner`` runs at NERSC (Part 2), run ``module load conda`` and
-   ``conda activate jfr`` on a Perlmutter login node. Then run the block of
-   item 3 of the **NERSC Perlmutter** tab of :ref:`cloud_runner_host` and restart the ``Runner``:
-
-   .. code-block:: bash
-
-       scancel --hurry --me -n jfr_runner
-       scrontab "$HOME/jfr_runner.scron"
-
-   Cancelling the job disables its ``scrontab`` entry. The second command
-   loads the entry again, and ``scrontab`` starts the ``Runner`` within 10
-   minutes. Do not run ``jf -p aws_ht admin reset`` here, because it deletes
-   the queue.
+   Do not run ``jf -p aws_ht admin reset`` here, because it deletes the queue.
 
 Update the stack only when no jobs are running. A change of the instance
 settings replaces the instances of a queue.
@@ -440,17 +428,13 @@ Step 5. Create the project file
        out = {o["OutputKey"]: o["OutputValue"] for o in stack["Stacks"][0]["Outputs"]}
 
        mongo = {"host": os.environ["MONGO_HOST"], "port": int(os.environ["MONGO_PORT"])}
-       if os.environ.get("MONGO_USER"):
-           mongo["username"] = os.environ["MONGO_USER"]
-           mongo["password"] = os.environ["MONGO_PASSWORD"]
-       database = os.environ.get("MONGO_DB")
 
 
-       def store(store_type, default_database, collection):
+       def store(store_type, database, collection):
            return {
                "type": store_type,
                **mongo,
-               "database": database or default_database,
+               "database": database,
                "collection_name": collection,
            }
 
@@ -640,7 +624,7 @@ the jobs it already has. No new jobs are submitted and no results are stored
 until the ``Runner`` runs again. A computer that sleeps or loses its network
 stops the ``Runner``.
 
-You can run the ``Runner`` in one of three places. Choose one and follow only
+You can run the ``Runner`` in one of two places. Choose one and follow only
 its tab below. The tabs of Part 3 and of :ref:`cloud_cleanup` follow your
 choice.
 
@@ -662,18 +646,10 @@ choice.
        0.005 USD per hour for its public IPv4 address and 0.08 USD per GB
        and month for its 20 GB disk
      - Runs without your computer. You submit flows on the instance.
-   * - NERSC Perlmutter
-     - A MongoDB database at NERSC
-     - Needs access to the ``workflow`` QOS
-     - Runs on a workflow node with ``scrontab``. You submit flows on a
-       Perlmutter login node.
 
 Each place has its own MongoDB, so each starts with an empty queue. Let the
 flows of the old place finish before you move. Their results stay in the old
 MongoDB. Run one ``Runner`` per MongoDB database.
-
-NERSC Spin can also run always-on services, but it needs the SpinUp training
-first. This guide does not cover it.
 
 .. tab-set::
     :sync-group: runner
@@ -872,112 +848,6 @@ first. This guide does not cover it.
             EOF
             mongorestore --gzip --archive=jfr_aws.gz --nsInclude 'jfr_aws_outputs.*' \
               --nsFrom 'jfr_aws_outputs.*' --nsTo 'jfr_ec2_outputs.*'
-
-    .. tab-item:: NERSC Perlmutter
-        :sync: nersc
-
-        The ``Runner`` runs in the ``workflow`` QOS of Perlmutter, which is meant for
-        light processes that run for a long time. A job in this QOS can run up to 90
-        days on a workflow node. ``scrontab`` starts it again if it ends. If the job
-        is cancelled, for example before a NERSC maintenance, Slurm disables the
-        entry. Run ``scrontab -e`` and remove the ``#DISABLED`` marks to start it
-        again. You need:
-
-        * access to the ``workflow`` QOS. Request it with the form linked in the
-          `NERSC docs of the workflow QOS
-          <https://docs.nersc.gov/jobs/workflow/workflow-queue/>`_.
-        * a MongoDB database at NERSC. Request one with the form linked in the
-          `NERSC docs of databases <https://docs.nersc.gov/services/databases/>`_.
-          Use a database that no other project uses, because Part 1, Step 6 runs
-          ``jf -p aws_ht admin reset`` on it. NERSC gives you its host, database
-          name, user, and password. It is reachable from Perlmutter, not from your
-          computer or from AWS.
-
-        1. On a Perlmutter login node, load conda:
-
-           .. code-block:: bash
-
-               module load conda
-
-           Then run the **conda** tab of Part 1, Step 1. In every later shell on
-           Perlmutter, run ``module load conda`` before ``conda activate jfr``.
-
-        2. In CloudShell, run item 1 of Part 1, Step 4 to create a new access key.
-           Then run item 2 of Part 1, Step 4 on a Perlmutter login node.
-
-        3. On a Perlmutter login node, create ``make_project.py`` with item 1 of
-           Part 1, Step 5. Then type the host, database, and user that NERSC
-           gave you into the boxes. The block below updates as you type. It asks
-           for the password of the database when it runs. The project file keeps
-           them and is readable only by you.
-
-           .. raw:: html
-
-               <div class="jfr-inputs">
-                 <label>MongoDB host <input data-jfr="mongo_host" size="24"></label>
-                 <label>Database <input data-jfr="mongo_db" size="12"></label>
-                 <label>User <input data-jfr="mongo_user" size="12"></label>
-               </div>
-
-           .. code-block:: bash
-
-               {
-               MONGO_HOST=<mongo_host>
-               MONGO_PORT=27017
-               MONGO_DB=<mongo_db>
-               MONGO_USER=<mongo_user>
-               printf "MongoDB password: "; read -rs MONGO_PASSWORD; echo
-               export MONGO_PASSWORD
-               env -u AWS_DEFAULT_REGION AWS_PROFILE=jfr-lab MONGO_HOST="$MONGO_HOST" MONGO_PORT="$MONGO_PORT" \
-                 MONGO_DB="$MONGO_DB" MONGO_USER="$MONGO_USER" python make_project.py
-               }
-
-           With ``MONGO_DB``, the queue and the outputs share this one database.
-
-        4. On a Perlmutter login node, run items 1 to 4 of Part 1, Step 6. The
-           ``Runner`` of item 3 runs on the login node for this short test. Stop it
-           with ``Ctrl+C`` when the four jobs are ``COMPLETED``.
-
-        5. On a Perlmutter login node, run the ``Runner`` in the ``workflow`` QOS with
-           ``scrontab``. Type your NERSC project, for example ``m5411``, into
-           the box. The entry starts the ``Runner`` if it is not running,
-           checking every 10 minutes.
-
-           .. raw:: html
-
-               <div class="jfr-inputs">
-                 <label>NERSC project <input data-jfr="nersc_project" size="10"></label>
-               </div>
-
-           .. code-block:: bash
-
-               NERSC_PROJECT=<nersc_project>
-               cat > "$HOME/jfr_runner.sh" <<'EOF'
-               #!/bin/bash
-               module load conda
-               conda activate jfr
-               exec jf -p aws_ht runner run
-               EOF
-               chmod +x "$HOME/jfr_runner.sh"
-               cat > "$HOME/jfr_runner.scron" <<EOF
-               #SCRON -q workflow
-               #SCRON -C cron
-               #SCRON -A $NERSC_PROJECT
-               #SCRON -t 30-00:00:00
-               #SCRON --job-name=jfr_runner
-               #SCRON --dependency=singleton
-               #SCRON -o $HOME/jfr_runner-%j.out
-               #SCRON --open-mode=append
-               */10 * * * * $HOME/jfr_runner.sh
-               EOF
-               scrontab -l
-               scrontab "$HOME/jfr_runner.scron"
-               scrontab -l
-
-           ``scrontab FILE`` replaces all your ``scrontab`` entries. If the first
-           ``scrontab -l`` shows other entries, add them to ``jfr_runner.scron``
-           first. ``squeue --me -q workflow`` shows the job of the ``Runner``. Its
-           log is in ``~/jfr_runner-<jobid>.out``.
 
 Part 3: Running a campaign
 ==========================
@@ -1241,9 +1111,8 @@ its vCPUs. Without it, PyTorch in each job starts one thread per core of the
 instance, and the jobs that share an instance slow each other down.
 
 1. Where you submit the flows, install ``atomate2`` in the environment from
-   Part 1, Step 1. You need it to build the flows. This is your computer, the
-   EC2 instance, or a Perlmutter login node, depending on where the
-   ``Runner`` runs (Part 2).
+   Part 1, Step 1. You need it to build the flows. This is your computer or the
+   EC2 instance, depending on where the ``Runner`` runs (Part 2).
 
    .. tab-set::
        :sync-group: env
@@ -1441,18 +1310,6 @@ instance, and the jobs that share an instance slow each other down.
 
            The last command prints ``active``.
 
-       .. tab-item:: NERSC Perlmutter
-           :sync: nersc
-
-           On a Perlmutter login node. ``scrontab`` runs the ``Runner``.
-
-           .. code-block:: bash
-
-               python submit_phonons.py
-               squeue --me -q workflow
-
-           The last command shows the job ``jfr_runner``.
-
 AWS Batch starts EC2 instances when jobs are queued and terminates them a few
 minutes after the queues are empty.
 
@@ -1460,9 +1317,8 @@ Checking and managing jobs
 ==========================
 
 Run the ``jf`` commands of this section where you submit the flows: on your
-computer, on the EC2 instance, or on a Perlmutter login node (Part 2). Run
-the ``aws`` commands in CloudShell. In a new terminal, activate the
-environment first:
+computer or on the EC2 instance (Part 2). Run the ``aws`` commands in
+CloudShell. In a new terminal, activate the environment first:
 
 .. tab-set::
     :sync-group: env
@@ -1621,46 +1477,6 @@ folder. The last line prints where the folder is.
             EOF
             }
 
-    .. tab-item:: NERSC Perlmutter
-        :sync: nersc
-
-        Your computer cannot reach the MongoDB at NERSC, so it cannot look up
-        the DB id. Type the Job id and the Index of the job from
-        ``jf -p aws_ht job list`` on Perlmutter instead. The Index is the
-        number in brackets after the Job id.
-
-        .. raw:: html
-
-            <div class="jfr-inputs">
-              <label>Job id <input data-jfr="job_id" size="38"></label>
-              <label>Index <input data-jfr="index" size="4" value="1"></label>
-            </div>
-
-        On your computer:
-
-        .. code-block:: bash
-
-            {
-            printf "The folder goes to ~/Downloads. Press Enter to keep this, or paste another folder: "; read -r DEST
-            DEST="${DEST:-$HOME/Downloads}" env -u AWS_DEFAULT_REGION python - <<'EOF'
-            import os
-            from pathlib import Path
-
-            import boto3
-
-            from jobflow_remote.remote.data import get_job_path
-            from jobflow_remote.remote.storage import S3Storage
-
-            run_dir = get_job_path("<job_id>", <index>, "/jf_work")
-            stack = boto3.Session(profile_name="jfr-lab").client("cloudformation").describe_stacks(StackName="jfr-lab")
-            outputs = {o["OutputKey"]: o["OutputValue"] for o in stack["Stacks"][0]["Outputs"]}
-            storage = S3Storage(bucket=outputs["S3BucketName"], prefix="runs", profile_name="jfr-lab")
-            folder = Path(os.environ["DEST"]).expanduser() / Path(run_dir).name
-            storage.download_dir(run_dir, folder)
-            print("Downloaded to", folder.resolve())
-            EOF
-            }
-
 Download the folders you need before step 3 of :ref:`cloud_cleanup`, which
 deletes the access keys of the ``jfr-lab`` profile.
 
@@ -1753,8 +1569,9 @@ starting, pause it, and resume it later:
     jf -p aws_ht job pause <db_id>
     jf -p aws_ht job resume <db_id>
 
-To change the resources of a job that is queued or running, stop it, set the
-new resources, and run it again. The values below are an example. They are
+To change the resources of a job that is queued, running, or ``FAILED``, stop
+it, set the new resources, and run it again. A ``FAILED`` job cannot be
+stopped, so skip the first command. The values below are an example. They are
 merged into the resources of the job.
 
 .. code-block:: bash
@@ -1803,18 +1620,6 @@ cancel AWS Batch jobs. The project file and the AWS stack stay.
                sudo systemctl stop jfr-runner && jf -p aws_ht admin reset && sudo systemctl start jfr-runner && systemctl is-active jfr-runner
 
            The last command prints ``active``.
-
-       .. tab-item:: NERSC Perlmutter
-           :sync: nersc
-
-           On a Perlmutter login node:
-
-           .. code-block:: bash
-
-               module load conda && conda activate jfr && scancel --me --name=jfr_runner && jf -p aws_ht admin reset && scrontab "$HOME/jfr_runner.scron"
-
-           ``scrontab`` enables the entry again, and the ``Runner`` starts within
-           10 minutes.
 
 2. In CloudShell, delete the job folders in the S3 bucket:
 
@@ -1894,19 +1699,6 @@ different versions can fail to run the jobs.
 
            The last command prints ``active``.
 
-       .. tab-item:: NERSC Perlmutter
-           :sync: nersc
-
-           On a Perlmutter login node:
-
-           .. code-block:: bash
-
-               module load conda && conda activate jfr && pip install --force-reinstall --no-deps "jobflow-remote[aws] @ git+https://github.com/hrushikesh-s/jobflow-remote.git@cloud-worker-docs" "qtoolkit[aws] @ git+https://github.com/hrushikesh-s/qtoolkit.git@aws-batch-api" && scancel --me --name=jfr_runner && scrontab "$HOME/jfr_runner.scron"
-
-           ``scancel`` stops the ``Runner`` and disables its ``scrontab`` entry.
-           ``scrontab`` enables the entry again, and the ``Runner`` starts within
-           10 minutes.
-
 3. Run the test flows of Part 1, Step 6 again to check the update.
 
 .. Boxes with data-jfr fill the placeholders <name> in the code blocks of
@@ -1923,20 +1715,25 @@ different versions can fail to run the jobs.
       const inputs = document.querySelectorAll("input[data-jfr]");
       const names = Array.from(inputs, (input) => input.dataset.jfr);
       const pattern = new RegExp(`<(${names.join("|")})>`, "g");
-      const blocks = Array.from(document.querySelectorAll("div.highlight pre"))
-        .filter((pre) => pre.textContent.match(pattern));
-      blocks.forEach((pre) => { pre.dataset.jfrText = pre.textContent; });
+      // Replace inside the text nodes only, so the syntax highlighting stays.
+      const texts = new Map();
+      document.querySelectorAll("div.highlight pre").forEach((pre) => {
+        const walker = document.createTreeWalker(pre, NodeFilter.SHOW_TEXT);
+        for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+          if (node.nodeValue.match(pattern)) texts.set(node, node.nodeValue);
+        }
+      });
       const update = () => {
         const values = {};
         inputs.forEach((input) => {
           if (input.value.trim()) values[input.dataset.jfr] = input.value.trim();
         });
-        blocks.forEach((pre) => {
-          pre.textContent = pre.dataset.jfrText.replace(pattern, (m, name) => values[name] ?? m);
+        texts.forEach((text, node) => {
+          node.nodeValue = text.replace(pattern, (m, name) => values[name] ?? m);
         });
       };
       inputs.forEach((input) => input.addEventListener("input", () => {
-        // Boxes with the same name, for example in different tabs, share their value.
+        // Boxes with the same name, for example the image tags of Part 3, Steps 1 and 2, share their value.
         inputs.forEach((other) => {
           if (other.dataset.jfr === input.dataset.jfr) other.value = input.value;
         });
@@ -1992,22 +1789,6 @@ The S3 bucket and its copies of the job folders are kept.
                mongodump --gzip --archive=jfr_aws.gz
                aws s3 cp jfr_aws.gz "s3://$BUCKET/mongodump/jfr_aws.gz"
 
-       .. tab-item:: NERSC Perlmutter
-           :sync: nersc
-
-           On a Perlmutter login node. ``scrontab -r`` removes all your
-           ``scrontab`` entries. If you have others, write them without the
-           ``jfr_runner`` lines to a file and load it with ``scrontab FILE``
-           instead.
-
-           .. code-block:: bash
-
-               module load conda
-               conda activate jfr
-               jf -p aws_ht job stop -s SUBMITTED -s RUNNING
-               scrontab -r
-               scancel --hurry --me -n jfr_runner
-
 2. In CloudShell, copy every job folder on EFS to S3. This also copies the
    folders of jobs whose container was stopped before the job ended. The
    command runs one AWS Batch job on the CPU queue that installs
@@ -2016,7 +1797,7 @@ The S3 bucket and its copies of the job folders are kept.
    .. code-block:: bash
 
        OUT() { aws cloudformation describe-stacks --stack-name jfr-lab --query "Stacks[0].Outputs[?OutputKey=='$1'].OutputValue" --output text; }
-       CMD="from jobflow_remote.remote.storage import S3Storage; S3Storage(bucket='$(OUT S3BucketName)', prefix='runs', region_name='$(OUT Region)').upload_dir('/mnt/jfr/runs', '.')"
+       CMD="import os; from jobflow_remote.remote.storage import S3Storage; os.path.isdir('/mnt/jfr/runs') and S3Storage(bucket='$(OUT S3BucketName)', prefix='runs', region_name='$(OUT Region)').upload_dir('/mnt/jfr/runs', '.')"
        OVERRIDES=$(python3 -c 'import json, sys; print(json.dumps({"command": ["sh", "-c", "apt-get -qq update && apt-get -qq install -y git > /dev/null && pip install -q --no-cache-dir \"jobflow-remote[aws] @ git+https://github.com/hrushikesh-s/jobflow-remote.git@cloud-worker-docs\" \"qtoolkit[aws] @ git+https://github.com/hrushikesh-s/qtoolkit.git@aws-batch-api\" && python -c \"$0\"", sys.argv[1]]}))' "$CMD")
        COPY_JOB=$(aws batch submit-job --job-name copy-job-folders --job-queue "$(OUT CpuJobQueueArn)" --job-definition "$(OUT CpuJobDefinitionArn)" --container-overrides "$OVERRIDES" --query jobId --output text)
        STATUS=SUBMITTED
@@ -2041,8 +1822,8 @@ The S3 bucket and its copies of the job folders are kept.
        aws cloudformation delete-stack --stack-name jfr-lab && \
        aws cloudformation wait stack-delete-complete --stack-name jfr-lab
 
-4. On your computer, and on Perlmutter if you used it, remove the profile
-   ``jfr-lab`` from ``~/.aws/credentials`` and ``~/.aws/config``:
+4. On your computer, remove the profile ``jfr-lab`` from ``~/.aws/credentials``
+   and ``~/.aws/config``:
 
    .. code-block:: bash
 

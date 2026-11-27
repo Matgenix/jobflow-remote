@@ -298,7 +298,7 @@ Resources:
   RunnerInstance:
     Type: AWS::EC2::Instance
     Condition: HasRunnerInstance
-    DependsOn: PublicRoute
+    DependsOn: [PublicRoute, Subnet1RouteAssoc]
     Metadata:
       cfn-lint:
         config:
