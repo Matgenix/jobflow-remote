@@ -1013,6 +1013,9 @@ class TestRunnerAndControllerCloudIntegration:
         monkeypatch.setattr(
             "jobflow_remote.cli.project.get_config_manager", lambda: fake_cm
         )
+        monkeypatch.setattr(
+            "jobflow_remote.cli.utils.get_config_manager", lambda: fake_cm
+        )
 
         cli_runner = CliRunner()
         res_qout = cli_runner.invoke(jf_app, ["job", "queue-out", "1"])
@@ -1037,3 +1040,31 @@ class TestRunnerAndControllerCloudIntegration:
 
         res_chk = cli_runner.invoke(jf_app, ["project", "check", "-w", "cloud_w"])
         assert res_chk.exit_code == 0, res_chk.output
+
+        from qtoolkit.core.data_objects import QCloudResources
+
+        fake_jc.set_job_run_properties.return_value = ["1"]
+        res_set_qcr = cli_runner.invoke(
+            jf_app,
+            [
+                "job",
+                "set",
+                "resources",
+                "-qcr",
+                '{"vcpus": 2, "memory": 7000, "time_limit": 43200}',
+                "-did",
+                "1",
+            ],
+        )
+        assert res_set_qcr.exit_code == 0, res_set_qcr.output
+        called_resources = fake_jc.set_job_run_properties.call_args.kwargs["resources"]
+        assert isinstance(called_resources, QCloudResources)
+        assert called_resources.vcpus == 2
+        assert called_resources.memory == 7000
+        assert called_resources.time_limit == 43200
+
+        res_set_both = cli_runner.invoke(
+            jf_app,
+            ["job", "set", "resources", "-qr", "-qcr", '{"memory": 7000}', "-did", "1"],
+        )
+        assert res_set_both.exit_code != 0
