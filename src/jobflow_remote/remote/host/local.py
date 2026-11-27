@@ -145,26 +145,32 @@ class LocalHost(BaseHost):
             The path to the directory tree to be removed.
 
         raise_on_error : bool
-            If set to `False` (default), errors will be ignored, and the method will
-            attempt to continue removing remaining files and directories.
-            Otherwise, any errors encountered during the removal process
-            will raise an exception.
+            In both cases the method continues past the errors, removing all the
+            files and directories that it can. If set to `False` (default), each
+            error emits a warning. Otherwise, a RuntimeError listing the errors
+            is raised at the end.
 
         Returns
         -------
         bool
             True if the directory tree was successfully removed, False otherwise.
         """
-        removed = True
+        errors: list[str] = []
 
         def onerror(func, dir_path, err):
-            nonlocal removed
-            removed = False
-            warnings.warn(f"Error while deleting folder {path}: {err[1]}", stacklevel=2)
+            errors.append(f"{dir_path}: {err[1]}")
+            if not raise_on_error:
+                warnings.warn(
+                    f"Error while deleting folder {path}: {err[1]}", stacklevel=2
+                )
 
-        shutil.rmtree(path, onerror=onerror if not raise_on_error else None)
+        shutil.rmtree(path, onerror=onerror)
 
-        return removed
+        if errors and raise_on_error:
+            raise RuntimeError(
+                f"Error while deleting folder {path}: {'; '.join(errors)}"
+            )
+        return not errors
 
     def shell(self, pre_cmd: str | None = None, shell: str = "bash"):
         """

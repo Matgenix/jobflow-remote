@@ -459,7 +459,7 @@ def test_clean(
         "Deleted execution folders of 1 Jobs",
         "Folder was not deleted for the following jobs:",
         f"- {job_2_2_doc.db_id}",
-        "WARNING  Did not delete folder",
+        f"WARNING  The files of Job {job_2_2_doc.db_id}",
         "jfremote_in.json is missing",
     ]
     excluded_out = ["Proceed anyway"]

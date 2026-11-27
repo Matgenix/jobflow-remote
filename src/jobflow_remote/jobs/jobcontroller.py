@@ -90,7 +90,11 @@ from jobflow_remote.utils.db import (
     pymongo_dump,
     pymongo_restore,
 )
-from jobflow_remote.utils.remote import SharedHosts, safe_remove_job_files
+from jobflow_remote.utils.remote import (
+    SharedHosts,
+    UnsafeDeletionError,
+    safe_remove_job_files,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Generator, Sequence
@@ -238,6 +242,64 @@ def collect_cancel_errors() -> Generator[list[tuple[str, Exception]], None, None
         yield errors
     finally:
         _cancel_errors.reset(token)
+
+
+# The list collecting the Jobs whose files could not be deleted, when a
+# collect_delete_files_errors block is active in the current thread or task.
+_delete_files_errors: ContextVar[
+    list[tuple[str | None, str, str, Exception]] | None
+] = ContextVar("_delete_files_errors", default=None)
+
+
+@contextlib.contextmanager
+def collect_delete_files_errors() -> (
+    Generator[list[tuple[str | None, str, str, Exception]], None, None]
+):
+    """
+    Collect the Jobs whose files on the worker could not be deleted.
+
+    The deletion of the files of the Jobs (e.g. ``delete_flow`` or
+    ``delete_job`` with ``delete_files=True``, or ``safe_delete_files``) is
+    performed on a best-effort basis: a failure only logs a warning, and the
+    other Jobs, as well as the deletion of the documents, go on. Inside this
+    context manager each failure is also appended to the returned list, as a
+    tuple with the db_id of the Job, the name of the worker, the folder that
+    was not deleted and the exception raised, so that the caller can report
+    which files stayed. These are still available after the documents of the
+    Jobs have been deleted.
+
+    A failure is any case where the files stay: the worker cannot be reached
+    (the Jobs of that worker skipped after the first failure get the same
+    exception), a command fails or times out, the folder does not look like
+    the one of a Job (UnsafeDeletionError), or its deletion fails. A folder
+    that does not exist is not a failure.
+
+    The list is specific to the current thread (and asyncio task), so that
+    concurrent callers each get only their own failures. In nested blocks
+    the failures are collected only by the innermost one.
+
+    Returns
+    -------
+    list
+        The list of (db_id, worker, run_dir, exception) of the Jobs whose
+        files could not be deleted, filled while the block runs.
+
+    Examples
+    --------
+    >>> with (
+    ...     collect_cancel_errors() as cancel_errors,
+    ...     collect_delete_files_errors() as files_errors,
+    ... ):
+    ...     job_controller.delete_flow(flow_uuid, delete_files=True)
+    >>> for db_id, worker, run_dir, exc in files_errors:
+    ...     print(f"The files of Job {db_id} in {run_dir} on {worker} stayed: {exc}")
+    """
+    errors: list[tuple[str | None, str, str, Exception]] = []
+    token = _delete_files_errors.set(errors)
+    try:
+        yield errors
+    finally:
+        _delete_files_errors.reset(token)
 
 
 class JobController:
@@ -3434,7 +3496,8 @@ class JobController:
         are still deleted. If the connection to a worker cannot be established,
         the files of all the Jobs on that worker are not deleted, without
         trying to connect again for each of them. The folder of each Job whose
-        files could not be deleted is logged.
+        files could not be deleted is logged and, inside a
+        `collect_delete_files_errors` block, added to its list.
 
         Parameters
         ----------
@@ -3448,8 +3511,11 @@ class JobController:
             The list of JobInfo whose files have been actually deleted.
         """
         deleted = []
-        # the workers whose host could not be connected
-        unreachable_workers: set[str] = set()
+        # the workers whose host could not be connected, with the error
+        unreachable_workers: dict[str, Exception] = {}
+        # the list of an active collect_delete_files_errors block, if any
+        collected_errors = _delete_files_errors.get()
+
         with SharedHosts(self.project) as shared_hosts:
             for job_info in jobs_info:
                 if isinstance(job_info, JobInfo):
@@ -3468,30 +3534,41 @@ class JobController:
                         f"The files of {job_desc} in {run_dir} were not deleted: "
                         f"the worker '{worker}' could not be reached."
                     )
+                    if collected_errors is not None:
+                        collected_errors.append(
+                            (db_id, worker, run_dir, unreachable_workers[worker])
+                        )
                     continue
                 try:
                     host = shared_hosts.get_host(worker)
                 except Exception as exc:
                     # the message of the connection error is explicit enough:
                     # do not log the traceback
-                    unreachable_workers.add(worker)
+                    unreachable_workers[worker] = exc
                     logger.warning(
                         f"The files of {job_desc} in {run_dir} were not deleted: "
                         f"{exc}. The files of the other Jobs on the worker "
                         f"'{worker}' will not be deleted either."
                     )
+                    if collected_errors is not None:
+                        collected_errors.append((db_id, worker, run_dir, exc))
                     continue
                 try:
+                    # raise on error, so that every failure has its exception.
+                    # A folder that does not exist only returns False.
                     if safe_remove_job_files(
-                        host=host, run_dir=run_dir, raise_on_error=False
+                        host=host, run_dir=run_dir, raise_on_error=True
                     ):
                         deleted.append(job_info)
-                except Exception:
+                except Exception as exc:
+                    # the reason of an UnsafeDeletionError is in its message
                     logger.warning(
                         f"The files of {job_desc} in {run_dir} on the worker "
-                        f"'{worker}' were not deleted.",
-                        exc_info=True,
+                        f"'{worker}' were not deleted: {exc}",
+                        exc_info=not isinstance(exc, UnsafeDeletionError),
                     )
+                    if collected_errors is not None:
+                        collected_errors.append((db_id, worker, run_dir, exc))
         return deleted
 
     def unlock_flows(

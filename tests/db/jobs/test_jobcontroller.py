@@ -2264,12 +2264,14 @@ def test_delete_flow_unreachable_worker(
     """
     A worker that cannot be reached does not stop the deletion of the Flow:
     the Flow, its Jobs and their outputs are deleted, the files are not, and
-    their folders are logged.
+    their folders are logged and collected.
     """
     from jobflow import Flow
 
     from jobflow_remote import submit_flow
+    from jobflow_remote.jobs.jobcontroller import collect_delete_files_errors
     from jobflow_remote.jobs.state import JobState
+    from jobflow_remote.remote.host.base import HostConnectionError
     from jobflow_remote.remote.host.local import LocalHost
     from jobflow_remote.testing import add
 
@@ -2292,7 +2294,10 @@ def test_delete_flow_unreachable_worker(
 
     monkeypatch.setattr(LocalHost, "connect", unreachable_connect)
 
-    assert job_controller.delete_flow(flow.uuid, delete_output=True, delete_files=True)
+    with collect_delete_files_errors() as files_errors:
+        assert job_controller.delete_flow(
+            flow.uuid, delete_output=True, delete_files=True
+        )
 
     # the documents and the outputs are deleted
     assert job_controller.count_flows(flow_ids=[flow.uuid]) == 0
@@ -2313,25 +2318,43 @@ def test_delete_flow_unreachable_worker(
             caplog.text
         )
 
+    # and collected, also the Job skipped after the first failure, with the
+    # same connection error
+    assert sorted(entry[:3] for entry in files_errors) == sorted(
+        (ji.db_id, "test_local_worker", ji.run_dir) for ji in jobs_info
+    )
+    exc = files_errors[0][3]
+    assert isinstance(exc, HostConnectionError)
+    assert exc.worker == "test_local_worker"
+    assert all(entry[3] is exc for entry in files_errors)
 
-def test_safe_delete_files_error_on_one_job(
-    job_controller, runner, caplog, monkeypatch
-) -> None:
-    """An error while deleting the files of a Job does not stop the others."""
+
+def test_safe_delete_files_errors(job_controller, runner, caplog, monkeypatch) -> None:
+    """
+    An error while deleting the files of a Job does not stop the others, and
+    each Job whose files stay is collected with its error.
+    """
     from jobflow import Flow
 
     from jobflow_remote import submit_flow
+    from jobflow_remote.jobs.jobcontroller import collect_delete_files_errors
     from jobflow_remote.remote.host.local import LocalHost
     from jobflow_remote.testing import add
+    from jobflow_remote.utils.remote import UnsafeDeletionError
 
     j1 = add(1, 2)
     j2 = add(j1.output, 4)
-    flow = Flow([j1, j2])
+    j3 = add(j2.output, 5)
+    flow = Flow([j1, j2, j3])
     submit_flow(flow, worker="test_local_worker")
     runner.run_all_jobs(max_seconds=20)
 
     j1_info = job_controller.get_job_info(job_id=j1.uuid, job_index=j1.index)
     j2_info = job_controller.get_job_info(job_id=j2.uuid, job_index=j2.index)
+    j3_info = job_controller.get_job_info(job_id=j3.uuid, job_index=j3.index)
+
+    # a folder that may not be the one of a Job is not deleted
+    os.unlink(os.path.join(j3_info.run_dir, "jfremote_in.json"))
 
     # emulate a file system that does not answer in time for the first Job only
     orig_listdir = LocalHost.listdir
@@ -2343,16 +2366,25 @@ def test_safe_delete_files_error_on_one_job(
 
     monkeypatch.setattr(LocalHost, "listdir", slow_listdir)
 
-    deleted = job_controller.safe_delete_files([j1_info, j2_info])
+    with collect_delete_files_errors() as files_errors:
+        deleted = job_controller.safe_delete_files([j1_info, j2_info, j3_info])
 
     assert [ji.db_id for ji in deleted] == [j2_info.db_id]
     assert os.path.isdir(j1_info.run_dir)
     assert not os.path.isdir(j2_info.run_dir)
+    assert os.path.isdir(j3_info.run_dir)
     assert (
         f"The files of Job {j1_info.db_id} in {j1_info.run_dir} on the worker "
         "'test_local_worker' were not deleted"
     ) in caplog.text
     assert "the command did not complete in time" in caplog.text
+
+    assert [entry[:3] for entry in files_errors] == [
+        (j1_info.db_id, "test_local_worker", j1_info.run_dir),
+        (j3_info.db_id, "test_local_worker", j3_info.run_dir),
+    ]
+    assert isinstance(files_errors[0][3], TimeoutError)
+    assert isinstance(files_errors[1][3], UnsafeDeletionError)
 
 
 def test_complete_onmissing_none(job_controller, runner):
