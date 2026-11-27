@@ -8,7 +8,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from monty.json import MontyDecoder
+
 from jobflow_remote.config.base import (
+    CloudWorker,
     ExecutionConfig,
     LocalWorker,
     Project,
@@ -181,6 +184,29 @@ def check_worker(
     worker: WorkerBase, full_check: bool = False
 ) -> tuple[str | None, str | None]:
     """Check that a connection to the configured worker can be made."""
+    if isinstance(worker, CloudWorker):
+        storage = None
+        try:
+            storage = worker.get_storage()
+            storage_error = storage.test()
+            if storage_error:
+                return storage_error, None
+            scheduler_io = worker.get_scheduler_io()
+            if worker.resources:
+                res = MontyDecoder().process_decoded(worker.resources)
+                if not isinstance(res, dict):
+                    scheduler_io.check_convert_qresources(res)
+            queue = getattr(scheduler_io, "job_queue", None)
+            if queue:
+                scheduler_io.get_jobs_list(queue=queue)
+        except Exception:
+            exc = traceback.format_exc()
+            return f"Error while testing cloud worker:\n {exc}", None
+        finally:
+            if storage is not None:
+                storage.close()
+        return None, None
+
     host = worker.get_host()
     worker_warn = None
     try:

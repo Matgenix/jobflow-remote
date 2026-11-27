@@ -24,10 +24,15 @@ from monty.json import MontyDecoder
 from monty.serialization import loadfn
 from packaging.version import Version
 from packaging.version import parse as parse_version
-from qtoolkit.core.data_objects import CancelStatus, QResources
+from qtoolkit.core.data_objects import CancelStatus
 
 import jobflow_remote
-from jobflow_remote.config.base import ConfigError, ExecutionConfig, Project
+from jobflow_remote.config.base import (
+    CloudWorker,
+    ConfigError,
+    ExecutionConfig,
+    Project,
+)
 from jobflow_remote.config.manager import ConfigManager
 from jobflow_remote.jobs.batch import RemoteBatchManager
 from jobflow_remote.jobs.data import (
@@ -40,6 +45,7 @@ from jobflow_remote.jobs.data import (
     JobDoc,
     JobInfo,
     RemoteError,
+    ResourcesType,
     get_initial_batch_doc_dict,
     get_initial_flow_doc_dict,
     get_initial_job_doc_dict,
@@ -56,6 +62,7 @@ from jobflow_remote.jobs.state import (
     FlowState,
     JobState,
 )
+from jobflow_remote.remote.cloud_queue import CloudQueueManager
 from jobflow_remote.remote.data import (
     get_local_data_path,
     get_remote_store,
@@ -2365,7 +2372,7 @@ class JobController:
         self,
         worker: str | None = None,
         exec_config: str | ExecutionConfig | dict | None = None,
-        resources: dict | QResources | None = None,
+        resources: ResourcesType = None,
         priority: int | None = None,
         update: bool = True,
         job_ids: tuple[str, int] | list[tuple[str, int]] | None = None,
@@ -2392,7 +2399,7 @@ class JobController:
             The name of the exec_config to set or an explicit value of
             ExecutionConfig or dict.
         resources
-            The resources to be set, either as a dict or a QResources instance.
+            The resources to be set, as a dict, QResources, or QCloudResources instance.
         priority
             The priority of the Job.
         update
@@ -2481,7 +2488,7 @@ class JobController:
                 set_dict["exec_config"] = exec_config
 
         if resources:
-            if isinstance(resources, QResources):
+            if not isinstance(resources, dict):
                 resources = resources.as_dict()
                 # if passing a QResources it is pointless to update
                 # all the keywords will be overwritten and if the previous
@@ -3020,9 +3027,9 @@ class JobController:
                     run_dir = job_info["run_dir"]
                     worker = job_info["worker"]
                 if run_dir:
-                    host = shared_hosts.get_host(worker)
+                    backend = shared_hosts.get_transfer_backend(worker)
                     if safe_remove_job_files(
-                        host=host, run_dir=run_dir, raise_on_error=False
+                        host=backend, run_dir=run_dir, raise_on_error=False
                     ):
                         deleted.append(job_info)
         return deleted
@@ -3749,7 +3756,7 @@ class JobController:
         worker: str,
         allow_external_references: bool = False,
         exec_config: ExecutionConfig | None = None,
-        resources: dict | QResources | None = None,
+        resources: ResourcesType = None,
         priority: int = 0,
         jobstore: str | None = None,
     ) -> list[str]:
@@ -3824,7 +3831,7 @@ class JobController:
         worker: str,
         response_type: DynamicResponseType,
         exec_config: ExecutionConfig | None = None,
-        resources: QResources | None = None,
+        resources: ResourcesType = None,
         priority: int = 0,
         stopped: bool = False,
     ) -> None:
@@ -4958,17 +4965,21 @@ class JobController:
         queue_process_id = job_doc["remote"]["process_id"]
         if not queue_process_id:
             raise ValueError("The process id is not defined in the job document")
-        with SharedHosts(self.project) as shared_hosts:
-            worker = self.project.workers[job_doc["worker"]]
-            host = shared_hosts.get_host(job_doc["worker"])
+        worker = self.project.workers[job_doc["worker"]]
+        if isinstance(worker, CloudWorker):
+            cloud_queue_manager = CloudQueueManager(worker.get_scheduler_io())
+            cancel_result = cloud_queue_manager.cancel(queue_process_id)
+        else:
+            with SharedHosts(self.project) as shared_hosts:
+                host = shared_hosts.get_host(job_doc["worker"])
+                queue_manager = QueueManager(worker.get_scheduler_io(), host)
+                cancel_result = queue_manager.cancel(queue_process_id)
 
-            queue_manager = QueueManager(worker.get_scheduler_io(), host)
-            cancel_result = queue_manager.cancel(queue_process_id)
-            if cancel_result.status != CancelStatus.SUCCESSFUL:
-                raise RuntimeError(
-                    f"Cancelling queue process {queue_process_id} failed. "
-                    f"stdout: {cancel_result.stdout}. stderr: {cancel_result.stderr}"
-                )
+        if cancel_result.status != CancelStatus.SUCCESSFUL:
+            raise RuntimeError(
+                f"Cancelling queue process {queue_process_id} failed. "
+                f"stdout: {cancel_result.stdout}. stderr: {cancel_result.stderr}"
+            )
 
     @staticmethod
     def _build_query_batch(

@@ -10,6 +10,7 @@ if TYPE_CHECKING:
 
     from jobflow_remote.config.base import Project
     from jobflow_remote.remote.host.base import BaseHost
+    from jobflow_remote.remote.storage.base import BaseCloudStorage
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +40,7 @@ class SharedHosts:
 
     _instance: SharedHosts = None
     _ref_count: int = 0
-    _hosts: ClassVar[dict[str, BaseHost]] = {}
+    _hosts: ClassVar[dict[str, BaseHost | BaseCloudStorage]] = {}
     _project: Project | None = None
 
     def __new__(cls, *args, **kwargs):
@@ -97,8 +98,20 @@ class SharedHosts:
         self._hosts[worker] = host
         return host
 
+    def get_transfer_backend(self, worker: str) -> BaseHost | BaseCloudStorage:
+        """Return the shared host or cloud storage of ``worker``, connecting it if needed."""
+        if worker not in self._project.workers:
+            raise ValueError(f"Worker {worker} not defined in {self._project.name}")
+        if not self._project.workers[worker].is_cloud:
+            return self.get_host(worker)
+        if worker not in self._hosts:
+            storage = self._project.workers[worker].get_transfer_backend()
+            storage.connect()
+            self._hosts[worker] = storage
+        return self._hosts[worker]
+
     def close_hosts(self) -> None:
-        """Close the connection to all the connected hosts"""
+        """Close the connection to all the shared hosts and cloud storages."""
         for worker in list(self._hosts):
             try:
                 self._hosts[worker].close()
@@ -134,7 +147,9 @@ class UnsafeDeletionError(Exception):
 
 
 def safe_remove_job_files(
-    host: BaseHost, run_dir: str | Path | None, raise_on_error: bool = False
+    host: BaseHost | BaseCloudStorage,
+    run_dir: str | Path | None,
+    raise_on_error: bool = False,
 ) -> bool:
     if not run_dir:
         return False

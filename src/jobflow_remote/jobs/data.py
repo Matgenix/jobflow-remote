@@ -2,11 +2,11 @@ from collections import defaultdict
 from datetime import datetime, timezone
 from enum import Enum
 from functools import cached_property
-from typing import Any
+from typing import TYPE_CHECKING, Any, TypeAlias
 
 from jobflow import Flow, Job
-from monty.json import jsanitize
-from pydantic import BaseModel, Field, field_validator
+from monty.json import MontyDecoder, jsanitize
+from pydantic import BaseModel, Field, TypeAdapter, field_validator
 from qtoolkit.core.data_objects import QResources, QState
 
 from jobflow_remote.config.base import ExecutionConfig
@@ -16,6 +16,20 @@ from jobflow_remote.jobs.state import (
     FlowState,
     JobState,
 )
+
+if TYPE_CHECKING:
+    from qtoolkit.core.data_objects import BaseQResources, QCloudResources
+
+    ResourcesType: TypeAlias = QResources | QCloudResources | dict | None
+else:
+    try:
+        from qtoolkit.core.data_objects import BaseQResources, QCloudResources
+
+        ResourcesType = QResources | QCloudResources | dict | None
+    except ImportError:  # pragma: no cover - older qtoolkit releases
+        BaseQResources = QResources
+        ResourcesType = QResources | dict | None
+
 
 IN_FILENAME = "jfremote_in.json"
 OUT_FILENAME = "jfremote_out.json"
@@ -28,7 +42,7 @@ def get_initial_job_doc_dict(
     db_id: str,
     worker: str,
     exec_config: ExecutionConfig | None,
-    resources: dict | QResources | None,
+    resources: ResourcesType,
     priority: int,
 ) -> dict:
     """
@@ -325,7 +339,7 @@ class JobDoc(BaseModel):
     updated_on: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     priority: int = 0
     exec_config: ExecutionConfig | str | None = None
-    resources: QResources | dict | None = None
+    resources: ResourcesType = None
 
     stored_data: dict | None = None
 
@@ -351,9 +365,24 @@ class JobDoc(BaseModel):
         )
         d["job"] = jsanitize(job, strict=True, allow_bson=True)
         # required since the resources are not serialized otherwise
-        if isinstance(self.resources, QResources):
+        if isinstance(self.resources, BaseQResources):
             d["resources"] = self.resources.as_dict()
         return d
+
+    @field_validator("resources", mode="wrap")
+    @classmethod
+    def resources_validator(cls, value: Any, handler: Any) -> Any:
+        # Decode serialized resources objects. Other dicts become QResources if
+        # they match its fields, otherwise they stay dicts.
+        if value is None or isinstance(value, BaseQResources):
+            return value
+        if isinstance(value, dict):
+            if "@class" in value:
+                decoded = MontyDecoder().process_decoded(value)
+                if isinstance(decoded, BaseQResources):
+                    return decoded
+            return TypeAdapter(QResources | dict).validate_python(value)
+        return handler(value)
 
     @field_validator("state", mode="before")
     @classmethod

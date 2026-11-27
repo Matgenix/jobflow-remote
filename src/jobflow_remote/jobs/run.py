@@ -10,6 +10,7 @@ import time
 import traceback
 from datetime import timezone
 from multiprocessing import Manager, Process
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from jobflow import JobStore, initialize_logger
@@ -27,11 +28,10 @@ from jobflow_remote.jobs.data import (
     JobDoc,
 )
 from jobflow_remote.remote.data import get_job_path, get_store_file_paths
+from jobflow_remote.remote.storage import cloud_storage_mapping
 from jobflow_remote.utils.log import initialize_remote_run_log
 
 if TYPE_CHECKING:
-    from pathlib import Path
-
     from jobflow.core.job import Job
 
 logger = logging.getLogger(__name__)
@@ -124,6 +124,88 @@ def run_remote_job(run_dir: str | Path = ".") -> None:
             dumpfn(output, OUT_FILENAME)
         finally:
             JfrState().reset()
+
+
+# Files that the Runner downloads after the job. They are uploaded first.
+_JFR_OUTPUT_PATTERNS = (
+    f"{OUT_FILENAME}*",
+    "remote_job_data.*",
+    "additional_store_*",
+)
+
+
+def _move_previous_attempt(run_dir: Path) -> None:
+    """Move the files of an earlier attempt into ``previous_attempt_<n>``.
+
+    An earlier attempt left files in the folder if the cloud scheduler retried the job or
+    the job was rerun. They are kept for debugging.
+    """
+    old_files = [
+        path
+        for path in run_dir.iterdir()
+        if not path.name.startswith("previous_attempt_")
+    ]
+    if not old_files:
+        return
+    numbers = [
+        int(path.name.removeprefix("previous_attempt_"))
+        for path in run_dir.glob("previous_attempt_*")
+        if path.name.removeprefix("previous_attempt_").isdigit()
+    ]
+    previous_dir = run_dir / f"previous_attempt_{max(numbers, default=0) + 1}"
+    previous_dir.mkdir()
+    for path in old_files:
+        path.rename(previous_dir / path.name)
+
+
+def run_cloud_job(
+    storage_uri: str,
+    local_dir: str | Path,
+    storage_options: dict | None = None,
+) -> None:
+    """Download the input of a job from cloud storage, run the job, and upload the folder.
+
+    The job runs in ``local_dir/<key>``, where ``<key>`` is the key of the job
+    folder in the storage. The folder is kept after the job, so later jobs can
+    read it if ``local_dir`` is on a file system shared by all containers.
+    ``storage_options`` are passed to the storage class.
+    """
+    scheme = storage_uri.split("://", 1)[0]
+    if scheme not in cloud_storage_mapping:
+        raise ValueError(f"Unknown storage scheme '{scheme}' in URI '{storage_uri}'.")
+    storage, key = cloud_storage_mapping[scheme].from_uri(
+        storage_uri, **(storage_options or {})
+    )
+    if not key:
+        raise ValueError(f"The URI '{storage_uri}' has no job folder.")
+
+    run_dir = Path(local_dir) / key
+    run_dir.mkdir(parents=True, exist_ok=True)
+    _move_previous_attempt(run_dir)
+    # The Runner uploads only the input file. Other files in the storage are
+    # from an earlier attempt and are not needed.
+    storage.get(f"{key}/{IN_FILENAME}", run_dir / IN_FILENAME)
+
+    # Upload an output file with only the start time before the job runs.
+    # If the container is killed (time limit, out of memory, Spot reclaim),
+    # the upload in ``finally`` never happens. The Runner then still finds
+    # this file and marks the job as FAILED, as it does for HPC workers.
+    out_file = run_dir / OUT_FILENAME
+    dumpfn({"start_time": datetime.datetime.now(timezone.utc)}, out_file)
+    storage.put(out_file, f"{key}/{OUT_FILENAME}")
+
+    try:
+        run_remote_job(run_dir)
+    finally:
+        # Upload the outputs first, so the Runner gets them even if the
+        # upload of another file fails.
+        uploaded: set[str] = set()
+        for pattern in _JFR_OUTPUT_PATTERNS:
+            for output in run_dir.glob(pattern):
+                if output.is_file():
+                    storage.put(output, f"{key}/{output.name}")
+                    uploaded.add(output.name)
+        storage.upload_dir(run_dir, key, skip_files=uploaded)
 
 
 def ping(start_time, interval=600, filename=BATCH_INFO_FILENAME):

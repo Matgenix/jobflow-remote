@@ -270,7 +270,10 @@ def check(
         for worker_name in workers_to_test:
             progress.update(task_id, description=f"Checking worker {worker_name}")
             worker_to_test = project.workers[worker_name]
-            if worker_to_test.get_host().interactive_login:
+            if (
+                not worker_to_test.is_cloud
+                and worker_to_test.get_host().interactive_login
+            ):
                 with hide_progress(progress):
                     err, worker_warn = check_worker(worker_to_test, full_check=full)
             else:
